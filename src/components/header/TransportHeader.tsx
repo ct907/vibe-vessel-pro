@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Play, Square, Minus, Plus, Save, Upload, BookOpen } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ALL_ROOTS } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";

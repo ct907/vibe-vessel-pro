@@ -20,8 +20,6 @@ interface LineRowProps {
   onAddLineAfter: () => void;
   onRemoveLine: () => void;
   onPickerOpen: (lineId: string, offset: number, anchorId?: string) => void;
-  basketDrop?: { chord: ChordSymbol } | null;
-  onBasketConsumed?: () => void;
 }
 
 function LineRow({ line, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
@@ -157,7 +155,7 @@ function LineRow({ line, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowPr
 }
 
 export function LyricsTab() {
-  const { lyrics, addLine, removeLine, upsertChordAt, removeChordAnchor, basket, addToBasket, clearBasket } = useSongStore();
+  const { lyrics, addLine, removeLine, upsertChordAt, removeChordAnchor, basket, clearBasket } = useSongStore();
   const [picker, setPicker] = useState<{ lineId: string; offset: number; anchorId?: string } | null>(null);
 
   const openPicker = (lineId: string, offset: number, anchorId?: string) =>
@@ -179,7 +177,7 @@ export function LyricsTab() {
   return (
     <div className="paper-card paper-ruled paper-margin rounded-xl px-10 py-6 min-h-[60vh]">
       <div className="space-y-1">
-        {lyrics.map((line, i) => (
+        {lyrics.map((line) => (
           <LineRow
             key={line.id}
             line={line}

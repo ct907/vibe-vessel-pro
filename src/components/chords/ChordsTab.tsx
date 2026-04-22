@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import {
   ChordSymbol,
-  COMMON_QUALITIES,
   Quality,
   nashvilleLadder,
   parseChord,

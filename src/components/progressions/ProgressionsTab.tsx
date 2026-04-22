@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { useSongStore, type PatternBlock as PatternBlockType, type PatternChord } from "@/store/song";
+import { useSongStore, type PatternBlock as PatternBlockType } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
