@@ -25,12 +25,13 @@ function measureOffsetX(measureEl: HTMLSpanElement, text: string, offset: number
 interface LineRowProps {
   sectionId: string;
   line: LyricLine;
+  active?: boolean;
   onAddLineAfter: () => void;
   onRemoveLine: () => void;
   onPickerOpen: (lineId: string, offset: number, anchorId?: string) => void;
 }
 
-function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
+function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
   const { setLineText, upsertChordAt, removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors } = useSongStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
