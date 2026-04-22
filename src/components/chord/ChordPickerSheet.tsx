@@ -158,6 +158,18 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
+            <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+              <SelectTrigger className="h-10 w-[64px] px-2 text-xs font-mono-chord" aria-label="Audition octave">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OCTAVE_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={String(o)} className="text-xs font-mono-chord">
+                    Oct {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {!query.trim() && (
