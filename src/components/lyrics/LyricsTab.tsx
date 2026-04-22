@@ -164,6 +164,10 @@ function LineRow({
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (selectMode) return;
     const k = e.key;
+    // Picker is "live" when this row is active and the parent passed query handlers.
+    const pickerLive = !!(active && onChordRowQueryChange);
+    const liveQuery = chordRowQuery ?? "";
+
     if (k === "ArrowUp" || k === "ArrowDown") {
       // Shortcut: if the picker sheet is open, toggle focus to its input.
       const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
@@ -173,6 +177,30 @@ function LineRow({
         return;
       }
     }
+    // While the picker is open, treat letter/digit/chord-symbol keys as edits
+    // to the shared chord query (mirrored in the picker input).
+    if (pickerLive && k.length === 1 && /[A-Za-z0-9#b/+°Δø]/.test(k)) {
+      e.preventDefault();
+      onChordRowQueryChange!(liveQuery + k);
+      return;
+    }
+    if (pickerLive && k === "Backspace" && liveQuery.length > 0) {
+      e.preventDefault();
+      onChordRowQueryChange!(liveQuery.slice(0, -1));
+      return;
+    }
+    if (pickerLive && k === "Enter" && liveQuery.trim()) {
+      // Let the picker's own Enter handler commit; forward focus to it.
+      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
+      if (pickerInput) {
+        e.preventDefault();
+        pickerInput.focus();
+        // Synthesize an Enter on the picker input.
+        pickerInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        return;
+      }
+    }
+
     if (k === " " || k === "Spacebar") {
       e.preventDefault();
       insertChordSpaceAt(sectionId, line.id, chordCaret);
@@ -213,7 +241,9 @@ function LineRow({
         }, 10);
       }
     } else if (k.length === 1 && /[A-Za-z]/.test(k)) {
+      // Picker is not yet open — open it and seed the query with this letter.
       e.preventDefault();
+      onChordRowQueryChange?.(k);
       onPickerOpen(line.id, chordCaret);
     }
   };
