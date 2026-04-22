@@ -6,8 +6,10 @@ import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/cho
 
 export interface ChordAnchor {
   id: string;
-  /** character offset within the lyric line (0..text.length) */
+  /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
+  /** New: column position in the chord row (in monospace cells). Independent from lyric text. */
+  chordCol?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
@@ -17,6 +19,8 @@ export interface LyricLine {
   id: string;
   text: string;
   chords: ChordAnchor[];
+  /** Number of cursor cells in the chord row (>= max chord col + 1). */
+  chordRowLen?: number;
 }
 
 export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
@@ -27,6 +31,8 @@ export interface Section {
   type: SectionType;
   collapsed: boolean;
   lines: LyricLine[];
+  /** Optional notes/comment for this section. */
+  comment?: string;
 }
 
 export interface PatternChord {
