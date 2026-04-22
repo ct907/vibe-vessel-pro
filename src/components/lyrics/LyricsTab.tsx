@@ -205,6 +205,9 @@ function LineRow({
   const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (selectMode) return;
     if (areaStartRef.current) return; // a drag just ended — skip caret
+    // Interacting with a chord row in lyrics clears any pattern-block focus
+    // so global play resumes from the start of the progression.
+    setFocusedPattern(null);
     const rect = chordRowRef.current!.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
