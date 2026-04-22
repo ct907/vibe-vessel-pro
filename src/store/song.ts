@@ -210,6 +210,27 @@ function nextFreeBeat(pattern: PatternBlock): number {
 }
 
 /**
+ * Repack chords left-aligned by current sort order; each chord starts at the
+ * previous chord's end. Returns a new chords array with adjusted startBeats and
+ * lengths clamped so the total never exceeds totalBeats. The chord whose length
+ * pushes past the cap gets its length clamped (it doesn't bump siblings off).
+ */
+function repackChords(chords: PatternChord[], totalBeats: number): PatternChord[] {
+  const sorted = [...chords].sort((a, b) => a.startBeat - b.startBeat);
+  let cursor = 0;
+  const out: PatternChord[] = [];
+  for (const c of sorted) {
+    if (cursor >= totalBeats) break; // no more room — drop overflow (shouldn't happen normally)
+    const minLen = 0.5;
+    const maxLen = totalBeats - cursor;
+    const len = Math.max(minLen, Math.min(c.lengthBeats, maxLen));
+    out.push({ ...c, startBeat: cursor, lengthBeats: len });
+    cursor += len;
+  }
+  return out;
+}
+
+/**
  * Place a new chord into a pattern with default 2-beat length, expanding bars
  * (or creating a new mirror pattern would be too disruptive — we just expand
  * bars on the bound block, capped at 32).
