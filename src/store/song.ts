@@ -96,6 +96,11 @@ export interface SongState {
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
   shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
+  /** Move selected chords by one slot in chord-list order, ignoring spaces.
+   *  direction = +1: snap each selected chord to just after its right neighbor (after that neighbor's last trailing space).
+   *  direction = -1: snap each selected chord to just before its left neighbor (before that neighbor's leading space).
+   */
+  moveSelectedChordsByOrder: (sectionId: string, lineId: string, anchorIds: string[], direction: -1 | 1) => void;
   /** Move a single chord anchor to another (section,line,col). Mirror link is detached. */
   moveChordAnchor: (
     fromSectionId: string, fromLineId: string, anchorId: string,
@@ -614,6 +619,65 @@ export const useSongStore = create<SongState>((set, get) => ({
     };
   }),
 
+  moveSelectedChordsByOrder: (sectionId, lineId, anchorIds, direction) => set((s) => {
+    const idSet = new Set(anchorIds);
+    return {
+      sections: s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const sorted = [...l.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            // Process in order so neighbor lookups stay consistent.
+            // For direction=+1, iterate right-to-left so we don't double-jump.
+            const order = direction === 1 ? [...sorted].reverse() : sorted;
+            const work = sorted.map((c) => ({ ...c }));
+            for (const sel of order) {
+              if (!idSet.has(sel.id)) continue;
+              const idx = work.findIndex((c) => c.id === sel.id);
+              if (idx < 0) continue;
+              const cur = work[idx];
+              const curCol = cur.chordCol ?? cur.offset ?? 0;
+              const curWidth = Math.max(1, cur.chord.display.length);
+              if (direction === 1) {
+                // Find first non-selected neighbor to the right.
+                const right = work.slice(idx + 1).find((c) => !idSet.has(c.id));
+                if (!right) continue;
+                const rCol = right.chordCol ?? right.offset ?? 0;
+                const rWidth = Math.max(1, right.chord.display.length);
+                // Place selected just after right neighbor's chip + 1 trailing space.
+                const newCol = rCol + rWidth + 1;
+                // Shift the right neighbor leftward into the slot vacated.
+                const shift = newCol - rCol; // positive = right shift; we want to swap positions.
+                // Compute new positions: right neighbor moves to curCol; selected moves after right neighbor's new end.
+                const rightNewCol = curCol;
+                const selNewCol = rightNewCol + rWidth + 1;
+                work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
+                const rIdx = work.findIndex((c) => c.id === right.id);
+                work[rIdx] = { ...right, chordCol: rightNewCol, offset: rightNewCol };
+              } else {
+                const left = [...work.slice(0, idx)].reverse().find((c) => !idSet.has(c.id));
+                if (!left) continue;
+                const lCol = left.chordCol ?? left.offset ?? 0;
+                const lWidth = Math.max(1, left.chord.display.length);
+                // Swap: selected takes left's old col; left moves to selected's old col.
+                const selNewCol = lCol;
+                const leftNewCol = lCol + curWidth + 1;
+                work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
+                const lIdx = work.findIndex((c) => c.id === left.id);
+                work[lIdx] = { ...left, chordCol: leftNewCol, offset: leftNewCol };
+              }
+              work.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            }
+            const maxEnd = work.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), 0);
+            return { ...l, chords: work, chordRowLen: Math.max(l.chordRowLen ?? 0, maxEnd) };
+          }),
+        };
+      }),
+    };
+  }),
+
   moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => set((s) => {
     // Find the anchor first
     let moved: ChordAnchor | undefined;
@@ -629,17 +693,34 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (!moved) return s;
     const movedChord = moved.chord;
 
-    // Same row: just shift this anchor's column.
+    // The dropped chord visually occupies its display width; reserve that
+    // many cells plus 4ch of breathing room so chips don't overlap when
+    // re-arranged via drag.
+    const reservedWidth = Math.max(1, movedChord.display.length) + 4;
+
+    // Same row: shift this anchor's column, pushing colliding chords aside.
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
       return {
         sections: s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
           ...sec,
           lines: sec.lines.map((l) => {
             if (l.id !== fromLineId) return l;
-            const chords = l.chords.map((c) => c.id === anchorId
-              ? { ...c, chordCol: toCol, offset: toCol }
-              : c).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = toCol + Math.max(1, movedChord.display.length) + 1;
+            // Compute push needed for any non-moved chord that overlaps the
+            // [toCol, toCol+reservedWidth) zone.
+            const others = l.chords.filter((c) => c.id !== anchorId);
+            const collision = others.find((c) => {
+              const cc = c.chordCol ?? c.offset ?? 0;
+              const cEnd = cc + Math.max(1, c.chord.display.length);
+              return cc < toCol + reservedWidth && cEnd > toCol;
+            });
+            const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
+            const chords = l.chords.map((c) => {
+              if (c.id === anchorId) return { ...c, chordCol: toCol, offset: toCol };
+              const cc = c.chordCol ?? c.offset ?? 0;
+              if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
+              return c;
+            }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), toCol + reservedWidth);
             return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
           }),
         }),
@@ -662,10 +743,21 @@ export const useSongStore = create<SongState>((set, get) => ({
           ...sec,
           lines: sec.lines.map((l) => {
             if (l.id !== toLineId) return l;
+            // Push existing chords that overlap the reserved zone aside.
+            const collision = l.chords.find((c) => {
+              const cc = c.chordCol ?? c.offset ?? 0;
+              const cEnd = cc + Math.max(1, c.chord.display.length);
+              return cc < toCol + reservedWidth && cEnd > toCol;
+            });
+            const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
             const newAnchor: ChordAnchor = { id: nanoid(), offset: toCol, chordCol: toCol, chord: movedChord };
-            const chords = [...l.chords.filter((c) => (c.chordCol ?? c.offset ?? 0) !== toCol), newAnchor]
-              .sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = toCol + Math.max(1, movedChord.display.length) + 1;
+            const shifted = l.chords.map((c) => {
+              const cc = c.chordCol ?? c.offset ?? 0;
+              if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
+              return c;
+            });
+            const chords = [...shifted, newAnchor].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), toCol + reservedWidth);
             return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
           }),
         };

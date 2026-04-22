@@ -46,15 +46,18 @@ interface LineRowProps {
   /** Drag a chord chip from this row onto another row */
   onChordDragStart: (anchorId: string) => void;
   onChordDrop: (toLineId: string, toCol: number) => void;
+  /** Live query from the chord picker (only meaningful when active). */
+  chordRowQuery?: string;
+  onChordRowQueryChange?: (q: string) => void;
 }
 
 function LineRow({
   sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
-  onChordDragStart, onChordDrop,
+  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange,
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
-    removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors,
+    removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
   } = useSongStore();
   const lyricInputRef = useRef<HTMLInputElement>(null);
@@ -117,6 +120,27 @@ function LineRow({
     if (selectMode && line.chords.length === 0) { setSelectMode(false); setSelected(new Set()); }
   }, [line.chords.length, selectMode]);
 
+  // Auto-exit select mode when the user has deselected the last chord.
+  useEffect(() => {
+    if (selectMode && selected.size === 0) setSelectMode(false);
+  }, [selected, selectMode]);
+
+  // Outside-tap closes the chord-row context menu (select mode).
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (rowRef.current && rowRef.current.contains(t)) return;
+      // Allow interactions with the picker sheet too (so users can switch).
+      if (t.closest("[data-radix-dialog-content]")) return;
+      setSelectMode(false);
+      setSelected(new Set());
+    };
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
+  }, [selectMode]);
+
   // ---------- Chord row interactions ----------
   const focusChord = () => {
     chordRowRef.current?.focus();
@@ -140,6 +164,10 @@ function LineRow({
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (selectMode) return;
     const k = e.key;
+    // Picker is "live" when this row is active and the parent passed query handlers.
+    const pickerLive = !!(active && onChordRowQueryChange);
+    const liveQuery = chordRowQuery ?? "";
+
     if (k === "ArrowUp" || k === "ArrowDown") {
       // Shortcut: if the picker sheet is open, toggle focus to its input.
       const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
@@ -149,6 +177,30 @@ function LineRow({
         return;
       }
     }
+    // While the picker is open, treat letter/digit/chord-symbol keys as edits
+    // to the shared chord query (mirrored in the picker input).
+    if (pickerLive && k.length === 1 && /[A-Za-z0-9#b/+°Δø]/.test(k)) {
+      e.preventDefault();
+      onChordRowQueryChange!(liveQuery + k);
+      return;
+    }
+    if (pickerLive && k === "Backspace" && liveQuery.length > 0) {
+      e.preventDefault();
+      onChordRowQueryChange!(liveQuery.slice(0, -1));
+      return;
+    }
+    if (pickerLive && k === "Enter" && liveQuery.trim()) {
+      // Let the picker's own Enter handler commit; forward focus to it.
+      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
+      if (pickerInput) {
+        e.preventDefault();
+        pickerInput.focus();
+        // Synthesize an Enter on the picker input.
+        pickerInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        return;
+      }
+    }
+
     if (k === " " || k === "Spacebar") {
       e.preventDefault();
       insertChordSpaceAt(sectionId, line.id, chordCaret);
@@ -189,7 +241,9 @@ function LineRow({
         }, 10);
       }
     } else if (k.length === 1 && /[A-Za-z]/.test(k)) {
+      // Picker is not yet open — open it and seed the query with this letter.
       e.preventDefault();
+      onChordRowQueryChange?.(k);
       onPickerOpen(line.id, chordCaret);
     }
   };
@@ -303,13 +357,24 @@ function LineRow({
             </div>
           );
         })}
-        {/* Caret */}
+        {/* Caret + live chord query (mirrored from picker input) */}
         {chordFocused && !selectMode && (
-          <span
-            aria-hidden
-            className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-            style={{ left: `${chordCaret * cellPx}px` }}
-          />
+          <>
+            {active && chordRowQuery && chordRowQuery.length > 0 && (
+              <span
+                aria-hidden
+                className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
+                style={{ left: `${chordCaret * cellPx}px` }}
+              >
+                {chordRowQuery}
+              </span>
+            )}
+            <span
+              aria-hidden
+              className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
+              style={{ left: `${(chordCaret + (active ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
+            />
+          </>
         )}
       </div>
 
@@ -317,11 +382,11 @@ function LineRow({
         <div className="mb-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
           <span className="text-muted-foreground">{selectedIds.length} selected</span>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, -1)} aria-label="Shift left">
+            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)} aria-label="Move chord left (by order)">
             <ArrowUp className="h-3 w-3 -rotate-90" />
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, 1)} aria-label="Shift right">
+            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)} aria-label="Move chord right (by order)">
             <ArrowDown className="h-3 w-3 -rotate-90" />
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
@@ -369,9 +434,11 @@ interface SectionCardProps {
   onPickerOpen: (sectionId: string, lineId: string, col: number, anchorId?: string) => void;
   onChordDragStart: (sectionId: string, lineId: string, anchorId: string) => void;
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
+  chordRowQuery?: string;
+  onChordRowQueryChange?: (q: string) => void;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection, moveSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
@@ -546,6 +613,8 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
                 onChordFocus={() => { /* parent handles via picker */ }}
                 onChordDragStart={(anchorId) => onChordDragStart(section.id, line.id, anchorId)}
                 onChordDrop={(toLineId, toCol) => onChordDrop(section.id, toLineId, toCol)}
+                chordRowQuery={activeLineId === line.id ? chordRowQuery : undefined}
+                onChordRowQueryChange={activeLineId === line.id ? onChordRowQueryChange : undefined}
               />
             ))}
           </div>
@@ -664,6 +733,8 @@ function useCellPx(): number {
 export function LyricsTab() {
   const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
+  // Shared chord query: typed in either the picker input OR the active chord row.
+  const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
 
@@ -675,9 +746,17 @@ export function LyricsTab() {
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
   const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
 
+  // Seed the shared query when the picker opens onto a specific chord.
+  useEffect(() => {
+    if (picker) setPickerQuery(initialChord?.display ?? "");
+    else setPickerQuery("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picker?.sectionId, picker?.lineId, picker?.anchorId]);
+
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    setPickerQuery("");
   };
   const handleRemove = () => {
     if (!picker?.anchorId) return;
@@ -707,6 +786,8 @@ export function LyricsTab() {
           onPickerOpen={openPicker}
           onChordDragStart={handleChordDragStart}
           onChordDrop={handleChordDrop}
+          chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
+          onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
         />
       ))}
 
@@ -729,6 +810,8 @@ export function LyricsTab() {
         onPick={handlePick}
         onRemove={picker?.anchorId ? handleRemove : undefined}
         activeLineId={picker?.lineId}
+        query={pickerQuery}
+        onQueryChange={setPickerQuery}
       />
     </div>
   );
