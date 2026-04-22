@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
-  const { meta, setTitle, setKey, setBpm, transposeSong, progression } = useSongStore();
+  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
@@ -158,6 +158,19 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                     <Upload className="h-4 w-4" /> Load
                   </span>
                 </label>
+                {suppressCrossTabDeleteWarning && (
+                  <Button
+                    variant="outline"
+                    className="justify-start border border-border"
+                    onClick={() => {
+                      setSuppressCrossTabDeleteWarning(false);
+                      toast({ title: "Delete warnings re-enabled" });
+                      setNavOpen(false);
+                    }}
+                  >
+                    Reset delete warnings
+                  </Button>
+                )}
               </div>
             </SheetContent>
           </Sheet>

@@ -596,18 +596,16 @@ export const useSongStore = create<SongState>((set, get) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       if (sec.lines.length <= 1) return sec;
-      const removed = sec.lines.find((l) => l.id === id);
-      // Also unlink any mirrored pattern chords (they remain in the pattern; user can edit/delete there).
       return { ...sec, lines: sec.lines.filter((l) => l.id !== id) };
     }),
-    // Detach mirror links on the bound pattern for orphaned anchor ids
+    // Detach mirror links on all the section's pattern blocks for orphaned anchor ids
     progression: (() => {
       const sec = s.sections.find((x) => x.id === sectionId);
       const removed = sec?.lines.find((l) => l.id === id);
       if (!removed?.chords.length) return s.progression;
       const anchorIds = new Set(removed.chords.map((a) => a.id));
       return s.progression.map((p) =>
-        p.id !== sectionId
+        (p.sectionId ?? p.id) !== sectionId
           ? p
           : { ...p, chords: p.chords.map((c) => (c.mirrorId && anchorIds.has(c.mirrorId) ? { ...c, mirrorId: undefined } : c)) },
       );
@@ -1529,16 +1527,29 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (parsed.version !== 2) return;
     const sectionsLoaded: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
+    // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
+    const migratedProgression = progressionLoaded.map((p) => ({
+      ...p,
+      sectionId: p.sectionId ?? p.id,
+      chords: repackChords(p.chords, p.bars * p.beatsPerBar),
+    }));
     set({
       meta: parsed.meta ?? get().meta,
       sections: sectionsLoaded,
-      progression: progressionLoaded.map((p) => ({ ...p, chords: repackChords(p.chords, p.bars * p.beatsPerBar) })),
+      progression: migratedProgression,
       basket: [],
+      suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
     });
   },
   toJSON: () => {
     const s = get();
-    return { version: 2, meta: s.meta, sections: s.sections, progression: s.progression };
+    return {
+      version: 2,
+      meta: s.meta,
+      sections: s.sections,
+      progression: s.progression,
+      suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+    };
   },
 }));
 

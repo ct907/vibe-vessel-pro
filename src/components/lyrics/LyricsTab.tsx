@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
@@ -701,14 +702,15 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
+    suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
-  // Remember previous type so we can revert if the user cancels the custom-name dialog
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section.label);
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
   const cellPx = useCellPx();
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -886,7 +888,10 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onClick={() => removeSection(section.id)}
+              onClick={() => {
+                if (suppressCrossTabDeleteWarning) removeSection(section.id);
+                else setConfirmDeleteSection(true);
+              }}
               disabled={total <= 1}
             >
               <Trash2 className="h-4 w-4" /> Delete section
@@ -1017,6 +1022,20 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteSection}
+        onOpenChange={setConfirmDeleteSection}
+        title="Delete entire section?"
+        description="This removes the section from BOTH the Lyrics and Progression tabs, including all lyric lines and chord pattern blocks inside it."
+        confirmLabel="Delete section"
+        showSuppressOption
+        onConfirm={(suppress) => {
+          setConfirmDeleteSection(false);
+          if (suppress) setSuppressCrossTabDeleteWarning(true);
+          removeSection(section.id);
+        }}
+      />
     </div>
   );
 }
