@@ -546,6 +546,9 @@ export const useSongStore = create<SongState>((set, get) => ({
   toggleSectionCollapsed: (id) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec)),
   })),
+  setAllSectionsCollapsed: (collapsed) => set((s) => ({
+    sections: s.sections.map((sec) => ({ ...sec, collapsed })),
+  })),
   setSectionComment: (id, comment) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),
   })),
