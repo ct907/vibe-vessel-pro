@@ -84,6 +84,8 @@ export interface SongState {
   setLineText: (sectionId: string, id: string, text: string) => void;
   upsertChordAt: (sectionId: string, lineId: string, offset: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
+  removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
+  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaChars: number) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -96,6 +98,9 @@ export interface SongState {
   updatePatternChord: (patternId: string, chordId: string, patch: Partial<Omit<PatternChord, "id" | "mirrorId">>) => void;
   removePatternChord: (patternId: string, chordId: string) => void;
   movePatternChord: (patternId: string, chordId: string, direction: -1 | 1) => void;
+  removePatternChordsBatch: (patternId: string, chordIds: string[]) => void;
+  shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
+  movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
 
   // ---- persistence ----
   loadFromJSON: (data: unknown) => void;
