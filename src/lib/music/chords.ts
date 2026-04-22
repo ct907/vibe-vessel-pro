@@ -243,10 +243,13 @@ export function describeChord(c: ChordSymbol): string {
 export function suggestChords(query: string): ChordSuggestion[] {
   const q = query.trim();
   if (!q) return [];
+  const rawMatch = q.match(/^[A-Ga-g][#b]?/);
+  if (!rawMatch) return [];
+  const consumed = rawMatch[0].length;
   const root = normalizeRoot(q);
   if (!root) return [];
   // If the user typed more than just the root, parse strictly
-  if (q.length > root.length) {
+  if (q.length > consumed) {
     const parsed = parseChord(q);
     return parsed ? [{ symbol: parsed, label: describeChord(parsed) }] : [];
   }
