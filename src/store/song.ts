@@ -605,7 +605,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   })),
 
   loadFromJSON: (data) => {
-    const parsed = data as Partial<SerializedSong> & { lyrics?: LyricLine[]; version?: number };
+    const parsed = data as any;
     if (!parsed) return;
 
     // v1 (lyrics: LyricLine[]) → v2 migration: wrap lines in a single Verse section.
