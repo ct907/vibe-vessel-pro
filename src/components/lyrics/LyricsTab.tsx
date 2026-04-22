@@ -357,13 +357,24 @@ function LineRow({
             </div>
           );
         })}
-        {/* Caret */}
+        {/* Caret + live chord query (mirrored from picker input) */}
         {chordFocused && !selectMode && (
-          <span
-            aria-hidden
-            className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-            style={{ left: `${chordCaret * cellPx}px` }}
-          />
+          <>
+            {active && chordRowQuery && chordRowQuery.length > 0 && (
+              <span
+                aria-hidden
+                className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
+                style={{ left: `${chordCaret * cellPx}px` }}
+              >
+                {chordRowQuery}
+              </span>
+            )}
+            <span
+              aria-hidden
+              className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
+              style={{ left: `${(chordCaret + (active ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
+            />
+          </>
         )}
       </div>
 
@@ -371,11 +382,11 @@ function LineRow({
         <div className="mb-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
           <span className="text-muted-foreground">{selectedIds.length} selected</span>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, -1)} aria-label="Shift left">
+            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)} aria-label="Move chord left (by order)">
             <ArrowUp className="h-3 w-3 -rotate-90" />
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, 1)} aria-label="Shift right">
+            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)} aria-label="Move chord right (by order)">
             <ArrowDown className="h-3 w-3 -rotate-90" />
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
