@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSongStore, type PatternBlock as PatternBlockType } from "@/store/song";
+import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,13 @@ function PatternBlock({
     removePatternChordsBatch, shiftPatternChords, movePatternChordsTo,
     reorderPatternChord,
   } = useSongStore();
+  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
+  const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const isFocused = focusedPatternId === pattern.id;
+  const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
+
   const [activeChord, setActiveChord] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -125,6 +133,7 @@ function PatternBlock({
   };
   const handleChordTap = (chordId: string) => {
     if (longFiredRef.current) return;
+    setFocusedPattern(pattern.id);
     if (selectMode) {
       setSelected((prev) => {
         const next = new Set(prev);
@@ -151,10 +160,20 @@ function PatternBlock({
   const activeIdx = active ? sortedChords.findIndex((c) => c.id === active.id) : -1;
 
   return (
-    <div ref={blockRef} className="rounded-xl border border-border bg-card p-4">
+    <div
+      ref={blockRef}
+      onClick={() => setFocusedPattern(pattern.id)}
+      className={cn(
+        "rounded-xl border bg-card p-4 transition-shadow cursor-pointer",
+        isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+      )}
+    >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="font-display text-base ink-chord truncate">{sectionLabel ?? pattern.label}</span>
+          {isFocused && (
+            <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">▸ play start</span>
+          )}
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">bound to section</span>
         </div>
         <span className="text-xs text-muted-foreground">·</span>
@@ -286,7 +305,7 @@ function PatternBlock({
                   onPickerOpen(pattern.id, c.startBeat, c.id);
                 }}
                 className={cn(
-                  "relative my-1 mx-0.5 rounded-md border border-chord-chip/60 bg-chord-chip text-chord-chip-foreground hover:bg-chord-chip/90 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
+                  "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
                   !selectMode && activeChord === c.id && "ring-2 ring-primary",
                   selectMode && isSel && "ring-2 ring-primary",
                   isBeingDragged && "opacity-40",
@@ -299,6 +318,13 @@ function PatternBlock({
                 )}
                 {dropIndicator === idx + 1 && draggingChordId && (
                   <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
+                )}
+                {/* Playhead — bright orange typing-cursor stick at left edge of currently-playing chord */}
+                {playingChordId === c.id && (
+                  <span
+                    aria-hidden
+                    className="absolute -left-0.5 top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                  />
                 )}
                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                   {c.chord.display}

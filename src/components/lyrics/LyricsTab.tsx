@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSongStore, getSectionDisplayName, type LyricLine, type Section, type SectionType } from "@/store/song";
+import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
@@ -61,6 +62,10 @@ function LineRow({
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
     undo, redo,
   } = useSongStore();
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const playingAnchorId = isPlaying && playbackCurrent?.mirrorId ? playbackCurrent.mirrorId : null;
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -200,6 +205,9 @@ function LineRow({
   const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (selectMode) return;
     if (areaStartRef.current) return; // a drag just ended — skip caret
+    // Interacting with a chord row in lyrics clears any pattern-block focus
+    // so global play resumes from the start of the progression.
+    setFocusedPattern(null);
     const rect = chordRowRef.current!.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
@@ -488,6 +496,18 @@ function LineRow({
             }}
           />
         )}
+        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord */}
+        {playingAnchorId && (() => {
+          const playing = line.chords.find((a) => a.id === playingAnchorId);
+          if (!playing) return null;
+          return (
+            <span
+              aria-hidden
+              className="absolute top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+              style={{ left: `${colOf(playing) * cellPx - 1}px` }}
+            />
+          );
+        })()}
         {/* Chord chips at columns */}
         {line.chords.map((a) => {
           const col = colOf(a);
