@@ -514,24 +514,33 @@ function LineRow({
           );
         })}
         {/* Caret + live chord query (mirrored from picker input) */}
-        {chordFocused && !selectMode && (
-          <>
-            {active && chordRowQuery && chordRowQuery.length > 0 && (
+        {chordFocused && !selectMode && (() => {
+          // Hide the ghost overlay if the query matches an existing chord at the caret —
+          // i.e. the picker was opened to edit, not to type a new chord. This prevents
+          // a stale "clone" of the chord display from rendering at the old position.
+          const editingExisting = !!sortedChords.find(
+            (c) => colOf(c) === chordCaret && c.chord.display === chordRowQuery,
+          );
+          const showOverlay = !!(active && chordRowQuery && chordRowQuery.length > 0 && !editingExisting);
+          return (
+            <>
+              {showOverlay && (
+                <span
+                  aria-hidden
+                  className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
+                  style={{ left: `${chordCaret * cellPx}px` }}
+                >
+                  {chordRowQuery}
+                </span>
+              )}
               <span
                 aria-hidden
-                className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
-                style={{ left: `${chordCaret * cellPx}px` }}
-              >
-                {chordRowQuery}
-              </span>
-            )}
-            <span
-              aria-hidden
-              className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-              style={{ left: `${(chordCaret + (active ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
-            />
-          </>
-        )}
+                className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
+                style={{ left: `${(chordCaret + (showOverlay ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
+              />
+            </>
+          );
+        })()}
       </div>
 
       {selectMode && (
