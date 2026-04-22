@@ -1022,6 +1022,20 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteSection}
+        onOpenChange={setConfirmDeleteSection}
+        title="Delete entire section?"
+        description="This removes the section from BOTH the Lyrics and Progression tabs, including all lyric lines and chord pattern blocks inside it."
+        confirmLabel="Delete section"
+        showSuppressOption
+        onConfirm={(suppress) => {
+          setConfirmDeleteSection(false);
+          if (suppress) setSuppressCrossTabDeleteWarning(true);
+          removeSection(section.id);
+        }}
+      />
     </div>
   );
 }

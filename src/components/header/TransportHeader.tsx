@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
-  const { meta, setTitle, setKey, setBpm, transposeSong, progression } = useSongStore();
+  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
