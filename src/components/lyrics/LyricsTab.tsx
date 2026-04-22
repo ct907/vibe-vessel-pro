@@ -76,6 +76,11 @@ function LineRow({
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
     setChordCaret(col);
     focusChord();
+    // If chord row is empty, open picker so users can immediately add a chord
+    // (this also brings up the on-screen keyboard on mobile via the picker's input).
+    if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) {
+      onPickerOpen(line.id, col);
+    }
   };
 
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -286,6 +291,9 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
+  // Remember previous type so we can revert if the user cancels the custom-name dialog
+  const prevTypeRef = useRef<SectionType | null>(null);
+  const prevLabelRef = useRef<string>(section.label);
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const cellPx = useCellPx();
@@ -296,6 +304,16 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const acceptCustomName = () => {
     const trimmed = draftLabel.trim() || "Section";
     updateSection(section.id, { label: trimmed });
+    prevTypeRef.current = null;
+    setCustomRenameOpen(false);
+  };
+
+  const cancelCustomName = () => {
+    // Revert to the previous section type/label if Custom was just selected
+    if (prevTypeRef.current && prevTypeRef.current !== "custom") {
+      updateSection(section.id, { type: prevTypeRef.current, label: prevLabelRef.current });
+    }
+    prevTypeRef.current = null;
     setCustomRenameOpen(false);
   };
 
@@ -356,8 +374,16 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           value={section.type}
           onValueChange={(v) => {
             const next = v as SectionType;
-            updateSection(section.id, { type: next, label: next === "custom" ? (section.label || "Section") : section.label });
-            if (next === "custom") setCustomRenameOpen(true);
+            if (next === "custom") {
+              // Stash previous so Cancel can revert
+              prevTypeRef.current = section.type;
+              prevLabelRef.current = section.label;
+              updateSection(section.id, { type: next, label: section.label || "Section" });
+              setDraftLabel(section.label && section.type === "custom" ? section.label : "");
+              setCustomRenameOpen(true);
+            } else {
+              updateSection(section.id, { type: next, label: section.label });
+            }
           }}
         >
           <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize">
@@ -487,7 +513,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
       )}
 
       {/* Custom name dialog */}
-      <Dialog open={customRenameOpen} onOpenChange={setCustomRenameOpen}>
+      <Dialog open={customRenameOpen} onOpenChange={(o) => { if (!o) cancelCustomName(); else setCustomRenameOpen(true); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Name this section</DialogTitle>
@@ -501,7 +527,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             className="font-display text-base"
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setCustomRenameOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={cancelCustomName}>Cancel</Button>
             <Button onClick={acceptCustomName}>Accept</Button>
           </DialogFooter>
         </DialogContent>
