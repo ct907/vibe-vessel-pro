@@ -450,14 +450,14 @@ export const useSongStore = create<SongState>((set, get) => ({
   updateSection: (id, patch) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, ...patch } : sec)),
     progression: patch.label !== undefined
-      ? s.progression.map((p) => (p.id === id ? { ...p, label: patch.label! } : p))
+      ? s.progression.map((p) => (p.sectionId === id ? { ...p, label: patch.label! } : p))
       : s.progression,
   })),
   removeSection: (id) => set((s) => {
     if (s.sections.length <= 1) return s;
     return {
       sections: s.sections.filter((sec) => sec.id !== id),
-      progression: s.progression.filter((p) => p.id !== id),
+      progression: s.progression.filter((p) => p.sectionId !== id),
     };
   }),
   duplicateSection: (id) => {
