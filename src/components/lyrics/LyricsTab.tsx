@@ -613,6 +613,8 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
                 onChordFocus={() => { /* parent handles via picker */ }}
                 onChordDragStart={(anchorId) => onChordDragStart(section.id, line.id, anchorId)}
                 onChordDrop={(toLineId, toCol) => onChordDrop(section.id, toLineId, toCol)}
+                chordRowQuery={activeLineId === line.id ? chordRowQuery : undefined}
+                onChordRowQueryChange={activeLineId === line.id ? onChordRowQueryChange : undefined}
               />
             ))}
           </div>
