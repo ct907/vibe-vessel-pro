@@ -64,12 +64,36 @@ const QUALITY_PRETTY: Record<Quality, string> = {
   maj9: "maj9", min9: "m9", "9": "9", "6": "6", min6: "m6", add9: "add9",
 };
 
+// Roots that don't exist in standard practice — silently fold to their
+// enharmonic equivalent (no double accidentals supported).
+const INVALID_ROOT_FIXUPS: Record<string, string> = {
+  "Fb": "E",
+  "Cb": "B",
+  "E#": "F",
+  "B#": "C",
+};
+
 export function normalizeRoot(input: string): string | null {
   const m = input.match(/^([A-Ga-g])([#b])?/);
   if (!m) return null;
   const letter = m[1].toUpperCase();
   const acc = m[2] ?? "";
-  return letter + (acc === "#" ? "#" : acc === "b" ? "b" : "");
+  const raw = letter + (acc === "#" ? "#" : acc === "b" ? "b" : "");
+  return INVALID_ROOT_FIXUPS[raw] ?? raw;
+}
+
+/** Pitch class (0-11) of a chord's root, ignoring spelling. */
+export function chordPitchClass(c: ChordSymbol): number {
+  return rootToPc(c.root);
+}
+
+/** Two chord symbols are musically equal (same pitch class root, quality, bass). */
+export function sameChord(a: ChordSymbol, b: ChordSymbol): boolean {
+  if (a.quality !== b.quality) return false;
+  if (rootToPc(a.root) !== rootToPc(b.root)) return false;
+  const aBass = a.bass ? rootToPc(a.bass) : -1;
+  const bBass = b.bass ? rootToPc(b.bass) : -1;
+  return aBass === bBass;
 }
 
 export function rootToPc(root: string): number {
@@ -87,9 +111,14 @@ export function pcToName(pc: number, useFlat = false): string {
 export function parseChord(input: string): ChordSymbol | null {
   if (!input) return null;
   const trimmed = input.trim();
+  // Determine how many characters of `trimmed` form the root (1 or 2),
+  // then normalize (which may fold invalid roots like Fb→E, B#→C).
+  const rawMatch = trimmed.match(/^[A-Ga-g][#b]?/);
+  if (!rawMatch) return null;
+  const consumed = rawMatch[0].length;
   const root = normalizeRoot(trimmed);
   if (!root) return null;
-  let rest = trimmed.slice(root.length);
+  let rest = trimmed.slice(consumed);
   let bass: string | undefined;
   const slashIdx = rest.indexOf("/");
   if (slashIdx >= 0) {
@@ -214,10 +243,13 @@ export function describeChord(c: ChordSymbol): string {
 export function suggestChords(query: string): ChordSuggestion[] {
   const q = query.trim();
   if (!q) return [];
+  const rawMatch = q.match(/^[A-Ga-g][#b]?/);
+  if (!rawMatch) return [];
+  const consumed = rawMatch[0].length;
   const root = normalizeRoot(q);
   if (!root) return [];
   // If the user typed more than just the root, parse strictly
-  if (q.length > root.length) {
+  if (q.length > consumed) {
     const parsed = parseChord(q);
     return parsed ? [{ symbol: parsed, label: describeChord(parsed) }] : [];
   }
