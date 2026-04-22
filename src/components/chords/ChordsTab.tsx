@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import {
   ChordSymbol,
@@ -10,7 +10,7 @@ import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { Plus, Music } from "lucide-react";
+import { Plus, Music, X } from "lucide-react";
 
 const QUALITY_FILTERS: Array<{ id: string; label: string; qualities: Quality[] }> = [
   { id: "triads", label: "Triads", qualities: ["maj", "min", "dim", "aug", "sus2", "sus4"] },
@@ -19,24 +19,41 @@ const QUALITY_FILTERS: Array<{ id: string; label: string; qualities: Quality[] }
 ];
 
 export function ChordsTab() {
-  const { meta, addToBasket, basket } = useSongStore();
+  const { meta, addToBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [activeFilter, setActiveFilter] = useState<string>("triads");
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
 
   const filterQualities = QUALITY_FILTERS.find((f) => f.id === activeFilter)!.qualities;
 
-  // Build a wide grid: each ladder root × each quality in the active filter
-  const grid = useMemo(() => {
-    return ladder.map((deg) => {
-      const variants = filterQualities.map((q) => {
+  // Build a wide grid: each ladder root × each quality in the active filter,
+  // deduping repeated chord displays (e.g. enharmonic dupes across rows).
+  const { grid, seenAcross } = useMemo(() => {
+    const seen = new Set<string>();
+    const rows = ladder.map((deg) => {
+      const variants: ChordSymbol[] = [];
+      for (const q of filterQualities) {
         const display = deg.chord.root + (q === "maj" ? "" : q === "min" ? "m" : q);
-        const parsed = parseChord(display)!;
-        return parsed;
-      });
+        if (seen.has(display)) continue;
+        seen.add(display);
+        const parsed = parseChord(display);
+        if (parsed) variants.push(parsed);
+      }
       return { numeral: deg.numeral, root: deg.chord.root, baseChord: deg.chord, variants };
     });
+    return { grid: rows, seenAcross: seen };
   }, [ladder, filterQualities]);
+
+  // When the filter changes, prune any selections that are no longer visible.
+  useEffect(() => {
+    setSelected((s) => {
+      const next: Record<string, ChordSymbol> = {};
+      for (const [k, v] of Object.entries(s)) {
+        if (seenAcross.has(k)) next[k] = v;
+      }
+      return next;
+    });
+  }, [seenAcross]);
 
   const toggleSelect = (chord: ChordSymbol) => {
     setSelected((s) => {
@@ -47,12 +64,28 @@ export function ChordsTab() {
     });
   };
 
+  const clearSelection = () => setSelected({});
+
   const sendSelected = () => {
     const chords = Object.values(selected);
     if (chords.length === 0) return;
     addToBasket(chords);
     setSelected({});
   };
+
+  // Esc cancels selection
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && Object.keys(selected).length > 0) {
+        e.preventDefault();
+        clearSelection();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  const selectedCount = Object.keys(selected).length;
 
   return (
     <div className="space-y-5">
@@ -74,20 +107,24 @@ export function ChordsTab() {
         </div>
       </div>
 
-      {/* Quality filter */}
+      {/* Quality filter (single-select; switching clears stale selections) */}
       <div className="flex items-center gap-2 flex-wrap">
         {QUALITY_FILTERS.map((f) => (
           <Button
             key={f.id}
             size="sm"
             variant={activeFilter === f.id ? "default" : "outline"}
-            onClick={() => setActiveFilter(f.id)}
+            onClick={() => {
+              if (activeFilter === f.id) return;
+              setActiveFilter(f.id);
+              setSelected({});
+            }}
           >
             {f.label}
           </Button>
         ))}
         <span className="ml-auto text-xs text-muted-foreground">
-          Tap to audition · Check to multi-select
+          Tap to audition · Check to multi-select · Esc to cancel
         </span>
       </div>
 
@@ -100,6 +137,9 @@ export function ChordsTab() {
               <span className="font-display text-base ink-chord">{row.root}</span>
             </div>
             <div className="flex flex-wrap gap-2">
+              {row.variants.length === 0 && (
+                <span className="text-xs text-muted-foreground italic">No new variants</span>
+              )}
               {row.variants.map((c) => {
                 const isSel = !!selected[c.display];
                 return (
@@ -124,10 +164,19 @@ export function ChordsTab() {
         ))}
       </div>
 
-      {Object.keys(selected).length > 0 && (
-        <div className="sticky bottom-20 flex justify-end">
-          <Button onClick={sendSelected} size="sm" className="shadow-lg">
-            <Plus className="h-4 w-4" /> Add {Object.keys(selected).length} to basket
+      {selectedCount > 0 && (
+        <div className="sticky bottom-20 flex justify-end gap-2">
+          <Button onClick={sendSelected} size="lg" className="shadow-lg text-base px-6 py-6">
+            <Plus className="h-5 w-5" /> Add {selectedCount} to basket
+          </Button>
+          <Button
+            onClick={clearSelection}
+            size="lg"
+            variant="outline"
+            className="shadow-lg text-base px-6 py-6"
+            aria-label="Cancel selection"
+          >
+            <X className="h-5 w-5" /> Cancel
           </Button>
         </div>
       )}
