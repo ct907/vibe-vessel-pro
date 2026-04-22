@@ -16,6 +16,7 @@ interface Props {
 
 export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove }: Props) {
   const [query, setQuery] = useState("");
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -24,6 +25,24 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord]);
+
+  // Lift the sheet above the on-screen keyboard on iOS/Android.
+  useEffect(() => {
+    if (!open || typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const update = () => {
+      const overlap = window.innerHeight - (vv.height + vv.offsetTop);
+      setKeyboardOffset(overlap > 0 ? overlap : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setKeyboardOffset(0);
+    };
+  }, [open]);
 
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
