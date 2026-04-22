@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChordSymbol, suggestChords, parseChord } from "@/lib/music/chords";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
 import { Trash2, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
