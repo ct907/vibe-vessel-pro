@@ -1007,15 +1007,78 @@ export const useSongStore = create<SongState>((set, get) => ({
   clearBasket: () => set({ basket: [] }),
 
   // ---- pattern blocks ----
-  updatePattern: (id, patch) => set((s) => ({
-    progression: s.progression.map((p) => {
-      if (p.id !== id) return p;
-      const next = { ...p, ...patch } as PatternBlock;
-      const total = next.bars * next.beatsPerBar;
-      next.chords = repackChords(p.chords, total);
-      return next;
-    }),
-  })),
+  updatePattern: (id, patch) => set((s) => {
+    const target = s.progression.find((p) => p.id === id);
+    if (!target) return s;
+    const next: PatternBlock = { ...target, ...patch };
+    const newTotal = next.bars * next.beatsPerBar;
+    // Determine which chords fit; collect overflow (in left-to-right order).
+    const sorted = [...target.chords].sort((a, b) => a.startBeat - b.startBeat);
+    const fit: PatternChord[] = [];
+    const overflow: PatternChord[] = [];
+    let cursor = 0;
+    for (const c of sorted) {
+      const len = Math.max(0.5, c.lengthBeats);
+      if (cursor + len <= newTotal + 1e-9) {
+        fit.push({ ...c, startBeat: cursor, lengthBeats: len });
+        cursor += len;
+      } else {
+        overflow.push(c);
+      }
+    }
+    let progression = s.progression.map((p) =>
+      p.id === id ? { ...next, chords: repackChords(fit, newTotal) } : p,
+    );
+    if (!overflow.length) return { progression };
+    // Distribute overflow into following blocks of the same section, creating new ones if needed.
+    const sectionBlocks = () =>
+      progression.map((p, i) => ({ p, i })).filter((x) => x.p.sectionId === target.sectionId);
+    const targetIdx = progression.findIndex((p) => p.id === id);
+    let nextBlocksAfter = sectionBlocks().filter((x) => x.i > targetIdx);
+    for (const oc of overflow) {
+      let placed = false;
+      for (const { p, i } of nextBlocksAfter) {
+        const total = p.bars * p.beatsPerBar;
+        const used = p.chords.reduce((sum, c) => sum + c.lengthBeats, 0);
+        const free = total - used;
+        if (free >= 0.5) {
+          const len = Math.max(0.5, Math.min(oc.lengthBeats, free));
+          const newPc: PatternChord = { ...oc, startBeat: used, lengthBeats: len };
+          progression = progression.map((q, qi) =>
+            qi === i
+              ? { ...q, chords: repackChords([...q.chords, newPc], total) }
+              : q,
+          );
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        // Append a new continuation block right after the last block of this section.
+        const blocks = sectionBlocks();
+        const lastIdx = blocks[blocks.length - 1].i;
+        const ref = progression[lastIdx];
+        const newBlock: PatternBlock = {
+          id: nanoid(),
+          sectionId: target.sectionId,
+          label: `${ref.label} (cont.)`,
+          bars: ref.bars,
+          beatsPerBar: ref.beatsPerBar,
+          chords: [],
+        };
+        const total = newBlock.bars * newBlock.beatsPerBar;
+        const len = Math.max(0.5, Math.min(oc.lengthBeats, total));
+        newBlock.chords = [{ ...oc, startBeat: 0, lengthBeats: len }];
+        progression = [
+          ...progression.slice(0, lastIdx + 1),
+          newBlock,
+          ...progression.slice(lastIdx + 1),
+        ];
+        nextBlocksAfter = sectionBlocks().filter((x) => x.i > targetIdx);
+      }
+    }
+    return { progression };
+  }),
 
   // Add chord into pattern; mirror it back as an anchor at end of last lyric line of bound section.
   addChordToPattern: (patternId, chord, atBeat, lengthBeats = 4) => set((s) => {
