@@ -105,7 +105,13 @@ function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPick
   const selectedIds = Array.from(selected);
 
   return (
-    <div ref={rowRef} className="relative group py-1">
+    <div
+      ref={rowRef}
+      className={cn(
+        "relative group py-1 transition-all",
+        active && "relative z-[60] rounded-md bg-card/95 ring-2 ring-primary shadow-lg px-2 -mx-2",
+      )}
+    >
       <div
         className="relative h-6 cursor-text"
         onClick={handleChordRowClick}
