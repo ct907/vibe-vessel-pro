@@ -54,6 +54,10 @@ export default {
         rule: "hsl(var(--rule))",
         "ink-soft": "hsl(var(--ink-soft))",
         "chord-ink": "hsl(var(--chord-ink))",
+        "chord-chip": {
+          DEFAULT: "hsl(var(--chord-chip))",
+          foreground: "hsl(var(--chord-chip-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
