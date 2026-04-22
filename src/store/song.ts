@@ -48,8 +48,8 @@ export interface PatternChord {
 
 export interface PatternBlock {
   id: string;
-  /** Owning section's id. Multiple PatternBlocks can share the same sectionId. */
-  sectionId: string;
+  /** Owning section's id. Optional for legacy data — defaults to `id`. */
+  sectionId?: string;
   label: string;
   bars: number;
   beatsPerBar: number;
