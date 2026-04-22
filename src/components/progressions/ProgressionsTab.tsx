@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSongStore, type PatternBlock as PatternBlockType } from "@/store/song";
+import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { Button } from "@/components/ui/button";
