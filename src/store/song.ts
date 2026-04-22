@@ -635,10 +635,14 @@ export const useSongStore = create<SongState>((set, get) => ({
       const last = lines[lastIdx];
       const newAnchorId = nanoid();
       createdAnchorId = newAnchorId;
+      const nextCol = (last.chordRowLen ?? 0) > 0
+        ? (last.chordRowLen ?? 0) + 1
+        : 0;
       lines[lastIdx] = {
         ...last,
-        chords: [...last.chords, { id: newAnchorId, offset: last.text.length, chord, mirrorId: newPcId }]
-          .sort((a, b) => a.offset - b.offset),
+        chords: [...last.chords, { id: newAnchorId, offset: nextCol, chordCol: nextCol, chord, mirrorId: newPcId }]
+          .sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0)),
+        chordRowLen: nextCol + 1,
       };
       return { ...sec, lines };
     });
