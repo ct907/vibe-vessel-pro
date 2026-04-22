@@ -762,14 +762,6 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
     >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4">
-        <button
-          onClick={() => toggleSectionCollapsed(section.id)}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
-        >
-          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
-
         <Select
           value={section.type}
           onValueChange={(v) => {
@@ -813,6 +805,25 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("application/x-section-id", section.id);
+            // Use the entire section card as the drag image (clone snapshot).
+            if (cardRef.current) {
+              const rect = cardRef.current.getBoundingClientRect();
+              const clone = cardRef.current.cloneNode(true) as HTMLElement;
+              clone.style.position = "absolute";
+              clone.style.top = "-10000px";
+              clone.style.left = "-10000px";
+              clone.style.width = `${rect.width}px`;
+              clone.style.pointerEvents = "none";
+              clone.style.opacity = "0.9";
+              clone.style.transform = "rotate(-1deg)";
+              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
+              document.body.appendChild(clone);
+              try {
+                e.dataTransfer.setDragImage(clone, 24, 24);
+              } catch { /* ignore */ }
+              // Remove after the browser has snapshotted it.
+              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
+            }
             onSectionDragStart(section.id);
           }}
           onDragEnd={onSectionDragEnd}
@@ -849,6 +860,15 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Expand/collapse toggle — moved to the right of the header */}
+        <button
+          onClick={() => toggleSectionCollapsed(section.id)}
+          className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
+        >
+          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Body */}
