@@ -1074,10 +1074,13 @@ export const useSongStore = create<SongState>((set, get) => ({
       target.chords.push({ id: m.id, chord: m.chord, startBeat: start, lengthBeats: len, mirrorId: undefined });
       cursor = start + len;
     }
-    target.chords.sort((a, b) => a.startBeat - b.startBeat);
+    target.chords = repackChords(target.chords, target.bars * target.beatsPerBar);
 
     const progression = s.progression.map((p) => {
-      if (p.id === fromPatternId) return { ...p, chords: p.chords.filter((c) => !idSet.has(c.id)) };
+      if (p.id === fromPatternId) {
+        const totalBeats = p.bars * p.beatsPerBar;
+        return { ...p, chords: repackChords(p.chords.filter((c) => !idSet.has(c.id)), totalBeats) };
+      }
       if (p.id === toPatternId) return target;
       return p;
     });
