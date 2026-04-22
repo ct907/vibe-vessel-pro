@@ -82,6 +82,7 @@ export interface SongState {
   removeSection: (id: string) => void;
   duplicateSection: (id: string) => string | null;
   moveSection: (id: string, direction: -1 | 1) => void;
+  reorderSection: (id: string, toIndex: number) => void;
   toggleSectionCollapsed: (id: string) => void;
   setSectionComment: (id: string, comment: string) => void;
 
