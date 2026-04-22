@@ -168,18 +168,92 @@ function LineRow({
     onChordFocus(line.id);
   };
 
+  const sortedChords = [...line.chords].sort(
+    (a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0),
+  );
+
+  const selectRangeTo = (anchorId: string, additive: boolean) => {
+    const anchor = lastSelectedRef.current;
+    const ids = sortedChords.map((c) => c.id);
+    const i2 = ids.indexOf(anchorId);
+    if (i2 < 0) return;
+    const i1 = anchor ? ids.indexOf(anchor) : i2;
+    const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
+    const range = ids.slice(from, to + 1);
+    setSelectMode(true);
+    setSelected((prev) => {
+      const next = additive ? new Set(prev) : new Set<string>();
+      range.forEach((id) => next.add(id));
+      return next;
+    });
+    lastSelectedRef.current = anchorId;
+  };
+
   const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (selectMode) return;
+    if (areaStartRef.current) return; // a drag just ended — skip caret
     const rect = chordRowRef.current!.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
     setChordCaret(col);
     focusChord();
-    // Always open the picker on tap so the keyboard surfaces on mobile and the
-    // user can extend the chord row with another chord next to existing ones.
-    // (Tapping directly on a chord chip is handled by the chip's own onClick.)
     onPickerOpen(line.id, col);
   };
+
+  // ---------- Drag-area select on empty chord row ----------
+  const handleRowMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    // Skip if mousedown started on a chip (chip wrapper has data-chip-anchor)
+    if (target.closest("[data-chip-anchor]")) return;
+    const rect = chordRowRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    areaStartRef.current = { x, additive: e.shiftKey || e.metaKey || e.ctrlKey };
+    setAreaSel({ x1: x, x2: x });
+  };
+
+  useEffect(() => {
+    if (!areaSel) return;
+    const onMove = (ev: MouseEvent) => {
+      const rect = chordRowRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = ev.clientX - rect.left;
+      setAreaSel((prev) => prev ? { ...prev, x2: x } : prev);
+    };
+    const onUp = () => {
+      const start = areaStartRef.current;
+      const cur = areaSel;
+      setAreaSel(null);
+      if (!start || !cur) { areaStartRef.current = null; return; }
+      const [x1, x2] = [Math.min(cur.x1, cur.x2), Math.max(cur.x1, cur.x2)];
+      if (Math.abs(cur.x2 - cur.x1) < 4) { areaStartRef.current = null; return; }
+      const cellWidth = Math.max(cellPx, 1);
+      const c1 = x1 / cellWidth;
+      const c2 = x2 / cellWidth;
+      const hits = sortedChords.filter((c) => {
+        const cc = c.chordCol ?? c.offset ?? 0;
+        const cEnd = cc + Math.max(1, c.chord.display.length);
+        return cc <= c2 && cEnd >= c1;
+      }).map((c) => c.id);
+      if (hits.length) {
+        setSelectMode(true);
+        setSelected((prev) => {
+          const next = start.additive ? new Set(prev) : new Set<string>();
+          hits.forEach((id) => next.add(id));
+          return next;
+        });
+        lastSelectedRef.current = hits[hits.length - 1];
+      }
+      // Defer clearing so the click handler can see we just dragged
+      setTimeout(() => { areaStartRef.current = null; }, 0);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp, { once: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [areaSel, cellPx, sortedChords]);
 
   const selectAll = () => {
     if (line.chords.length === 0) return;
