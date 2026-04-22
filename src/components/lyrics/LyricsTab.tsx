@@ -120,6 +120,27 @@ function LineRow({
     if (selectMode && line.chords.length === 0) { setSelectMode(false); setSelected(new Set()); }
   }, [line.chords.length, selectMode]);
 
+  // Auto-exit select mode when the user has deselected the last chord.
+  useEffect(() => {
+    if (selectMode && selected.size === 0) setSelectMode(false);
+  }, [selected, selectMode]);
+
+  // Outside-tap closes the chord-row context menu (select mode).
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (rowRef.current && rowRef.current.contains(t)) return;
+      // Allow interactions with the picker sheet too (so users can switch).
+      if (t.closest("[data-radix-dialog-content]")) return;
+      setSelectMode(false);
+      setSelected(new Set());
+    };
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
+  }, [selectMode]);
+
   // ---------- Chord row interactions ----------
   const focusChord = () => {
     chordRowRef.current?.focus();
