@@ -569,7 +569,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div ref={cardRef} className="paper-card paper-ruled paper-margin rounded-xl px-10 py-5">
+    <div ref={cardRef} className="paper-card rounded-xl px-5 py-5">
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4">
         <button
