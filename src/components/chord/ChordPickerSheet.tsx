@@ -62,6 +62,26 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
     };
   }, [open]);
 
+  // With modal={false}, Radix won't auto-close on overlay click. Re-add that
+  // behavior by attaching a click handler to the overlay element.
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => {
+      const overlay = document.querySelector<HTMLElement>("[data-radix-dialog-overlay]");
+      if (!overlay) return;
+      overlay.style.pointerEvents = "auto";
+      const onClick = () => onOpenChange(false);
+      overlay.addEventListener("click", onClick);
+      (overlay as any).__chordPickerCleanup = () => overlay.removeEventListener("click", onClick);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      const overlay = document.querySelector<HTMLElement>("[data-radix-dialog-overlay]");
+      const cleanup = overlay && (overlay as any).__chordPickerCleanup;
+      if (cleanup) cleanup();
+    };
+  }, [open, onOpenChange]);
+
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
