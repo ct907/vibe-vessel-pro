@@ -1156,10 +1156,12 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
 
     if (parsed.version !== 2) return;
+    const sectionsLoaded: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
+    const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     set({
       meta: parsed.meta ?? get().meta,
-      sections: parsed.sections?.length ? parsed.sections : [makeSection().section],
-      progression: parsed.progression?.length ? parsed.progression : [makeSection().pattern],
+      sections: sectionsLoaded,
+      progression: progressionLoaded.map((p) => ({ ...p, chords: repackChords(p.chords, p.bars * p.beatsPerBar) })),
       basket: [],
     });
   },
