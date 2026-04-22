@@ -6,8 +6,10 @@ import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/cho
 
 export interface ChordAnchor {
   id: string;
-  /** character offset within the lyric line (0..text.length) */
+  /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
+  /** New: column position in the chord row (in monospace cells). Independent from lyric text. */
+  chordCol?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
@@ -17,6 +19,8 @@ export interface LyricLine {
   id: string;
   text: string;
   chords: ChordAnchor[];
+  /** Number of cursor cells in the chord row (>= max chord col + 1). */
+  chordRowLen?: number;
 }
 
 export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
@@ -27,6 +31,8 @@ export interface Section {
   type: SectionType;
   collapsed: boolean;
   lines: LyricLine[];
+  /** Optional notes/comment for this section. */
+  comment?: string;
 }
 
 export interface PatternChord {
@@ -72,20 +78,24 @@ export interface SongState {
 
   // ---- sections ----
   addSection: (type?: SectionType, label?: string) => string;
-  updateSection: (id: string, patch: Partial<Pick<Section, "label" | "type" | "collapsed">>) => void;
+  updateSection: (id: string, patch: Partial<Pick<Section, "label" | "type" | "collapsed" | "comment">>) => void;
   removeSection: (id: string) => void;
   duplicateSection: (id: string) => string | null;
   moveSection: (id: string, direction: -1 | 1) => void;
   toggleSectionCollapsed: (id: string) => void;
+  setSectionComment: (id: string, comment: string) => void;
 
   // ---- lyrics (line-level) ----
   addLine: (sectionId: string, afterId?: string) => string;
   removeLine: (sectionId: string, id: string) => void;
   setLineText: (sectionId: string, id: string, text: string) => void;
-  upsertChordAt: (sectionId: string, lineId: string, offset: number, chord: ChordSymbol, anchorId?: string) => void;
+  setChordRowLen: (sectionId: string, id: string, len: number) => void;
+  insertChordSpaceAt: (sectionId: string, lineId: string, col: number) => void;
+  removeChordCellAt: (sectionId: string, lineId: string, col: number) => boolean;
+  upsertChordAt: (sectionId: string, lineId: string, col: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
-  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaChars: number) => void;
+  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -334,6 +344,9 @@ export const useSongStore = create<SongState>((set, get) => ({
   toggleSectionCollapsed: (id) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec)),
   })),
+  setSectionComment: (id, comment) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),
+  })),
 
   // ---- lyric lines ----
   addLine: (sectionId, afterId) => {
@@ -376,17 +389,75 @@ export const useSongStore = create<SongState>((set, get) => ({
       if (sec.id !== sectionId) return sec;
       return {
         ...sec,
+        // Chord row is now decoupled from lyric text; just update the text.
+        lines: sec.lines.map((l) => (l.id === id ? { ...l, text } : l)),
+      };
+    }),
+  })),
+
+  setChordRowLen: (sectionId, id, len) => set((s) => ({
+    sections: s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        lines: sec.lines.map((l) => (l.id === id ? { ...l, chordRowLen: Math.max(0, len) } : l)),
+      };
+    }),
+  })),
+
+  insertChordSpaceAt: (sectionId, lineId, col) => set((s) => ({
+    sections: s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
         lines: sec.lines.map((l) => {
-          if (l.id !== id) return l;
-          const max = text.length;
-          return { ...l, text, chords: l.chords.map((c) => ({ ...c, offset: Math.min(c.offset, max) })) };
+          if (l.id !== lineId) return l;
+          const chords = l.chords.map((c) => {
+            const cc = c.chordCol ?? c.offset ?? 0;
+            return cc >= col ? { ...c, chordCol: cc + 1 } : { ...c, chordCol: cc };
+          });
+          const len = Math.max((l.chordRowLen ?? 0) + 1, col + 1);
+          return { ...l, chords, chordRowLen: len };
         }),
       };
     }),
   })),
 
+  removeChordCellAt: (sectionId, lineId, col) => {
+    const state = get();
+    const sec = state.sections.find((x) => x.id === sectionId);
+    const line = sec?.lines.find((l) => l.id === lineId);
+    if (!sec || !line) return false;
+    const chordAt = line.chords.find((c) => (c.chordCol ?? c.offset ?? 0) === col);
+    if (chordAt) {
+      get().removeChordAnchor(sectionId, lineId, chordAt.id);
+      return true;
+    }
+    // Otherwise shift later chords back by 1
+    const hasLater = line.chords.some((c) => (c.chordCol ?? c.offset ?? 0) > col);
+    if (!hasLater && (line.chordRowLen ?? 0) <= 0) return false;
+    set((s) => ({
+      sections: s.sections.map((s2) => {
+        if (s2.id !== sectionId) return s2;
+        return {
+          ...s2,
+          lines: s2.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const chords = l.chords.map((c) => {
+              const cc = c.chordCol ?? c.offset ?? 0;
+              return cc > col ? { ...c, chordCol: cc - 1 } : { ...c, chordCol: cc };
+            });
+            const len = Math.max(0, (l.chordRowLen ?? 0) - 1);
+            return { ...l, chords, chordRowLen: len };
+          }),
+        };
+      }),
+    }));
+    return true;
+  },
+
   // Add or replace a chord anchor; mirror to bound pattern block.
-  upsertChordAt: (sectionId, lineId, offset, chord, anchorId) => set((s) => {
+  upsertChordAt: (sectionId, lineId, col, chord, anchorId) => set((s) => {
     let createdAnchorId: string | null = null;
     let updatedAnchorId: string | null = null;
     let prevMirrorId: string | undefined;
@@ -403,37 +474,35 @@ export const useSongStore = create<SongState>((set, get) => ({
               if (c.id !== anchorId) return c;
               prevMirrorId = c.mirrorId;
               updatedAnchorId = c.id;
-              return { ...c, chord, offset };
+              return { ...c, chord, chordCol: col, offset: col };
             });
           } else {
-            const existing = chords.findIndex((c) => c.offset === offset);
+            const existing = chords.findIndex((c) => (c.chordCol ?? c.offset ?? 0) === col);
             if (existing >= 0) {
               prevMirrorId = chords[existing].mirrorId;
               updatedAnchorId = chords[existing].id;
-              chords[existing] = { ...chords[existing], chord };
+              chords[existing] = { ...chords[existing], chord, chordCol: col, offset: col };
             } else {
               const newId = nanoid();
               createdAnchorId = newId;
-              chords.push({ id: newId, offset, chord });
+              chords.push({ id: newId, offset: col, chordCol: col, chord });
             }
           }
-          chords.sort((a, b) => a.offset - b.offset);
-          return { ...l, chords };
+          chords.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          const newLen = Math.max(l.chordRowLen ?? 0, col + 1);
+          return { ...l, chords, chordRowLen: newLen };
         }),
       };
     });
 
-    // Mirror to pattern
+    // Mirror to pattern (unchanged)
     let progression = s.progression;
     if (createdAnchorId) {
       progression = s.progression.map((p) => {
         if (p.id !== sectionId) return p;
         const placed = placeMirroredChord(p, chord, createdAnchorId!);
-        // back-link the anchor with the new pattern chord id
-        const newPcId = placed.chordId;
         return placed.pattern;
       });
-      // Now write the mirrorId back onto the anchor we just created
       const newPcByPattern = new Map<string, string>();
       progression.forEach((p) => {
         if (p.id === sectionId) {
@@ -452,7 +521,6 @@ export const useSongStore = create<SongState>((set, get) => ({
         }
       }
     } else if (updatedAnchorId && prevMirrorId) {
-      // Replace chord on the mirrored pattern chord (keep its position/length)
       progression = s.progression.map((p) =>
         p.id !== sectionId
           ? p
@@ -505,7 +573,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { sections, progression };
   }),
 
-  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaChars) => set((s) => {
+  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => set((s) => {
     const idSet = new Set(anchorIds);
     return {
       sections: s.sections.map((sec) => {
@@ -514,11 +582,14 @@ export const useSongStore = create<SongState>((set, get) => ({
           ...sec,
           lines: sec.lines.map((l) => {
             if (l.id !== lineId) return l;
-            const max = l.text.length;
-            const chords = l.chords.map((c) => idSet.has(c.id)
-              ? { ...c, offset: Math.max(0, Math.min(max, c.offset + deltaChars)) }
-              : c).sort((a, b) => a.offset - b.offset);
-            return { ...l, chords };
+            const chords = l.chords.map((c) => {
+              if (!idSet.has(c.id)) return c;
+              const cur = c.chordCol ?? c.offset ?? 0;
+              const next = Math.max(0, cur + deltaCols);
+              return { ...c, chordCol: next, offset: next };
+            }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const maxCol = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + 1), 0);
+            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, maxCol) };
           }),
         };
       }),
@@ -564,10 +635,14 @@ export const useSongStore = create<SongState>((set, get) => ({
       const last = lines[lastIdx];
       const newAnchorId = nanoid();
       createdAnchorId = newAnchorId;
+      const nextCol = (last.chordRowLen ?? 0) > 0
+        ? (last.chordRowLen ?? 0) + 1
+        : 0;
       lines[lastIdx] = {
         ...last,
-        chords: [...last.chords, { id: newAnchorId, offset: last.text.length, chord, mirrorId: newPcId }]
-          .sort((a, b) => a.offset - b.offset),
+        chords: [...last.chords, { id: newAnchorId, offset: nextCol, chordCol: nextCol, chord, mirrorId: newPcId }]
+          .sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0)),
+        chordRowLen: nextCol + 1,
       };
       return { ...sec, lines };
     });
