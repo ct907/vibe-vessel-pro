@@ -111,9 +111,14 @@ export function pcToName(pc: number, useFlat = false): string {
 export function parseChord(input: string): ChordSymbol | null {
   if (!input) return null;
   const trimmed = input.trim();
+  // Determine how many characters of `trimmed` form the root (1 or 2),
+  // then normalize (which may fold invalid roots like Fb→E, B#→C).
+  const rawMatch = trimmed.match(/^[A-Ga-g][#b]?/);
+  if (!rawMatch) return null;
+  const consumed = rawMatch[0].length;
   const root = normalizeRoot(trimmed);
   if (!root) return null;
-  let rest = trimmed.slice(root.length);
+  let rest = trimmed.slice(consumed);
   let bass: string | undefined;
   const slashIdx = rest.indexOf("/");
   if (slashIdx >= 0) {
