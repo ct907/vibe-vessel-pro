@@ -47,6 +47,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        paper: {
+          DEFAULT: "hsl(var(--paper))",
+          shade: "hsl(var(--paper-shade))",
+        },
+        rule: "hsl(var(--rule))",
+        "ink-soft": "hsl(var(--ink-soft))",
+        "chord-ink": "hsl(var(--chord-ink))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
