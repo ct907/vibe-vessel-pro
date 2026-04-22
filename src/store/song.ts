@@ -96,6 +96,16 @@ export interface SongState {
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
   shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
+  /** Move a single chord anchor to another (section,line,col). Mirror link is detached. */
+  moveChordAnchor: (
+    fromSectionId: string, fromLineId: string, anchorId: string,
+    toSectionId: string, toLineId: string, toCol: number,
+  ) => void;
+  /** Paste a list of chord shapes at the given column (no anchorId reuse). */
+  pasteChordsAt: (
+    sectionId: string, lineId: string, atCol: number,
+    chords: { chord: ChordSymbol; relCol: number; widthCh: number }[],
+  ) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
