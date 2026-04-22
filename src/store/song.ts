@@ -1529,16 +1529,29 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (parsed.version !== 2) return;
     const sectionsLoaded: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
+    // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
+    const migratedProgression = progressionLoaded.map((p) => ({
+      ...p,
+      sectionId: p.sectionId ?? p.id,
+      chords: repackChords(p.chords, p.bars * p.beatsPerBar),
+    }));
     set({
       meta: parsed.meta ?? get().meta,
       sections: sectionsLoaded,
-      progression: progressionLoaded.map((p) => ({ ...p, chords: repackChords(p.chords, p.bars * p.beatsPerBar) })),
+      progression: migratedProgression,
       basket: [],
+      suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
     });
   },
   toJSON: () => {
     const s = get();
-    return { version: 2, meta: s.meta, sections: s.sections, progression: s.progression };
+    return {
+      version: 2,
+      meta: s.meta,
+      sections: s.sections,
+      progression: s.progression,
+      suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+    };
   },
 }));
 
