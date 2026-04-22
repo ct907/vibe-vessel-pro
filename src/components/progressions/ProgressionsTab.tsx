@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Minus, Trash2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical } from "lucide-react";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,11 @@ interface PatternProps {
   onDropChordOnPattern: (toPatternId: string, toIndex: number) => void;
   draggingChordId: string | null;
   draggingFromPatternId: string | null;
+  /** Section drag-to-sort across pattern blocks (mirrors lyrics tab). */
+  onSectionDragStart: (id: string) => void;
+  onSectionDragOver: (overId: string) => void;
+  onSectionDragEnd: () => void;
+  isSectionDragOver: boolean;
 }
 
 function formatBeats(n: number) {
@@ -37,6 +42,7 @@ function PatternBlock({
   pattern, sectionLabel, canDelete, otherPatterns, onPickerOpen,
   onDragChordStart, onDragChordEnd, onDropChordOnPattern,
   draggingChordId, draggingFromPatternId,
+  onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver,
 }: PatternProps) {
   const {
     updatePattern, basket, addChordToPattern,
