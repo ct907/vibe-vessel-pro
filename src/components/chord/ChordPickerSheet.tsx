@@ -195,7 +195,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
                       <span
                         role="button"
                         aria-label={`Preview ${s.symbol.display}`}
-                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol); }}
+                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
                         className="ml-auto rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-background"
                       >
                         <Play className="h-3.5 w-3.5" />
@@ -222,7 +222,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
                     <span
                       role="button"
                       aria-label={`Preview ${s.symbol.display}`}
-                      onClick={(e) => { e.stopPropagation(); void playChord(s.symbol); }}
+                      onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
                       className="rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-background"
                     >
                       <Play className="h-4 w-4" />
