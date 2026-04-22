@@ -117,6 +117,11 @@ function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPick
         onClick={handleChordRowClick}
         title={selectMode ? "Tap chips to add/remove from selection" : "Click to add a chord above this position"}
       >
+        {line.chords.length === 0 && (
+          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-6 pointer-events-none select-none">
+            add your chords here
+          </span>
+        )}
         {line.chords.map((a) => {
           const x = measureRef.current ? measureOffsetX(measureRef.current, line.text, a.offset) : 0;
           const isSel = selected.has(a.id);
