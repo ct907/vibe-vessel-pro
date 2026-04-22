@@ -84,6 +84,7 @@ export interface SongState {
   moveSection: (id: string, direction: -1 | 1) => void;
   reorderSection: (id: string, toIndex: number) => void;
   toggleSectionCollapsed: (id: string) => void;
+  setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
 
   // ---- lyrics (line-level) ----
