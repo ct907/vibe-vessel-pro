@@ -169,3 +169,137 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
     </Sheet>
   );
 }
+
+// ============================================================================
+// Helper dropdowns shown to the right of the chord input.
+// They compose into the typed query string; the user can still type freely.
+// ============================================================================
+
+type TypeKey = "maj" | "m" | "dim" | "aug";
+type ExtKey = "none" | "7" | "9" | "11";
+
+const TYPE_OPTIONS: { value: TypeKey; label: string }[] = [
+  { value: "maj", label: "maj" },
+  { value: "m",   label: "m" },
+  { value: "dim", label: "dim" },
+  { value: "aug", label: "aug" },
+];
+const EXT_OPTIONS: { value: ExtKey; label: string }[] = [
+  { value: "none", label: "—" },
+  { value: "7",    label: "7" },
+  { value: "9",    label: "9" },
+  { value: "11",   label: "11" },
+];
+
+/** Pull a normalized root from the start of the query, or default to "C". */
+function rootOf(query: string): string {
+  return normalizeRoot(query.trim()) ?? "C";
+}
+function rootLen(query: string): number {
+  const m = query.trim().match(/^[A-Ga-g][#b]?/);
+  return m ? m[0].length : 0;
+}
+/** Parse the slash-bass off the end, returning [coreTail, bass|""]. */
+function splitSlash(tail: string): [string, string] {
+  const i = tail.indexOf("/");
+  if (i < 0) return [tail, ""];
+  const bass = normalizeRoot(tail.slice(i + 1)) ?? "";
+  return [tail.slice(0, i), bass];
+}
+/** Detect the type segment at the start of the (post-root, pre-slash) tail. */
+function detectType(core: string): TypeKey {
+  const c = core.toLowerCase();
+  if (c.startsWith("maj")) return "maj";
+  if (c.startsWith("dim") || c.startsWith("°")) return "dim";
+  if (c.startsWith("aug") || c.startsWith("+")) return "aug";
+  if (c.startsWith("m") && !c.startsWith("maj")) return "m";
+  return "maj";
+}
+function stripTypePrefix(core: string, type: TypeKey): string {
+  const c = core;
+  const lc = c.toLowerCase();
+  if (type === "maj" && lc.startsWith("maj")) return c.slice(3);
+  if (type === "m"   && lc.startsWith("m") && !lc.startsWith("maj")) return c.slice(1);
+  if (type === "dim" && lc.startsWith("dim")) return c.slice(3);
+  if (type === "aug" && lc.startsWith("aug")) return c.slice(3);
+  return c; // no explicit prefix typed — treat as default ("maj")
+}
+function detectExt(rest: string): ExtKey {
+  if (/^11/.test(rest)) return "11";
+  if (/^9/.test(rest))  return "9";
+  if (/^7/.test(rest))  return "7";
+  return "none";
+}
+
+interface HelpersProps { query: string; onChange: (q: string) => void; }
+
+function ChordTypeHelpers({ query, onChange }: HelpersProps) {
+  const root = rootOf(query);
+  const rl = rootLen(query);
+  const tail = query.trim().slice(rl);
+  const [core, bass] = splitSlash(tail);
+  const typeVal = detectType(core);
+  const rest = stripTypePrefix(core, typeVal);
+  const extVal = detectExt(rest);
+
+  const compose = (t: TypeKey, e: ExtKey, b: string) => {
+    // Pretty-print the type so it round-trips with the parser.
+    const typeStr =
+      t === "maj" ? (e === "none" ? "" : "maj") // "C" + "7" = C7 (dom); "C" + "maj"+"7" handled by ext below
+                  : t === "m" ? "m"
+                  : t === "dim" ? "dim"
+                  : "aug";
+    // Special: when type=maj and ext is set, we want major-7th/9th, so emit "maj7"/"maj9".
+    let suffix = typeStr;
+    if (e !== "none") {
+      if (t === "maj") suffix = "maj" + e;       // Cmaj7, Cmaj9, Cmaj11
+      else if (t === "m") suffix = "m" + e;      // Cm7, Cm9
+      else if (t === "dim") suffix = "dim" + e;  // Cdim7
+      else suffix = typeStr + e;                  // Caug7
+    } else if (t === "maj") {
+      suffix = ""; // plain major
+    }
+    const slash = b ? `/${b}` : "";
+    return `${root}${suffix}${slash}`;
+  };
+
+  const slashOptions = ALL_ROOTS.filter((r) => r !== root);
+
+  return (
+    <>
+      <Select value={typeVal} onValueChange={(v) => onChange(compose(v as TypeKey, extVal, bass))}>
+        <SelectTrigger className="h-10 w-[68px] px-2 text-xs font-mono-chord">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TYPE_OPTIONS.map((o) => (
+            <SelectItem key={o.value} value={o.value} className="text-xs font-mono-chord">{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={extVal} onValueChange={(v) => onChange(compose(typeVal, v as ExtKey, bass))}>
+        <SelectTrigger className="h-10 w-[64px] px-2 text-xs font-mono-chord">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {EXT_OPTIONS.map((o) => (
+            <SelectItem key={o.value} value={o.value} className="text-xs font-mono-chord">{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={bass || "__none"} onValueChange={(v) => onChange(compose(typeVal, extVal, v === "__none" ? "" : v))}>
+        <SelectTrigger className="h-10 w-[72px] px-2 text-xs font-mono-chord">
+          <SelectValue placeholder="/—" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none" className="text-xs font-mono-chord">/—</SelectItem>
+          {slashOptions.map((r) => (
+            <SelectItem key={r} value={r} className="text-xs font-mono-chord">/{r}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
+  );
+}
