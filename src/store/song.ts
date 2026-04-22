@@ -467,6 +467,46 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { sections, progression };
   }),
 
+  removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => set((s) => {
+    const idSet = new Set(anchorIds);
+    const mirrorIds = new Set<string>();
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== lineId) return l;
+          l.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorIds.add(c.mirrorId); });
+          return { ...l, chords: l.chords.filter((c) => !idSet.has(c.id)) };
+        }),
+      };
+    });
+    const progression = mirrorIds.size
+      ? s.progression.map((p) => p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => !mirrorIds.has(c.id)) })
+      : s.progression;
+    return { sections, progression };
+  }),
+
+  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaChars) => set((s) => {
+    const idSet = new Set(anchorIds);
+    return {
+      sections: s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const max = l.text.length;
+            const chords = l.chords.map((c) => idSet.has(c.id)
+              ? { ...c, offset: Math.max(0, Math.min(max, c.offset + deltaChars)) }
+              : c).sort((a, b) => a.offset - b.offset);
+            return { ...l, chords };
+          }),
+        };
+      }),
+    };
+  }),
+
   // ---- basket ----
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
