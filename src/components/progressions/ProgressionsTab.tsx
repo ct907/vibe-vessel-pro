@@ -582,6 +582,19 @@ export function ProgressionsTab() {
           onDropChordOnPattern={handleDropChord}
           draggingChordId={drag?.chordId ?? null}
           draggingFromPatternId={drag?.fromPatternId ?? null}
+          onSectionDragStart={(id) => setSectionDrag({ id })}
+          onSectionDragOver={(overId) => {
+            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
+          }}
+          onSectionDragEnd={() => {
+            const sd = sectionDrag;
+            if (sd && sd.overId && sd.overId !== sd.id) {
+              const targetIdx = progression.findIndex((x) => x.id === sd.overId);
+              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
+            }
+            setSectionDrag(null);
+          }}
+          isSectionDragOver={sectionDrag?.overId === p.id && sectionDrag?.id !== p.id}
         />
       ))}
 
