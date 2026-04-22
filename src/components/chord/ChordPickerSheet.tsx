@@ -82,16 +82,19 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px` }}
       >
         <div className="space-y-3 flex-1 min-h-0 flex flex-col">
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a chord… e.g. Bbm9, Fmaj7, Csus4"
-            className="font-mono-chord text-base"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && exact) handlePick(exact);
-            }}
-          />
+          <div className="flex items-stretch gap-1.5">
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type a chord… e.g. Bbm9, Fmaj7, Csus4"
+              className="font-mono-chord text-base flex-1 min-w-0"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && exact) handlePick(exact);
+              }}
+            />
+            <ChordTypeHelpers query={query} onChange={setQuery} />
+          </div>
 
           {!query.trim() && (
             <p className="text-sm text-muted-foreground">
