@@ -7,17 +7,12 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ArrowLeft, ArrowRight, Pencil, X } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, Pencil, X } from "lucide-react";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
 
-const DURATION_OPTIONS = [
-  { v: 1, label: "1 beat" },
-  { v: 2, label: "2 beats" },
-  { v: 4, label: "1 bar" },
-  { v: 8, label: "2 bars" },
-  { v: 16, label: "4 bars" },
-];
+const LENGTH_STEP = 0.5;
+const MIN_LEN = 0.5;
 
 interface PatternProps {
   pattern: PatternBlockType;
@@ -27,10 +22,15 @@ interface PatternProps {
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
 }
 
+function formatBeats(n: number) {
+  // Show .5 only when fractional
+  return Number.isInteger(n) ? `${n}` : n.toFixed(1).replace(/\.0$/, "");
+}
+
 function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPickerOpen }: PatternProps) {
   const {
     updatePattern, basket, addChordToPattern, removePatternChord,
-    updatePatternChord, movePatternChord, removeSection,
+    setPatternChordLength, movePatternChord, removeSection,
     removePatternChordsBatch, shiftPatternChords, movePatternChordsTo,
   } = useSongStore();
   const [activeChord, setActiveChord] = useState<string | null>(null);
@@ -42,15 +42,9 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
+  const freeBeats = Math.max(0, totalBeats - usedBeats);
   const selectedIds = Array.from(selected);
-
-  const handleGridClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (selectMode) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const beat = Math.floor((x / rect.width) * totalBeats);
-    onPickerOpen(pattern.id, beat);
-  };
 
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
 
@@ -63,7 +57,6 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
         setSelected(new Set([chordId]));
         setActiveChord(null);
       } else {
-        // toggle
         setSelected((prev) => {
           const next = new Set(prev);
           if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
@@ -88,8 +81,12 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
     }
   };
 
+  const active = activeChord ? sortedChords.find((c) => c.id === activeChord) ?? null : null;
+  // Max length the active chord can grow to without bumping siblings.
+  const activeMaxLen = active ? totalBeats - (usedBeats - active.lengthBeats) : 0;
+
   return (
-    <div className="paper-card rounded-xl p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="font-display text-base ink-chord truncate">{sectionLabel ?? pattern.label}</span>
@@ -107,6 +104,9 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
             className="h-7 w-14 font-mono-chord"
           />
         </div>
+        <span className="text-[11px] text-muted-foreground">
+          {formatBeats(usedBeats)} / {totalBeats} beats
+        </span>
         <Button
           variant="ghost"
           size="icon"
@@ -153,27 +153,22 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
         </div>
       )}
 
+      {/* Left-aligned flex layout. Each chord's width is proportional to its
+          beat length relative to total beats. Empty space stays on the right. */}
       <div className="relative">
-        <div
-          className="relative h-20 rounded-md border border-border bg-paper-shade/40 overflow-hidden cursor-pointer"
-          onClick={handleGridClick}
-        >
+        <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch">
+          {/* Bar grid lines (visual reference only) */}
           {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
             <div
               key={`bar-${i}`}
-              className="absolute top-0 bottom-0 border-l border-rule/70"
+              className="absolute top-0 bottom-0 border-l border-border/70 pointer-events-none"
               style={{ left: `${(i / pattern.bars) * 100}%` }}
             />
           ))}
-          {Array.from({ length: totalBeats }).map((_, i) => (
-            <div
-              key={`beat-${i}`}
-              className="absolute top-0 bottom-0 border-l border-rule/30"
-              style={{ left: `${(i / totalBeats) * 100}%` }}
-            />
-          ))}
+
           {sortedChords.map((c) => {
             const isSel = selected.has(c.id);
+            const widthPct = (c.lengthBeats / totalBeats) * 100;
             return (
               <button
                 key={c.id}
@@ -185,50 +180,67 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
                 onContextMenu={(e) => { e.preventDefault(); }}
                 onClick={(e) => { e.stopPropagation(); handleChordTap(c.id); }}
                 className={cn(
-                  "absolute top-1 bottom-1 rounded-md border border-primary/40 bg-card hover:bg-accent flex items-center justify-center px-1 overflow-hidden select-none",
+                  "relative my-1 mx-0.5 rounded-md border border-primary/40 bg-card hover:bg-accent flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
                   !selectMode && activeChord === c.id && "ring-2 ring-primary",
                   selectMode && isSel && "ring-2 ring-primary bg-accent",
                 )}
-                style={{
-                  left: `${(c.startBeat / totalBeats) * 100}%`,
-                  width: `${(c.lengthBeats / totalBeats) * 100}%`,
-                }}
+                style={{ width: `calc(${widthPct}% - 4px)`, minWidth: 32 }}
               >
-                <span className="font-mono-chord font-semibold ink-chord text-sm truncate">
+                <span className="font-mono-chord font-semibold ink-chord text-sm leading-tight truncate max-w-full">
                   {c.chord.display}
+                </span>
+                <span className="font-mono-chord text-[10px] text-muted-foreground leading-tight">
+                  {formatBeats(c.lengthBeats)}b
                 </span>
               </button>
             );
           })}
 
-          {sortedChords.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
-              Click a beat to add a chord, or drop from the basket below
-            </div>
-          )}
+          {/* Empty trailing zone — click to add at end */}
+          <button
+            type="button"
+            onClick={() => onPickerOpen(pattern.id, usedBeats)}
+            className="flex-1 min-w-0 my-1 mx-0.5 rounded-md border border-dashed border-border/70 text-[11px] text-muted-foreground hover:bg-accent/40 transition-colors"
+            style={{ display: freeBeats > 0 ? "block" : "none" }}
+            aria-label="Add chord at end"
+          >
+            {sortedChords.length === 0 ? "Click to add a chord" : `+ ${formatBeats(freeBeats)}b`}
+          </button>
         </div>
 
-        {!selectMode && activeChord && (() => {
-          const c = sortedChords.find((x) => x.id === activeChord);
-          if (!c) return null;
+        {!selectMode && active && (() => {
+          const c = active;
+          const canDecrease = c.lengthBeats > MIN_LEN;
+          const canIncrease = c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9;
           return (
             <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 shadow-sm flex-wrap">
               <span className="font-mono-chord ink-chord text-sm">{c.chord.display}</span>
-              <span className="text-xs text-muted-foreground">at beat {c.startBeat + 1}</span>
+              <span className="text-xs text-muted-foreground">
+                len {formatBeats(c.lengthBeats)}b
+              </span>
 
-              <Select
-                value={String(c.lengthBeats)}
-                onValueChange={(v) => updatePatternChord(pattern.id, c.id, { lengthBeats: Number(v) })}
-              >
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DURATION_OPTIONS.map((d) => (
-                    <SelectItem key={d.v} value={String(d.v)} className="text-xs">{d.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  disabled={!canDecrease}
+                  onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP)}
+                  aria-label="Decrease length"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  disabled={!canIncrease}
+                  onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP)}
+                  aria-label="Increase length"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
 
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => movePatternChord(pattern.id, c.id, -1)} aria-label="Move earlier">
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -251,7 +263,7 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
       </div>
 
       <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-        Long-press a chord to multi-select
+        Long-press a chord to multi-select · Tap to edit length
       </p>
 
       {basket.length > 0 && (
@@ -263,13 +275,7 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
                 key={b.id}
                 chord={b.chord}
                 size="sm"
-                onClick={() => {
-                  const lastEnd = sortedChords.length
-                    ? Math.max(...sortedChords.map((c) => c.startBeat + c.lengthBeats))
-                    : 0;
-                  const start = Math.min(lastEnd, totalBeats - 1);
-                  addChordToPattern(pattern.id, b.chord, start, 2);
-                }}
+                onClick={() => addChordToPattern(pattern.id, b.chord, usedBeats, 2)}
               />
             ))}
           </div>
