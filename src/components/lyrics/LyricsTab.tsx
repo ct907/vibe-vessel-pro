@@ -93,11 +93,24 @@ function LineRow({
     }));
   };
 
+  const writeOSClipboard = (clip: ChordClip[]) => {
+    if (!clip.length) return;
+    try {
+      const text = clip
+        .sort((a, b) => a.relCol - b.relCol)
+        .map((c) => c.chord.display)
+        .join(" ");
+      void navigator.clipboard?.writeText(text);
+    } catch { /* ignore */ }
+  };
+
   const doCopy = () => {
     chordClipboard = collectClip(Array.from(selected));
+    writeOSClipboard(chordClipboard);
   };
   const doCut = () => {
     chordClipboard = collectClip(Array.from(selected));
+    writeOSClipboard(chordClipboard);
     removeChordAnchorsBatch(sectionId, line.id, Array.from(selected));
     exitSelect();
   };
