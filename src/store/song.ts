@@ -542,6 +542,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
     return { sections, progression };
   }),
+  toggleSectionCollapsed: (id) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec)),
   })),
   setSectionComment: (id, comment) => set((s) => ({
