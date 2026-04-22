@@ -429,6 +429,7 @@ function LineRow({
         ref={chordRowRef}
         data-chord-row={line.id}
         tabIndex={0}
+        onMouseDown={handleRowMouseDown}
         onClick={handleChordRowClick}
         onKeyDown={handleChordKeyDown}
         onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
@@ -450,14 +451,32 @@ function LineRow({
             add your chords here
           </span>
         )}
+        {/* Drag-area visual rectangle */}
+        {areaSel && (
+          <span
+            aria-hidden
+            className="absolute top-0 bottom-0 bg-primary/20 border border-primary/50 rounded-sm pointer-events-none"
+            style={{
+              left: `${Math.min(areaSel.x1, areaSel.x2)}px`,
+              width: `${Math.abs(areaSel.x2 - areaSel.x1)}px`,
+            }}
+          />
+        )}
         {/* Chord chips at columns */}
         {line.chords.map((a) => {
           const col = colOf(a);
           const isSel = selected.has(a.id);
-          const handleChipTap = () => {
-            if (selectMode) { toggleSelected(a.id); return; }
-            // Tap = open picker for editing. Context menu (select mode) is
-            // exclusively reserved for tap-and-hold (long press).
+          const handleChipTap = (e?: React.MouseEvent) => {
+            // Shift+click = range select (works in or out of selectMode)
+            if (e && e.shiftKey) {
+              selectRangeTo(a.id, true);
+              return;
+            }
+            if (selectMode) {
+              toggleSelected(a.id);
+              lastSelectedRef.current = a.id;
+              return;
+            }
             setChordCaret(col);
             focusChord();
             onPickerOpen(line.id, col, a.id);
@@ -465,6 +484,7 @@ function LineRow({
           return (
             <div
               key={a.id}
+              data-chip-anchor={a.id}
               className="absolute top-0 leading-7"
               style={{ left: `${col * cellPx}px` }}
               draggable
@@ -476,7 +496,7 @@ function LineRow({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                handleChipTap();
+                handleChipTap(e);
               }}
             >
               <ChordChip
@@ -484,10 +504,11 @@ function LineRow({
                 variant="ink"
                 size="sm"
                 selected={selectMode && isSel}
-                audition={!selectMode}
-                onClick={handleChipTap}
+                audition
+                onClick={() => handleChipTap()}
                 onLongPress={() => {
                   if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
+                  lastSelectedRef.current = a.id;
                 }}
               />
             </div>
