@@ -66,6 +66,7 @@ function PatternBlock({
   const longFiredRef = useRef(false);
   const lastTapRef = useRef<{ id: string; t: number } | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
@@ -167,11 +168,25 @@ function PatternBlock({
 
   return (
     <div
-      ref={blockRef}
+      ref={(el) => { blockRef.current = el; cardRef.current = el; }}
       onClick={() => setFocusedPattern(pattern.id)}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("application/x-pattern-section-id")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          onSectionDragOver(pattern.id);
+        }
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.types.includes("application/x-pattern-section-id")) {
+          e.preventDefault();
+          onSectionDragEnd();
+        }
+      }}
       className={cn(
         "rounded-xl border bg-card p-4 transition-shadow cursor-pointer",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+        isSectionDragOver && "ring-2 ring-primary/60",
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
