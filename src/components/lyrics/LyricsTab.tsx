@@ -374,6 +374,7 @@ export function LyricsTab() {
           section={sec}
           index={i}
           total={sections.length}
+          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
           onPickerOpen={openPicker}
         />
       ))}
