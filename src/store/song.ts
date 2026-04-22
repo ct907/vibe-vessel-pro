@@ -580,7 +580,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
 
     return { sections, progression };
-  }),
+  })); },
 
   removeChordAnchor: (sectionId, lineId, anchorId) => { pushHistory(get); return set((s) => {
     let mirrorId: string | undefined;
@@ -602,7 +602,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         )
       : s.progression;
     return { sections, progression };
-  }),
+  })); },
 
   removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
@@ -622,7 +622,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       ? s.progression.map((p) => p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => !mirrorIds.has(c.id)) })
       : s.progression;
     return { sections, progression };
-  }),
+  })); },
 
   shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
@@ -645,7 +645,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         };
       }),
     };
-  }),
+  })); },
 
   moveSelectedChordsByOrder: (sectionId, lineId, anchorIds, direction) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
@@ -704,7 +704,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         };
       }),
     };
-  }),
+  })); },
 
   moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => { pushHistory(get); return set((s) => {
     // Find the anchor first
@@ -799,7 +799,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       : s.progression;
 
     return { sections, progression };
-  }),
+  })); },
 
   pasteChordsAt: (sectionId, lineId, atCol, items) => { pushHistory(get); return set((s) => ({
     sections: s.sections.map((sec) => {
@@ -821,7 +821,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         }),
       };
     }),
-  })),
+  }))); },
 
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
