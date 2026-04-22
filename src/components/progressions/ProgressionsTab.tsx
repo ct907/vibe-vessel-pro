@@ -21,15 +21,19 @@ const DURATION_OPTIONS = [
 
 interface PatternProps {
   pattern: PatternBlockType;
+  sectionLabel?: string;
+  canDelete: boolean;
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
 }
 
-function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
-  const { updatePattern, removePattern, basket, addChordToPattern, removePatternChord, updatePatternChord, movePatternChord } = useSongStore();
+function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: PatternProps) {
+  const {
+    updatePattern, basket, addChordToPattern, removePatternChord,
+    updatePatternChord, movePatternChord, removeSection,
+  } = useSongStore();
   const [activeChord, setActiveChord] = useState<string | null>(null);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
-  const cellWidth = 100 / totalBeats;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
 
   const handleGridClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -41,36 +45,40 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
 
   return (
     <div className="paper-card rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Input
-          value={pattern.label}
-          onChange={(e) => updatePattern(pattern.id, { label: e.target.value })}
-          className="h-8 w-40 font-display text-base bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
-        />
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="font-display text-base ink-chord truncate">{sectionLabel ?? pattern.label}</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">bound to section</span>
+        </div>
         <span className="text-xs text-muted-foreground">·</span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           Bars
           <Input
             type="number"
             min={1}
-            max={16}
+            max={32}
             value={pattern.bars}
-            onChange={(e) => updatePattern(pattern.id, { bars: Math.max(1, Math.min(16, Number(e.target.value) || 1)) })}
+            onChange={(e) => updatePattern(pattern.id, { bars: Math.max(1, Math.min(32, Number(e.target.value) || 1)) })}
             className="h-7 w-14 font-mono-chord"
           />
         </div>
-        <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removePattern(pattern.id)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={() => removeSection(pattern.id)}
+          disabled={!canDelete}
+          title="Delete section + pattern"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Bar grid */}
       <div className="relative">
         <div
           className="relative h-20 rounded-md border border-border bg-paper-shade/40 overflow-hidden cursor-pointer"
           onClick={handleGridClick}
         >
-          {/* bar lines */}
           {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
             <div
               key={`bar-${i}`}
@@ -78,7 +86,6 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
               style={{ left: `${(i / pattern.bars) * 100}%` }}
             />
           ))}
-          {/* beat ticks */}
           {Array.from({ length: totalBeats }).map((_, i) => (
             <div
               key={`beat-${i}`}
@@ -86,7 +93,6 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
               style={{ left: `${(i / totalBeats) * 100}%` }}
             />
           ))}
-          {/* placed chords */}
           {sortedChords.map((c) => (
             <button
               key={c.id}
@@ -113,12 +119,11 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
           )}
         </div>
 
-        {/* contextual menu under the block */}
         {activeChord && (() => {
           const c = sortedChords.find((x) => x.id === activeChord);
           if (!c) return null;
           return (
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 shadow-sm">
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 shadow-sm flex-wrap">
               <span className="font-mono-chord ink-chord text-sm">{c.chord.display}</span>
               <span className="text-xs text-muted-foreground">at beat {c.startBeat + 1}</span>
 
@@ -156,7 +161,6 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
         })()}
       </div>
 
-      {/* basket → drop into this block */}
       {basket.length > 0 && (
         <div className="mt-3">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">From basket</p>
@@ -167,12 +171,11 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
                 chord={b.chord}
                 size="sm"
                 onClick={() => {
-                  // append at the next free beat
                   const lastEnd = sortedChords.length
                     ? Math.max(...sortedChords.map((c) => c.startBeat + c.lengthBeats))
                     : 0;
                   const start = Math.min(lastEnd, totalBeats - 1);
-                  addChordToPattern(pattern.id, b.chord, start, 4);
+                  addChordToPattern(pattern.id, b.chord, start, 2);
                 }}
               />
             ))}
@@ -184,30 +187,39 @@ function PatternBlock({ pattern, onPickerOpen }: PatternProps) {
 }
 
 export function ProgressionsTab() {
-  const { progression, addPattern, addChordToPattern, updatePatternChord } = useSongStore();
+  const { progression, sections, addSection, addChordToPattern, updatePatternChord } = useSongStore();
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
+
+  const labelById = new Map(sections.map((s) => [s.id, s.label] as const));
+  const canDelete = sections.length > 1;
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
     if (picker.replaceChordId) {
       updatePatternChord(picker.patternId, picker.replaceChordId, { chord });
     } else {
-      addChordToPattern(picker.patternId, chord, picker.atBeat, 4);
+      addChordToPattern(picker.patternId, chord, picker.atBeat, 2);
     }
   };
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Each pattern block is bound to a section in the Lyrics tab. Adding a chord here also drops it at the end of that section's last lyric line, and vice versa.
+      </p>
+
       {progression.map((p) => (
         <PatternBlock
           key={p.id}
           pattern={p}
+          sectionLabel={labelById.get(p.id)}
+          canDelete={canDelete}
           onPickerOpen={(patternId, atBeat, replaceChordId) => setPicker({ patternId, atBeat, replaceChordId })}
         />
       ))}
 
-      <Button variant="outline" onClick={() => addPattern()}>
-        <Plus className="h-4 w-4" /> Add pattern
+      <Button variant="outline" onClick={() => addSection("custom")}>
+        <Plus className="h-4 w-4" /> Add pattern (creates a new section)
       </Button>
 
       <ChordPickerSheet
