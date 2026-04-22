@@ -68,6 +68,9 @@ function LineRow({
   const [chordFocused, setChordFocused] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const lastSelectedRef = useRef<string | null>(null);
+  const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
+  const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
 
   // Scroll the active row to ~80px below the top of the visual viewport
   // whenever it becomes the active (picker-open) row.
