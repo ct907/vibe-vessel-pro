@@ -56,7 +56,16 @@ function LineRow({
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const len = Math.max(line.chordRowLen ?? 0, ...line.chords.map((c) => colOf(c) + 1), 1);
+  // Effective row length must account for the visual width of each chord chip
+  // (e.g. "Fmaj7" occupies 5 ch-cells), so the caret can land to the right of
+  // any chord, not just one cell after its starting column.
+  const chordEndCol = (a: { chordCol?: number; offset?: number; chord: { display: string } }) =>
+    colOf(a) + Math.max(1, a.chord.display.length);
+  const len = Math.max(
+    line.chordRowLen ?? 0,
+    ...line.chords.map(chordEndCol),
+    1,
+  );
 
   useEffect(() => {
     if (selectMode && line.chords.length === 0) { setSelectMode(false); setSelected(new Set()); }
