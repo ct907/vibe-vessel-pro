@@ -416,6 +416,8 @@ export const useSongStore = create<SongState>((set, get) => ({
   sections: [seed.section],
   basket: [],
   progression: [seed.pattern],
+  suppressCrossTabDeleteWarning: false,
+  setSuppressCrossTabDeleteWarning: (v) => set({ suppressCrossTabDeleteWarning: v }),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
   setKey: (keyRoot, keyMode) => set((s) => ({ meta: { ...s.meta, keyRoot, keyMode } })),
