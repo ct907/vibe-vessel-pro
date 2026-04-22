@@ -59,6 +59,7 @@ function LineRow({
     setLineText, upsertChordAt,
     removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
+    undo, redo,
   } = useSongStore();
   const lyricInputRef = useRef<HTMLInputElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
@@ -170,6 +171,18 @@ function LineRow({
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const k = e.key;
     const mod = e.metaKey || e.ctrlKey;
+
+    // Undo / Redo (chord-row history). Cmd/Ctrl+Z = undo; Cmd/Ctrl+Y or Cmd/Ctrl+Shift+Z = redo.
+    if (mod && (k === "z" || k === "Z")) {
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+      return;
+    }
+    if (mod && (k === "y" || k === "Y")) {
+      e.preventDefault();
+      redo();
+      return;
+    }
 
     // Keyboard shortcuts: Cmd/Ctrl + A / C / X / V — work in or out of selectMode.
     if (mod && (k === "a" || k === "A")) {
