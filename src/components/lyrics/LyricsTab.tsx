@@ -583,17 +583,10 @@ function useCellPx(): number {
 export function LyricsTab() {
   const { sections, upsertChordAt, removeChordAnchor, addSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
+  const cellPx = useCellPx();
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     setPicker({ sectionId, lineId, col, anchorId });
-    // Scroll the active row to ~80px below top of viewport
-    setTimeout(() => {
-      const row = document.querySelector<HTMLDivElement>(`[data-line-id="${lineId}"]`);
-      if (!row) return;
-      const rect = row.getBoundingClientRect();
-      const targetTop = 80;
-      window.scrollBy({ top: rect.top - targetTop, behavior: "smooth" });
-    }, 30);
   };
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
@@ -608,6 +601,14 @@ export function LyricsTab() {
     if (!picker?.anchorId) return;
     removeChordAnchor(picker.sectionId, picker.lineId, picker.anchorId);
   };
+
+  const cloneLen = activeLine
+    ? Math.max(
+        activeLine.chordRowLen ?? 0,
+        ...activeLine.chords.map((a) => colOf(a) + Math.max(1, a.chord.display.length)),
+        1,
+      )
+    : 0;
 
   return (
     <div className="space-y-4">
@@ -634,6 +635,41 @@ export function LyricsTab() {
           <Plus className="h-3.5 w-3.5" /> Custom…
         </Button>
       </div>
+
+      {/* Pinned clone of the active row — sits 80px below the top of the
+          visual viewport, above the chord picker sheet (which reserves the
+          top ~140px). Non-interactive snapshot for context while editing. */}
+      {picker && activeLine && (
+        <div
+          className="fixed left-0 right-0 z-[60] pointer-events-none px-4"
+          style={{ top: 80 }}
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="paper-card rounded-md ring-2 ring-primary/70 bg-primary/5 px-3 py-2 shadow-lg overflow-x-auto">
+              <div
+                className="relative h-7"
+                style={{ minWidth: `${Math.max(cloneLen + 1, 8) * cellPx}px` }}
+              >
+                {activeLine.chords.map((a) => {
+                  const col = colOf(a);
+                  return (
+                    <div
+                      key={a.id}
+                      className="absolute top-0 leading-7 font-mono-chord font-semibold ink-chord text-sm"
+                      style={{ left: `${col * cellPx}px` }}
+                    >
+                      {a.chord.display}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="font-display text-lg leading-9 text-foreground whitespace-pre">
+                {activeLine.text || <span className="text-muted-foreground/60 italic">add your lyric…</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ChordPickerSheet
         open={!!picker}
