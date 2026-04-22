@@ -525,9 +525,10 @@ function PatternBlock({
 }
 
 export function ProgressionsTab() {
-  const { progression, sections, addSection, addChordToPattern, updatePatternChord, basket, reorderPatternChord, movePatternChordToPatternAt } = useSongStore();
+  const { progression, sections, addSection, addChordToPattern, updatePatternChord, basket, reorderPatternChord, movePatternChordToPatternAt, reorderSection } = useSongStore();
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [drag, setDrag] = useState<{ fromPatternId: string; chordId: string } | null>(null);
+  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
 
   const labelById = new Map(sections.map((s) => [s.id, s.label] as const));
   const canDelete = sections.length > 1;
