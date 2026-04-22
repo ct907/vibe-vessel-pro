@@ -442,7 +442,7 @@ function LineRow({
           const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
           onChordDrop(line.id, col);
         }}
-        className="relative h-7 cursor-text outline-none rounded-sm focus:bg-accent/30"
+        className="relative h-7 cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
         style={{ minWidth: `${Math.max(len + 1, 8) * cellPx}px` }}
       >
         {/* Placeholder */}
