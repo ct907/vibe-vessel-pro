@@ -44,6 +44,13 @@ function PatternBlock({
     removePatternChordsBatch, shiftPatternChords, movePatternChordsTo,
     reorderPatternChord,
   } = useSongStore();
+  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
+  const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const isFocused = focusedPatternId === pattern.id;
+  const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
+
   const [activeChord, setActiveChord] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
