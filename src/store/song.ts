@@ -71,6 +71,9 @@ export interface SongState {
   sections: Section[];
   basket: BasketItem[];
   progression: PatternBlock[];
+  /** When true, cross-tab delete confirmation dialogs are suppressed. */
+  suppressCrossTabDeleteWarning: boolean;
+  setSuppressCrossTabDeleteWarning: (v: boolean) => void;
 
   // ---- meta ----
   setTitle: (t: string) => void;
@@ -100,17 +103,11 @@ export interface SongState {
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
   shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
-  /** Move selected chords by one slot in chord-list order, ignoring spaces.
-   *  direction = +1: snap each selected chord to just after its right neighbor (after that neighbor's last trailing space).
-   *  direction = -1: snap each selected chord to just before its left neighbor (before that neighbor's leading space).
-   */
   moveSelectedChordsByOrder: (sectionId: string, lineId: string, anchorIds: string[], direction: -1 | 1) => void;
-  /** Move a single chord anchor to another (section,line,col). Mirror link is detached. */
   moveChordAnchor: (
     fromSectionId: string, fromLineId: string, anchorId: string,
     toSectionId: string, toLineId: string, toCol: number,
   ) => void;
-  /** Paste a list of chord shapes at the given column (no anchorId reuse). */
   pasteChordsAt: (
     sectionId: string, lineId: string, atCol: number,
     chords: { chord: ChordSymbol; relCol: number; widthCh: number }[],
@@ -130,14 +127,17 @@ export interface SongState {
   removePatternChordsBatch: (patternId: string, chordIds: string[]) => void;
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
-  /** Adjust a single pattern chord's length (in beats, supports 0.5 increments). Re-packs neighbors. */
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
-  /** Reorder a chord within its pattern to a target index (0-based, in left-to-right order). */
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
-  /** Move a single chord from one pattern to another at a target index. */
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
+  /** Append a fresh empty pattern block to a section. Returns its id. */
+  addPatternToSection: (sectionId: string) => string;
+  /** Remove a single pattern block. No-op if it's the only block in its section. */
+  removePatternBlock: (patternId: string) => void;
+  /** Replace a pattern's chords (used for variation suggestions). Lengths preserved. */
+  replacePatternChords: (patternId: string, chords: ChordSymbol[]) => void;
 
-  // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
+  // ---- chord-row undo/redo ----
   undo: () => boolean;
   redo: () => boolean;
   canUndo: () => boolean;
@@ -153,6 +153,7 @@ export interface SerializedSong {
   meta: SongState["meta"];
   sections: Section[];
   progression: PatternBlock[];
+  suppressCrossTabDeleteWarning?: boolean;
 }
 
 // ---------- Factories ----------
