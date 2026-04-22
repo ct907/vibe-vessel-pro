@@ -319,13 +319,7 @@ function PatternBlock({
                 {dropIndicator === idx + 1 && draggingChordId && (
                   <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
                 )}
-                {/* Playhead — bright orange typing-cursor stick at left edge of currently-playing chord */}
-                {playingChordId === c.id && (
-                  <span
-                    aria-hidden
-                    className="absolute -left-0.5 top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
-                  />
-                )}
+                {/* (playhead drawn in outer wrapper so it can extend above the chip) */}
                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                   {c.chord.display}
                 </span>
