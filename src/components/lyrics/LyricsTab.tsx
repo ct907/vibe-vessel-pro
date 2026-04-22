@@ -434,9 +434,11 @@ interface SectionCardProps {
   onPickerOpen: (sectionId: string, lineId: string, col: number, anchorId?: string) => void;
   onChordDragStart: (sectionId: string, lineId: string, anchorId: string) => void;
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
+  chordRowQuery?: string;
+  onChordRowQueryChange?: (q: string) => void;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection, moveSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
