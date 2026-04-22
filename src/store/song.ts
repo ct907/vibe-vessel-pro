@@ -457,7 +457,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   // Add or replace a chord anchor; mirror to bound pattern block.
-  upsertChordAt: (sectionId, lineId, offset, chord, anchorId) => set((s) => {
+  upsertChordAt: (sectionId, lineId, col, chord, anchorId) => set((s) => {
     let createdAnchorId: string | null = null;
     let updatedAnchorId: string | null = null;
     let prevMirrorId: string | undefined;
@@ -474,37 +474,35 @@ export const useSongStore = create<SongState>((set, get) => ({
               if (c.id !== anchorId) return c;
               prevMirrorId = c.mirrorId;
               updatedAnchorId = c.id;
-              return { ...c, chord, offset };
+              return { ...c, chord, chordCol: col, offset: col };
             });
           } else {
-            const existing = chords.findIndex((c) => c.offset === offset);
+            const existing = chords.findIndex((c) => (c.chordCol ?? c.offset ?? 0) === col);
             if (existing >= 0) {
               prevMirrorId = chords[existing].mirrorId;
               updatedAnchorId = chords[existing].id;
-              chords[existing] = { ...chords[existing], chord };
+              chords[existing] = { ...chords[existing], chord, chordCol: col, offset: col };
             } else {
               const newId = nanoid();
               createdAnchorId = newId;
-              chords.push({ id: newId, offset, chord });
+              chords.push({ id: newId, offset: col, chordCol: col, chord });
             }
           }
-          chords.sort((a, b) => a.offset - b.offset);
-          return { ...l, chords };
+          chords.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          const newLen = Math.max(l.chordRowLen ?? 0, col + 1);
+          return { ...l, chords, chordRowLen: newLen };
         }),
       };
     });
 
-    // Mirror to pattern
+    // Mirror to pattern (unchanged)
     let progression = s.progression;
     if (createdAnchorId) {
       progression = s.progression.map((p) => {
         if (p.id !== sectionId) return p;
         const placed = placeMirroredChord(p, chord, createdAnchorId!);
-        // back-link the anchor with the new pattern chord id
-        const newPcId = placed.chordId;
         return placed.pattern;
       });
-      // Now write the mirrorId back onto the anchor we just created
       const newPcByPattern = new Map<string, string>();
       progression.forEach((p) => {
         if (p.id === sectionId) {
@@ -523,7 +521,6 @@ export const useSongStore = create<SongState>((set, get) => ({
         }
       }
     } else if (updatedAnchorId && prevMirrorId) {
-      // Replace chord on the mirrored pattern chord (keep its position/length)
       progression = s.progression.map((p) =>
         p.id !== sectionId
           ? p
