@@ -140,6 +140,15 @@ function LineRow({
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (selectMode) return;
     const k = e.key;
+    if (k === "ArrowUp" || k === "ArrowDown") {
+      // Shortcut: if the picker sheet is open, toggle focus to its input.
+      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
+      if (pickerInput) {
+        e.preventDefault();
+        pickerInput.focus();
+        return;
+      }
+    }
     if (k === " " || k === "Spacebar") {
       e.preventDefault();
       insertChordSpaceAt(sectionId, line.id, chordCaret);
@@ -157,17 +166,13 @@ function LineRow({
     } else if (k === "Backspace") {
       e.preventDefault();
       if (chordCaret === 0) {
-        // At start of chord row → maybe merge up
         if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) {
-          // If lyric has text, ask before deleting whole row
           onMergeUp("chord", line.text, 0, 0);
         } else {
-          // Has chord-row content; ask before merging up
           onMergeUp("chord", line.text, line.chords.length, line.chordRowLen ?? 0);
         }
         return;
       }
-      // Try to delete the cell at caret-1
       const target = chordCaret - 1;
       const removed = removeChordCellAt(sectionId, line.id, target);
       if (removed) setChordCaret(target);
@@ -179,17 +184,13 @@ function LineRow({
       e.preventDefault();
       const newId = onAddLineAfter();
       if (typeof newId === "string") {
-        // focus chord row of next line shortly after render
         setTimeout(() => {
           document.querySelector<HTMLDivElement>(`[data-chord-row="${newId}"]`)?.focus();
         }, 10);
       }
     } else if (k.length === 1 && /[A-Za-z]/.test(k)) {
-      // Open picker prefilled with this letter as a hint
       e.preventDefault();
       onPickerOpen(line.id, chordCaret);
-    } else if (k === "Enter") {
-      // handled above
     }
   };
 
