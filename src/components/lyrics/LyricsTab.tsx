@@ -1006,6 +1006,19 @@ export function LyricsTab() {
           onChordDrop={handleChordDrop}
           chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
           onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
+          onSectionDragStart={(id) => setSectionDrag({ id })}
+          onSectionDragOver={(overId) => {
+            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
+          }}
+          onSectionDragEnd={() => {
+            const sd = sectionDrag;
+            if (sd && sd.overId && sd.overId !== sd.id) {
+              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
+              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
+            }
+            setSectionDrag(null);
+          }}
+          isSectionDragOver={sectionDrag?.overId === sec.id && sectionDrag?.id !== sec.id}
         />
       ))}
 
