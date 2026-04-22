@@ -993,6 +993,12 @@ export function LyricsTab() {
     if (!picker) return;
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
     setPickerQuery("");
+    // After committing, drop the anchor so subsequent typing creates a NEW
+    // chord instead of editing the one we just placed. Advance the caret
+    // past the placed chord (display width + 1 space) so the next chord
+    // appears next to it rather than overlapping.
+    const advance = Math.max(1, chord.display.length) + 1;
+    setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
   };
   const handleRemove = () => {
     if (!picker?.anchorId) return;
