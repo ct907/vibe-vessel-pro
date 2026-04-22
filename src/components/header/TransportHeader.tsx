@@ -263,6 +263,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           </div>
         </div>
       </div>
+      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     </header>
   );
 }
