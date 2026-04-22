@@ -127,6 +127,12 @@ export interface SongState {
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
 
+  // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
+  undo: () => boolean;
+  redo: () => boolean;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
   // ---- persistence ----
   loadFromJSON: (data: unknown) => void;
   toJSON: () => SerializedSong;
@@ -239,6 +245,27 @@ function placeMirroredChord(pattern: PatternBlock, chord: ChordSymbol, mirrorId:
 // ---------- Store ----------
 
 const seed = makeSection("verse");
+
+// History stacks live outside the reactive state so snapshots don't trigger re-renders.
+type HistorySnapshot = { sections: Section[]; progression: PatternBlock[] };
+const undoStack: HistorySnapshot[] = [];
+const redoStack: HistorySnapshot[] = [];
+const HISTORY_LIMIT = 50;
+
+function snapshot(s: { sections: Section[]; progression: PatternBlock[] }): HistorySnapshot {
+  return {
+    sections: JSON.parse(JSON.stringify(s.sections)),
+    progression: JSON.parse(JSON.stringify(s.progression)),
+  };
+}
+
+/** Call BEFORE mutating sections/progression in a chord-row action. */
+function pushHistory(get: () => SongState) {
+  const s = get();
+  undoStack.push(snapshot(s));
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
 
 export const useSongStore = create<SongState>((set, get) => ({
   meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
@@ -401,7 +428,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       );
     })(),
   })),
-  setLineText: (sectionId, id, text) => set((s) => ({
+  setLineText: (sectionId, id, text) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       return {
@@ -410,9 +437,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         lines: sec.lines.map((l) => (l.id === id ? { ...l, text } : l)),
       };
     }),
-  })),
+  })); },
 
-  setChordRowLen: (sectionId, id, len) => set((s) => ({
+  setChordRowLen: (sectionId, id, len) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       return {
@@ -420,9 +447,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         lines: sec.lines.map((l) => (l.id === id ? { ...l, chordRowLen: Math.max(0, len) } : l)),
       };
     }),
-  })),
+  })); },
 
-  insertChordSpaceAt: (sectionId, lineId, col) => set((s) => ({
+  insertChordSpaceAt: (sectionId, lineId, col) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       return {
@@ -438,9 +465,10 @@ export const useSongStore = create<SongState>((set, get) => ({
         }),
       };
     }),
-  })),
+  })); },
 
   removeChordCellAt: (sectionId, lineId, col) => {
+    pushHistory(get);
     const state = get();
     const sec = state.sections.find((x) => x.id === sectionId);
     const line = sec?.lines.find((l) => l.id === lineId);
@@ -474,7 +502,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   // Add or replace a chord anchor; mirror to bound pattern block.
-  upsertChordAt: (sectionId, lineId, col, chord, anchorId) => set((s) => {
+  upsertChordAt: (sectionId, lineId, col, chord, anchorId) => { pushHistory(get); return set((s) => {
     let createdAnchorId: string | null = null;
     let updatedAnchorId: string | null = null;
     let prevMirrorId: string | undefined;
@@ -552,9 +580,9 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
 
     return { sections, progression };
-  }),
+  }); },
 
-  removeChordAnchor: (sectionId, lineId, anchorId) => set((s) => {
+  removeChordAnchor: (sectionId, lineId, anchorId) => { pushHistory(get); return set((s) => {
     let mirrorId: string | undefined;
     const sections = s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
@@ -574,9 +602,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         )
       : s.progression;
     return { sections, progression };
-  }),
+  }); },
 
-  removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => set((s) => {
+  removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
     const mirrorIds = new Set<string>();
     const sections = s.sections.map((sec) => {
@@ -594,9 +622,9 @@ export const useSongStore = create<SongState>((set, get) => ({
       ? s.progression.map((p) => p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => !mirrorIds.has(c.id)) })
       : s.progression;
     return { sections, progression };
-  }),
+  }); },
 
-  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => set((s) => {
+  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
     return {
       sections: s.sections.map((sec) => {
@@ -617,9 +645,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         };
       }),
     };
-  }),
+  }); },
 
-  moveSelectedChordsByOrder: (sectionId, lineId, anchorIds, direction) => set((s) => {
+  moveSelectedChordsByOrder: (sectionId, lineId, anchorIds, direction) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
     return {
       sections: s.sections.map((sec) => {
@@ -676,9 +704,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         };
       }),
     };
-  }),
+  }); },
 
-  moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => set((s) => {
+  moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => { pushHistory(get); return set((s) => {
     // Find the anchor first
     let moved: ChordAnchor | undefined;
     let mirrorId: string | undefined;
@@ -771,9 +799,9 @@ export const useSongStore = create<SongState>((set, get) => ({
       : s.progression;
 
     return { sections, progression };
-  }),
+  }); },
 
-  pasteChordsAt: (sectionId, lineId, atCol, items) => set((s) => ({
+  pasteChordsAt: (sectionId, lineId, atCol, items) => { pushHistory(get); return set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       return {
@@ -793,7 +821,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         }),
       };
     }),
-  })),
+  })); },
 
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
@@ -1022,7 +1050,32 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { progression, sections };
   }),
 
+  // ---- chord-row undo/redo ----
+  undo: () => {
+    if (!undoStack.length) return false;
+    const cur = get();
+    const prev = undoStack.pop()!;
+    redoStack.push(snapshot(cur));
+    if (redoStack.length > HISTORY_LIMIT) redoStack.shift();
+    set({ sections: prev.sections, progression: prev.progression });
+    return true;
+  },
+  redo: () => {
+    if (!redoStack.length) return false;
+    const cur = get();
+    const next = redoStack.pop()!;
+    undoStack.push(snapshot(cur));
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    set({ sections: next.sections, progression: next.progression });
+    return true;
+  },
+  canUndo: () => undoStack.length > 0,
+  canRedo: () => redoStack.length > 0,
+
   loadFromJSON: (data) => {
+    // Loading a project clears history.
+    undoStack.length = 0;
+    redoStack.length = 0;
     const parsed = data as any;
     if (!parsed) return;
 
