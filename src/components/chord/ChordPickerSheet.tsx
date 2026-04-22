@@ -125,16 +125,16 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
         onCloseAutoFocus={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => {
           // Allow taps on the underlying chord row / chord chips to focus them
-          // without closing the sheet. Only the explicit close button or the
-          // overlay (which we hide via modal=false) should close.
+          // without closing the sheet — but tapping a LYRIC input should close
+          // the picker so the user can edit the lyric line normally.
           const t = e.target as HTMLElement | null;
-          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+          if (t && t.closest("[data-chord-row]")) {
             e.preventDefault();
           }
         }}
         onInteractOutside={(e) => {
           const t = e.target as HTMLElement | null;
-          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+          if (t && t.closest("[data-chord-row]")) {
             e.preventDefault();
           }
         }}
