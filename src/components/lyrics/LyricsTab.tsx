@@ -585,7 +585,7 @@ function LineRow({
       )}
 
       {/* LYRIC INPUT */}
-      <div className="relative">
+      <div className="relative rounded-sm bg-accent/10">
         <input
           ref={lyricInputRef}
           data-lyric-input={line.id}
@@ -593,7 +593,7 @@ function LineRow({
           onChange={handleLyricChange}
           onKeyDown={handleLyricKeyDown}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-0"
+          className="w-full bg-transparent border-0 outline-none font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1"
         />
       </div>
     </div>
