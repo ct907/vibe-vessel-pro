@@ -496,16 +496,29 @@ function LineRow({
             }}
           />
         )}
-        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord */}
+        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord, with a downward arrow on top */}
         {playingAnchorId && (() => {
           const playing = line.chords.find((a) => a.id === playingAnchorId);
           if (!playing) return null;
           return (
-            <span
+            <div
               aria-hidden
-              className="absolute top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
-              style={{ left: `${colOf(playing) * cellPx - 1}px` }}
-            />
+              className="absolute top-0 bottom-0 pointer-events-none animate-pulse"
+              style={{ left: `${colOf(playing) * cellPx - 1}px`, width: "3px" }}
+            >
+              <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
+              <span
+                className="absolute top-0 left-1/2 -translate-x-1/2"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: "5px solid transparent",
+                  borderRight: "5px solid transparent",
+                  borderTop: "7px solid hsl(var(--chord-chip))",
+                  filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
+                }}
+              />
+            </div>
           );
         })()}
         {/* Chord chips at columns */}
