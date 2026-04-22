@@ -677,6 +677,8 @@ export const useSongStore = create<SongState>((set, get) => ({
       }),
     };
   }),
+
+  moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => set((s) => {
     // Find the anchor first
     let moved: ChordAnchor | undefined;
     let mirrorId: string | undefined;
