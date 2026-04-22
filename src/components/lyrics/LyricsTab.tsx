@@ -261,6 +261,24 @@ function LineRow({
     setSelected(new Set(line.chords.map((c) => c.id)));
   };
 
+  // Global Ctrl/Cmd+A: select all chords in this row when the row is "active"
+  // (chord row focused OR already in select mode). Works even if focus drifted
+  // to the picker, lyric input, or elsewhere on the page.
+  useEffect(() => {
+    if (!chordFocused && !selectMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || (e.key !== "a" && e.key !== "A")) return;
+      // Don't hijack ⌘A inside an input/textarea unless we're in selectMode.
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (!selectMode && (tag === "INPUT" || tag === "TEXTAREA")) return;
+      e.preventDefault();
+      selectAll();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [chordFocused, selectMode, line.chords]);
+
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const k = e.key;
     const mod = e.metaKey || e.ctrlKey;
