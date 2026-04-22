@@ -1,19 +1,10 @@
 import { useState } from "react";
 import { useSongStore } from "@/store/song";
-import {
-  downloadProjectJSON,
-  loadProjectFromFile,
-} from "@/store/song";
+import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Play, Square, Minus, Plus, Save, Upload, BookOpen } from "lucide-react";
 import { ALL_ROOTS } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
@@ -73,7 +64,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       <div className="mx-auto max-w-6xl px-4 py-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 mr-2">
           <BookOpen className="h-5 w-5 ink-chord" />
-          <span className="font-display text-lg font-semibold">Notebook</span>
+          <span className="font-display text-xl font-bold">Notebook</span>
           <span className="text-muted-foreground">›</span>
           <Input
             value={meta.title}
@@ -91,7 +82,9 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             </SelectTrigger>
             <SelectContent>
               {ALL_ROOTS.map((r) => (
-                <SelectItem key={r} value={r} className="font-mono-chord">{r}</SelectItem>
+                <SelectItem key={r} value={r} className="font-mono-chord">
+                  {r}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -117,23 +110,28 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             onChange={(e) => setBpm(Number(e.target.value))}
             className="h-8 w-16 font-mono-chord"
           />
-          <Slider
-            min={40}
-            max={220}
-            step={1}
-            value={[meta.bpm]}
-            onValueChange={([v]) => setBpm(v)}
-            className="w-28"
-          />
+          <Slider min={40} max={220} step={1} value={[meta.bpm]} onValueChange={([v]) => setBpm(v)} className="w-28" />
         </div>
 
         {/* Transpose */}
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Transpose</span>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => transposeSong(-1)} aria-label="Down semitone">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => transposeSong(-1)}
+            aria-label="Down semitone"
+          >
             <Minus className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => transposeSong(1)} aria-label="Up semitone">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => transposeSong(1)}
+            aria-label="Up semitone"
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -150,7 +148,11 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             </Button>
           )}
 
-          <Button size="sm" variant="ghost" onClick={() => downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")}
+          >
             <Save className="h-4 w-4" /> Save
           </Button>
           <label className="inline-flex">
