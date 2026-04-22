@@ -230,39 +230,151 @@ function repackChords(chords: PatternChord[], totalBeats: number): PatternChord[
   return out;
 }
 
+/** Visual-order list of anchors across all lines of a section. */
+function anchorsInVisualOrder(section: Section): { lineId: string; anchor: ChordAnchor }[] {
+  const out: { lineId: string; anchor: ChordAnchor }[] = [];
+  section.lines.forEach((l) => {
+    const sorted = [...l.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+    sorted.forEach((a) => out.push({ lineId: l.id, anchor: a }));
+  });
+  return out;
+}
+
 /**
- * Place a new chord into a pattern with default 2-beat length, expanding bars
- * (or creating a new mirror pattern would be too disruptive — we just expand
- * bars on the bound block, capped at 32).
- * Returns the created PatternChord id.
+ * Given an updated section, reorder the bound pattern's chords so their
+ * left-to-right order matches the section anchors' visual order. Mirrored
+ * pairs (anchor.mirrorId ↔ patternChord.id) are reordered together; unmirrored
+ * pattern chords keep their relative tail position.
  */
-function placeMirroredChord(pattern: PatternBlock, chord: ChordSymbol, mirrorId: string): { pattern: PatternBlock; chordId: string } {
-  const len = 2;
-  let next = pattern;
-  let start = nextFreeBeat(next);
-  let total = next.bars * next.beatsPerBar;
-  if (start + len > total) {
-    // grow bars to fit, cap at 32 bars
-    const neededBars = Math.min(32, Math.ceil((start + len) / next.beatsPerBar));
-    next = { ...next, bars: neededBars };
-    total = next.bars * next.beatsPerBar;
-    if (start + len > total) {
-      // still no room; clamp into last beat
-      start = Math.max(0, total - len);
+function syncPatternFromAnchors(progression: PatternBlock[], section: Section): PatternBlock[] {
+  const pattern = progression.find((p) => p.id === section.id);
+  if (!pattern) return progression;
+  const visual = anchorsInVisualOrder(section);
+  const pcById = new Map(pattern.chords.map((c) => [c.id, c]));
+  const orderedMirrored: PatternChord[] = [];
+  const usedPcIds = new Set<string>();
+  for (const { anchor } of visual) {
+    if (anchor.mirrorId && pcById.has(anchor.mirrorId)) {
+      orderedMirrored.push(pcById.get(anchor.mirrorId)!);
+      usedPcIds.add(anchor.mirrorId);
     }
   }
+  const tail = pattern.chords.filter((c) => !usedPcIds.has(c.id));
+  const newOrder = [...orderedMirrored, ...tail];
+  // Reassign startBeats sequentially so repack picks them up in this order.
+  let cursor = 0;
+  const reseq: PatternChord[] = newOrder.map((c) => {
+    const next = { ...c, startBeat: cursor };
+    cursor += c.lengthBeats;
+    return next;
+  });
+  const totalBeats = pattern.bars * pattern.beatsPerBar;
+  return progression.map((p) =>
+    p.id === pattern.id ? { ...p, chords: repackChords(reseq, totalBeats) } : p,
+  );
+}
+
+/**
+ * Given an updated pattern, rotate the bound section's mirrored anchor contents
+ * so the chords displayed at each anchor slot follow the pattern's new order.
+ * Anchor slots (their lineId + col positions) are preserved.
+ */
+function syncAnchorsFromPattern(sections: Section[], pattern: PatternBlock): Section[] {
+  const section = sections.find((s) => s.id === pattern.id);
+  if (!section) return sections;
+  const visual = anchorsInVisualOrder(section);
+  // Map current mirrorIds in pattern order
+  const sortedPcs = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  // Collect mirrored slots in visual order
+  const mirroredSlots = visual.filter((v) => v.anchor.mirrorId && sortedPcs.some((c) => c.id === v.anchor.mirrorId));
+  const mirroredPcs = sortedPcs.filter((c) => mirroredSlots.some((s) => s.anchor.mirrorId === c.id));
+  if (mirroredSlots.length !== mirroredPcs.length) return sections;
+  // Build replacement map: anchorId -> new {chord, mirrorId}
+  const replace = new Map<string, { chord: ChordSymbol; mirrorId: string }>();
+  for (let i = 0; i < mirroredSlots.length; i++) {
+    replace.set(mirroredSlots[i].anchor.id, { chord: mirroredPcs[i].chord, mirrorId: mirroredPcs[i].id });
+  }
+  return sections.map((sec) => {
+    if (sec.id !== section.id) return sec;
+    return {
+      ...sec,
+      lines: sec.lines.map((l) => ({
+        ...l,
+        chords: l.chords.map((a) => {
+          const r = replace.get(a.id);
+          return r ? { ...a, chord: r.chord, mirrorId: r.mirrorId } : a;
+        }),
+      })),
+    };
+  });
+}
+
+/**
+ * Place a new chord into a pattern. If the bound pattern doesn't have enough
+ * empty space, append a new pattern block (overflow pattern) and place the
+ * chord there instead. Returns the (possibly extended) progression and the
+ * created PatternChord id + the patternId it ended up in.
+ */
+function placeMirroredChord(
+  progression: PatternBlock[],
+  boundPatternId: string,
+  chord: ChordSymbol,
+  mirrorId: string,
+): { progression: PatternBlock[]; chordId: string; patternId: string } {
+  const len = 2;
+  const idx = progression.findIndex((p) => p.id === boundPatternId);
+  if (idx < 0) {
+    // Shouldn't happen — fall back to no-op.
+    return { progression, chordId: "", patternId: boundPatternId };
+  }
+  const findRoom = (p: PatternBlock) => {
+    const start = nextFreeBeat(p);
+    const total = p.bars * p.beatsPerBar;
+    return total - start >= 0.5 ? Math.min(len, total - start) : 0;
+  };
+  // Try bound pattern first
+  let target = progression[idx];
+  let placedLen = findRoom(target);
+  let next = [...progression];
+  if (placedLen <= 0) {
+    // Find any later overflow block (custom-typed sibling) with space, else create one.
+    let overflowIdx = -1;
+    for (let i = idx + 1; i < next.length; i++) {
+      const room = findRoom(next[i]);
+      if (room > 0) { overflowIdx = i; placedLen = room; break; }
+    }
+    if (overflowIdx === -1) {
+      // Create a fresh overflow pattern with the bound section's metric.
+      const newPattern: PatternBlock = {
+        id: nanoid(),
+        label: `${target.label} (cont.)`,
+        bars: target.bars,
+        beatsPerBar: target.beatsPerBar,
+        chords: [],
+      };
+      next.splice(idx + 1, 0, newPattern);
+      overflowIdx = idx + 1;
+      placedLen = Math.min(len, newPattern.bars * newPattern.beatsPerBar);
+    }
+    target = next[overflowIdx];
+    const start = nextFreeBeat(target);
+    const id = nanoid();
+    const pc: PatternChord = { id, chord, startBeat: start, lengthBeats: placedLen, mirrorId };
+    next[overflowIdx] = {
+      ...target,
+      chords: [...target.chords, pc].sort((a, b) => a.startBeat - b.startBeat),
+    };
+    return { progression: next, chordId: id, patternId: target.id };
+  }
+  // Fits in bound pattern.
+  const start = nextFreeBeat(target);
   const id = nanoid();
-  const pc: PatternChord = {
-    id,
-    chord,
-    startBeat: start,
-    lengthBeats: Math.min(len, total - start),
-    mirrorId,
+  const pc: PatternChord = { id, chord, startBeat: start, lengthBeats: placedLen, mirrorId };
+  next[idx] = {
+    ...target,
+    chords: [...target.chords, pc].sort((a, b) => a.startBeat - b.startBeat),
   };
-  return {
-    pattern: { ...next, chords: [...next.chords, pc].sort((a, b) => a.startBeat - b.startBeat) },
-    chordId: id,
-  };
+  return { progression: next, chordId: id, patternId: target.id };
 }
 
 // ---------- Store ----------
@@ -569,31 +681,28 @@ export const useSongStore = create<SongState>((set, get) => ({
       };
     });
 
-    // Mirror to pattern (unchanged)
+    // Mirror to pattern.
     let progression = s.progression;
+    let finalSections = sections;
     if (createdAnchorId) {
-      progression = s.progression.map((p) => {
-        if (p.id !== sectionId) return p;
-        const placed = placeMirroredChord(p, chord, createdAnchorId!);
-        return placed.pattern;
-      });
-      const newPcByPattern = new Map<string, string>();
-      progression.forEach((p) => {
-        if (p.id === sectionId) {
-          const pc = p.chords.find((c) => c.mirrorId === createdAnchorId);
-          if (pc) newPcByPattern.set(p.id, pc.id);
-        }
-      });
-      const pcId = newPcByPattern.get(sectionId);
+      const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
+      progression = placed.progression;
+      const pcId = placed.chordId;
       if (pcId) {
-        for (const sec of sections) {
-          if (sec.id !== sectionId) continue;
-          for (const ln of sec.lines) {
-            const a = ln.chords.find((x) => x.id === createdAnchorId);
-            if (a) a.mirrorId = pcId;
-          }
-        }
+        finalSections = sections.map((sec) => {
+          if (sec.id !== sectionId) return sec;
+          return {
+            ...sec,
+            lines: sec.lines.map((l) => ({
+              ...l,
+              chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
+            })),
+          };
+        });
       }
+      // After mirror placement, ensure pattern order matches anchor visual order.
+      const updatedSection = finalSections.find((x) => x.id === sectionId);
+      if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
     } else if (updatedAnchorId && prevMirrorId) {
       progression = s.progression.map((p) =>
         p.id !== sectionId
@@ -602,7 +711,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       );
     }
 
-    return { sections, progression };
+    return { sections: finalSections, progression };
   }); },
 
   removeChordAnchor: (sectionId, lineId, anchorId) => { pushHistory(get); return set((s) => {
@@ -672,61 +781,54 @@ export const useSongStore = create<SongState>((set, get) => ({
 
   moveSelectedChordsByOrder: (sectionId, lineId, anchorIds, direction) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
-    return {
-      sections: s.sections.map((sec) => {
-        if (sec.id !== sectionId) return sec;
-        return {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== lineId) return l;
-            const sorted = [...l.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            // Process in order so neighbor lookups stay consistent.
-            // For direction=+1, iterate right-to-left so we don't double-jump.
-            const order = direction === 1 ? [...sorted].reverse() : sorted;
-            const work = sorted.map((c) => ({ ...c }));
-            for (const sel of order) {
-              if (!idSet.has(sel.id)) continue;
-              const idx = work.findIndex((c) => c.id === sel.id);
-              if (idx < 0) continue;
-              const cur = work[idx];
-              const curCol = cur.chordCol ?? cur.offset ?? 0;
-              const curWidth = Math.max(1, cur.chord.display.length);
-              if (direction === 1) {
-                // Find first non-selected neighbor to the right.
-                const right = work.slice(idx + 1).find((c) => !idSet.has(c.id));
-                if (!right) continue;
-                const rCol = right.chordCol ?? right.offset ?? 0;
-                const rWidth = Math.max(1, right.chord.display.length);
-                // Place selected just after right neighbor's chip + 1 trailing space.
-                const newCol = rCol + rWidth + 1;
-                // Shift the right neighbor leftward into the slot vacated.
-                const shift = newCol - rCol; // positive = right shift; we want to swap positions.
-                // Compute new positions: right neighbor moves to curCol; selected moves after right neighbor's new end.
-                const rightNewCol = curCol;
-                const selNewCol = rightNewCol + rWidth + 1;
-                work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
-                const rIdx = work.findIndex((c) => c.id === right.id);
-                work[rIdx] = { ...right, chordCol: rightNewCol, offset: rightNewCol };
-              } else {
-                const left = [...work.slice(0, idx)].reverse().find((c) => !idSet.has(c.id));
-                if (!left) continue;
-                const lCol = left.chordCol ?? left.offset ?? 0;
-                const lWidth = Math.max(1, left.chord.display.length);
-                // Swap: selected takes left's old col; left moves to selected's old col.
-                const selNewCol = lCol;
-                const leftNewCol = lCol + curWidth + 1;
-                work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
-                const lIdx = work.findIndex((c) => c.id === left.id);
-                work[lIdx] = { ...left, chordCol: leftNewCol, offset: leftNewCol };
-              }
-              work.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== lineId) return l;
+          const sorted = [...l.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          // Process in order so neighbor lookups stay consistent.
+          // For direction=+1, iterate right-to-left so we don't double-jump.
+          const order = direction === 1 ? [...sorted].reverse() : sorted;
+          const work = sorted.map((c) => ({ ...c }));
+          for (const sel of order) {
+            if (!idSet.has(sel.id)) continue;
+            const idx = work.findIndex((c) => c.id === sel.id);
+            if (idx < 0) continue;
+            const cur = work[idx];
+            const curCol = cur.chordCol ?? cur.offset ?? 0;
+            const curWidth = Math.max(1, cur.chord.display.length);
+            if (direction === 1) {
+              const right = work.slice(idx + 1).find((c) => !idSet.has(c.id));
+              if (!right) continue;
+              const rCol = right.chordCol ?? right.offset ?? 0;
+              const rWidth = Math.max(1, right.chord.display.length);
+              const rightNewCol = curCol;
+              const selNewCol = rightNewCol + rWidth + 1;
+              work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
+              const rIdx = work.findIndex((c) => c.id === right.id);
+              work[rIdx] = { ...right, chordCol: rightNewCol, offset: rightNewCol };
+            } else {
+              const left = work.slice(0, idx).reverse().find((c) => !idSet.has(c.id));
+              if (!left) continue;
+              const lCol = left.chordCol ?? left.offset ?? 0;
+              const selNewCol = lCol;
+              const leftNewCol = lCol + curWidth + 1;
+              work[idx] = { ...cur, chordCol: selNewCol, offset: selNewCol };
+              const lIdx = work.findIndex((c) => c.id === left.id);
+              work[lIdx] = { ...left, chordCol: leftNewCol, offset: leftNewCol };
             }
-            const maxEnd = work.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), 0);
-            return { ...l, chords: work, chordRowLen: Math.max(l.chordRowLen ?? 0, maxEnd) };
-          }),
-        };
-      }),
-    };
+            work.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          }
+          const maxEnd = work.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), 0);
+          return { ...l, chords: work, chordRowLen: Math.max(l.chordRowLen ?? 0, maxEnd) };
+        }),
+      };
+    });
+    const updatedSection = sections.find((x) => x.id === sectionId);
+    const progression = updatedSection ? syncPatternFromAnchors(s.progression, updatedSection) : s.progression;
+    return { sections, progression };
   }); },
 
   moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => { pushHistory(get); return set((s) => {
@@ -753,31 +855,31 @@ export const useSongStore = create<SongState>((set, get) => ({
 
     // Same row: shift this anchor's column, pushing colliding chords aside.
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
-      return {
-        sections: s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== fromLineId) return l;
-            // Compute push needed for any non-moved chord that overlaps the
-            // [toCol, toCol+reservedWidth) zone.
-            const others = l.chords.filter((c) => c.id !== anchorId);
-            const collision = others.find((c) => {
-              const cc = c.chordCol ?? c.offset ?? 0;
-              const cEnd = cc + visualWidth(c.chord.display);
-              return cc < toCol + reservedWidth && cEnd > toCol;
-            });
-            const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
-            const chords = l.chords.map((c) => {
-              if (c.id === anchorId) return { ...c, chordCol: toCol, offset: toCol };
-              const cc = c.chordCol ?? c.offset ?? 0;
-              if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
-              return c;
-            }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
-            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
-          }),
+      const sectionsNext = s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== fromLineId) return l;
+          const others = l.chords.filter((c) => c.id !== anchorId);
+          const collision = others.find((c) => {
+            const cc = c.chordCol ?? c.offset ?? 0;
+            const cEnd = cc + visualWidth(c.chord.display);
+            return cc < toCol + reservedWidth && cEnd > toCol;
+          });
+          const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
+          const chords = l.chords.map((c) => {
+            if (c.id === anchorId) return { ...c, chordCol: toCol, offset: toCol };
+            const cc = c.chordCol ?? c.offset ?? 0;
+            if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
+            return c;
+          }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
+          return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
         }),
-      };
+      });
+      // Mirror the new visual order back to the bound pattern so progressions stay in sync.
+      const updatedSection = sectionsNext.find((x) => x.id === fromSectionId);
+      const progression = updatedSection ? syncPatternFromAnchors(s.progression, updatedSection) : s.progression;
+      return { sections: sectionsNext, progression };
     }
 
     // Cross-row move: remove from source line, insert into target line. Detach mirror.
@@ -991,8 +1093,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { progression, sections };
   }),
 
-  movePatternChord: (patternId, chordId, direction) => set((s) => ({
-    progression: s.progression.map((p) => {
+  movePatternChord: (patternId, chordId, direction) => set((s) => {
+    const progression = s.progression.map((p) => {
       if (p.id !== patternId) return p;
       const totalBeats = p.bars * p.beatsPerBar;
       const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
@@ -1001,8 +1103,11 @@ export const useSongStore = create<SongState>((set, get) => ({
       if (idx < 0 || swapWith < 0 || swapWith >= sorted.length) return p;
       [sorted[idx], sorted[swapWith]] = [sorted[swapWith], sorted[idx]];
       return { ...p, chords: repackChords(sorted, totalBeats) };
-    }),
-  })),
+    });
+    const updatedPattern = progression.find((p) => p.id === patternId);
+    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
+    return { progression, sections };
+  }),
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
     const idSet = new Set(chordIds);
@@ -1023,29 +1128,28 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
 
   shiftPatternChords: (patternId, chordIds, deltaBeats) => set((s) => {
-    // With left-aligned packing, "shifting" reorders chords in the chord list by direction.
     const idSet = new Set(chordIds);
-    return {
-      progression: s.progression.map((p) => {
-        if (p.id !== patternId) return p;
-        const totalBeats = p.bars * p.beatsPerBar;
-        const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-        const dir = deltaBeats > 0 ? 1 : -1;
-        const indices = sorted
-          .map((c, i) => idSet.has(c.id) ? i : -1)
-          .filter((i) => i >= 0);
-        // Process in correct order to avoid swap collisions
-        const order = dir > 0 ? indices.slice().reverse() : indices.slice();
-        const arr = [...sorted];
-        for (const i of order) {
-          const j = i + dir;
-          if (j < 0 || j >= arr.length) continue;
-          if (idSet.has(arr[j].id)) continue;
-          [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return { ...p, chords: repackChords(arr, totalBeats) };
-      }),
-    };
+    const progression = s.progression.map((p) => {
+      if (p.id !== patternId) return p;
+      const totalBeats = p.bars * p.beatsPerBar;
+      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+      const dir = deltaBeats > 0 ? 1 : -1;
+      const indices = sorted
+        .map((c, i) => idSet.has(c.id) ? i : -1)
+        .filter((i) => i >= 0);
+      const order = dir > 0 ? indices.slice().reverse() : indices.slice();
+      const arr = [...sorted];
+      for (const i of order) {
+        const j = i + dir;
+        if (j < 0 || j >= arr.length) continue;
+        if (idSet.has(arr[j].id)) continue;
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return { ...p, chords: repackChords(arr, totalBeats) };
+    });
+    const updatedPattern = progression.find((p) => p.id === patternId);
+    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
+    return { progression, sections };
   }),
 
   movePatternChordsTo: (fromPatternId, toPatternId, chordIds) => set((s) => {

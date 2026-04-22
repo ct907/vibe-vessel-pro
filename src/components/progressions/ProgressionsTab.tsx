@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSongStore, type PatternBlock as PatternBlockType } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
@@ -286,11 +286,21 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
 }
 
 export function ProgressionsTab() {
-  const { progression, sections, addSection, addChordToPattern, updatePatternChord } = useSongStore();
+  const { progression, sections, addSection, addChordToPattern, updatePatternChord, basket } = useSongStore();
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
 
   const labelById = new Map(sections.map((s) => [s.id, s.label] as const));
   const canDelete = sections.length > 1;
+
+  // Basket steals focus: close picker if basket becomes non-empty.
+  useEffect(() => {
+    if (basket.length > 0 && picker) setPicker(null);
+  }, [basket.length, picker]);
+
+  const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
+    if (basket.length > 0) return;
+    setPicker({ patternId, atBeat, replaceChordId });
+  };
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
@@ -316,7 +326,7 @@ export function ProgressionsTab() {
           otherPatterns={progression
             .filter((q) => q.id !== p.id)
             .map((q) => ({ id: q.id, label: labelById.get(q.id) ?? q.label }))}
-          onPickerOpen={(patternId, atBeat, replaceChordId) => setPicker({ patternId, atBeat, replaceChordId })}
+          onPickerOpen={openPicker}
         />
       ))}
 
