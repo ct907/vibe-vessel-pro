@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSongStore } from "@/store/song";
 import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
+import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +18,9 @@ interface Props {
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const { meta, setTitle, setKey, setBpm, transposeSong, progression } = useSongStore();
+  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
+  const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
+  const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   // Track total semitones the user has shifted from the original key in this session.
@@ -24,17 +28,30 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
 
   const handlePlay = async () => {
     await ensureAudio();
+    // Build a global, looping event list. If a pattern is focused,
+    // start sequence at that pattern (loop continues from its position).
+    const startIdx = focusedPatternId
+      ? Math.max(0, progression.findIndex((p) => p.id === focusedPatternId))
+      : 0;
+    const ordered = startIdx > 0
+      ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)]
+      : progression;
+
     let cursorBeat = 0;
     const events: ScheduledChord[] = [];
-    progression.forEach((p) => {
+    const meta2: Array<{ patternId: string; patternChordId: string; mirrorId?: string }> = [];
+    ordered.forEach((p) => {
       const totalBeats = p.bars * p.beatsPerBar;
-      p.chords.forEach((c) => {
-        events.push({
-          chord: c.chord,
-          startBeat: cursorBeat + c.startBeat,
-          lengthBeats: c.lengthBeats,
+      [...p.chords]
+        .sort((a, b) => a.startBeat - b.startBeat)
+        .forEach((c) => {
+          events.push({
+            chord: c.chord,
+            startBeat: cursorBeat + c.startBeat,
+            lengthBeats: c.lengthBeats,
+          });
+          meta2.push({ patternId: p.id, patternChordId: c.id, mirrorId: c.mirrorId });
         });
-      });
       cursorBeat += totalBeats;
     });
     if (!events.length) {
@@ -42,12 +59,18 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       return;
     }
     setIsPlaying(true);
-    await playProgression(events, meta.bpm, undefined, cursorBeat);
+    setPlayingStore(true);
+    await playProgression(events, meta.bpm, {
+      loopBeats: cursorBeat,
+      onChordStart: (i) => setCurrent(meta2[i] ?? null),
+    });
   };
 
   const handleStop = () => {
     stopProgression();
     setIsPlaying(false);
+    setPlayingStore(false);
+    setCurrent(null);
   };
 
   const handleLoad = async (file?: File) => {
