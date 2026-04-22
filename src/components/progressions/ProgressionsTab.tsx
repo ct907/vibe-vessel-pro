@@ -319,13 +319,7 @@ function PatternBlock({
                 {dropIndicator === idx + 1 && draggingChordId && (
                   <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
                 )}
-                {/* Playhead — bright orange typing-cursor stick at left edge of currently-playing chord */}
-                {playingChordId === c.id && (
-                  <span
-                    aria-hidden
-                    className="absolute -left-0.5 top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
-                  />
-                )}
+                {/* (playhead drawn in outer wrapper so it can extend above the chip) */}
                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                   {c.chord.display}
                 </span>
@@ -352,6 +346,40 @@ function PatternBlock({
             {sortedChords.length === 0 ? "Click to add a chord" : `+ ${formatBeats(freeBeats)}b`}
           </button>
         </div>
+
+        {/* Playback playhead — bright orange typing-cursor stick anchored to the bottom of the chip,
+            extending 20% taller than the chip with a downward arrow on top. */}
+        {playingChordId && (() => {
+          const playing = sortedChords.find((c) => c.id === playingChordId);
+          if (!playing) return null;
+          const leftPct = (playing.startBeat / totalBeats) * 100;
+          // Chip is h-20 (80px) container minus my-1 (8px total) = 72px chip; 20% taller ≈ 86px.
+          return (
+            <div
+              aria-hidden
+              className="absolute pointer-events-none animate-pulse"
+              style={{
+                left: `calc(${leftPct}% + 1px)`,
+                bottom: "4px",
+                height: "86px",
+                width: "3px",
+              }}
+            >
+              <span className="absolute left-0 right-0 bottom-0 top-[7px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
+              <span
+                className="absolute top-0 left-1/2 -translate-x-1/2"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: "5px solid transparent",
+                  borderRight: "5px solid transparent",
+                  borderTop: "7px solid hsl(var(--chord-chip))",
+                  filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
+                }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Per-chord +/- and arrow controls — anchored under the active chip */}
         {!selectMode && active && activeIdx >= 0 && (() => {
