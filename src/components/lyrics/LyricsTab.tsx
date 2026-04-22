@@ -733,6 +733,8 @@ function useCellPx(): number {
 export function LyricsTab() {
   const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
+  // Shared chord query: typed in either the picker input OR the active chord row.
+  const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
 
@@ -744,9 +746,17 @@ export function LyricsTab() {
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
   const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
 
+  // Seed the shared query when the picker opens onto a specific chord.
+  useEffect(() => {
+    if (picker) setPickerQuery(initialChord?.display ?? "");
+    else setPickerQuery("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picker?.sectionId, picker?.lineId, picker?.anchorId]);
+
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    setPickerQuery("");
   };
   const handleRemove = () => {
     if (!picker?.anchorId) return;
@@ -776,6 +786,8 @@ export function LyricsTab() {
           onPickerOpen={openPicker}
           onChordDragStart={handleChordDragStart}
           onChordDrop={handleChordDrop}
+          chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
+          onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
         />
       ))}
 
@@ -798,6 +810,8 @@ export function LyricsTab() {
         onPick={handlePick}
         onRemove={picker?.anchorId ? handleRemove : undefined}
         activeLineId={picker?.lineId}
+        query={pickerQuery}
+        onQueryChange={setPickerQuery}
       />
     </div>
   );
