@@ -573,7 +573,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { sections, progression };
   }),
 
-  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaChars) => set((s) => {
+  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => set((s) => {
     const idSet = new Set(anchorIds);
     return {
       sections: s.sections.map((sec) => {
@@ -582,11 +582,14 @@ export const useSongStore = create<SongState>((set, get) => ({
           ...sec,
           lines: sec.lines.map((l) => {
             if (l.id !== lineId) return l;
-            const max = l.text.length;
-            const chords = l.chords.map((c) => idSet.has(c.id)
-              ? { ...c, offset: Math.max(0, Math.min(max, c.offset + deltaChars)) }
-              : c).sort((a, b) => a.offset - b.offset);
-            return { ...l, chords };
+            const chords = l.chords.map((c) => {
+              if (!idSet.has(c.id)) return c;
+              const cur = c.chordCol ?? c.offset ?? 0;
+              const next = Math.max(0, cur + deltaCols);
+              return { ...c, chordCol: next, offset: next };
+            }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const maxCol = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + 1), 0);
+            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, maxCol) };
           }),
         };
       }),
