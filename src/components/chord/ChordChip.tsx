@@ -1,6 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ChordSymbol } from "@/lib/music/chords";
-import { playChord } from "@/lib/music/audio";
+import { holdChord, playChord } from "@/lib/music/audio";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -12,6 +12,10 @@ interface Props {
   variant?: "ink" | "card" | "filled";
   className?: string;
   audition?: boolean; // play sound on click by default
+  /** When true (default), pressing-and-holding sustains the chord until release. */
+  sustainOnHold?: boolean;
+  /** Octave for audition (overrides default 4). */
+  octave?: number;
 }
 
 export function ChordChip({
@@ -23,50 +27,85 @@ export function ChordChip({
   variant = "card",
   className,
   audition = true,
+  sustainOnHold = true,
+  octave = 4,
 }: Props) {
-  // Use refs so timer/long-press state survive re-renders. Plain `let` inside
-  // the render body would reset on every render, leading to stale `longFired`
-  // reads after a state-update re-render — which caused tap→toggle→re-render→
-  // tap-handler-runs-again-with-stale-state bugs (chord selected then deselected
-  // in a single tap).
+  // Use refs so timer/long-press state survive re-renders.
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
-  // De-dupe touch + synthesized mouse events. On touch devices the browser
-  // fires touchstart → touchend → mousedown → mouseup → click, which would
-  // otherwise create two timers and fire onLongPress twice.
   const lastTouchAtRef = useRef(0);
+  // Sustain bookkeeping
+  const releaseRef = useRef<null | (() => void)>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heldRef = useRef(false);
+  // True after either: (a) long-press fired, or (b) sustain has been engaged.
+  // Used to swallow the trailing click event so it doesn't toggle selection.
+  const swallowClickRef = useRef(false);
+
+  // Threshold before we engage sustain — short enough to feel responsive on
+  // touch, long enough that a quick tap still routes to onClick/audition.
+  const SUSTAIN_DELAY_MS = 140;
+  const LONG_PRESS_MS = 500;
+
+  const releaseHold = () => {
+    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (releaseRef.current) {
+      try { releaseRef.current(); } catch { /* noop */ }
+      releaseRef.current = null;
+    }
+    heldRef.current = false;
+  };
+
+  // Cleanup on unmount so we never leak a sustained voice.
+  useEffect(() => () => releaseHold(), []);
 
   const start = (fromTouch: boolean) => {
     if (!fromTouch && Date.now() - lastTouchAtRef.current < 600) return;
     if (fromTouch) lastTouchAtRef.current = Date.now();
     longFiredRef.current = false;
+    swallowClickRef.current = false;
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+
+    if (sustainOnHold && audition) {
+      // Engage sustained voice after a small delay so a fast tap still uses
+      // triggerAttackRelease (so ADSR's release shapes the tail naturally).
+      holdTimerRef.current = setTimeout(() => {
+        heldRef.current = true;
+        swallowClickRef.current = true;
+        void holdChord(chord, octave).then((rel) => {
+          if (heldRef.current) releaseRef.current = rel;
+          else { try { rel(); } catch { /* noop */ } }
+        });
+      }, SUSTAIN_DELAY_MS);
+    }
+
     if (onLongPress) {
       pressTimerRef.current = setTimeout(() => {
         longFiredRef.current = true;
+        swallowClickRef.current = true;
+        // Releasing a sustained voice before firing the long-press feels right
+        // (the user clearly wanted to "select" rather than "hold").
+        releaseHold();
         onLongPress();
-      }, 500);
+      }, LONG_PRESS_MS);
     }
   };
+
   const cancel = () => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
+    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
+    releaseHold();
   };
+
   const handleClick = (e: React.MouseEvent) => {
-    if (longFiredRef.current) {
-      // A long-press just fired — its handler already updated selection.
-      // Swallow this click entirely so the parent wrapper's onClick doesn't
-      // also toggle (which would immediately undo the selection).
+    if (swallowClickRef.current) {
       e.stopPropagation();
       e.preventDefault();
+      swallowClickRef.current = false;
       longFiredRef.current = false;
       return;
     }
-    // Audition runs alongside any selection toggle the parent performs via the
-    // wrapper's onClick — they're independent and both fire on a single tap.
-    if (audition) void playChord(chord);
+    if (audition) void playChord(chord, undefined, octave);
     onClick?.();
   };
 
@@ -90,9 +129,9 @@ export function ChordChip({
       onClick={handleClick}
       onContextMenu={(e) => {
         e.preventDefault();
-        // Mark as long-press so the subsequent click is swallowed — prevents
-        // the "select then immediately deselect" double-toggle.
+        swallowClickRef.current = true;
         longFiredRef.current = true;
+        releaseHold();
         onLongPress?.();
       }}
       className={cn(

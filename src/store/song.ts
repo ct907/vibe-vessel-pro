@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
+import { useSoundStore, type SoundSettings } from "@/store/sound";
 
 // ---------- Types ----------
 
@@ -154,6 +155,7 @@ export interface SerializedSong {
   sections: Section[];
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
+  sound?: SoundSettings;
 }
 
 // ---------- Factories ----------
@@ -1540,6 +1542,8 @@ export const useSongStore = create<SongState>((set, get) => ({
       basket: [],
       suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
     });
+    // Sound settings live in their own store but travel with the song JSON.
+    useSoundStore.getState().loadFrom(parsed.sound);
   },
   toJSON: () => {
     const s = get();
@@ -1549,6 +1553,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       sections: s.sections,
       progression: s.progression,
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+      sound: useSoundStore.getState().toJSON(),
     };
   },
 }));

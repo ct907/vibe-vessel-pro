@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Play, Square, Minus, Plus, Save, Upload, BookOpen, Menu, Sun, Moon } from "lucide-react";
-import { ALL_ROOTS } from "@/lib/music/chords";
+import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
+import { SoundPanel } from "@/components/sound/SoundPanel";
+import { Music2 } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -26,6 +28,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [fileInputKey, setFileInputKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [soundOpen, setSoundOpen] = useState(false);
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
 
@@ -213,6 +216,9 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 <Square className="h-4 w-4" /> Stop
               </Button>
             )}
+            <Button size="sm" variant="outline" onClick={() => setSoundOpen(true)} aria-label="Sound settings">
+              <Music2 className="h-4 w-4" /> Sound
+            </Button>
           </div>
         </div>
 
@@ -232,13 +238,14 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as "maj" | "min")}>
-              <SelectTrigger className="h-8 w-[80px]">
+            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
+              <SelectTrigger className="h-8 w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="maj">major</SelectItem>
-                <SelectItem value="min">minor</SelectItem>
+                {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
+                  <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -256,6 +263,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           </div>
         </div>
       </div>
+      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     </header>
   );
 }

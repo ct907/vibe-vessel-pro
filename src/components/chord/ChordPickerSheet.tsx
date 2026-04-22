@@ -10,6 +10,8 @@ import { playChord } from "@/lib/music/audio";
 import { Trash2, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const OCTAVE_OPTIONS = [3, 4, 5];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +31,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
+  const [octave, setOctave] = useState<number>(4);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
@@ -122,16 +125,16 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
         onCloseAutoFocus={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => {
           // Allow taps on the underlying chord row / chord chips to focus them
-          // without closing the sheet. Only the explicit close button or the
-          // overlay (which we hide via modal=false) should close.
+          // without closing the sheet — but tapping a LYRIC input should close
+          // the picker so the user can edit the lyric line normally.
           const t = e.target as HTMLElement | null;
-          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+          if (t && t.closest("[data-chord-row]")) {
             e.preventDefault();
           }
         }}
         onInteractOutside={(e) => {
           const t = e.target as HTMLElement | null;
-          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+          if (t && t.closest("[data-chord-row]")) {
             e.preventDefault();
           }
         }}
@@ -155,6 +158,18 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
+            <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+              <SelectTrigger className="h-10 w-[64px] px-2 text-xs font-mono-chord" aria-label="Audition octave">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OCTAVE_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={String(o)} className="text-xs font-mono-chord">
+                    Oct {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {!query.trim() && (
@@ -180,7 +195,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
                       <span
                         role="button"
                         aria-label={`Preview ${s.symbol.display}`}
-                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol); }}
+                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
                         className="ml-auto rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-background"
                       >
                         <Play className="h-3.5 w-3.5" />
@@ -207,7 +222,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
                     <span
                       role="button"
                       aria-label={`Preview ${s.symbol.display}`}
-                      onClick={(e) => { e.stopPropagation(); void playChord(s.symbol); }}
+                      onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
                       className="rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-background"
                     >
                       <Play className="h-4 w-4" />

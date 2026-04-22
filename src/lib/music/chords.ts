@@ -140,8 +140,10 @@ export function chordToMidi(chord: ChordSymbol, octave = 4): number[] {
   const base = 12 * (octave + 1) + rootPc; // MIDI C4 = 60
   const notes = intervals.map((i) => base + i);
   if (chord.bass) {
+    // Slash-chord inverted bass: always exactly one octave below the chord root.
     const bassPc = rootToPc(chord.bass);
-    notes.unshift(12 * octave + bassPc);
+    const bassSameOct = base + ((bassPc - rootPc + 12) % 12);
+    notes.unshift(bassSameOct - 12);
   }
   return notes;
 }
@@ -158,16 +160,127 @@ export function midiToNoteName(midi: number, useFlat = false): string {
 
 // ---------- Nashville ladder ----------
 
-export type Mode = "maj" | "min";
+// Mode/scale identifier used by the song meta and key selector.
+export type Mode =
+  | "maj" | "min"
+  | "dorian" | "phrygian" | "lydian" | "mixolydian" | "locrian"
+  | "harmonic-minor" | "melodic-minor"
+  | "pentatonic-maj" | "pentatonic-min"
+  | "blues";
 
-const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
-const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10];
+export const MODE_LABEL: Record<Mode, string> = {
+  maj: "major",
+  min: "minor",
+  dorian: "Dorian",
+  phrygian: "Phrygian",
+  lydian: "Lydian",
+  mixolydian: "Mixolydian",
+  locrian: "Locrian",
+  "harmonic-minor": "harmonic minor",
+  "melodic-minor": "melodic minor",
+  "pentatonic-maj": "pentatonic major",
+  "pentatonic-min": "pentatonic minor",
+  blues: "blues",
+};
 
-const MAJOR_DEGREE_QUALITY: Quality[] = ["maj", "min", "min", "maj", "maj", "min", "dim"];
-const MINOR_DEGREE_QUALITY: Quality[] = ["min", "dim", "maj", "min", "min", "maj", "maj"];
+/** Suffix appended to the key root for display (e.g. C + "m" = Cm). */
+export const MODE_SUFFIX: Record<Mode, string> = {
+  maj: "",
+  min: "m",
+  dorian: " dorian",
+  phrygian: " phrygian",
+  lydian: " lydian",
+  mixolydian: " mixo",
+  locrian: " locrian",
+  "harmonic-minor": " harm-min",
+  "melodic-minor": " mel-min",
+  "pentatonic-maj": " pent",
+  "pentatonic-min": "m pent",
+  blues: " blues",
+};
 
-const NUMERAL_MAJ = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
-const NUMERAL_MIN = ["i", "ii°", "III", "iv", "v", "VI", "VII"];
+interface ScaleDef {
+  intervals: number[];
+  qualities: Quality[];
+  numerals: string[];
+}
+
+const SCALE_DEFS: Record<Mode, ScaleDef> = {
+  maj: {
+    intervals: [0, 2, 4, 5, 7, 9, 11],
+    qualities: ["maj", "min", "min", "maj", "maj", "min", "dim"],
+    numerals: ["I", "ii", "iii", "IV", "V", "vi", "vii°"],
+  },
+  min: {
+    intervals: [0, 2, 3, 5, 7, 8, 10],
+    qualities: ["min", "dim", "maj", "min", "min", "maj", "maj"],
+    numerals: ["i", "ii°", "III", "iv", "v", "VI", "VII"],
+  },
+  dorian: {
+    intervals: [0, 2, 3, 5, 7, 9, 10],
+    qualities: ["min", "min", "maj", "maj", "min", "dim", "maj"],
+    numerals: ["i", "ii", "III", "IV", "v", "vi°", "VII"],
+  },
+  phrygian: {
+    intervals: [0, 1, 3, 5, 7, 8, 10],
+    qualities: ["min", "maj", "maj", "min", "dim", "maj", "min"],
+    numerals: ["i", "II", "III", "iv", "v°", "VI", "vii"],
+  },
+  lydian: {
+    intervals: [0, 2, 4, 6, 7, 9, 11],
+    qualities: ["maj", "maj", "min", "dim", "maj", "min", "min"],
+    numerals: ["I", "II", "iii", "iv°", "V", "vi", "vii"],
+  },
+  mixolydian: {
+    intervals: [0, 2, 4, 5, 7, 9, 10],
+    qualities: ["maj", "min", "dim", "maj", "min", "min", "maj"],
+    numerals: ["I", "ii", "iii°", "IV", "v", "vi", "VII"],
+  },
+  locrian: {
+    intervals: [0, 1, 3, 5, 6, 8, 10],
+    qualities: ["dim", "maj", "min", "min", "maj", "maj", "min"],
+    numerals: ["i°", "II", "iii", "iv", "V", "VI", "vii"],
+  },
+  "harmonic-minor": {
+    intervals: [0, 2, 3, 5, 7, 8, 11],
+    qualities: ["min", "dim", "aug", "min", "maj", "maj", "dim"],
+    numerals: ["i", "ii°", "III+", "iv", "V", "VI", "vii°"],
+  },
+  "melodic-minor": {
+    intervals: [0, 2, 3, 5, 7, 9, 11],
+    qualities: ["min", "min", "aug", "maj", "maj", "dim", "dim"],
+    numerals: ["i", "ii", "III+", "IV", "V", "vi°", "vii°"],
+  },
+  "pentatonic-maj": {
+    intervals: [0, 2, 4, 7, 9],
+    qualities: ["maj", "min", "min", "maj", "min"],
+    numerals: ["I", "ii", "iii", "V", "vi"],
+  },
+  "pentatonic-min": {
+    intervals: [0, 3, 5, 7, 10],
+    qualities: ["min", "maj", "min", "min", "maj"],
+    numerals: ["i", "III", "iv", "v", "VII"],
+  },
+  blues: {
+    intervals: [0, 3, 5, 6, 7, 10],
+    qualities: ["min", "maj", "maj", "dim", "maj", "maj"],
+    numerals: ["i", "III", "IV", "♭V", "V", "VII"],
+  },
+};
+
+/** True when a mode is essentially "minor" for naming purposes (lowercase i, etc.) */
+export function isMinorMode(mode: Mode): boolean {
+  return (
+    mode === "min" ||
+    mode === "dorian" ||
+    mode === "phrygian" ||
+    mode === "locrian" ||
+    mode === "harmonic-minor" ||
+    mode === "melodic-minor" ||
+    mode === "pentatonic-min" ||
+    mode === "blues"
+  );
+}
 
 export interface DegreeChord {
   numeral: string;
@@ -175,18 +288,16 @@ export interface DegreeChord {
 }
 
 export function nashvilleLadder(keyRoot: string, mode: Mode): DegreeChord[] {
-  const intervals = mode === "maj" ? MAJOR_SCALE_INTERVALS : MINOR_SCALE_INTERVALS;
-  const qualities = mode === "maj" ? MAJOR_DEGREE_QUALITY : MINOR_DEGREE_QUALITY;
-  const numerals = mode === "maj" ? NUMERAL_MAJ : NUMERAL_MIN;
+  const def = SCALE_DEFS[mode] ?? SCALE_DEFS.maj;
   const rootPc = rootToPc(keyRoot);
   const useFlat = keyRoot.includes("b") || ["F", "Bb", "Eb", "Ab", "Db", "Gb"].includes(keyRoot);
-  return intervals.map((iv, i) => {
+  return def.intervals.map((iv, i) => {
     const pc = (rootPc + iv) % 12;
     const root = pcToName(pc, useFlat);
-    const quality = qualities[i];
+    const quality = def.qualities[i];
     const display = root + QUALITY_PRETTY[quality];
     return {
-      numeral: numerals[i],
+      numeral: def.numerals[i],
       chord: { root, quality, display },
     };
   });
