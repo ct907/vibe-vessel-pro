@@ -5,12 +5,13 @@ import {
   Quality,
   nashvilleLadder,
   parseChord,
+  isMinorMode,
 } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { Plus, Music, X } from "lucide-react";
+import { Plus, Music, X, Filter } from "lucide-react";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
@@ -19,32 +20,51 @@ const ALL_QUALITIES: Quality[] = [
   "maj9", "min9", "9", "add9", "6", "min6",
 ];
 
+const qualitySuffix = (q: Quality): string =>
+  q === "maj" ? "" : q === "min" ? "m" : q;
+
 export function ChordsTab() {
   const { meta, addToBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
+  // Numeral filter: when non-empty, only rows whose numeral is selected are shown.
+  const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
 
-  // Build rows with all qualities, deduping repeated chord displays across rows.
+  // Build rows with all qualities. Dedupe variants WITHIN each row by their
+  // canonical (parsed) display so e.g. "Dm" never appears twice.
   const grid = useMemo(() => {
-    const seen = new Set<string>();
     return ladder.map((deg) => {
       const variants: ChordSymbol[] = [];
+      const seenInRow = new Set<string>();
       for (const q of ALL_QUALITIES) {
-        const display = deg.chord.root + (q === "maj" ? "" : q === "min" ? "m" : q);
-        if (seen.has(display)) continue;
-        seen.add(display);
-        const parsed = parseChord(display);
-        if (parsed) variants.push(parsed);
+        const parsed = parseChord(deg.chord.root + qualitySuffix(q));
+        if (!parsed) continue;
+        if (seenInRow.has(parsed.display)) continue;
+        seenInRow.add(parsed.display);
+        variants.push(parsed);
       }
       return { numeral: deg.numeral, root: deg.chord.root, baseChord: deg.chord, variants };
     });
   }, [ladder]);
+
+  const visibleGrid = useMemo(
+    () => (numeralFilter.size === 0 ? grid : grid.filter((r) => numeralFilter.has(r.numeral))),
+    [grid, numeralFilter],
+  );
 
   const toggleSelect = (chord: ChordSymbol) => {
     setSelected((s) => {
       const next = { ...s };
       if (next[chord.display]) delete next[chord.display];
       else next[chord.display] = chord;
+      return next;
+    });
+  };
+
+  const toggleNumeral = (numeral: string) => {
+    setNumeralFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(numeral)) next.delete(numeral); else next.add(numeral);
       return next;
     });
   };
@@ -71,6 +91,9 @@ export function ChordsTab() {
   }, [selected]);
 
   const selectedCount = Object.keys(selected).length;
+  const keySuffix = isMinorMode(meta.keyMode) && meta.keyMode !== "blues" && meta.keyMode !== "pentatonic-min"
+    ? "m"
+    : "";
 
   return (
     <div className="space-y-5">
@@ -78,38 +101,62 @@ export function ChordsTab() {
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Music className="h-4 w-4 ink-chord" />
-          <h2 className="font-display text-lg">
-            Diatonic ladder · <span className="font-mono-chord">{meta.keyRoot}{meta.keyMode === "min" ? "m" : ""}</span>
+          <h2 className="font-display text-lg flex-1 min-w-0 truncate">
+            Diatonic ladder · <span className="font-mono-chord">{meta.keyRoot}{keySuffix}</span>
           </h2>
+          {numeralFilter.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setNumeralFilter(new Set())}>
+              Clear filter
+            </Button>
+          )}
         </div>
-        <div className="grid grid-cols-7 gap-2">
-          {ladder.map((d) => (
-            <div key={d.numeral} className="rounded-md bg-muted/50 border border-border p-2 text-center">
-              <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
-              <ChordChip chord={d.chord} variant="ink" size="sm" />
-            </div>
-          ))}
+        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+          <Filter className="h-3 w-3" />
+          <span>Tap a numeral to filter the rows below</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {ladder.map((d) => {
+            const active = numeralFilter.has(d.numeral);
+            return (
+              <button
+                key={d.numeral}
+                type="button"
+                onClick={() => toggleNumeral(d.numeral)}
+                className={cn(
+                  "rounded-md border p-2 text-center transition-colors",
+                  active
+                    ? "border-primary bg-accent ring-1 ring-primary"
+                    : "border-border bg-muted/50 hover:bg-accent/60",
+                )}
+              >
+                <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
+                <ChordChip chord={d.chord} variant="ink" size="sm" />
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div className="flex items-center">
         <span className="ml-auto text-xs text-muted-foreground">
-          Tap to audition · Check to multi-select · Esc to cancel
+          Tap to audition · Hold to sustain · Check to multi-select · Esc to cancel
         </span>
       </div>
 
-      {/* Chord cards — one row per scale degree */}
+      {/* Chord cards — one row per scale degree (filtered) */}
       <div className="space-y-2">
-        {grid.map((row) => (
+        {visibleGrid.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            No degrees match this filter.
+          </div>
+        )}
+        {visibleGrid.map((row) => (
           <div key={row.numeral} className="rounded-xl border border-border bg-card p-3">
             <div className="flex items-baseline gap-3 mb-2">
               <span className="font-mono-chord text-xs text-muted-foreground w-10">{row.numeral}</span>
               <span className="font-display text-base ink-chord">{row.root}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {row.variants.length === 0 && (
-                <span className="text-xs text-muted-foreground italic">No new variants</span>
-              )}
               {row.variants.map((c) => {
                 const isSel = !!selected[c.display];
                 return (
