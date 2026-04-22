@@ -692,7 +692,27 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div ref={cardRef} className="paper-card rounded-xl px-5 py-5">
+    <div
+      ref={cardRef}
+      className={cn(
+        "paper-card rounded-xl px-5 py-5 transition-shadow",
+        isSectionDragOver && "ring-2 ring-primary/60",
+      )}
+      onDragOver={(e) => {
+        // Accept section drops anywhere on the card
+        if (e.dataTransfer.types.includes("application/x-section-id")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          onSectionDragOver(section.id);
+        }
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.types.includes("application/x-section-id")) {
+          e.preventDefault();
+          onSectionDragEnd();
+        }
+      }}
+    >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4">
         <button
@@ -739,9 +759,26 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           {section.lines.length} line{section.lines.length === 1 ? "" : "s"}
         </span>
 
+        {/* Drag handle — placed to the left of the 3-dot menu with a 12px gap */}
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/x-section-id", section.id);
+            onSectionDragStart(section.id);
+          }}
+          onDragEnd={onSectionDragEnd}
+          className="ml-auto h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Drag to reorder section"
+          title="Drag to reorder section"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto">
+            <Button size="icon" variant="ghost" className="h-7 w-7" style={{ marginLeft: 12 }}>
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -754,13 +791,6 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             )}
             <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
               <Copy className="h-4 w-4" /> Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => moveSection(section.id, -1)} disabled={index === 0}>
-              <ArrowUp className="h-4 w-4" /> Move up
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => moveSection(section.id, 1)} disabled={index === total - 1}>
-              <ArrowDown className="h-4 w-4" /> Move down
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
