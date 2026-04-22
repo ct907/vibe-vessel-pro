@@ -183,6 +183,7 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
     },
     pattern: {
       id,
+      sectionId: id,
       label: finalLabel,
       bars: 4,
       beatsPerBar: 4,
