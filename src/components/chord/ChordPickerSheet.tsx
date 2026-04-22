@@ -34,10 +34,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
 
   useEffect(() => {
     if (open) {
-      setQuery(initialChord?.display ?? "");
+      // When uncontrolled, seed with the existing chord display. When parent
+      // controls the query, leave it alone (parent owns sync with chord row).
+      if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [open, initialChord]);
+  }, [open, initialChord, queryProp]);
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return;
