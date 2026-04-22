@@ -248,18 +248,32 @@ export function suggestChords(query: string): ChordSuggestion[] {
   const consumed = rawMatch[0].length;
   const root = normalizeRoot(q);
   if (!root) return [];
-  // If the user typed more than just the root, parse strictly
-  if (q.length > consumed) {
-    const parsed = parseChord(q);
-    return parsed ? [{ symbol: parsed, label: describeChord(parsed) }] : [];
-  }
-  // Just a root: surface every common quality on it
-  return COMMON_QUALITIES.map((quality) => {
-    const symbol: ChordSymbol = {
-      root,
-      quality,
-      display: root + QUALITY_PRETTY[quality],
-    };
+  const tail = q.slice(consumed);
+
+  // Helper to build a suggestion for a quality on the resolved root.
+  const make = (quality: Quality): ChordSuggestion => {
+    const symbol: ChordSymbol = { root, quality, display: root + QUALITY_PRETTY[quality] };
     return { symbol, label: describeChord(symbol) };
-  });
+  };
+
+  // Just a root: surface every common quality.
+  if (tail.length === 0) return COMMON_QUALITIES.map(make);
+
+  // Partial-quality filter: any common quality whose pretty form is a prefix
+  // of what the user typed (or vice versa). This lets "Cdim" → dim/dim7,
+  // "Cm" → m/m7/m9/m6/…, "Cmaj" → maj/maj7/maj9.
+  const lowerTail = tail.toLowerCase();
+  const filtered = COMMON_QUALITIES.filter((quality) => {
+    const pretty = QUALITY_PRETTY[quality].toLowerCase();
+    if (!pretty) return false;
+    return pretty.startsWith(lowerTail) || lowerTail.startsWith(pretty);
+  }).map(make);
+
+  // Always include a strict parse if we can produce one (e.g. slash chords,
+  // exotic qualities, or fully-typed chords).
+  const parsed = parseChord(q);
+  if (parsed && !filtered.some((f) => f.symbol.display === parsed.display)) {
+    return [{ symbol: parsed, label: describeChord(parsed) }, ...filtered];
+  }
+  return filtered;
 }
