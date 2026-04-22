@@ -46,6 +46,9 @@ interface LineRowProps {
   /** Drag a chord chip from this row onto another row */
   onChordDragStart: (anchorId: string) => void;
   onChordDrop: (toLineId: string, toCol: number) => void;
+  /** Live query from the chord picker (only meaningful when active). */
+  chordRowQuery?: string;
+  onChordRowQueryChange?: (q: string) => void;
 }
 
 function LineRow({
