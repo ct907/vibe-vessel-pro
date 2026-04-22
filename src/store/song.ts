@@ -488,6 +488,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     const newPattern: PatternBlock = srcPattern
       ? {
           id: newId,
+          sectionId: newId,
           label: newSection.label,
           bars: srcPattern.bars,
           beatsPerBar: srcPattern.beatsPerBar,
@@ -504,7 +505,7 @@ export const useSongStore = create<SongState>((set, get) => ({
             return { id: newPcId, chord: c.chord, startBeat: c.startBeat, lengthBeats: c.lengthBeats, mirrorId: linkedAnchor };
           }),
         }
-      : { id: newId, label: newSection.label, bars: 4, beatsPerBar: 4, chords: [] };
+      : { id: newId, sectionId: newId, label: newSection.label, bars: 4, beatsPerBar: 4, chords: [] };
 
     set((s) => {
       const sections = [...s.sections];
