@@ -286,11 +286,21 @@ function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPicke
 }
 
 export function ProgressionsTab() {
-  const { progression, sections, addSection, addChordToPattern, updatePatternChord } = useSongStore();
+  const { progression, sections, addSection, addChordToPattern, updatePatternChord, basket } = useSongStore();
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
 
   const labelById = new Map(sections.map((s) => [s.id, s.label] as const));
   const canDelete = sections.length > 1;
+
+  // Basket steals focus: close picker if basket becomes non-empty.
+  useEffect(() => {
+    if (basket.length > 0 && picker) setPicker(null);
+  }, [basket.length, picker]);
+
+  const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
+    if (basket.length > 0) return;
+    setPicker({ patternId, atBeat, replaceChordId });
+  };
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
