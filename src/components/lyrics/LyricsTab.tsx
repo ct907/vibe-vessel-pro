@@ -62,6 +62,10 @@ function LineRow({
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
     undo, redo,
   } = useSongStore();
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const playingAnchorId = isPlaying && playbackCurrent?.mirrorId ? playbackCurrent.mirrorId : null;
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
