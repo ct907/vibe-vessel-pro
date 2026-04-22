@@ -39,7 +39,6 @@ export function ChordChip({
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
   };
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     if (longFired) return;
     if (audition) void playChord(chord);
     onClick?.();

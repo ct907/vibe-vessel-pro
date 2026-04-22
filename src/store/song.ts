@@ -82,6 +82,7 @@ export interface SongState {
   removeSection: (id: string) => void;
   duplicateSection: (id: string) => string | null;
   moveSection: (id: string, direction: -1 | 1) => void;
+  reorderSection: (id: string, toIndex: number) => void;
   toggleSectionCollapsed: (id: string) => void;
   setSectionComment: (id: string, comment: string) => void;
 
@@ -521,6 +522,23 @@ export const useSongStore = create<SongState>((set, get) => ({
     const progression = [...s.progression];
     if (pIdx >= 0 && pSwap >= 0) {
       [progression[pIdx], progression[pSwap]] = [progression[pSwap], progression[pIdx]];
+    }
+    return { sections, progression };
+  }),
+  reorderSection: (id, toIndex) => set((s) => {
+    const idx = s.sections.findIndex((sec) => sec.id === id);
+    if (idx < 0) return s;
+    const sections = [...s.sections];
+    const [moved] = sections.splice(idx, 1);
+    const clamped = Math.max(0, Math.min(sections.length, toIndex));
+    sections.splice(clamped, 0, moved);
+    // Mirror order in progression by section ids.
+    const progression = [...s.progression];
+    const pIdx = progression.findIndex((p) => p.id === id);
+    if (pIdx >= 0) {
+      const [pMoved] = progression.splice(pIdx, 1);
+      const pClamp = Math.max(0, Math.min(progression.length, clamped));
+      progression.splice(pClamp, 0, pMoved);
     }
     return { sections, progression };
   }),
