@@ -207,10 +207,11 @@ interface SectionCardProps {
   section: Section;
   index: number;
   total: number;
+  activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, offset: number, anchorId?: string) => void;
 }
 
-function SectionCard({ section, index, total, onPickerOpen }: SectionCardProps) {
+function SectionCard({ section, index, total, activeLineId, onPickerOpen }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection, moveSection,
     toggleSectionCollapsed, upsertChordAt, basket,
