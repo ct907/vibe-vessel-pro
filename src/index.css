@@ -2,104 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/*
+  Songwriter's Notebook — Warm paper design system.
+  All colors HSL. Use semantic tokens, never raw hex in components.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Paper & ink */
+    --background: 41 38% 92%;        /* warm cream paper */
+    --foreground: 25 25% 18%;        /* dark sepia ink */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 40 45% 96%;
+    --card-foreground: 25 25% 18%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 40 45% 97%;
+    --popover-foreground: 25 25% 18%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Amber accent (the one warm pop) */
+    --primary: 28 78% 48%;           /* burnt amber */
+    --primary-foreground: 40 50% 97%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 38 30% 86%;
+    --secondary-foreground: 25 25% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 38 25% 88%;
+    --muted-foreground: 30 15% 38%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 28 60% 90%;            /* faint amber wash */
+    --accent-foreground: 28 60% 25%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 40 50% 97%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 35 25% 78%;
+    --input: 35 25% 78%;
+    --ring: 28 78% 48%;
 
-    --radius: 0.5rem;
+    --radius: 0.6rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Notebook specifics */
+    --paper: 41 38% 92%;
+    --paper-shade: 38 30% 86%;
+    --rule: 30 30% 70%;              /* ruled line color */
+    --margin-line: 0 55% 55%;        /* red left margin */
+    --ink-soft: 30 15% 38%;
+    --chord-ink: 28 78% 38%;         /* deep amber for chord glyphs */
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --shadow-paper: 0 1px 0 hsl(35 25% 78% / 0.6), 0 8px 24px -12px hsl(25 25% 18% / 0.18);
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar (unused but kept for shadcn) */
+    --sidebar-background: 40 45% 96%;
+    --sidebar-foreground: 25 25% 18%;
+    --sidebar-primary: 28 78% 48%;
+    --sidebar-primary-foreground: 40 50% 97%;
+    --sidebar-accent: 38 30% 86%;
+    --sidebar-accent-foreground: 25 25% 18%;
+    --sidebar-border: 35 25% 78%;
+    --sidebar-ring: 28 78% 48%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 25 18% 10%;
+    --foreground: 40 35% 90%;
+    --card: 25 18% 13%;
+    --card-foreground: 40 35% 90%;
+    --popover: 25 18% 13%;
+    --popover-foreground: 40 35% 90%;
+    --primary: 28 78% 58%;
+    --primary-foreground: 25 18% 10%;
+    --secondary: 25 12% 20%;
+    --secondary-foreground: 40 35% 90%;
+    --muted: 25 12% 18%;
+    --muted-foreground: 30 15% 65%;
+    --accent: 28 40% 22%;
+    --accent-foreground: 28 78% 78%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 40 35% 90%;
+    --border: 25 12% 22%;
+    --input: 25 12% 22%;
+    --ring: 28 78% 58%;
+    --paper: 25 18% 10%;
+    --paper-shade: 25 12% 14%;
+    --rule: 25 12% 25%;
+    --margin-line: 0 55% 45%;
+    --ink-soft: 30 15% 65%;
+    --chord-ink: 28 78% 62%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
+  html, body, #root { height: 100%; }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    background-image:
+      radial-gradient(hsl(var(--ink-soft) / 0.05) 1px, transparent 1px),
+      radial-gradient(hsl(var(--ink-soft) / 0.04) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .font-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+  .font-mono-chord { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* Ruled paper background — used in lyrics editor */
+  .paper-ruled {
+    background-color: hsl(var(--paper));
+    background-image:
+      linear-gradient(to bottom, transparent 0, transparent calc(2.25rem - 1px), hsl(var(--rule) / 0.55) calc(2.25rem - 1px), hsl(var(--rule) / 0.55) 2.25rem);
+    background-size: 100% 2.25rem;
+    background-position: 0 1.5rem;
+  }
+  .paper-margin {
+    box-shadow: inset 3.25rem 0 0 -3.125rem hsl(var(--margin-line) / 0.55);
+  }
+
+  .ink-chord { color: hsl(var(--chord-ink)); }
+
+  .paper-card {
+    background-color: hsl(var(--card));
+    box-shadow: var(--shadow-paper);
+    border: 1px solid hsl(var(--border));
   }
 }
