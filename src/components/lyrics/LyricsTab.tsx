@@ -496,6 +496,18 @@ function LineRow({
             }}
           />
         )}
+        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord */}
+        {playingAnchorId && (() => {
+          const playing = line.chords.find((a) => a.id === playingAnchorId);
+          if (!playing) return null;
+          return (
+            <span
+              aria-hidden
+              className="absolute top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+              style={{ left: `${colOf(playing) * cellPx - 1}px` }}
+            />
+          );
+        })()}
         {/* Chord chips at columns */}
         {line.chords.map((a) => {
           const col = colOf(a);
