@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { useSongStore, type LyricLine, type Section, type SectionType } from "@/store/song";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSongStore, getSectionDisplayName, type LyricLine, type Section, type SectionType } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSeparator, DropdownMenuLabel,
@@ -12,8 +15,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
@@ -29,22 +33,38 @@ interface LineRowProps {
   onAddLineAfter: () => void;
   onRemoveLine: () => void;
   onPickerOpen: (lineId: string, offset: number, anchorId?: string) => void;
+  onActiveRect?: (rect: { width: number; left: number } | null) => void;
 }
 
-function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
+function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPickerOpen, onActiveRect }: LineRowProps) {
   const { setLineText, upsertChordAt, removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors } = useSongStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const chordRowRef = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const ro = new ResizeObserver(() => force((x) => x + 1));
     if (rowRef.current) ro.observe(rowRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Report rect for the pinned mobile clone
+  useLayoutEffect(() => {
+    if (!active || !onActiveRect) return;
+    const measure = () => {
+      if (!chordRowRef.current) return;
+      const r = chordRowRef.current.getBoundingClientRect();
+      onActiveRect({ width: r.width, left: r.left });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [active, onActiveRect]);
 
   // Exit select mode if no chips remain
   useEffect(() => {
@@ -108,11 +128,13 @@ function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPick
     <div
       ref={rowRef}
       className={cn(
-        "relative group py-1 transition-all",
-        active && "relative z-[60] rounded-md bg-card/95 ring-2 ring-primary shadow-lg px-2 -mx-2",
+        "relative group py-1 transition-colors",
+        active && "rounded-md ring-2 ring-primary/70 bg-primary/5 px-2 -mx-2",
       )}
+      data-active={active ? "true" : undefined}
     >
       <div
+        ref={chordRowRef}
         className="relative h-6 cursor-text"
         onClick={handleChordRowClick}
         title={selectMode ? "Tap chips to add/remove from selection" : "Click to add a chord above this position"}
@@ -207,16 +229,27 @@ interface SectionCardProps {
   section: Section;
   index: number;
   total: number;
+  displayName: string;
   activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, offset: number, anchorId?: string) => void;
+  onActiveRect?: (rect: { width: number; left: number } | null) => void;
 }
 
-function SectionCard({ section, index, total, activeLineId, onPickerOpen }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onActiveRect }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection, moveSection,
     toggleSectionCollapsed, upsertChordAt, basket,
   } = useSongStore();
-  const [renaming, setRenaming] = useState(false);
+  const [customRenameOpen, setCustomRenameOpen] = useState(false);
+  const [draftLabel, setDraftLabel] = useState(section.label);
+
+  useEffect(() => { setDraftLabel(section.label); }, [section.label]);
+
+  const acceptCustomName = () => {
+    const trimmed = draftLabel.trim() || "Section";
+    updateSection(section.id, { label: trimmed });
+    setCustomRenameOpen(false);
+  };
 
   return (
     <div className="paper-card paper-ruled paper-margin rounded-xl px-10 py-5">
@@ -230,9 +263,17 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
           {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
 
-        <Select value={section.type} onValueChange={(v) => updateSection(section.id, { type: v as SectionType })}>
-          <SelectTrigger className="h-7 w-[120px] text-xs capitalize">
-            <SelectValue />
+        <Select
+          value={section.type}
+          onValueChange={(v) => {
+            const next = v as SectionType;
+            // If switching to custom, prompt for a name; otherwise label is computed.
+            updateSection(section.id, { type: next, label: next === "custom" ? (section.label || "Section") : section.label });
+            if (next === "custom") setCustomRenameOpen(true);
+          }}
+        >
+          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize">
+            <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {SECTION_TYPES.map((t) => (
@@ -241,22 +282,10 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
           </SelectContent>
         </Select>
 
-        {renaming ? (
-          <Input
-            autoFocus
-            value={section.label}
-            onChange={(e) => updateSection(section.id, { label: e.target.value })}
-            onBlur={() => setRenaming(false)}
-            onKeyDown={(e) => { if (e.key === "Enter") setRenaming(false); }}
-            className="h-7 w-44 font-display text-base"
-          />
-        ) : (
-          <button
-            onClick={() => setRenaming(true)}
-            className="font-display text-lg font-semibold ink-chord hover:underline truncate max-w-xs text-left"
-          >
-            {section.label}
-          </button>
+        {section.type === "custom" && (
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setCustomRenameOpen(true)} aria-label="Rename custom section">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
         )}
 
         <span className="text-xs text-muted-foreground ml-1">
@@ -271,7 +300,11 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>Section</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setRenaming(true)}>Rename…</DropdownMenuItem>
+            {section.type === "custom" && (
+              <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
+                <Pencil className="h-4 w-4" /> Rename…
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
               <Copy className="h-4 w-4" /> Duplicate
             </DropdownMenuItem>
@@ -307,6 +340,7 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onRemoveLine={() => removeLine(section.id, line.id)}
                 onPickerOpen={(lineId, offset, anchorId) => onPickerOpen(section.id, lineId, offset, anchorId)}
+                onActiveRect={activeLineId === line.id ? onActiveRect : undefined}
               />
             ))}
           </div>
@@ -339,6 +373,77 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
           )}
         </>
       )}
+
+      {/* Custom name dialog */}
+      <Dialog open={customRenameOpen} onOpenChange={setCustomRenameOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Name this section</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") acceptCustomName(); }}
+            placeholder="e.g. Refrain, Tag, Solo…"
+            className="font-display text-base"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCustomRenameOpen(false)}>Cancel</Button>
+            <Button onClick={acceptCustomName}>Accept</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Pinned clone of the active line's chord row for mobile, fixed at top:100px. */
+function MobilePinnedActiveRow({
+  line, rect, onPickerOpen, onHeight,
+}: {
+  line: LyricLine;
+  rect: { width: number; left: number };
+  onPickerOpen: (lineId: string, offset: number, anchorId?: string) => void;
+  onHeight: (h: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [, force] = useState(0);
+
+  useLayoutEffect(() => {
+    if (ref.current) onHeight(ref.current.getBoundingClientRect().height);
+    force((x) => x + 1); // ensure measure span has rendered
+    return () => onHeight(0);
+  }, [line.id, onHeight]);
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-40 pointer-events-auto rounded-md ring-2 ring-primary/70 bg-paper shadow-md px-2 py-1"
+      style={{ top: 100, left: rect.left - 8, width: rect.width + 16 }}
+    >
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Editing chords on:</div>
+      <div className="relative h-6">
+        {line.chords.length === 0 && (
+          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-6">
+            add your chords here
+          </span>
+        )}
+        {line.chords.map((a) => {
+          const x = measureRef.current ? measureOffsetX(measureRef.current, line.text, a.offset) : 0;
+          return (
+            <div key={a.id} className="absolute -translate-x-1/2" style={{ left: `${x}px`, top: 0 }}>
+              <ChordChip chord={a.chord} variant="ink" size="sm" audition
+                onClick={() => onPickerOpen(line.id, a.offset, a.id)} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="font-display text-base leading-7 text-foreground/80 truncate">
+        {line.text || <span className="text-muted-foreground/60">(empty line)</span>}
+      </div>
+      <span ref={measureRef} aria-hidden className="invisible absolute left-0 top-0 whitespace-pre font-display text-lg leading-9" />
     </div>
   );
 }
@@ -346,16 +451,16 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
 export function LyricsTab() {
   const { sections, upsertChordAt, removeChordAnchor, addSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; offset: number; anchorId?: string } | null>(null);
+  const [activeRect, setActiveRect] = useState<{ width: number; left: number } | null>(null);
+  const [pinnedHeight, setPinnedHeight] = useState(0);
+  const isMobile = useIsMobile();
 
   const openPicker = (sectionId: string, lineId: string, offset: number, anchorId?: string) =>
     setPicker({ sectionId, lineId, offset, anchorId });
 
-  const initialChord = picker
-    ? sections
-        .find((s) => s.id === picker.sectionId)
-        ?.lines.find((l) => l.id === picker.lineId)
-        ?.chords.find((c) => c.id === picker.anchorId)?.chord
-    : undefined;
+  const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
+  const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
+  const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
@@ -366,6 +471,9 @@ export function LyricsTab() {
     removeChordAnchor(picker.sectionId, picker.lineId, picker.anchorId);
   };
 
+  // Reserved area at top of viewport: ~100px offset + pinned row height (mobile only)
+  const topReservedPx = isMobile && picker && pinnedHeight ? 100 + pinnedHeight + 12 : 0;
+
   return (
     <div className="space-y-4">
       {sections.map((sec, i) => (
@@ -374,8 +482,10 @@ export function LyricsTab() {
           section={sec}
           index={i}
           total={sections.length}
+          displayName={getSectionDisplayName(sections, sec.id)}
           activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
           onPickerOpen={openPicker}
+          onActiveRect={picker?.sectionId === sec.id ? setActiveRect : undefined}
         />
       ))}
 
@@ -391,12 +501,23 @@ export function LyricsTab() {
         </Button>
       </div>
 
+      {/* Mobile-only pinned active row */}
+      {isMobile && picker && activeLine && activeRect && (
+        <MobilePinnedActiveRow
+          line={activeLine}
+          rect={activeRect}
+          onPickerOpen={(lineId, offset, anchorId) => openPicker(picker.sectionId, lineId, offset, anchorId)}
+          onHeight={setPinnedHeight}
+        />
+      )}
+
       <ChordPickerSheet
         open={!!picker}
-        onOpenChange={(o) => !o && setPicker(null)}
+        onOpenChange={(o) => { if (!o) { setPicker(null); setActiveRect(null); setPinnedHeight(0); } }}
         initialChord={initialChord}
         onPick={handlePick}
         onRemove={picker?.anchorId ? handleRemove : undefined}
+        topReservedPx={topReservedPx}
       />
     </div>
   );
