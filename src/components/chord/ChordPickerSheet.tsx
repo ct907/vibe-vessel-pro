@@ -54,7 +54,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[80vh] paper-card rounded-t-2xl">
+      <SheetContent
+        side="bottom"
+        className="max-h-[80vh] paper-card rounded-t-2xl transition-[bottom] duration-150"
+        style={{ bottom: `${keyboardOffset}px` }}
+      >
         <SheetHeader>
           <SheetTitle className="font-display text-xl">Choose a chord</SheetTitle>
         </SheetHeader>
