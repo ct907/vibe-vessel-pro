@@ -71,102 +71,21 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
 
   return (
     <header className="border-b border-border bg-paper/85">
-      <div className="mx-auto max-w-6xl px-4 py-3 flex flex-wrap items-center gap-3">
-        {/* Title */}
-        <div className="flex items-center gap-2 mr-2">
+      <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3">
+        {/* Row 1: Logo + Title + Nav menu */}
+        <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 ink-chord" />
           <span className="font-display text-xl font-bold">Notebook</span>
           <span className="text-muted-foreground">›</span>
           <Input
             value={meta.title}
             onChange={(e) => setTitle(e.target.value)}
-            className="h-8 w-44 font-display text-base bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
+            className="h-8 flex-1 min-w-0 max-w-xs font-display text-base bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
           />
-        </div>
-
-        {/* Group: Key + BPM */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Key</span>
-            <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
-              <SelectTrigger className="h-8 w-auto min-w-0 px-2 gap-1 font-mono-chord">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ALL_ROOTS.map((r) => (
-                  <SelectItem key={r} value={r} className="font-mono-chord">
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as "maj" | "min")}>
-              <SelectTrigger className="h-8 w-[80px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="maj">major</SelectItem>
-                <SelectItem value="min">minor</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">BPM</span>
-            <Input
-              type="number"
-              min={40}
-              max={220}
-              value={meta.bpm}
-              onChange={(e) => setBpm(Number(e.target.value))}
-              className="h-8 w-16 font-mono-chord"
-            />
-          </div>
-        </div>
-
-        {/* Group: Transpose + Transport */}
-        <div className="flex items-center gap-3 ml-auto">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Transpose</span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => stepTranspose(-1)}
-              aria-label="Down semitone"
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <span className="font-mono-chord text-sm w-8 text-center tabular-nums">
-              {fmtOffset(transposeOffset)}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => stepTranspose(1)}
-              aria-label="Up semitone"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {!isPlaying ? (
-              <Button size="sm" onClick={handlePlay}>
-                <Play className="h-4 w-4" /> Play
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={handleStop}>
-                <Square className="h-4 w-4" /> Stop
-              </Button>
-            )}
-          </div>
-
-          {/* Nav menu (top right) */}
+          {/* Nav menu (top right of first row) */}
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Open menu">
+              <Button variant="outline" size="icon" className="h-8 w-8 ml-auto" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
@@ -205,6 +124,86 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               </div>
             </SheetContent>
           </Sheet>
+        </div>
+
+        {/* Row 2 (was row 3): Transpose + Play */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Transpose</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => stepTranspose(-1)}
+              aria-label="Down semitone"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <span className="font-mono-chord text-sm w-8 text-center tabular-nums">
+              {fmtOffset(transposeOffset)}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => stepTranspose(1)}
+              aria-label="Up semitone"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1 ml-auto">
+            {!isPlaying ? (
+              <Button size="sm" onClick={handlePlay}>
+                <Play className="h-4 w-4" /> Play
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={handleStop}>
+                <Square className="h-4 w-4" /> Stop
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Row 3 (was row 2): Key + BPM */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">Key</span>
+            <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
+              <SelectTrigger className="h-8 w-auto min-w-0 px-2 gap-1 font-mono-chord">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALL_ROOTS.map((r) => (
+                  <SelectItem key={r} value={r} className="font-mono-chord">
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as "maj" | "min")}>
+              <SelectTrigger className="h-8 w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="maj">major</SelectItem>
+                <SelectItem value="min">minor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">BPM</span>
+            <Input
+              type="number"
+              min={40}
+              max={220}
+              value={meta.bpm}
+              onChange={(e) => setBpm(Number(e.target.value))}
+              className="h-8 w-16 font-mono-chord"
+            />
+          </div>
         </div>
       </div>
     </header>
