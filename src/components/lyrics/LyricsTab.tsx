@@ -701,14 +701,15 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
+    suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
-  // Remember previous type so we can revert if the user cancels the custom-name dialog
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section.label);
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
   const cellPx = useCellPx();
   const cardRef = useRef<HTMLDivElement>(null);
 
