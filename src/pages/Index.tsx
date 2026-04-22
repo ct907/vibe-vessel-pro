@@ -6,10 +6,14 @@ import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave } from "@/store/song";
+import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
+import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     hydrateFromStorage();
@@ -25,12 +29,23 @@ const Index = () => {
         <h1 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h1>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <div className="flex justify-center">
+          <div className="relative flex justify-center items-center">
             <TabsList className="bg-paper-shade/70">
               <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
               <TabsTrigger value="chords">Chords</TabsTrigger>
               <TabsTrigger value="progressions">Progressions</TabsTrigger>
             </TabsList>
+            {tab === "lyrics" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute right-0"
+                onClick={() => setExportOpen(true)}
+              >
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Export Lyrics</span>
+              </Button>
+            )}
           </div>
 
           <TabsContent value="lyrics" className="mt-4">
@@ -49,6 +64,8 @@ const Index = () => {
         onSendToLyrics={() => setTab("lyrics")}
         onSendToProgressions={() => setTab("progressions")}
       />
+
+      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
     </div>
   );
 };
