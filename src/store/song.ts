@@ -471,27 +471,33 @@ export const useSongStore = create<SongState>((set, get) => ({
         lines: sec.lines.map((l) => {
           if (l.id !== lineId) return l;
           let chords = [...l.chords];
+          // Pad with 1ch on each side when this is the first chord placed
+          // in an empty row, so the caret can land before/after the chip.
+          const isFirstInEmpty = !anchorId && chords.length === 0 && (l.chordRowLen ?? 0) === 0;
+          const placedCol = isFirstInEmpty ? Math.max(1, col + (col === 0 ? 1 : 0)) : col;
           if (anchorId) {
             chords = chords.map((c) => {
               if (c.id !== anchorId) return c;
               prevMirrorId = c.mirrorId;
               updatedAnchorId = c.id;
-              return { ...c, chord, chordCol: col, offset: col };
+              return { ...c, chord, chordCol: placedCol, offset: placedCol };
             });
           } else {
-            const existing = chords.findIndex((c) => (c.chordCol ?? c.offset ?? 0) === col);
+            const existing = chords.findIndex((c) => (c.chordCol ?? c.offset ?? 0) === placedCol);
             if (existing >= 0) {
               prevMirrorId = chords[existing].mirrorId;
               updatedAnchorId = chords[existing].id;
-              chords[existing] = { ...chords[existing], chord, chordCol: col, offset: col };
+              chords[existing] = { ...chords[existing], chord, chordCol: placedCol, offset: placedCol };
             } else {
               const newId = nanoid();
               createdAnchorId = newId;
-              chords.push({ id: newId, offset: col, chordCol: col, chord });
+              chords.push({ id: newId, offset: placedCol, chordCol: placedCol, chord });
             }
           }
           chords.sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-          const newLen = Math.max(l.chordRowLen ?? 0, col + 1);
+          // Reserve 1ch trailing space after the chord too.
+          const minLen = placedCol + Math.max(1, chord.display.length) + 1;
+          const newLen = Math.max(l.chordRowLen ?? 0, minLen);
           return { ...l, chords, chordRowLen: newLen };
         }),
       };
