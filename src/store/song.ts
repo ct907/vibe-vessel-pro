@@ -860,14 +860,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       if (p.id !== id) return p;
       const next = { ...p, ...patch } as PatternBlock;
       const total = next.bars * next.beatsPerBar;
-      // clip chord positions/lengths to new size
-      next.chords = p.chords
-        .map((c) => ({
-          ...c,
-          startBeat: Math.min(c.startBeat, Math.max(0, total - 1)),
-          lengthBeats: Math.max(1, Math.min(c.lengthBeats, total - Math.min(c.startBeat, total - 1))),
-        }))
-        .sort((a, b) => a.startBeat - b.startBeat);
+      next.chords = repackChords(p.chords, total);
       return next;
     }),
   })),
