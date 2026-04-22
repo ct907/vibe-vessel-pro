@@ -63,9 +63,13 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
+  // Picking a chord no longer auto-closes the sheet — user can keep adding chords.
+  // Close manually via the X button. Pressing Enter or double-tapping a suggestion
+  // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
     onPick(chord);
-    onOpenChange(false);
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
   };
 
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
