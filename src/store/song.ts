@@ -614,7 +614,95 @@ export const useSongStore = create<SongState>((set, get) => ({
     };
   }),
 
-  // ---- basket ----
+  moveChordAnchor: (fromSectionId, fromLineId, anchorId, toSectionId, toLineId, toCol) => set((s) => {
+    // Find the anchor first
+    let moved: ChordAnchor | undefined;
+    let mirrorId: string | undefined;
+    s.sections.forEach((sec) => {
+      if (sec.id !== fromSectionId) return;
+      sec.lines.forEach((l) => {
+        if (l.id !== fromLineId) return;
+        const a = l.chords.find((c) => c.id === anchorId);
+        if (a) { moved = a; mirrorId = a.mirrorId; }
+      });
+    });
+    if (!moved) return s;
+    const movedChord = moved.chord;
+
+    // Same row: just shift this anchor's column.
+    if (fromSectionId === toSectionId && fromLineId === toLineId) {
+      return {
+        sections: s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== fromLineId) return l;
+            const chords = l.chords.map((c) => c.id === anchorId
+              ? { ...c, chordCol: toCol, offset: toCol }
+              : c).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const minLen = toCol + Math.max(1, movedChord.display.length) + 1;
+            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
+          }),
+        }),
+      };
+    }
+
+    // Cross-row move: remove from source line, insert into target line. Detach mirror.
+    const sections = s.sections.map((sec) => {
+      if (sec.id === fromSectionId) {
+        sec = {
+          ...sec,
+          lines: sec.lines.map((l) => l.id !== fromLineId ? l : ({
+            ...l,
+            chords: l.chords.filter((c) => c.id !== anchorId),
+          })),
+        };
+      }
+      if (sec.id === toSectionId) {
+        sec = {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== toLineId) return l;
+            const newAnchor: ChordAnchor = { id: nanoid(), offset: toCol, chordCol: toCol, chord: movedChord };
+            const chords = [...l.chords.filter((c) => (c.chordCol ?? c.offset ?? 0) !== toCol), newAnchor]
+              .sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+            const minLen = toCol + Math.max(1, movedChord.display.length) + 1;
+            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
+          }),
+        };
+      }
+      return sec;
+    });
+
+    // Detach mirrored pattern chord (if any) since we no longer track which anchor it belongs to.
+    const progression = mirrorId
+      ? s.progression.map((p) => ({ ...p, chords: p.chords.map((c) => c.id === mirrorId ? { ...c, mirrorId: undefined } : c) }))
+      : s.progression;
+
+    return { sections, progression };
+  }),
+
+  pasteChordsAt: (sectionId, lineId, atCol, items) => set((s) => ({
+    sections: s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== lineId) return l;
+          const newAnchors: ChordAnchor[] = items.map((it) => {
+            const col = atCol + Math.max(0, it.relCol);
+            return { id: nanoid(), offset: col, chordCol: col, chord: it.chord };
+          });
+          // Replace any chord at the same column.
+          const occupied = new Set(newAnchors.map((a) => a.chordCol!));
+          const kept = l.chords.filter((c) => !occupied.has((c.chordCol ?? c.offset ?? 0)));
+          const chords = [...kept, ...newAnchors].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          const maxEnd = newAnchors.reduce((m, a) => Math.max(m, (a.chordCol ?? 0) + Math.max(1, a.chord.display.length) + 1), 0);
+          return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, maxEnd) };
+        }),
+      };
+    }),
+  })),
+
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
   })),
