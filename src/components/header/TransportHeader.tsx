@@ -158,6 +158,19 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                     <Upload className="h-4 w-4" /> Load
                   </span>
                 </label>
+                {suppressCrossTabDeleteWarning && (
+                  <Button
+                    variant="outline"
+                    className="justify-start border border-border"
+                    onClick={() => {
+                      setSuppressCrossTabDeleteWarning(false);
+                      toast({ title: "Delete warnings re-enabled" });
+                      setNavOpen(false);
+                    }}
+                  >
+                    Reset delete warnings
+                  </Button>
+                )}
               </div>
             </SheetContent>
           </Sheet>
