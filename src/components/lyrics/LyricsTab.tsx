@@ -106,11 +106,14 @@ function LineRow({
     pasteChordsAt(sectionId, line.id, chordCaret, chordClipboard);
   };
 
-  // Effective row length must account for the visual width of each chord chip
-  // (e.g. "Fmaj7" occupies 5 ch-cells), so the caret can land to the right of
-  // any chord, not just one cell after its starting column.
+  // Effective row length must account for the visual width of each chord chip,
+  // including the chip's horizontal padding (px-2 ≈ 2ch each side ≈ 4ch total).
+  // Without this padding budget, neighboring chips visually overlap even though
+  // their starting columns are technically distinct.
+  const CHIP_PAD_CH = 4;
+  const chordVisualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
   const chordEndCol = (a: { chordCol?: number; offset?: number; chord: { display: string } }) =>
-    colOf(a) + Math.max(1, a.chord.display.length);
+    colOf(a) + chordVisualWidth(a.chord.display);
   const len = Math.max(
     line.chordRowLen ?? 0,
     ...line.chords.map(chordEndCol),
@@ -361,6 +364,14 @@ function LineRow({
         {line.chords.map((a) => {
           const col = colOf(a);
           const isSel = selected.has(a.id);
+          const handleChipTap = () => {
+            if (selectMode) { toggleSelected(a.id); return; }
+            // Tap = open picker for editing. Context menu (select mode) is
+            // exclusively reserved for tap-and-hold (long press).
+            setChordCaret(col);
+            focusChord();
+            onPickerOpen(line.id, col, a.id);
+          };
           return (
             <div
               key={a.id}
@@ -375,10 +386,7 @@ function LineRow({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                if (selectMode) { toggleSelected(a.id); return; }
-                setChordCaret(col);
-                focusChord();
-                onPickerOpen(line.id, col, a.id);
+                handleChipTap();
               }}
             >
               <ChordChip
@@ -387,6 +395,7 @@ function LineRow({
                 size="sm"
                 selected={selectMode && isSel}
                 audition={!selectMode}
+                onClick={handleChipTap}
                 onLongPress={() => {
                   if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
                 }}
@@ -560,7 +569,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div ref={cardRef} className="paper-card paper-ruled paper-margin rounded-xl px-10 py-5">
+    <div ref={cardRef} className="paper-card rounded-xl px-5 py-5">
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4">
         <button

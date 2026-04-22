@@ -721,10 +721,12 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (!moved) return s;
     const movedChord = moved.chord;
 
-    // The dropped chord visually occupies its display width; reserve that
-    // many cells plus 4ch of breathing room so chips don't overlap when
-    // re-arranged via drag.
-    const reservedWidth = Math.max(1, movedChord.display.length) + 4;
+    // The dropped chord visually occupies its display width plus chip padding
+    // (px-2 ≈ 2ch each side ≈ 4ch). Reserve that many cells so chips don't
+    // overlap when re-arranged via drag.
+    const CHIP_PAD_CH = 4;
+    const visualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
+    const reservedWidth = visualWidth(movedChord.display);
 
     // Same row: shift this anchor's column, pushing colliding chords aside.
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
@@ -738,7 +740,7 @@ export const useSongStore = create<SongState>((set, get) => ({
             const others = l.chords.filter((c) => c.id !== anchorId);
             const collision = others.find((c) => {
               const cc = c.chordCol ?? c.offset ?? 0;
-              const cEnd = cc + Math.max(1, c.chord.display.length);
+              const cEnd = cc + visualWidth(c.chord.display);
               return cc < toCol + reservedWidth && cEnd > toCol;
             });
             const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
@@ -748,7 +750,7 @@ export const useSongStore = create<SongState>((set, get) => ({
               if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
               return c;
             }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), toCol + reservedWidth);
+            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
             return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
           }),
         }),
@@ -774,7 +776,7 @@ export const useSongStore = create<SongState>((set, get) => ({
             // Push existing chords that overlap the reserved zone aside.
             const collision = l.chords.find((c) => {
               const cc = c.chordCol ?? c.offset ?? 0;
-              const cEnd = cc + Math.max(1, c.chord.display.length);
+              const cEnd = cc + visualWidth(c.chord.display);
               return cc < toCol + reservedWidth && cEnd > toCol;
             });
             const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
@@ -785,7 +787,7 @@ export const useSongStore = create<SongState>((set, get) => ({
               return c;
             });
             const chords = [...shifted, newAnchor].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + Math.max(1, c.chord.display.length) + 1), toCol + reservedWidth);
+            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
             return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
           }),
         };
