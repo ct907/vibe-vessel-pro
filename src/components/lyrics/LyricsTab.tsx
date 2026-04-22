@@ -106,11 +106,14 @@ function LineRow({
     pasteChordsAt(sectionId, line.id, chordCaret, chordClipboard);
   };
 
-  // Effective row length must account for the visual width of each chord chip
-  // (e.g. "Fmaj7" occupies 5 ch-cells), so the caret can land to the right of
-  // any chord, not just one cell after its starting column.
+  // Effective row length must account for the visual width of each chord chip,
+  // including the chip's horizontal padding (px-2 ≈ 2ch each side ≈ 4ch total).
+  // Without this padding budget, neighboring chips visually overlap even though
+  // their starting columns are technically distinct.
+  const CHIP_PAD_CH = 4;
+  const chordVisualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
   const chordEndCol = (a: { chordCol?: number; offset?: number; chord: { display: string } }) =>
-    colOf(a) + Math.max(1, a.chord.display.length);
+    colOf(a) + chordVisualWidth(a.chord.display);
   const len = Math.max(
     line.chordRowLen ?? 0,
     ...line.chords.map(chordEndCol),
