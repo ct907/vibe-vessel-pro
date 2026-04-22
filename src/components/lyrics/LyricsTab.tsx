@@ -43,10 +43,14 @@ interface LineRowProps {
   cellPx: number;
   /** Tell parent which row is focused on chord side, for picker context */
   onChordFocus: (lineId: string) => void;
+  /** Drag a chord chip from this row onto another row */
+  onChordDragStart: (anchorId: string) => void;
+  onChordDrop: (toLineId: string, toCol: number) => void;
 }
 
 function LineRow({
   sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
+  onChordDragStart, onChordDrop,
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
