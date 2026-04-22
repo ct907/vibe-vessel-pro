@@ -596,18 +596,16 @@ export const useSongStore = create<SongState>((set, get) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       if (sec.lines.length <= 1) return sec;
-      const removed = sec.lines.find((l) => l.id === id);
-      // Also unlink any mirrored pattern chords (they remain in the pattern; user can edit/delete there).
       return { ...sec, lines: sec.lines.filter((l) => l.id !== id) };
     }),
-    // Detach mirror links on the bound pattern for orphaned anchor ids
+    // Detach mirror links on all the section's pattern blocks for orphaned anchor ids
     progression: (() => {
       const sec = s.sections.find((x) => x.id === sectionId);
       const removed = sec?.lines.find((l) => l.id === id);
       if (!removed?.chords.length) return s.progression;
       const anchorIds = new Set(removed.chords.map((a) => a.id));
       return s.progression.map((p) =>
-        p.id !== sectionId
+        (p.sectionId ?? p.id) !== sectionId
           ? p
           : { ...p, chords: p.chords.map((c) => (c.mirrorId && anchorIds.has(c.mirrorId) ? { ...c, mirrorId: undefined } : c)) },
       );
