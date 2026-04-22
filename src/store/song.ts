@@ -523,13 +523,23 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (idx < 0 || swap < 0 || swap >= s.sections.length) return s;
     const sections = [...s.sections];
     [sections[idx], sections[swap]] = [sections[swap], sections[idx]];
-    // mirror order in progression
-    const pIdx = s.progression.findIndex((p) => p.id === id);
-    const pSwap = s.progression.findIndex((p) => p.id === sections[idx].id); // after swap, idx now holds previous swap section
-    const progression = [...s.progression];
-    if (pIdx >= 0 && pSwap >= 0) {
-      [progression[pIdx], progression[pSwap]] = [progression[pSwap], progression[pIdx]];
-    }
+    // Reorder progression so that block groups follow new section order.
+    const groups = new Map<string, PatternBlock[]>();
+    s.progression.forEach((p) => {
+      const arr = groups.get(p.sectionId) ?? [];
+      arr.push(p);
+      groups.set(p.sectionId, arr);
+    });
+    const progression: PatternBlock[] = [];
+    sections.forEach((sec) => {
+      (groups.get(sec.id) ?? []).forEach((p) => progression.push(p));
+    });
+    // Append any orphan blocks (sectionId not matching any section) at the end.
+    s.progression.forEach((p) => {
+      if (!sections.some((sec) => sec.id === p.sectionId) && !progression.includes(p)) {
+        progression.push(p);
+      }
+    });
     return { sections, progression };
   }),
   reorderSection: (id, toIndex) => set((s) => {
@@ -539,14 +549,22 @@ export const useSongStore = create<SongState>((set, get) => ({
     const [moved] = sections.splice(idx, 1);
     const clamped = Math.max(0, Math.min(sections.length, toIndex));
     sections.splice(clamped, 0, moved);
-    // Mirror order in progression by section ids.
-    const progression = [...s.progression];
-    const pIdx = progression.findIndex((p) => p.id === id);
-    if (pIdx >= 0) {
-      const [pMoved] = progression.splice(pIdx, 1);
-      const pClamp = Math.max(0, Math.min(progression.length, clamped));
-      progression.splice(pClamp, 0, pMoved);
-    }
+    // Rebuild progression so all blocks of each section stay grouped, in new section order.
+    const groups = new Map<string, PatternBlock[]>();
+    s.progression.forEach((p) => {
+      const arr = groups.get(p.sectionId) ?? [];
+      arr.push(p);
+      groups.set(p.sectionId, arr);
+    });
+    const progression: PatternBlock[] = [];
+    sections.forEach((sec) => {
+      (groups.get(sec.id) ?? []).forEach((p) => progression.push(p));
+    });
+    s.progression.forEach((p) => {
+      if (!sections.some((sec) => sec.id === p.sectionId) && !progression.includes(p)) {
+        progression.push(p);
+      }
+    });
     return { sections, progression };
   }),
   toggleSectionCollapsed: (id) => set((s) => ({
