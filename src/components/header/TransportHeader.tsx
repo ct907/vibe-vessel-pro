@@ -216,6 +216,9 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 <Square className="h-4 w-4" /> Stop
               </Button>
             )}
+            <Button size="sm" variant="outline" onClick={() => setSoundOpen(true)} aria-label="Sound settings">
+              <Music2 className="h-4 w-4" /> Sound
+            </Button>
           </div>
         </div>
 
@@ -235,13 +238,14 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as "maj" | "min")}>
-              <SelectTrigger className="h-8 w-[80px]">
+            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
+              <SelectTrigger className="h-8 w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="maj">major</SelectItem>
-                <SelectItem value="min">minor</SelectItem>
+                {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
+                  <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
