@@ -437,7 +437,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         lines: sec.lines.map((l) => (l.id === id ? { ...l, text } : l)),
       };
     }),
-  }); },
+  })); },
 
   setChordRowLen: (sectionId, id, len) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
@@ -447,7 +447,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         lines: sec.lines.map((l) => (l.id === id ? { ...l, chordRowLen: Math.max(0, len) } : l)),
       };
     }),
-  }); },
+  })); },
 
   insertChordSpaceAt: (sectionId, lineId, col) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
@@ -465,7 +465,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         }),
       };
     }),
-  }); },
+  })); },
 
   removeChordCellAt: (sectionId, lineId, col) => {
     pushHistory(get);
