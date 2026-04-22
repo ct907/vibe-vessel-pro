@@ -543,6 +543,8 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
                 onPickerOpen={(lineId, col, anchorId) => onPickerOpen(section.id, lineId, col, anchorId)}
                 cellPx={cellPx}
                 onChordFocus={() => { /* parent handles via picker */ }}
+                onChordDragStart={(anchorId) => onChordDragStart(section.id, line.id, anchorId)}
+                onChordDrop={(toLineId, toCol) => onChordDrop(section.id, toLineId, toCol)}
               />
             ))}
           </div>
