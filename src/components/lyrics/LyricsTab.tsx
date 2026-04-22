@@ -303,6 +303,7 @@ function SectionCard({ section, index, total, activeLineId, onPickerOpen }: Sect
                 key={line.id}
                 sectionId={section.id}
                 line={line}
+                active={activeLineId === line.id}
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onRemoveLine={() => removeLine(section.id, line.id)}
                 onPickerOpen={(lineId, offset, anchorId) => onPickerOpen(section.id, lineId, offset, anchorId)}
