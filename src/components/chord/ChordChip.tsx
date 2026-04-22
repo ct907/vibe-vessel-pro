@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ChordSymbol } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
 import { cn } from "@/lib/utils";
@@ -23,23 +24,48 @@ export function ChordChip({
   className,
   audition = true,
 }: Props) {
-  let pressTimer: ReturnType<typeof setTimeout> | null = null;
-  let longFired = false;
+  // Use refs so timer/long-press state survive re-renders. Plain `let` inside
+  // the render body would reset on every render, leading to stale `longFired`
+  // reads after a state-update re-render — which caused tap→toggle→re-render→
+  // tap-handler-runs-again-with-stale-state bugs (chord selected then deselected
+  // in a single tap).
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longFiredRef = useRef(false);
+  // De-dupe touch + synthesized mouse events. On touch devices the browser
+  // fires touchstart → touchend → mousedown → mouseup → click, which would
+  // otherwise create two timers and fire onLongPress twice.
+  const lastTouchAtRef = useRef(0);
 
-  const start = () => {
-    longFired = false;
+  const start = (fromTouch: boolean) => {
+    if (!fromTouch && Date.now() - lastTouchAtRef.current < 600) return;
+    if (fromTouch) lastTouchAtRef.current = Date.now();
+    longFiredRef.current = false;
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
     if (onLongPress) {
-      pressTimer = setTimeout(() => {
-        longFired = true;
+      pressTimerRef.current = setTimeout(() => {
+        longFiredRef.current = true;
         onLongPress();
       }, 500);
     }
   };
   const cancel = () => {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
   };
   const handleClick = (e: React.MouseEvent) => {
-    if (longFired) return;
+    if (longFiredRef.current) {
+      // A long-press just fired — its handler already updated selection.
+      // Swallow this click entirely so the parent wrapper's onClick doesn't
+      // also toggle (which would immediately undo the selection).
+      e.stopPropagation();
+      e.preventDefault();
+      longFiredRef.current = false;
+      return;
+    }
+    // Audition runs alongside any selection toggle the parent performs via the
+    // wrapper's onClick — they're independent and both fire on a single tap.
     if (audition) void playChord(chord);
     onClick?.();
   };
@@ -55,13 +81,20 @@ export function ChordChip({
   return (
     <button
       type="button"
-      onMouseDown={start}
+      onMouseDown={() => start(false)}
       onMouseUp={cancel}
       onMouseLeave={cancel}
-      onTouchStart={start}
+      onTouchStart={() => start(true)}
       onTouchEnd={cancel}
+      onTouchCancel={cancel}
       onClick={handleClick}
-      onContextMenu={(e) => { e.preventDefault(); onLongPress?.(); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // Mark as long-press so the subsequent click is swallowed — prevents
+        // the "select then immediately deselect" double-toggle.
+        longFiredRef.current = true;
+        onLongPress?.();
+      }}
       className={cn(
         "inline-flex items-center rounded-md font-mono-chord font-semibold transition-colors select-none",
         sizeCls,
