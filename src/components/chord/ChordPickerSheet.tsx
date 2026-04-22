@@ -10,6 +10,8 @@ import { playChord } from "@/lib/music/audio";
 import { Trash2, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const OCTAVE_OPTIONS = [3, 4, 5];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +31,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
+  const [octave, setOctave] = useState<number>(4);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
