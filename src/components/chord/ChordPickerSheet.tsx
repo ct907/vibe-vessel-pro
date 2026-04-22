@@ -16,9 +16,11 @@ interface Props {
   initialChord?: ChordSymbol;
   onPick: (chord: ChordSymbol) => void;
   onRemove?: () => void;
+  /** Active chord row's line id — used so ArrowUp/Down can refocus it. */
+  activeLineId?: string;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove, activeLineId }: Props) {
   const [query, setQuery] = useState("");
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
@@ -60,6 +62,26 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
     };
   }, [open]);
 
+  // With modal={false}, Radix won't auto-close on overlay click. Re-add that
+  // behavior by attaching a click handler to the overlay element.
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => {
+      const overlay = document.querySelector<HTMLElement>("[data-radix-dialog-overlay]");
+      if (!overlay) return;
+      overlay.style.pointerEvents = "auto";
+      const onClick = () => onOpenChange(false);
+      overlay.addEventListener("click", onClick);
+      (overlay as any).__chordPickerCleanup = () => overlay.removeEventListener("click", onClick);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      const overlay = document.querySelector<HTMLElement>("[data-radix-dialog-overlay]");
+      const cleanup = overlay && (overlay as any).__chordPickerCleanup;
+      if (cleanup) cleanup();
+    };
+  }, [open, onOpenChange]);
+
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
@@ -79,22 +101,50 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
   const gridMaxHeight = Math.max(80, vvHeight - TOP_RESERVED - SHEET_CHROME);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="bottom"
         className="paper-card rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px` }}
+        onOpenAutoFocus={(e) => {
+          // We focus the input ourselves; don't let Radix steal focus from
+          // the chord row if user tapped to switch back.
+          e.preventDefault();
+          setTimeout(() => inputRef.current?.focus(), 30);
+        }}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => {
+          // Allow taps on the underlying chord row / chord chips to focus them
+          // without closing the sheet. Only the explicit close button or the
+          // overlay (which we hide via modal=false) should close.
+          const t = e.target as HTMLElement | null;
+          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          const t = e.target as HTMLElement | null;
+          if (t && (t.closest("[data-chord-row]") || t.closest("[data-lyric-input]"))) {
+            e.preventDefault();
+          }
+        }}
       >
         <div className="space-y-3 flex-1 min-h-0 flex flex-col">
           <div className="flex items-stretch gap-1.5">
             <Input
               ref={inputRef}
+              data-chord-picker-input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Type a chord… e.g. Bbm9, Fmaj7, Csus4"
               className="font-mono-chord text-base flex-1 min-w-0"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && exact) handlePick(exact);
+                if (e.key === "Enter" && exact) { handlePick(exact); return; }
+                if ((e.key === "ArrowUp" || e.key === "ArrowDown") && activeLineId) {
+                  e.preventDefault();
+                  const el = document.querySelector<HTMLDivElement>(`[data-chord-row="${activeLineId}"]`);
+                  el?.focus();
+                }
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
