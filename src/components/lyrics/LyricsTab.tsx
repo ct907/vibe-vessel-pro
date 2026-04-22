@@ -787,7 +787,7 @@ function useCellPx(): number {
 }
 
 export function LyricsTab() {
-  const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor } = useSongStore();
+  const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor, basket } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
@@ -795,8 +795,15 @@ export function LyricsTab() {
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
+    // Basket steals focus: while it has items, the chord picker cannot open.
+    if (basket.length > 0) return;
     setPicker({ sectionId, lineId, col, anchorId });
   };
+
+  // If basket becomes non-empty while picker is open, close it.
+  useEffect(() => {
+    if (basket.length > 0 && picker) setPicker(null);
+  }, [basket.length, picker]);
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
