@@ -78,20 +78,24 @@ export interface SongState {
 
   // ---- sections ----
   addSection: (type?: SectionType, label?: string) => string;
-  updateSection: (id: string, patch: Partial<Pick<Section, "label" | "type" | "collapsed">>) => void;
+  updateSection: (id: string, patch: Partial<Pick<Section, "label" | "type" | "collapsed" | "comment">>) => void;
   removeSection: (id: string) => void;
   duplicateSection: (id: string) => string | null;
   moveSection: (id: string, direction: -1 | 1) => void;
   toggleSectionCollapsed: (id: string) => void;
+  setSectionComment: (id: string, comment: string) => void;
 
   // ---- lyrics (line-level) ----
   addLine: (sectionId: string, afterId?: string) => string;
   removeLine: (sectionId: string, id: string) => void;
   setLineText: (sectionId: string, id: string, text: string) => void;
-  upsertChordAt: (sectionId: string, lineId: string, offset: number, chord: ChordSymbol, anchorId?: string) => void;
+  setChordRowLen: (sectionId: string, id: string, len: number) => void;
+  insertChordSpaceAt: (sectionId: string, lineId: string, col: number) => void;
+  removeChordCellAt: (sectionId: string, lineId: string, col: number) => boolean;
+  upsertChordAt: (sectionId: string, lineId: string, col: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
-  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaChars: number) => void;
+  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
