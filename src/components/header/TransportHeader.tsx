@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Play, Square, Minus, Plus, Save, Upload, BookOpen, Menu, Sun, Moon } from "lucide-react";
-import { ALL_ROOTS } from "@/lib/music/chords";
+import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
+import { SoundPanel } from "@/components/sound/SoundPanel";
+import { Music2 } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -26,6 +28,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [fileInputKey, setFileInputKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [soundOpen, setSoundOpen] = useState(false);
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
 
