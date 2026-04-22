@@ -185,7 +185,7 @@ function LineRow({
   return (
     <div
       className={cn(
-        "relative group py-1 transition-colors scroll-mt-[100px]",
+        "relative group py-1 transition-colors",
         active && "rounded-md ring-2 ring-primary/70 bg-primary/5 px-2 -mx-2",
       )}
       data-line-id={line.id}
