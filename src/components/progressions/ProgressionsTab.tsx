@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSongStore, type PatternBlock as PatternBlockType } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
@@ -23,24 +23,69 @@ interface PatternProps {
   pattern: PatternBlockType;
   sectionLabel?: string;
   canDelete: boolean;
+  otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
 }
 
-function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: PatternProps) {
+function PatternBlock({ pattern, sectionLabel, canDelete, otherPatterns, onPickerOpen }: PatternProps) {
   const {
     updatePattern, basket, addChordToPattern, removePatternChord,
     updatePatternChord, movePatternChord, removeSection,
+    removePatternChordsBatch, shiftPatternChords, movePatternChordsTo,
   } = useSongStore();
   const [activeChord, setActiveChord] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longFiredRef = useRef(false);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  const selectedIds = Array.from(selected);
 
   const handleGridClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (selectMode) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const beat = Math.floor((x / rect.width) * totalBeats);
     onPickerOpen(pattern.id, beat);
+  };
+
+  const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+
+  const startPress = (chordId: string) => {
+    longFiredRef.current = false;
+    pressTimer.current = setTimeout(() => {
+      longFiredRef.current = true;
+      if (!selectMode) {
+        setSelectMode(true);
+        setSelected(new Set([chordId]));
+        setActiveChord(null);
+      } else {
+        // toggle
+        setSelected((prev) => {
+          const next = new Set(prev);
+          if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
+          return next;
+        });
+      }
+    }, 450);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  };
+  const handleChordTap = (chordId: string) => {
+    if (longFiredRef.current) return;
+    if (selectMode) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
+        return next;
+      });
+    } else {
+      setActiveChord(activeChord === chordId ? null : chordId);
+    }
   };
 
   return (
@@ -74,6 +119,40 @@ function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: Patter
         </Button>
       </div>
 
+      {selectMode && (
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs">
+          <span className="font-medium">{selectedIds.length} selected</span>
+          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => shiftPatternChords(pattern.id, selectedIds, -1)} aria-label="Shift earlier">
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => shiftPatternChords(pattern.id, selectedIds, 1)} aria-label="Shift later">
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
+            onClick={() => { removePatternChordsBatch(pattern.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+          {otherPatterns.length > 0 && (
+            <Select
+              value=""
+              onValueChange={(toId) => { movePatternChordsTo(pattern.id, toId, selectedIds); exitSelect(); }}
+            >
+              <SelectTrigger className="h-7 w-[140px] text-xs" disabled={!selectedIds.length}>
+                <SelectValue placeholder="Move to…" />
+              </SelectTrigger>
+              <SelectContent>
+                {otherPatterns.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={exitSelect}>Done</Button>
+        </div>
+      )}
+
       <div className="relative">
         <div
           className="relative h-20 rounded-md border border-border bg-paper-shade/40 overflow-hidden cursor-pointer"
@@ -93,24 +172,34 @@ function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: Patter
               style={{ left: `${(i / totalBeats) * 100}%` }}
             />
           ))}
-          {sortedChords.map((c) => (
-            <button
-              key={c.id}
-              onClick={(e) => { e.stopPropagation(); setActiveChord(activeChord === c.id ? null : c.id); }}
-              className={cn(
-                "absolute top-1 bottom-1 rounded-md border border-primary/40 bg-card hover:bg-accent flex items-center justify-center px-1 overflow-hidden",
-                activeChord === c.id && "ring-2 ring-primary",
-              )}
-              style={{
-                left: `${(c.startBeat / totalBeats) * 100}%`,
-                width: `${(c.lengthBeats / totalBeats) * 100}%`,
-              }}
-            >
-              <span className="font-mono-chord font-semibold ink-chord text-sm truncate">
-                {c.chord.display}
-              </span>
-            </button>
-          ))}
+          {sortedChords.map((c) => {
+            const isSel = selected.has(c.id);
+            return (
+              <button
+                key={c.id}
+                onMouseDown={(e) => { e.stopPropagation(); startPress(c.id); }}
+                onMouseUp={cancelPress}
+                onMouseLeave={cancelPress}
+                onTouchStart={(e) => { e.stopPropagation(); startPress(c.id); }}
+                onTouchEnd={cancelPress}
+                onContextMenu={(e) => { e.preventDefault(); }}
+                onClick={(e) => { e.stopPropagation(); handleChordTap(c.id); }}
+                className={cn(
+                  "absolute top-1 bottom-1 rounded-md border border-primary/40 bg-card hover:bg-accent flex items-center justify-center px-1 overflow-hidden select-none",
+                  !selectMode && activeChord === c.id && "ring-2 ring-primary",
+                  selectMode && isSel && "ring-2 ring-primary bg-accent",
+                )}
+                style={{
+                  left: `${(c.startBeat / totalBeats) * 100}%`,
+                  width: `${(c.lengthBeats / totalBeats) * 100}%`,
+                }}
+              >
+                <span className="font-mono-chord font-semibold ink-chord text-sm truncate">
+                  {c.chord.display}
+                </span>
+              </button>
+            );
+          })}
 
           {sortedChords.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
@@ -119,7 +208,7 @@ function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: Patter
           )}
         </div>
 
-        {activeChord && (() => {
+        {!selectMode && activeChord && (() => {
           const c = sortedChords.find((x) => x.id === activeChord);
           if (!c) return null;
           return (
@@ -160,6 +249,10 @@ function PatternBlock({ pattern, sectionLabel, canDelete, onPickerOpen }: Patter
           );
         })()}
       </div>
+
+      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Long-press a chord to multi-select
+      </p>
 
       {basket.length > 0 && (
         <div className="mt-3">
@@ -214,6 +307,9 @@ export function ProgressionsTab() {
           pattern={p}
           sectionLabel={labelById.get(p.id)}
           canDelete={canDelete}
+          otherPatterns={progression
+            .filter((q) => q.id !== p.id)
+            .map((q) => ({ id: q.id, label: labelById.get(q.id) ?? q.label }))}
           onPickerOpen={(patternId, atBeat, replaceChordId) => setPicker({ patternId, atBeat, replaceChordId })}
         />
       ))}
