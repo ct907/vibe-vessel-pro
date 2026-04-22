@@ -21,7 +21,7 @@ const Index = () => {
     <div className="min-h-screen bg-paper text-foreground flex flex-col">
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6 pb-32">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6 pb-[48rem]">
         <h1 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h1>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
