@@ -61,7 +61,7 @@ function LineRow({
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
     undo, redo,
   } = useSongStore();
-  const lyricInputRef = useRef<HTMLInputElement>(null);
+  const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const [chordCaret, setChordCaret] = useState(0); // column index in chord row
