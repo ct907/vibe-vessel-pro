@@ -72,6 +72,14 @@ function LineRow({
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
 
+  // Auto-resize lyric textarea to fit wrapped content.
+  useLayoutEffect(() => {
+    const ta = lyricInputRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [line.text]);
+
   // Scroll the active row to ~80px below the top of the visual viewport
   // whenever it becomes the active (picker-open) row.
   useEffect(() => {
