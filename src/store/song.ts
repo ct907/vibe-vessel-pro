@@ -171,10 +171,12 @@ export function getSectionDisplayName(sections: Section[], sectionId: string): s
   const sec = sections.find((s) => s.id === sectionId);
   if (!sec) return "";
   if (sec.type === "custom") return sec.label || "Section";
+  if (sec.type === "intro" || sec.type === "outro") return SECTION_DEFAULT_LABEL[sec.type];
   const sameType = sections.filter((s) => s.type === sec.type);
   const idx = sameType.findIndex((s) => s.id === sectionId);
   const base = SECTION_DEFAULT_LABEL[sec.type];
-  return idx <= 0 ? base : `${base} ${idx + 1}`;
+  // Always number verse/chorus/bridge/pre-chorus starting at 1
+  return `${base} ${idx + 1}`;
 }
 
 // ---------- Sync helpers ----------
