@@ -1407,6 +1407,65 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { progression, sections };
   }),
 
+  addPatternToSection: (sectionId) => {
+    const newId = nanoid();
+    let createdId = newId;
+    set((s) => {
+      const blocks = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+      if (!blocks.length) return s;
+      const ref = blocks[blocks.length - 1];
+      const newBlock: PatternBlock = {
+        id: newId,
+        sectionId,
+        label: ref.label,
+        bars: ref.bars,
+        beatsPerBar: ref.beatsPerBar,
+        chords: [],
+      };
+      const lastIdx = s.progression.lastIndexOf(ref);
+      const progression = [
+        ...s.progression.slice(0, lastIdx + 1),
+        newBlock,
+        ...s.progression.slice(lastIdx + 1),
+      ];
+      return { progression };
+    });
+    return createdId;
+  },
+  removePatternBlock: (patternId) => set((s) => {
+    const target = s.progression.find((p) => p.id === patternId);
+    if (!target) return s;
+    const sid = target.sectionId ?? target.id;
+    const siblings = s.progression.filter((p) => (p.sectionId ?? p.id) === sid);
+    if (siblings.length <= 1) return s; // can't remove the only block
+    // Detach mirror anchors that pointed into this block.
+    const mirrorIds = new Set(target.chords.map((c) => c.mirrorId).filter(Boolean) as string[]);
+    const sections = mirrorIds.size
+      ? s.sections.map((sec) => sec.id !== sid ? sec : {
+          ...sec,
+          lines: sec.lines.map((l) => ({
+            ...l,
+            chords: l.chords.map((a) => mirrorIds.has(a.mirrorId ?? "") ? { ...a, mirrorId: undefined } : a),
+          })),
+        })
+      : s.sections;
+    return { sections, progression: s.progression.filter((p) => p.id !== patternId) };
+  }),
+  replacePatternChords: (patternId, chords) => set((s) => {
+    const progression = s.progression.map((p) => {
+      if (p.id !== patternId) return p;
+      // Preserve length structure, swap chord identities. Detach mirror links.
+      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+      const next = sorted.map((c, i) => ({
+        ...c,
+        chord: chords[i] ?? c.chord,
+        mirrorId: undefined,
+      }));
+      return { ...p, chords: repackChords(next, p.bars * p.beatsPerBar) };
+    });
+    return { progression };
+  }),
+
   // ---- chord-row undo/redo ----
   undo: () => {
     if (!undoStack.length) return false;
