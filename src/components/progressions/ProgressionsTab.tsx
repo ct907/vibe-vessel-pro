@@ -212,11 +212,43 @@ function PatternBlock({
         <span className="text-[11px] text-muted-foreground">
           {formatBeats(usedBeats)} / {totalBeats} beats
         </span>
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/x-pattern-section-id", pattern.id);
+            if (cardRef.current) {
+              const rect = cardRef.current.getBoundingClientRect();
+              const clone = cardRef.current.cloneNode(true) as HTMLElement;
+              clone.style.position = "absolute";
+              clone.style.top = "-10000px";
+              clone.style.left = "-10000px";
+              clone.style.width = `${rect.width}px`;
+              clone.style.pointerEvents = "none";
+              clone.style.opacity = "0.9";
+              clone.style.transform = "rotate(-1deg)";
+              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
+              document.body.appendChild(clone);
+              try { e.dataTransfer.setDragImage(clone, 24, 24); } catch { /* ignore */ }
+              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
+            }
+            onSectionDragStart(pattern.id);
+          }}
+          onDragEnd={onSectionDragEnd}
+          onClick={(e) => e.stopPropagation()}
+          className="ml-auto h-8 w-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Drag to reorder section"
+          title="Drag to reorder section"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         <Button
           variant="ghost"
           size="icon"
-          className="ml-auto h-8 w-8 text-muted-foreground hover:text-destructive"
-          onClick={() => removeSection(pattern.id)}
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={(e) => { e.stopPropagation(); removeSection(pattern.id); }}
           disabled={!canDelete}
           title="Delete section + pattern"
         >
