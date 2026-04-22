@@ -505,7 +505,6 @@ function LineRow({
                 size="sm"
                 selected={selectMode && isSel}
                 audition
-                onClick={() => handleChipTap()}
                 onLongPress={() => {
                   if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
                   lastSelectedRef.current = a.id;
