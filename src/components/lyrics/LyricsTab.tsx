@@ -85,11 +85,10 @@ function LineRow({
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
     setChordCaret(col);
     focusChord();
-    // If chord row is empty, open picker so users can immediately add a chord
-    // (this also brings up the on-screen keyboard on mobile via the picker's input).
-    if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) {
-      onPickerOpen(line.id, col);
-    }
+    // Always open the picker on tap so the keyboard surfaces on mobile and the
+    // user can extend the chord row with another chord next to existing ones.
+    // (Tapping directly on a chord chip is handled by the chip's own onClick.)
+    onPickerOpen(line.id, col);
   };
 
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
