@@ -55,14 +55,52 @@ function LineRow({
   const {
     setLineText, upsertChordAt,
     removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors,
-    setChordRowLen, insertChordSpaceAt, removeChordCellAt,
+    setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
   } = useSongStore();
   const lyricInputRef = useRef<HTMLInputElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [chordCaret, setChordCaret] = useState(0); // column index in chord row
   const [chordFocused, setChordFocused] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Scroll the active row to ~80px below the top of the visual viewport
+  // whenever it becomes the active (picker-open) row.
+  useEffect(() => {
+    if (!active || !rowRef.current) return;
+    const el = rowRef.current;
+    const rect = el.getBoundingClientRect();
+    const targetTop = 80;
+    const delta = rect.top - targetTop;
+    // Use the visualViewport offset if present so mobile keyboards behave.
+    window.scrollBy({ top: delta, behavior: "smooth" });
+  }, [active]);
+
+  // Build a clipboard payload from the current selection.
+  const collectClip = (ids: string[]): ChordClip[] => {
+    const sel = line.chords.filter((c) => ids.includes(c.id));
+    if (!sel.length) return [];
+    const minCol = Math.min(...sel.map((c) => colOf(c)));
+    return sel.map((c) => ({
+      chord: c.chord,
+      relCol: colOf(c) - minCol,
+      widthCh: Math.max(1, c.chord.display.length),
+    }));
+  };
+
+  const doCopy = () => {
+    chordClipboard = collectClip(Array.from(selected));
+  };
+  const doCut = () => {
+    chordClipboard = collectClip(Array.from(selected));
+    removeChordAnchorsBatch(sectionId, line.id, Array.from(selected));
+    exitSelect();
+  };
+  const doPaste = () => {
+    if (!chordClipboard.length) return;
+    pasteChordsAt(sectionId, line.id, chordCaret, chordClipboard);
+  };
 
   // Effective row length must account for the visual width of each chord chip
   // (e.g. "Fmaj7" occupies 5 ch-cells), so the caret can land to the right of
