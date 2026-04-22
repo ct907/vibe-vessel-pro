@@ -82,7 +82,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="paper-card rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col"
+        className="paper-card rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px` }}
       >
         <div className="space-y-3 flex-1 min-h-0 flex flex-col">
