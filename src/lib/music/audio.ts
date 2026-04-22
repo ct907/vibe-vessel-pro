@@ -11,9 +11,7 @@ let reverbNode: Tone.Reverb | null = null;
 let masterGain: Tone.Gain | null = null;
 let started = false;
 
-type AnySynthOpts = ConstructorParameters<typeof Tone.PolySynth>[1];
-
-function presetVoice(preset: SoundPreset): { voice: any; opts: AnySynthOpts } {
+function presetVoice(preset: SoundPreset): { voice: any; opts: any } {
   switch (preset) {
     case "organ":
       return {
