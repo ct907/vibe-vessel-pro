@@ -681,31 +681,28 @@ export const useSongStore = create<SongState>((set, get) => ({
       };
     });
 
-    // Mirror to pattern (unchanged)
+    // Mirror to pattern.
     let progression = s.progression;
+    let finalSections = sections;
     if (createdAnchorId) {
-      progression = s.progression.map((p) => {
-        if (p.id !== sectionId) return p;
-        const placed = placeMirroredChord(p, chord, createdAnchorId!);
-        return placed.pattern;
-      });
-      const newPcByPattern = new Map<string, string>();
-      progression.forEach((p) => {
-        if (p.id === sectionId) {
-          const pc = p.chords.find((c) => c.mirrorId === createdAnchorId);
-          if (pc) newPcByPattern.set(p.id, pc.id);
-        }
-      });
-      const pcId = newPcByPattern.get(sectionId);
+      const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
+      progression = placed.progression;
+      const pcId = placed.chordId;
       if (pcId) {
-        for (const sec of sections) {
-          if (sec.id !== sectionId) continue;
-          for (const ln of sec.lines) {
-            const a = ln.chords.find((x) => x.id === createdAnchorId);
-            if (a) a.mirrorId = pcId;
-          }
-        }
+        finalSections = sections.map((sec) => {
+          if (sec.id !== sectionId) return sec;
+          return {
+            ...sec,
+            lines: sec.lines.map((l) => ({
+              ...l,
+              chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
+            })),
+          };
+        });
       }
+      // After mirror placement, ensure pattern order matches anchor visual order.
+      const updatedSection = finalSections.find((x) => x.id === sectionId);
+      if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
     } else if (updatedAnchorId && prevMirrorId) {
       progression = s.progression.map((p) =>
         p.id !== sectionId
@@ -714,7 +711,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       );
     }
 
-    return { sections, progression };
+    return { sections: finalSections, progression };
   }); },
 
   removeChordAnchor: (sectionId, lineId, anchorId) => { pushHistory(get); return set((s) => {
