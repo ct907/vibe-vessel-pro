@@ -364,6 +364,14 @@ function LineRow({
         {line.chords.map((a) => {
           const col = colOf(a);
           const isSel = selected.has(a.id);
+          const handleChipTap = () => {
+            if (selectMode) { toggleSelected(a.id); return; }
+            // Tap = open picker for editing. Context menu (select mode) is
+            // exclusively reserved for tap-and-hold (long press).
+            setChordCaret(col);
+            focusChord();
+            onPickerOpen(line.id, col, a.id);
+          };
           return (
             <div
               key={a.id}
@@ -378,10 +386,7 @@ function LineRow({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                if (selectMode) { toggleSelected(a.id); return; }
-                setChordCaret(col);
-                focusChord();
-                onPickerOpen(line.id, col, a.id);
+                handleChipTap();
               }}
             >
               <ChordChip
@@ -390,6 +395,7 @@ function LineRow({
                 size="sm"
                 selected={selectMode && isSel}
                 audition={!selectMode}
+                onClick={handleChipTap}
                 onLongPress={() => {
                   if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
                 }}
