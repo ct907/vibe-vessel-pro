@@ -53,11 +53,11 @@ interface LineRowProps {
 
 function LineRow({
   sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
-  onChordDragStart, onChordDrop,
+  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange,
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
-    removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors,
+    removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
   } = useSongStore();
   const lyricInputRef = useRef<HTMLInputElement>(null);
