@@ -855,31 +855,31 @@ export const useSongStore = create<SongState>((set, get) => ({
 
     // Same row: shift this anchor's column, pushing colliding chords aside.
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
-      return {
-        sections: s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== fromLineId) return l;
-            // Compute push needed for any non-moved chord that overlaps the
-            // [toCol, toCol+reservedWidth) zone.
-            const others = l.chords.filter((c) => c.id !== anchorId);
-            const collision = others.find((c) => {
-              const cc = c.chordCol ?? c.offset ?? 0;
-              const cEnd = cc + visualWidth(c.chord.display);
-              return cc < toCol + reservedWidth && cEnd > toCol;
-            });
-            const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
-            const chords = l.chords.map((c) => {
-              if (c.id === anchorId) return { ...c, chordCol: toCol, offset: toCol };
-              const cc = c.chordCol ?? c.offset ?? 0;
-              if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
-              return c;
-            }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-            const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
-            return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
-          }),
+      const sectionsNext = s.sections.map((sec) => sec.id !== fromSectionId ? sec : {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== fromLineId) return l;
+          const others = l.chords.filter((c) => c.id !== anchorId);
+          const collision = others.find((c) => {
+            const cc = c.chordCol ?? c.offset ?? 0;
+            const cEnd = cc + visualWidth(c.chord.display);
+            return cc < toCol + reservedWidth && cEnd > toCol;
+          });
+          const push = collision ? (toCol + reservedWidth) - (collision.chordCol ?? collision.offset ?? 0) : 0;
+          const chords = l.chords.map((c) => {
+            if (c.id === anchorId) return { ...c, chordCol: toCol, offset: toCol };
+            const cc = c.chordCol ?? c.offset ?? 0;
+            if (push > 0 && cc >= toCol) return { ...c, chordCol: cc + push, offset: cc + push };
+            return c;
+          }).sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+          const minLen = chords.reduce((m, c) => Math.max(m, (c.chordCol ?? c.offset ?? 0) + visualWidth(c.chord.display)), toCol + reservedWidth);
+          return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, minLen) };
         }),
-      };
+      });
+      // Mirror the new visual order back to the bound pattern so progressions stay in sync.
+      const updatedSection = sectionsNext.find((x) => x.id === fromSectionId);
+      const progression = updatedSection ? syncPatternFromAnchors(s.progression, updatedSection) : s.progression;
+      return { sections: sectionsNext, progression };
     }
 
     // Cross-row move: remove from source line, insert into target line. Detach mirror.
