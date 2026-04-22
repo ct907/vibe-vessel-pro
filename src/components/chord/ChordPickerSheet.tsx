@@ -18,10 +18,15 @@ interface Props {
   onRemove?: () => void;
   /** Active chord row's line id — used so ArrowUp/Down can refocus it. */
   activeLineId?: string;
+  /** Optional controlled query (kept in sync with the active chord row). */
+  query?: string;
+  onQueryChange?: (q: string) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove, activeLineId }: Props) {
-  const [query, setQuery] = useState("");
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove, activeLineId, query: queryProp, onQueryChange }: Props) {
+  const [queryInner, setQueryInner] = useState("");
+  const query = queryProp ?? queryInner;
+  const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
   const inputRef = useRef<HTMLInputElement>(null);
