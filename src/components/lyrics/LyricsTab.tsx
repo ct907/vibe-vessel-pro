@@ -602,16 +602,22 @@ function LineRow({
         </div>
       )}
 
-      {/* LYRIC INPUT */}
+      {/* LYRIC INPUT — textarea so long lines wrap to new visual lines within the same lyric row */}
       <div className="relative rounded-sm bg-accent/10">
-        <input
-          ref={lyricInputRef}
+        <textarea
+          ref={lyricInputRef as unknown as React.RefObject<HTMLTextAreaElement>}
           data-lyric-input={line.id}
           value={line.text}
-          onChange={handleLyricChange}
-          onKeyDown={handleLyricKeyDown}
+          rows={1}
+          onChange={(e) => {
+            handleLyricChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
+            const ta = e.currentTarget;
+            ta.style.height = "auto";
+            ta.style.height = `${ta.scrollHeight}px`;
+          }}
+          onKeyDown={(e) => handleLyricKeyDown(e as unknown as React.KeyboardEvent<HTMLInputElement>)}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1"
+          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 break-words"
         />
       </div>
     </div>
