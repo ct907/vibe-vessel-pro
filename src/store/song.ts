@@ -149,6 +149,24 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
   };
 }
 
+// ---------- Display helpers ----------
+/**
+ * Compute display name for a section based on its position among sections of
+ * the same type. Custom sections use their user-set label as-is.
+ *  - First Verse → "Verse"
+ *  - Second Verse → "Verse 2"
+ *  - Third Verse → "Verse 3"
+ */
+export function getSectionDisplayName(sections: Section[], sectionId: string): string {
+  const sec = sections.find((s) => s.id === sectionId);
+  if (!sec) return "";
+  if (sec.type === "custom") return sec.label || "Section";
+  const sameType = sections.filter((s) => s.type === sec.type);
+  const idx = sameType.findIndex((s) => s.id === sectionId);
+  const base = SECTION_DEFAULT_LABEL[sec.type];
+  return idx <= 0 ? base : `${base} ${idx + 1}`;
+}
+
 // ---------- Sync helpers ----------
 // Find the next free start beat in a pattern (after the last chord's end).
 function nextFreeBeat(pattern: PatternBlock): number {
