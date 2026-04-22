@@ -5,10 +5,10 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
-import { hydrateFromStorage, startAutosave } from "@/store/song";
+import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { FileText, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
