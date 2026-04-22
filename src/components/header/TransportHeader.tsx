@@ -69,7 +69,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-paper/85 backdrop-blur supports-[backdrop-filter]:bg-paper/70">
+    <header className="border-b border-border bg-paper/85">
       <div className="mx-auto max-w-6xl px-4 py-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 mr-2">
           <BookOpen className="h-5 w-5 ink-chord" />
