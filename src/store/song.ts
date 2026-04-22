@@ -230,39 +230,151 @@ function repackChords(chords: PatternChord[], totalBeats: number): PatternChord[
   return out;
 }
 
+/** Visual-order list of anchors across all lines of a section. */
+function anchorsInVisualOrder(section: Section): { lineId: string; anchor: ChordAnchor }[] {
+  const out: { lineId: string; anchor: ChordAnchor }[] = [];
+  section.lines.forEach((l) => {
+    const sorted = [...l.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
+    sorted.forEach((a) => out.push({ lineId: l.id, anchor: a }));
+  });
+  return out;
+}
+
 /**
- * Place a new chord into a pattern with default 2-beat length, expanding bars
- * (or creating a new mirror pattern would be too disruptive — we just expand
- * bars on the bound block, capped at 32).
- * Returns the created PatternChord id.
+ * Given an updated section, reorder the bound pattern's chords so their
+ * left-to-right order matches the section anchors' visual order. Mirrored
+ * pairs (anchor.mirrorId ↔ patternChord.id) are reordered together; unmirrored
+ * pattern chords keep their relative tail position.
  */
-function placeMirroredChord(pattern: PatternBlock, chord: ChordSymbol, mirrorId: string): { pattern: PatternBlock; chordId: string } {
-  const len = 2;
-  let next = pattern;
-  let start = nextFreeBeat(next);
-  let total = next.bars * next.beatsPerBar;
-  if (start + len > total) {
-    // grow bars to fit, cap at 32 bars
-    const neededBars = Math.min(32, Math.ceil((start + len) / next.beatsPerBar));
-    next = { ...next, bars: neededBars };
-    total = next.bars * next.beatsPerBar;
-    if (start + len > total) {
-      // still no room; clamp into last beat
-      start = Math.max(0, total - len);
+function syncPatternFromAnchors(progression: PatternBlock[], section: Section): PatternBlock[] {
+  const pattern = progression.find((p) => p.id === section.id);
+  if (!pattern) return progression;
+  const visual = anchorsInVisualOrder(section);
+  const pcById = new Map(pattern.chords.map((c) => [c.id, c]));
+  const orderedMirrored: PatternChord[] = [];
+  const usedPcIds = new Set<string>();
+  for (const { anchor } of visual) {
+    if (anchor.mirrorId && pcById.has(anchor.mirrorId)) {
+      orderedMirrored.push(pcById.get(anchor.mirrorId)!);
+      usedPcIds.add(anchor.mirrorId);
     }
   }
+  const tail = pattern.chords.filter((c) => !usedPcIds.has(c.id));
+  const newOrder = [...orderedMirrored, ...tail];
+  // Reassign startBeats sequentially so repack picks them up in this order.
+  let cursor = 0;
+  const reseq: PatternChord[] = newOrder.map((c) => {
+    const next = { ...c, startBeat: cursor };
+    cursor += c.lengthBeats;
+    return next;
+  });
+  const totalBeats = pattern.bars * pattern.beatsPerBar;
+  return progression.map((p) =>
+    p.id === pattern.id ? { ...p, chords: repackChords(reseq, totalBeats) } : p,
+  );
+}
+
+/**
+ * Given an updated pattern, rotate the bound section's mirrored anchor contents
+ * so the chords displayed at each anchor slot follow the pattern's new order.
+ * Anchor slots (their lineId + col positions) are preserved.
+ */
+function syncAnchorsFromPattern(sections: Section[], pattern: PatternBlock): Section[] {
+  const section = sections.find((s) => s.id === pattern.id);
+  if (!section) return sections;
+  const visual = anchorsInVisualOrder(section);
+  // Map current mirrorIds in pattern order
+  const sortedPcs = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  // Collect mirrored slots in visual order
+  const mirroredSlots = visual.filter((v) => v.anchor.mirrorId && sortedPcs.some((c) => c.id === v.anchor.mirrorId));
+  const mirroredPcs = sortedPcs.filter((c) => mirroredSlots.some((s) => s.anchor.mirrorId === c.id));
+  if (mirroredSlots.length !== mirroredPcs.length) return sections;
+  // Build replacement map: anchorId -> new {chord, mirrorId}
+  const replace = new Map<string, { chord: ChordSymbol; mirrorId: string }>();
+  for (let i = 0; i < mirroredSlots.length; i++) {
+    replace.set(mirroredSlots[i].anchor.id, { chord: mirroredPcs[i].chord, mirrorId: mirroredPcs[i].id });
+  }
+  return sections.map((sec) => {
+    if (sec.id !== section.id) return sec;
+    return {
+      ...sec,
+      lines: sec.lines.map((l) => ({
+        ...l,
+        chords: l.chords.map((a) => {
+          const r = replace.get(a.id);
+          return r ? { ...a, chord: r.chord, mirrorId: r.mirrorId } : a;
+        }),
+      })),
+    };
+  });
+}
+
+/**
+ * Place a new chord into a pattern. If the bound pattern doesn't have enough
+ * empty space, append a new pattern block (overflow pattern) and place the
+ * chord there instead. Returns the (possibly extended) progression and the
+ * created PatternChord id + the patternId it ended up in.
+ */
+function placeMirroredChord(
+  progression: PatternBlock[],
+  boundPatternId: string,
+  chord: ChordSymbol,
+  mirrorId: string,
+): { progression: PatternBlock[]; chordId: string; patternId: string } {
+  const len = 2;
+  const idx = progression.findIndex((p) => p.id === boundPatternId);
+  if (idx < 0) {
+    // Shouldn't happen — fall back to no-op.
+    return { progression, chordId: "", patternId: boundPatternId };
+  }
+  const findRoom = (p: PatternBlock) => {
+    const start = nextFreeBeat(p);
+    const total = p.bars * p.beatsPerBar;
+    return total - start >= 0.5 ? Math.min(len, total - start) : 0;
+  };
+  // Try bound pattern first
+  let target = progression[idx];
+  let placedLen = findRoom(target);
+  let next = [...progression];
+  if (placedLen <= 0) {
+    // Find any later overflow block (custom-typed sibling) with space, else create one.
+    let overflowIdx = -1;
+    for (let i = idx + 1; i < next.length; i++) {
+      const room = findRoom(next[i]);
+      if (room > 0) { overflowIdx = i; placedLen = room; break; }
+    }
+    if (overflowIdx === -1) {
+      // Create a fresh overflow pattern with the bound section's metric.
+      const newPattern: PatternBlock = {
+        id: nanoid(),
+        label: `${target.label} (cont.)`,
+        bars: target.bars,
+        beatsPerBar: target.beatsPerBar,
+        chords: [],
+      };
+      next.splice(idx + 1, 0, newPattern);
+      overflowIdx = idx + 1;
+      placedLen = Math.min(len, newPattern.bars * newPattern.beatsPerBar);
+    }
+    target = next[overflowIdx];
+    const start = nextFreeBeat(target);
+    const id = nanoid();
+    const pc: PatternChord = { id, chord, startBeat: start, lengthBeats: placedLen, mirrorId };
+    next[overflowIdx] = {
+      ...target,
+      chords: [...target.chords, pc].sort((a, b) => a.startBeat - b.startBeat),
+    };
+    return { progression: next, chordId: id, patternId: target.id };
+  }
+  // Fits in bound pattern.
+  const start = nextFreeBeat(target);
   const id = nanoid();
-  const pc: PatternChord = {
-    id,
-    chord,
-    startBeat: start,
-    lengthBeats: Math.min(len, total - start),
-    mirrorId,
+  const pc: PatternChord = { id, chord, startBeat: start, lengthBeats: placedLen, mirrorId };
+  next[idx] = {
+    ...target,
+    chords: [...target.chords, pc].sort((a, b) => a.startBeat - b.startBeat),
   };
-  return {
-    pattern: { ...next, chords: [...next.chords, pc].sort((a, b) => a.startBeat - b.startBeat) },
-    chordId: id,
-  };
+  return { progression: next, chordId: id, patternId: target.id };
 }
 
 // ---------- Store ----------
