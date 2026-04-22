@@ -48,6 +48,8 @@
     --margin-line: 0 55% 55%;        /* red left margin */
     --ink-soft: 30 15% 38%;
     --chord-ink: 28 78% 38%;         /* deep amber for chord glyphs */
+    --chord-chip: 28 90% 60%;        /* warm orange chord chip background */
+    --chord-chip-foreground: 25 30% 15%;
 
     --shadow-paper: 0 1px 0 hsl(35 25% 78% / 0.6), 0 8px 24px -12px hsl(25 25% 18% / 0.18);
 
@@ -88,6 +90,8 @@
     --margin-line: 0 55% 45%;
     --ink-soft: 30 15% 65%;
     --chord-ink: 28 78% 62%;
+    --chord-chip: 28 85% 55%;
+    --chord-chip-foreground: 25 18% 10%;
   }
 }
 

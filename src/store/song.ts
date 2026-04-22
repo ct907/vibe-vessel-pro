@@ -128,6 +128,10 @@ export interface SongState {
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
   /** Adjust a single pattern chord's length (in beats, supports 0.5 increments). Re-packs neighbors. */
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
+  /** Reorder a chord within its pattern to a target index (0-based, in left-to-right order). */
+  reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
+  /** Move a single chord from one pattern to another at a target index. */
+  movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
 
   // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
   undo: () => boolean;
@@ -1067,6 +1071,78 @@ export const useSongStore = create<SongState>((set, get) => ({
       return { ...p, chords: repackChords(next, totalBeats) };
     });
     return { progression };
+  }),
+
+  reorderPatternChord: (patternId, chordId, toIndex) => set((s) => {
+    const progression = s.progression.map((p) => {
+      if (p.id !== patternId) return p;
+      const totalBeats = p.bars * p.beatsPerBar;
+      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+      const fromIdx = sorted.findIndex((c) => c.id === chordId);
+      if (fromIdx < 0) return p;
+      const [moved] = sorted.splice(fromIdx, 1);
+      const insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+      sorted.splice(insertAt, 0, moved);
+      return { ...p, chords: repackChords(sorted, totalBeats) };
+    });
+    const updatedPattern = progression.find((p) => p.id === patternId);
+    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
+    return { progression, sections };
+  }),
+
+  movePatternChordToPatternAt: (fromPatternId, toPatternId, chordId, toIndex) => set((s) => {
+    if (fromPatternId === toPatternId) {
+      const progression = s.progression.map((p) => {
+        if (p.id !== fromPatternId) return p;
+        const totalBeats = p.bars * p.beatsPerBar;
+        const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+        const fromIdx = sorted.findIndex((c) => c.id === chordId);
+        if (fromIdx < 0) return p;
+        const [moved] = sorted.splice(fromIdx, 1);
+        const insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+        sorted.splice(insertAt, 0, moved);
+        return { ...p, chords: repackChords(sorted, totalBeats) };
+      });
+      const updatedPattern = progression.find((p) => p.id === fromPatternId);
+      const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
+      return { progression, sections };
+    }
+    const fromPattern = s.progression.find((p) => p.id === fromPatternId);
+    const toPattern = s.progression.find((p) => p.id === toPatternId);
+    if (!fromPattern || !toPattern) return s;
+    const moving = fromPattern.chords.find((c) => c.id === chordId);
+    if (!moving) return s;
+    const mirrorAnchorId = moving.mirrorId;
+    const detached: PatternChord = { ...moving, mirrorId: undefined };
+
+    const progression = s.progression.map((p) => {
+      if (p.id === fromPatternId) {
+        const totalBeats = p.bars * p.beatsPerBar;
+        return { ...p, chords: repackChords(p.chords.filter((c) => c.id !== chordId), totalBeats) };
+      }
+      if (p.id === toPatternId) {
+        const totalBeats = p.bars * p.beatsPerBar;
+        const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+        const insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+        sorted.splice(insertAt, 0, detached);
+        const othersSum = sorted.reduce((sum, c) => sum + (c.id === detached.id ? 0 : c.lengthBeats), 0);
+        const maxForMoved = Math.max(0.5, totalBeats - othersSum);
+        const clamped = sorted.map((c) =>
+          c.id === detached.id ? { ...c, lengthBeats: Math.min(c.lengthBeats, maxForMoved) } : c,
+        );
+        return { ...p, chords: repackChords(clamped, totalBeats) };
+      }
+      return p;
+    });
+
+    const sections = mirrorAnchorId
+      ? s.sections.map((sec) => sec.id !== fromPatternId ? sec : {
+          ...sec,
+          lines: sec.lines.map((l) => ({ ...l, chords: l.chords.filter((a) => a.id !== mirrorAnchorId) })),
+        })
+      : s.sections;
+
+    return { progression, sections };
   }),
 
   removePatternChord: (patternId, chordId) => set((s) => {
