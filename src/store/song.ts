@@ -96,6 +96,11 @@ export interface SongState {
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
   shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
+  /** Move selected chords by one slot in chord-list order, ignoring spaces.
+   *  direction = +1: snap each selected chord to just after its right neighbor (after that neighbor's last trailing space).
+   *  direction = -1: snap each selected chord to just before its left neighbor (before that neighbor's leading space).
+   */
+  moveSelectedChordsByOrder: (sectionId: string, lineId: string, anchorIds: string[], direction: -1 | 1) => void;
   /** Move a single chord anchor to another (section,line,col). Mirror link is detached. */
   moveChordAnchor: (
     fromSectionId: string, fromLineId: string, anchorId: string,
