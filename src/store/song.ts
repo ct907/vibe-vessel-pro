@@ -994,18 +994,13 @@ export const useSongStore = create<SongState>((set, get) => ({
   movePatternChord: (patternId, chordId, direction) => set((s) => ({
     progression: s.progression.map((p) => {
       if (p.id !== patternId) return p;
+      const totalBeats = p.bars * p.beatsPerBar;
       const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
       const idx = sorted.findIndex((c) => c.id === chordId);
       const swapWith = idx + direction;
       if (idx < 0 || swapWith < 0 || swapWith >= sorted.length) return p;
-      const a = sorted[idx];
-      const b = sorted[swapWith];
-      const updated = sorted.map((c) => {
-        if (c.id === a.id) return { ...c, startBeat: b.startBeat };
-        if (c.id === b.id) return { ...c, startBeat: a.startBeat };
-        return c;
-      }).sort((x, y) => x.startBeat - y.startBeat);
-      return { ...p, chords: updated };
+      [sorted[idx], sorted[swapWith]] = [sorted[swapWith], sorted[idx]];
+      return { ...p, chords: repackChords(sorted, totalBeats) };
     }),
   })),
 
