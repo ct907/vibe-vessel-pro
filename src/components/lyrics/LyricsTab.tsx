@@ -728,6 +728,7 @@ export function LyricsTab() {
         initialChord={initialChord}
         onPick={handlePick}
         onRemove={picker?.anchorId ? handleRemove : undefined}
+        activeLineId={picker?.lineId}
       />
     </div>
   );
