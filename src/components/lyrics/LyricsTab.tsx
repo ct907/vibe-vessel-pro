@@ -20,7 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
@@ -161,9 +161,33 @@ function LineRow({
     onPickerOpen(line.id, col);
   };
 
+  const selectAll = () => {
+    if (line.chords.length === 0) return;
+    setSelectMode(true);
+    setSelected(new Set(line.chords.map((c) => c.id)));
+  };
+
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (selectMode) return;
     const k = e.key;
+    const mod = e.metaKey || e.ctrlKey;
+
+    // Keyboard shortcuts: Cmd/Ctrl + A / C / X / V — work in or out of selectMode.
+    if (mod && (k === "a" || k === "A")) {
+      e.preventDefault();
+      selectAll();
+      return;
+    }
+    if (mod && (k === "c" || k === "C")) {
+      if (selected.size > 0) { e.preventDefault(); doCopy(); return; }
+    }
+    if (mod && (k === "x" || k === "X")) {
+      if (selected.size > 0) { e.preventDefault(); doCut(); return; }
+    }
+    if (mod && (k === "v" || k === "V")) {
+      e.preventDefault(); doPaste(); return;
+    }
+
+    if (selectMode) return;
     // Picker is "live" when this row is active and the parent passed query handlers.
     const pickerLive = !!(active && onChordRowQueryChange);
     const liveQuery = chordRowQuery ?? "";
@@ -379,33 +403,43 @@ function LineRow({
       </div>
 
       {selectMode && (
-        <div className="mb-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
-          <span className="text-muted-foreground">{selectedIds.length} selected</span>
-          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)} aria-label="Move chord left (by order)">
-            <ArrowUp className="h-3 w-3 -rotate-90" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)} aria-label="Move chord right (by order)">
-            <ArrowDown className="h-3 w-3 -rotate-90" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={doCut} aria-label="Cut">
-            <Scissors className="h-3 w-3" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
-            onClick={doCopy} aria-label="Copy">
-            <Copy className="h-3 w-3" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6"
-            onClick={doPaste} aria-label="Paste">
-            <ClipboardPaste className="h-3 w-3" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" disabled={!selectedIds.length}
-            onClick={() => { removeChordAnchorsBatch(sectionId, line.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <Button size="sm" variant="ghost" className="h-6 px-2 ml-auto" onClick={exitSelect}>Done</Button>
+        <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs">
+          {/* Row 1: status + action buttons */}
+          <div className="flex flex-wrap items-center gap-[10px]">
+            <span className="text-muted-foreground">{selectedIds.length} selected</span>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={selectAll}
+              aria-label="Select all chords" title="Select all (⌘/Ctrl+A)">
+              <CheckSquare className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+              onClick={doCut} aria-label="Cut" title="Cut (⌘/Ctrl+X)">
+              <Scissors className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+              onClick={doCopy} aria-label="Copy" title="Copy (⌘/Ctrl+C)">
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7"
+              onClick={doPaste} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
+              <ClipboardPaste className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
+              onClick={() => { removeChordAnchorsBatch(sectionId, line.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {/* Row 2: arrows + Done */}
+          <div className="flex flex-wrap items-center gap-[10px]">
+            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)} aria-label="Move chord left (by order)">
+              <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
+              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)} aria-label="Move chord right (by order)">
+              <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>Done</Button>
+          </div>
         </div>
       )}
 
