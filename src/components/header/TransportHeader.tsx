@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Play, Square, Minus, Plus, Save, Upload, BookOpen, Menu } from "lucide-react";
+import { Play, Square, Minus, Plus, Save, Upload, BookOpen, Menu, Sun, Moon } from "lucide-react";
 import { ALL_ROOTS } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "@/hooks/use-theme";
 
 interface Props {
   isPlaying: boolean;
@@ -23,6 +25,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
 
@@ -117,6 +120,17 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-2">
+                <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                    Dark mode
+                  </div>
+                  <Switch
+                    checked={theme === "dark"}
+                    onCheckedChange={toggleTheme}
+                    aria-label="Toggle dark mode"
+                  />
+                </div>
                 <Button
                   variant="outline"
                   className="justify-start border border-border"

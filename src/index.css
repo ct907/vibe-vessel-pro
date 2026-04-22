@@ -9,6 +9,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     /* Paper & ink */
     --background: 41 38% 92%;        /* warm cream paper */
     --foreground: 25 25% 18%;        /* dark sepia ink */
@@ -65,6 +66,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 25 18% 10%;
     --foreground: 40 35% 90%;
     --card: 25 18% 13%;
