@@ -126,6 +126,8 @@ export interface SongState {
   removePatternChordsBatch: (patternId: string, chordIds: string[]) => void;
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
+  /** Adjust a single pattern chord's length (in beats, supports 0.5 increments). Re-packs neighbors. */
+  setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
 
   // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
   undo: () => boolean;
