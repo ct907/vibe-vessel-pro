@@ -721,10 +721,12 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (!moved) return s;
     const movedChord = moved.chord;
 
-    // The dropped chord visually occupies its display width; reserve that
-    // many cells plus 4ch of breathing room so chips don't overlap when
-    // re-arranged via drag.
-    const reservedWidth = Math.max(1, movedChord.display.length) + 4;
+    // The dropped chord visually occupies its display width plus chip padding
+    // (px-2 ≈ 2ch each side ≈ 4ch). Reserve that many cells so chips don't
+    // overlap when re-arranged via drag.
+    const CHIP_PAD_CH = 4;
+    const visualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
+    const reservedWidth = visualWidth(movedChord.display);
 
     // Same row: shift this anchor's column, pushing colliding chords aside.
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
