@@ -25,12 +25,13 @@ function measureOffsetX(measureEl: HTMLSpanElement, text: string, offset: number
 interface LineRowProps {
   sectionId: string;
   line: LyricLine;
+  active?: boolean;
   onAddLineAfter: () => void;
   onRemoveLine: () => void;
   onPickerOpen: (lineId: string, offset: number, anchorId?: string) => void;
 }
 
-function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
+function LineRow({ sectionId, line, active, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
   const { setLineText, upsertChordAt, removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors } = useSongStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
@@ -104,12 +105,23 @@ function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }
   const selectedIds = Array.from(selected);
 
   return (
-    <div ref={rowRef} className="relative group py-1">
+    <div
+      ref={rowRef}
+      className={cn(
+        "relative group py-1 transition-all",
+        active && "relative z-[60] rounded-md bg-card/95 ring-2 ring-primary shadow-lg px-2 -mx-2",
+      )}
+    >
       <div
         className="relative h-6 cursor-text"
         onClick={handleChordRowClick}
         title={selectMode ? "Tap chips to add/remove from selection" : "Click to add a chord above this position"}
       >
+        {line.chords.length === 0 && (
+          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-6 pointer-events-none select-none">
+            add your chords here
+          </span>
+        )}
         {line.chords.map((a) => {
           const x = measureRef.current ? measureOffsetX(measureRef.current, line.text, a.offset) : 0;
           const isSel = selected.has(a.id);
@@ -195,10 +207,11 @@ interface SectionCardProps {
   section: Section;
   index: number;
   total: number;
+  activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, offset: number, anchorId?: string) => void;
 }
 
-function SectionCard({ section, index, total, onPickerOpen }: SectionCardProps) {
+function SectionCard({ section, index, total, activeLineId, onPickerOpen }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection, moveSection,
     toggleSectionCollapsed, upsertChordAt, basket,
@@ -290,6 +303,7 @@ function SectionCard({ section, index, total, onPickerOpen }: SectionCardProps) 
                 key={line.id}
                 sectionId={section.id}
                 line={line}
+                active={activeLineId === line.id}
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onRemoveLine={() => removeLine(section.id, line.id)}
                 onPickerOpen={(lineId, offset, anchorId) => onPickerOpen(section.id, lineId, offset, anchorId)}
@@ -360,6 +374,7 @@ export function LyricsTab() {
           section={sec}
           index={i}
           total={sections.length}
+          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
           onPickerOpen={openPicker}
         />
       ))}
