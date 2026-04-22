@@ -1103,9 +1103,18 @@ export const useSongStore = create<SongState>((set, get) => ({
       const fromIdx = sorted.findIndex((c) => c.id === chordId);
       if (fromIdx < 0) return p;
       const [moved] = sorted.splice(fromIdx, 1);
-      const insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+      let insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+      // Removing from before the target shifts the target index left by one.
+      if (toIndex > fromIdx) insertAt = Math.max(0, insertAt - 1);
       sorted.splice(insertAt, 0, moved);
-      return { ...p, chords: repackChords(sorted, totalBeats) };
+      // Reassign startBeats so repack (which sorts by startBeat) preserves new order.
+      let cursor = 0;
+      const reseq = sorted.map((c) => {
+        const next = { ...c, startBeat: cursor };
+        cursor += c.lengthBeats;
+        return next;
+      });
+      return { ...p, chords: repackChords(reseq, totalBeats) };
     });
     const updatedPattern = progression.find((p) => p.id === patternId);
     const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
@@ -1121,9 +1130,16 @@ export const useSongStore = create<SongState>((set, get) => ({
         const fromIdx = sorted.findIndex((c) => c.id === chordId);
         if (fromIdx < 0) return p;
         const [moved] = sorted.splice(fromIdx, 1);
-        const insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+        let insertAt = Math.max(0, Math.min(sorted.length, toIndex));
+        if (toIndex > fromIdx) insertAt = Math.max(0, insertAt - 1);
         sorted.splice(insertAt, 0, moved);
-        return { ...p, chords: repackChords(sorted, totalBeats) };
+        let cursor = 0;
+        const reseq = sorted.map((c) => {
+          const next = { ...c, startBeat: cursor };
+          cursor += c.lengthBeats;
+          return next;
+        });
+        return { ...p, chords: repackChords(reseq, totalBeats) };
       });
       const updatedPattern = progression.find((p) => p.id === fromPatternId);
       const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
@@ -1200,7 +1216,14 @@ export const useSongStore = create<SongState>((set, get) => ({
       const swapWith = idx + direction;
       if (idx < 0 || swapWith < 0 || swapWith >= sorted.length) return p;
       [sorted[idx], sorted[swapWith]] = [sorted[swapWith], sorted[idx]];
-      return { ...p, chords: repackChords(sorted, totalBeats) };
+      // Reassign startBeats so repack (which sorts by startBeat) preserves the swap.
+      let cursor = 0;
+      const reseq = sorted.map((c) => {
+        const next = { ...c, startBeat: cursor };
+        cursor += c.lengthBeats;
+        return next;
+      });
+      return { ...p, chords: repackChords(reseq, totalBeats) };
     });
     const updatedPattern = progression.find((p) => p.id === patternId);
     const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
