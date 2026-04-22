@@ -54,9 +54,13 @@ export function ChordChip({
       pressTimerRef.current = null;
     }
   };
-  const handleClick = (_e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent) => {
     if (longFiredRef.current) {
-      // Reset for next interaction; swallow this click so we don't also toggle.
+      // A long-press just fired — its handler already updated selection.
+      // Swallow this click entirely so the parent wrapper's onClick doesn't
+      // also toggle (which would immediately undo the selection).
+      e.stopPropagation();
+      e.preventDefault();
       longFiredRef.current = false;
       return;
     }
