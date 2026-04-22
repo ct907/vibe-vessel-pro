@@ -31,11 +31,13 @@ interface LineRowProps {
 }
 
 function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }: LineRowProps) {
-  const { setLineText, upsertChordAt, removeChordAnchor } = useSongStore();
+  const { setLineText, upsertChordAt, removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors } = useSongStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const ro = new ResizeObserver(() => force((x) => x + 1));
@@ -43,7 +45,13 @@ function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }
     return () => ro.disconnect();
   }, []);
 
+  // Exit select mode if no chips remain
+  useEffect(() => {
+    if (selectMode && line.chords.length === 0) { setSelectMode(false); setSelected(new Set()); }
+  }, [line.chords.length, selectMode]);
+
   const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (selectMode) return; // don't open picker while selecting
     if (!measureRef.current || !inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -80,15 +88,31 @@ function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }
     }
   };
 
+  const enterSelect = (anchorId: string) => {
+    setSelectMode(true);
+    setSelected(new Set([anchorId]));
+  };
+  const toggleSelected = (anchorId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(anchorId)) next.delete(anchorId); else next.add(anchorId);
+      return next;
+    });
+  };
+  const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+
+  const selectedIds = Array.from(selected);
+
   return (
     <div ref={rowRef} className="relative group py-1">
       <div
         className="relative h-6 cursor-text"
         onClick={handleChordRowClick}
-        title="Click to add a chord above this position"
+        title={selectMode ? "Tap chips to add/remove from selection" : "Click to add a chord above this position"}
       >
         {line.chords.map((a) => {
           const x = measureRef.current ? measureOffsetX(measureRef.current, line.text, a.offset) : 0;
+          const isSel = selected.has(a.id);
           return (
             <div
               key={a.id}
@@ -100,12 +124,37 @@ function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }
                 chord={a.chord}
                 variant="ink"
                 size="sm"
-                onLongPress={() => onPickerOpen(line.id, a.offset, a.id)}
+                selected={selectMode && isSel}
+                audition={!selectMode}
+                onClick={selectMode ? () => toggleSelected(a.id) : undefined}
+                onLongPress={() => {
+                  if (selectMode) toggleSelected(a.id);
+                  else enterSelect(a.id);
+                }}
               />
             </div>
           );
         })}
       </div>
+
+      {selectMode && (
+        <div className="mb-1 -mt-0.5 flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
+          <span className="text-muted-foreground">{selectedIds.length} selected</span>
+          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
+            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, -1)} aria-label="Shift left">
+            <ArrowUp className="h-3 w-3 -rotate-90" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
+            onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, 1)} aria-label="Shift right">
+            <ArrowDown className="h-3 w-3 -rotate-90" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" disabled={!selectedIds.length}
+            onClick={() => { removeChordAnchorsBatch(sectionId, line.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+          <Button size="sm" variant="ghost" className="h-6 px-2 ml-auto" onClick={exitSelect}>Done</Button>
+        </div>
+      )}
 
       <div className="relative">
         <input
@@ -130,7 +179,7 @@ function LineRow({ sectionId, line, onAddLineAfter, onRemoveLine, onPickerOpen }
         </button>
       </div>
 
-      {line.chords.length > 0 && (
+      {line.chords.length > 0 && !selectMode && (
         <button
           onClick={() => line.chords.forEach((c) => removeChordAnchor(sectionId, line.id, c.id))}
           className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"

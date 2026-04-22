@@ -84,6 +84,8 @@ export interface SongState {
   setLineText: (sectionId: string, id: string, text: string) => void;
   upsertChordAt: (sectionId: string, lineId: string, offset: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
+  removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
+  shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaChars: number) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -96,6 +98,9 @@ export interface SongState {
   updatePatternChord: (patternId: string, chordId: string, patch: Partial<Omit<PatternChord, "id" | "mirrorId">>) => void;
   removePatternChord: (patternId: string, chordId: string) => void;
   movePatternChord: (patternId: string, chordId: string, direction: -1 | 1) => void;
+  removePatternChordsBatch: (patternId: string, chordIds: string[]) => void;
+  shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
+  movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
 
   // ---- persistence ----
   loadFromJSON: (data: unknown) => void;
@@ -462,6 +467,46 @@ export const useSongStore = create<SongState>((set, get) => ({
     return { sections, progression };
   }),
 
+  removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => set((s) => {
+    const idSet = new Set(anchorIds);
+    const mirrorIds = new Set<string>();
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        lines: sec.lines.map((l) => {
+          if (l.id !== lineId) return l;
+          l.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorIds.add(c.mirrorId); });
+          return { ...l, chords: l.chords.filter((c) => !idSet.has(c.id)) };
+        }),
+      };
+    });
+    const progression = mirrorIds.size
+      ? s.progression.map((p) => p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => !mirrorIds.has(c.id)) })
+      : s.progression;
+    return { sections, progression };
+  }),
+
+  shiftChordAnchors: (sectionId, lineId, anchorIds, deltaChars) => set((s) => {
+    const idSet = new Set(anchorIds);
+    return {
+      sections: s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const max = l.text.length;
+            const chords = l.chords.map((c) => idSet.has(c.id)
+              ? { ...c, offset: Math.max(0, Math.min(max, c.offset + deltaChars)) }
+              : c).sort((a, b) => a.offset - b.offset);
+            return { ...l, chords };
+          }),
+        };
+      }),
+    };
+  }),
+
   // ---- basket ----
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
@@ -603,6 +648,88 @@ export const useSongStore = create<SongState>((set, get) => ({
       return { ...p, chords: updated };
     }),
   })),
+
+  removePatternChordsBatch: (patternId, chordIds) => set((s) => {
+    const idSet = new Set(chordIds);
+    const mirrorAnchorIds = new Set<string>();
+    const progression = s.progression.map((p) => {
+      if (p.id !== patternId) return p;
+      p.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorAnchorIds.add(c.mirrorId); });
+      return { ...p, chords: p.chords.filter((c) => !idSet.has(c.id)) };
+    });
+    const sections = mirrorAnchorIds.size
+      ? s.sections.map((sec) => sec.id !== patternId ? sec : {
+          ...sec,
+          lines: sec.lines.map((l) => ({ ...l, chords: l.chords.filter((a) => !mirrorAnchorIds.has(a.id)) })),
+        })
+      : s.sections;
+    return { progression, sections };
+  }),
+
+  shiftPatternChords: (patternId, chordIds, deltaBeats) => set((s) => {
+    const idSet = new Set(chordIds);
+    return {
+      progression: s.progression.map((p) => {
+        if (p.id !== patternId) return p;
+        const totalBeats = p.bars * p.beatsPerBar;
+        const selected = p.chords.filter((c) => idSet.has(c.id));
+        if (!selected.length) return p;
+        const minStart = Math.min(...selected.map((c) => c.startBeat));
+        const maxEnd = Math.max(...selected.map((c) => c.startBeat + c.lengthBeats));
+        let d = deltaBeats;
+        if (minStart + d < 0) d = -minStart;
+        if (maxEnd + d > totalBeats) d = totalBeats - maxEnd;
+        if (d === 0) return p;
+        const chords = p.chords.map((c) => idSet.has(c.id) ? { ...c, startBeat: c.startBeat + d } : c)
+          .sort((a, b) => a.startBeat - b.startBeat);
+        return { ...p, chords };
+      }),
+    };
+  }),
+
+  movePatternChordsTo: (fromPatternId, toPatternId, chordIds) => set((s) => {
+    if (fromPatternId === toPatternId) return s;
+    const idSet = new Set(chordIds);
+    const fromPattern = s.progression.find((p) => p.id === fromPatternId);
+    const toPattern = s.progression.find((p) => p.id === toPatternId);
+    if (!fromPattern || !toPattern) return s;
+    const moving = fromPattern.chords.filter((c) => idSet.has(c.id));
+    if (!moving.length) return s;
+    const mirrorAnchorIds = new Set(moving.map((c) => c.mirrorId).filter(Boolean) as string[]);
+
+    let target: PatternBlock = { ...toPattern, chords: [...toPattern.chords] };
+    let cursor = target.chords.length
+      ? Math.max(...target.chords.map((c) => c.startBeat + c.lengthBeats))
+      : 0;
+    for (const m of moving) {
+      let total = target.bars * target.beatsPerBar;
+      if (cursor + m.lengthBeats > total) {
+        const neededBars = Math.min(32, Math.ceil((cursor + m.lengthBeats) / target.beatsPerBar));
+        target = { ...target, bars: neededBars };
+        total = target.bars * target.beatsPerBar;
+      }
+      const start = Math.min(cursor, total - 1);
+      const len = Math.max(1, Math.min(m.lengthBeats, total - start));
+      target.chords.push({ id: m.id, chord: m.chord, startBeat: start, lengthBeats: len, mirrorId: undefined });
+      cursor = start + len;
+    }
+    target.chords.sort((a, b) => a.startBeat - b.startBeat);
+
+    const progression = s.progression.map((p) => {
+      if (p.id === fromPatternId) return { ...p, chords: p.chords.filter((c) => !idSet.has(c.id)) };
+      if (p.id === toPatternId) return target;
+      return p;
+    });
+
+    const sections = mirrorAnchorIds.size
+      ? s.sections.map((sec) => sec.id !== fromPatternId ? sec : {
+          ...sec,
+          lines: sec.lines.map((l) => ({ ...l, chords: l.chords.filter((a) => !mirrorAnchorIds.has(a.id)) })),
+        })
+      : s.sections;
+
+    return { progression, sections };
+  }),
 
   loadFromJSON: (data) => {
     const parsed = data as any;
