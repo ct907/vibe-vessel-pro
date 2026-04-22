@@ -24,15 +24,14 @@ const Index = () => {
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6 pb-32">
         <h1 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h1>
 
-        <Tabs value={tab} onValueChange={setTab} className="w-full relative">
-          <TabsList
-            className="bg-paper-shade/70 left-1/2 -translate-x-1/2"
-            style={{ position: "absolute", transform: "translate(-50%, -61px)" }}
-          >
-            <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
-            <TabsTrigger value="chords">Chords</TabsTrigger>
-            <TabsTrigger value="progressions">Progressions</TabsTrigger>
-          </TabsList>
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
+          <div className="flex justify-center">
+            <TabsList className="bg-paper-shade/70">
+              <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
+              <TabsTrigger value="chords">Chords</TabsTrigger>
+              <TabsTrigger value="progressions">Progressions</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="lyrics" className="mt-4">
             <LyricsTab />
