@@ -326,7 +326,7 @@ export function ProgressionsTab() {
           otherPatterns={progression
             .filter((q) => q.id !== p.id)
             .map((q) => ({ id: q.id, label: labelById.get(q.id) ?? q.label }))}
-          onPickerOpen={(patternId, atBeat, replaceChordId) => setPicker({ patternId, atBeat, replaceChordId })}
+          onPickerOpen={openPicker}
         />
       ))}
 
