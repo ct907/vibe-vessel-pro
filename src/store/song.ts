@@ -47,7 +47,9 @@ export interface PatternChord {
 }
 
 export interface PatternBlock {
-  id: string; // SAME id as its bound section
+  id: string;
+  /** Owning section's id. Multiple PatternBlocks can share the same sectionId. */
+  sectionId: string;
   label: string;
   bars: number;
   beatsPerBar: number;
