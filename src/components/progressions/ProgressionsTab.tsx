@@ -133,6 +133,7 @@ function PatternBlock({
   };
   const handleChordTap = (chordId: string) => {
     if (longFiredRef.current) return;
+    setFocusedPattern(pattern.id);
     if (selectMode) {
       setSelected((prev) => {
         const next = new Set(prev);
