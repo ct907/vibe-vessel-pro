@@ -128,6 +128,10 @@ export interface SongState {
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
   /** Adjust a single pattern chord's length (in beats, supports 0.5 increments). Re-packs neighbors. */
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
+  /** Reorder a chord within its pattern to a target index (0-based, in left-to-right order). */
+  reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
+  /** Move a single chord from one pattern to another at a target index. */
+  movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
 
   // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
   undo: () => boolean;
