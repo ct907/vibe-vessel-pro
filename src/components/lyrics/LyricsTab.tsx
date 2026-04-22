@@ -230,9 +230,12 @@ function LineRow({
 
   return (
     <div
+      ref={rowRef}
       className={cn(
-        "relative group py-1 transition-colors",
-        active && "rounded-md ring-2 ring-primary/70 bg-primary/5 px-2 -mx-2",
+        "group py-1 transition-colors",
+        active
+          ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
+          : "relative",
       )}
       data-line-id={line.id}
     >
@@ -245,6 +248,14 @@ function LineRow({
         onKeyDown={handleChordKeyDown}
         onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
         onBlur={() => setChordFocused(false)}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const rect = chordRowRef.current!.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
+          onChordDrop(line.id, col);
+        }}
         className="relative h-7 cursor-text outline-none rounded-sm focus:bg-accent/30"
         style={{ minWidth: `${Math.max(len + 1, 8) * cellPx}px` }}
       >
@@ -263,6 +274,13 @@ function LineRow({
               key={a.id}
               className="absolute top-0 leading-7"
               style={{ left: `${col * cellPx}px` }}
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", a.chord.display);
+                onChordDragStart(a.id);
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (selectMode) { toggleSelected(a.id); return; }
@@ -295,7 +313,7 @@ function LineRow({
       </div>
 
       {selectMode && (
-        <div className="mb-1 flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
+        <div className="mb-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-2 py-1 shadow-sm text-xs">
           <span className="text-muted-foreground">{selectedIds.length} selected</span>
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
             onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, -1)} aria-label="Shift left">
@@ -304,6 +322,18 @@ function LineRow({
           <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
             onClick={() => shiftChordAnchors(sectionId, line.id, selectedIds, 1)} aria-label="Shift right">
             <ArrowDown className="h-3 w-3 -rotate-90" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
+            onClick={doCut} aria-label="Cut">
+            <Scissors className="h-3 w-3" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={!selectedIds.length}
+            onClick={doCopy} aria-label="Copy">
+            <Copy className="h-3 w-3" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6"
+            onClick={doPaste} aria-label="Paste">
+            <ClipboardPaste className="h-3 w-3" />
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" disabled={!selectedIds.length}
             onClick={() => { removeChordAnchorsBatch(sectionId, line.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
