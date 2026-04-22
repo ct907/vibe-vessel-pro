@@ -304,7 +304,7 @@ function PatternBlock({
                   onPickerOpen(pattern.id, c.startBeat, c.id);
                 }}
                 className={cn(
-                  "relative my-1 mx-0.5 rounded-md border border-chord-chip/60 bg-chord-chip text-chord-chip-foreground hover:bg-chord-chip/90 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
+                  "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
                   !selectMode && activeChord === c.id && "ring-2 ring-primary",
                   selectMode && isSel && "ring-2 ring-primary",
                   isBeingDragged && "opacity-40",
@@ -317,6 +317,13 @@ function PatternBlock({
                 )}
                 {dropIndicator === idx + 1 && draggingChordId && (
                   <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
+                )}
+                {/* Playhead — bright orange typing-cursor stick at left edge of currently-playing chord */}
+                {playingChordId === c.id && (
+                  <span
+                    aria-hidden
+                    className="absolute -left-0.5 top-0 bottom-0 w-[3px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                  />
                 )}
                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                   {c.chord.display}
