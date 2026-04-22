@@ -605,17 +605,32 @@ function LineRow({
       {/* LYRIC INPUT — textarea so long lines wrap to new visual lines within the same lyric row */}
       <div className="relative rounded-sm bg-accent/10">
         <textarea
-          ref={lyricInputRef as unknown as React.RefObject<HTMLTextAreaElement>}
+          ref={lyricInputRef}
           data-lyric-input={line.id}
           value={line.text}
           rows={1}
           onChange={(e) => {
-            handleLyricChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
-            const ta = e.currentTarget;
-            ta.style.height = "auto";
-            ta.style.height = `${ta.scrollHeight}px`;
+            setLineText(sectionId, line.id, e.target.value);
           }}
-          onKeyDown={(e) => handleLyricKeyDown(e as unknown as React.KeyboardEvent<HTMLInputElement>)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              const newId = onAddLineAfter();
+              if (typeof newId === "string") {
+                setTimeout(() => {
+                  document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${newId}"]`)?.focus();
+                }, 10);
+              }
+            } else if (
+              e.key === "Backspace" &&
+              lyricInputRef.current?.selectionStart === 0 &&
+              lyricInputRef.current.selectionEnd === 0 &&
+              line.text === ""
+            ) {
+              e.preventDefault();
+              onMergeUp("lyric", "", line.chords.length, line.chordRowLen ?? 0);
+            }
+          }}
           placeholder="Write your lyric line…"
           className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 break-words"
         />
