@@ -1014,8 +1014,9 @@ export const useSongStore = create<SongState>((set, get) => ({
     const mirrorAnchorIds = new Set<string>();
     const progression = s.progression.map((p) => {
       if (p.id !== patternId) return p;
+      const totalBeats = p.bars * p.beatsPerBar;
       p.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorAnchorIds.add(c.mirrorId); });
-      return { ...p, chords: p.chords.filter((c) => !idSet.has(c.id)) };
+      return { ...p, chords: repackChords(p.chords.filter((c) => !idSet.has(c.id)), totalBeats) };
     });
     const sections = mirrorAnchorIds.size
       ? s.sections.map((sec) => sec.id !== patternId ? sec : {
@@ -1027,22 +1028,27 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
 
   shiftPatternChords: (patternId, chordIds, deltaBeats) => set((s) => {
+    // With left-aligned packing, "shifting" reorders chords in the chord list by direction.
     const idSet = new Set(chordIds);
     return {
       progression: s.progression.map((p) => {
         if (p.id !== patternId) return p;
         const totalBeats = p.bars * p.beatsPerBar;
-        const selected = p.chords.filter((c) => idSet.has(c.id));
-        if (!selected.length) return p;
-        const minStart = Math.min(...selected.map((c) => c.startBeat));
-        const maxEnd = Math.max(...selected.map((c) => c.startBeat + c.lengthBeats));
-        let d = deltaBeats;
-        if (minStart + d < 0) d = -minStart;
-        if (maxEnd + d > totalBeats) d = totalBeats - maxEnd;
-        if (d === 0) return p;
-        const chords = p.chords.map((c) => idSet.has(c.id) ? { ...c, startBeat: c.startBeat + d } : c)
-          .sort((a, b) => a.startBeat - b.startBeat);
-        return { ...p, chords };
+        const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+        const dir = deltaBeats > 0 ? 1 : -1;
+        const indices = sorted
+          .map((c, i) => idSet.has(c.id) ? i : -1)
+          .filter((i) => i >= 0);
+        // Process in correct order to avoid swap collisions
+        const order = dir > 0 ? indices.slice().reverse() : indices.slice();
+        const arr = [...sorted];
+        for (const i of order) {
+          const j = i + dir;
+          if (j < 0 || j >= arr.length) continue;
+          if (idSet.has(arr[j].id)) continue;
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return { ...p, chords: repackChords(arr, totalBeats) };
       }),
     };
   }),
