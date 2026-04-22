@@ -84,6 +84,7 @@ export interface SongState {
   moveSection: (id: string, direction: -1 | 1) => void;
   reorderSection: (id: string, toIndex: number) => void;
   toggleSectionCollapsed: (id: string) => void;
+  setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
 
   // ---- lyrics (line-level) ----
@@ -544,6 +545,9 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
   toggleSectionCollapsed: (id) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec)),
+  })),
+  setAllSectionsCollapsed: (collapsed) => set((s) => ({
+    sections: s.sections.map((sec) => ({ ...sec, collapsed })),
   })),
   setSectionComment: (id, comment) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),

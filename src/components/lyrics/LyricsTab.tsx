@@ -61,7 +61,7 @@ function LineRow({
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
     undo, redo,
   } = useSongStore();
-  const lyricInputRef = useRef<HTMLInputElement>(null);
+  const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const [chordCaret, setChordCaret] = useState(0); // column index in chord row
@@ -71,6 +71,14 @@ function LineRow({
   const lastSelectedRef = useRef<string | null>(null);
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
+
+  // Auto-resize lyric textarea to fit wrapped content.
+  useLayoutEffect(() => {
+    const ta = lyricInputRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [line.text]);
 
   // Scroll the active row to ~80px below the top of the visual viewport
   // whenever it becomes the active (picker-open) row.
@@ -602,16 +610,37 @@ function LineRow({
         </div>
       )}
 
-      {/* LYRIC INPUT */}
+      {/* LYRIC INPUT — textarea so long lines wrap to new visual lines within the same lyric row */}
       <div className="relative rounded-sm bg-accent/10">
-        <input
+        <textarea
           ref={lyricInputRef}
           data-lyric-input={line.id}
           value={line.text}
-          onChange={handleLyricChange}
-          onKeyDown={handleLyricKeyDown}
+          rows={1}
+          onChange={(e) => {
+            setLineText(sectionId, line.id, e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              const newId = onAddLineAfter();
+              if (typeof newId === "string") {
+                setTimeout(() => {
+                  document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${newId}"]`)?.focus();
+                }, 10);
+              }
+            } else if (
+              e.key === "Backspace" &&
+              lyricInputRef.current?.selectionStart === 0 &&
+              lyricInputRef.current.selectionEnd === 0 &&
+              line.text === ""
+            ) {
+              e.preventDefault();
+              onMergeUp("lyric", "", line.chords.length, line.chordRowLen ?? 0);
+            }
+          }}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1"
+          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 break-words"
         />
       </div>
     </div>
@@ -733,14 +762,6 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
     >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4">
-        <button
-          onClick={() => toggleSectionCollapsed(section.id)}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
-        >
-          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
-
         <Select
           value={section.type}
           onValueChange={(v) => {
@@ -784,6 +805,25 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("application/x-section-id", section.id);
+            // Use the entire section card as the drag image (clone snapshot).
+            if (cardRef.current) {
+              const rect = cardRef.current.getBoundingClientRect();
+              const clone = cardRef.current.cloneNode(true) as HTMLElement;
+              clone.style.position = "absolute";
+              clone.style.top = "-10000px";
+              clone.style.left = "-10000px";
+              clone.style.width = `${rect.width}px`;
+              clone.style.pointerEvents = "none";
+              clone.style.opacity = "0.9";
+              clone.style.transform = "rotate(-1deg)";
+              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
+              document.body.appendChild(clone);
+              try {
+                e.dataTransfer.setDragImage(clone, 24, 24);
+              } catch { /* ignore */ }
+              // Remove after the browser has snapshotted it.
+              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
+            }
             onSectionDragStart(section.id);
           }}
           onDragEnd={onSectionDragEnd}
@@ -820,6 +860,15 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Expand/collapse toggle — moved to the right of the header */}
+        <button
+          onClick={() => toggleSectionCollapsed(section.id)}
+          className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
+        >
+          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Body */}

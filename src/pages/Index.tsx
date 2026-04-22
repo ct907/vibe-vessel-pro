@@ -5,15 +5,18 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
-import { hydrateFromStorage, startAutosave } from "@/store/song";
+import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { FileText, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
   const [isPlaying, setIsPlaying] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const sections = useSongStore((s) => s.sections);
+  const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
+  const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
 
   useEffect(() => {
     hydrateFromStorage();
@@ -30,6 +33,19 @@ const Index = () => {
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="relative flex justify-center items-center">
+            {tab === "lyrics" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute left-0"
+                onClick={() => setAllSectionsCollapsed(!allCollapsed)}
+                aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+                title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+              >
+                {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+                <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
+              </Button>
+            )}
             <TabsList className="bg-paper-shade/70">
               <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
               <TabsTrigger value="chords">Chords</TabsTrigger>
