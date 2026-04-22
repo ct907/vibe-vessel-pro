@@ -159,10 +159,20 @@ function PatternBlock({
   const activeIdx = active ? sortedChords.findIndex((c) => c.id === active.id) : -1;
 
   return (
-    <div ref={blockRef} className="rounded-xl border border-border bg-card p-4">
+    <div
+      ref={blockRef}
+      onClick={() => setFocusedPattern(pattern.id)}
+      className={cn(
+        "rounded-xl border bg-card p-4 transition-shadow cursor-pointer",
+        isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+      )}
+    >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="font-display text-base ink-chord truncate">{sectionLabel ?? pattern.label}</span>
+          {isFocused && (
+            <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">▸ play start</span>
+          )}
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">bound to section</span>
         </div>
         <span className="text-xs text-muted-foreground">·</span>
