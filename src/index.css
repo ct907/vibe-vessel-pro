@@ -99,11 +99,6 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
-    background-image:
-      radial-gradient(hsl(var(--ink-soft) / 0.05) 1px, transparent 1px),
-      radial-gradient(hsl(var(--ink-soft) / 0.04) 1px, transparent 1px);
-    background-size: 3px 3px, 7px 7px;
-    background-position: 0 0, 1px 2px;
   }
 
   h1, h2, h3, h4 {
