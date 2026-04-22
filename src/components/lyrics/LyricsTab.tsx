@@ -57,7 +57,7 @@ function LineRow({
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
-    removeChordAnchor, removeChordAnchorsBatch, shiftChordAnchors, moveSelectedChordsByOrder,
+    removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
   } = useSongStore();
   const lyricInputRef = useRef<HTMLInputElement>(null);
