@@ -73,10 +73,10 @@ export function ChordChip({
   const sizeCls = size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
   const variantCls =
     variant === "ink"
-      ? "bg-chord-chip text-chord-chip-foreground hover:bg-chord-chip/90 border border-chord-chip/60"
+      ? "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 border border-chord-chip/40"
       : variant === "filled"
-      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-      : "bg-chord-chip text-chord-chip-foreground border border-chord-chip/70 hover:bg-chord-chip/90";
+      ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
+      : "bg-chord-chip/50 text-chord-chip-foreground border border-chord-chip/40 hover:bg-chord-chip/60";
 
   return (
     <button
