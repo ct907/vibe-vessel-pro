@@ -127,6 +127,12 @@ export interface SongState {
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
 
+  // ---- chord-row undo/redo (scoped to chord/lyric line state) ----
+  undo: () => boolean;
+  redo: () => boolean;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
   // ---- persistence ----
   loadFromJSON: (data: unknown) => void;
   toJSON: () => SerializedSong;
@@ -239,6 +245,27 @@ function placeMirroredChord(pattern: PatternBlock, chord: ChordSymbol, mirrorId:
 // ---------- Store ----------
 
 const seed = makeSection("verse");
+
+// History stacks live outside the reactive state so snapshots don't trigger re-renders.
+type HistorySnapshot = { sections: Section[]; progression: PatternBlock[] };
+const undoStack: HistorySnapshot[] = [];
+const redoStack: HistorySnapshot[] = [];
+const HISTORY_LIMIT = 50;
+
+function snapshot(s: { sections: Section[]; progression: PatternBlock[] }): HistorySnapshot {
+  return {
+    sections: JSON.parse(JSON.stringify(s.sections)),
+    progression: JSON.parse(JSON.stringify(s.progression)),
+  };
+}
+
+/** Call BEFORE mutating sections/progression in a chord-row action. */
+function pushHistory(get: () => SongState) {
+  const s = get();
+  undoStack.push(snapshot(s));
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
 
 export const useSongStore = create<SongState>((set, get) => ({
   meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
