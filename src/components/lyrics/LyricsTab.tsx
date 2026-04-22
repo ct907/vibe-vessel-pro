@@ -661,9 +661,74 @@ function useCellPx(): number {
 }
 
 export function LyricsTab() {
-  const { sections, upsertChordAt, removeChordAnchor, addSection } = useSongStore();
+  const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
-  const cellPx = useCellPx();
+  // Track which chord chip is being dragged (across rows / sections).
+  const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
+
+  const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
+    setPicker({ sectionId, lineId, col, anchorId });
+  };
+
+  const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
+  const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
+  const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
+
+  const handlePick = (chord: ChordSymbol) => {
+    if (!picker) return;
+    upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+  };
+  const handleRemove = () => {
+    if (!picker?.anchorId) return;
+    removeChordAnchor(picker.sectionId, picker.lineId, picker.anchorId);
+  };
+
+  const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
+    dragRef.current = { sectionId, lineId, anchorId };
+  };
+  const handleChordDrop = (toSectionId: string, toLineId: string, toCol: number) => {
+    const src = dragRef.current;
+    dragRef.current = null;
+    if (!src) return;
+    moveChordAnchor(src.sectionId, src.lineId, src.anchorId, toSectionId, toLineId, toCol);
+  };
+
+  return (
+    <div className="space-y-4">
+      {sections.map((sec, i) => (
+        <SectionCard
+          key={sec.id}
+          section={sec}
+          index={i}
+          total={sections.length}
+          displayName={getSectionDisplayName(sections, sec.id)}
+          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
+          onPickerOpen={openPicker}
+          onChordDragStart={handleChordDragStart}
+          onChordDrop={handleChordDrop}
+        />
+      ))}
+
+      <div className={cn("flex flex-wrap items-center gap-2")}>
+        <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
+        {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+          <Button key={t} size="sm" variant="outline" onClick={() => addSection(t)} className="capitalize">
+            <Plus className="h-3.5 w-3.5" /> {t}
+          </Button>
+        ))}
+        <Button size="sm" variant="ghost" onClick={() => addSection("custom")}>
+          <Plus className="h-3.5 w-3.5" /> Custom…
+        </Button>
+      </div>
+
+      <ChordPickerSheet
+        open={!!picker}
+        onOpenChange={(o) => { if (!o) setPicker(null); }}
+        initialChord={initialChord}
+        onPick={handlePick}
+        onRemove={picker?.anchorId ? handleRemove : undefined}
+      />
+    </div>
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     setPicker({ sectionId, lineId, col, anchorId });
