@@ -20,7 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
