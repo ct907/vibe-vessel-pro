@@ -181,6 +181,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                   variant="outline"
                   className="justify-start border border-border"
                   onClick={() => {
+                    setExportOpen(true);
+                    setNavOpen(false);
+                  }}
+                >
+                  <FileText className="h-4 w-4" /> Export Lyrics
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => {
                     downloadProjectJSON(
                       meta.title.replace(/\s+/g, "-").toLowerCase() + ".json",
                     );
@@ -325,6 +335,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
         </div>
       </div>
       <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
+      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
     </header>
   );
 }
