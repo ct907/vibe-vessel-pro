@@ -1059,7 +1059,7 @@ function useCellPx(): number {
 }
 
 export function LyricsTab() {
-  const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
@@ -1164,7 +1164,6 @@ export function LyricsTab() {
         onOpenChange={(o) => { if (!o) setPicker(null); }}
         initialChord={initialChord}
         onPick={handlePick}
-        onRemove={picker?.anchorId ? handleRemove : undefined}
         activeLineId={picker?.lineId}
         query={pickerQuery}
         onQueryChange={setPickerQuery}
