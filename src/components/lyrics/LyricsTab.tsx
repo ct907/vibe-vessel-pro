@@ -1067,7 +1067,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
       }}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2 mb-3 -ml-4">
+      <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
           value={section.type}
           onValueChange={(v) => {
