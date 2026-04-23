@@ -102,6 +102,14 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     setCurrent(null);
   };
 
+  // Allow other components (e.g. ProgressionsTab "Play from here") to trigger playback.
+  useEffect(() => {
+    const onReq = () => { handlePlay(); };
+    window.addEventListener("lovable:request-play", onReq);
+    return () => window.removeEventListener("lovable:request-play", onReq);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progression, focusedPatternId, meta.bpm]);
+
   const handleLoad = async (file?: File) => {
     if (!file) return;
     try {
