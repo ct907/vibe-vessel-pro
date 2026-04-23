@@ -23,7 +23,20 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
-  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning, undo, redo, canUndo, canRedo } = useSongStore();
+  const {
+    meta,
+    setTitle,
+    setKey,
+    setBpm,
+    transposeSong,
+    progression,
+    suppressCrossTabDeleteWarning,
+    setSuppressCrossTabDeleteWarning,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
@@ -41,11 +54,12 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     // Build a global, looping event list. If a pattern is focused,
     // start sequence at that pattern (loop continues from its position).
     const startIdx = focusedPatternId
-      ? Math.max(0, progression.findIndex((p) => p.id === focusedPatternId))
+      ? Math.max(
+          0,
+          progression.findIndex((p) => p.id === focusedPatternId),
+        )
       : 0;
-    const ordered = startIdx > 0
-      ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)]
-      : progression;
+    const ordered = startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
 
     let cursorBeat = 0;
     const events: ScheduledChord[] = [];
@@ -106,7 +120,9 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
 
   // Allow other components (e.g. ProgressionsTab "Play from here") to trigger playback.
   useEffect(() => {
-    const onReq = () => { handlePlay(); };
+    const onReq = () => {
+      handlePlay();
+    };
     window.addEventListener("lovable:request-play", onReq);
     return () => window.removeEventListener("lovable:request-play", onReq);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,11 +177,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                     {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                     Dark mode
                   </div>
-                  <Switch
-                    checked={theme === "dark"}
-                    onCheckedChange={toggleTheme}
-                    aria-label="Toggle dark mode"
-                  />
+                  <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
                 </div>
                 <Button
                   variant="outline"
@@ -191,9 +203,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                   variant="outline"
                   className="justify-start border border-border"
                   onClick={() => {
-                    downloadProjectJSON(
-                      meta.title.replace(/\s+/g, "-").toLowerCase() + ".json",
-                    );
+                    downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json");
                     setNavOpen(false);
                   }}
                 >
@@ -238,11 +248,13 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             <Button
               variant="outline"
               size="icon"
-              className="h-7 w-7"
+              className="w-10"
               onClick={() => stepTranspose(-1)}
               aria-label="Transpose down semitone"
             >
-              <span aria-hidden className="text-base leading-none">−</span>
+              <span aria-hidden className="text-base leading-none">
+                −
+              </span>
             </Button>
             <span className="font-mono-chord text-xs px-1.5 text-center tabular-nums whitespace-nowrap">
               {isMobile ? "Transp" : "Transpose"} {fmtOffset(transposeOffset)}
@@ -250,11 +262,13 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             <Button
               variant="outline"
               size="icon"
-              className="h-7 w-7"
+              className="w-10"
               onClick={() => stepTranspose(1)}
               aria-label="Transpose up semitone"
             >
-              <span aria-hidden className="text-base leading-none">+</span>
+              <span aria-hidden className="text-base leading-none">
+                +
+              </span>
             </Button>
           </div>
 
@@ -315,7 +329,9 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
-                  <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
+                  <SelectItem key={m} value={m}>
+                    {MODE_LABEL[m]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
