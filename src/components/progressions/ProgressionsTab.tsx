@@ -610,10 +610,14 @@ function SectionGroup({
   );
 }
 
-export function ProgressionsTab() {
+interface ProgressionsTabProps {
+  sortMode?: boolean;
+}
+
+export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
   const {
     progression, sections, addSection, addChordToPattern, updatePatternChord,
-    basket, reorderPatternChord, movePatternChordToPatternAt, reorderSection,
+    basket, reorderPatternChord, movePatternChordToPatternAt, moveSection,
     removeSection, removePatternBlock,
     suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
     setAllSectionsCollapsed,
@@ -621,7 +625,6 @@ export function ProgressionsTab() {
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [drag, setDrag] = useState<{ fromPatternId: string; chordId: string } | null>(null);
-  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
@@ -683,19 +686,21 @@ export function ProgressionsTab() {
           onClick={() => setAllSectionsCollapsed(!allCollapsed)}
           aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
           title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+          disabled={sortMode}
         >
           {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
           <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
         </Button>
       </div>
 
-      {groupedSections.map(({ section, blocks }) => (
+      {groupedSections.map(({ section, blocks }, i) => (
         <SectionGroup
           key={section.id}
           sectionId={section.id}
           displayName={getSectionDisplayName(sections, section.id)}
           blocks={blocks}
           totalSections={sections.length}
+          index={i}
           allPatterns={progression}
           onPickerOpen={openPicker}
           onDragChordStart={(fromPatternId, chordId) => setDrag({ fromPatternId, chordId })}
@@ -703,23 +708,13 @@ export function ProgressionsTab() {
           onDropChordOnPattern={handleDropChord}
           draggingChordId={drag?.chordId ?? null}
           draggingFromPatternId={drag?.fromPatternId ?? null}
-          onSectionDragStart={(id) => setSectionDrag({ id })}
-          onSectionDragOver={(overId) => {
-            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
-          }}
-          onSectionDragEnd={() => {
-            const sd = sectionDrag;
-            if (sd && sd.overId && sd.overId !== sd.id) {
-              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
-              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
-            }
-            setSectionDrag(null);
-          }}
-          isSectionDragOver={sectionDrag?.overId === section.id && sectionDrag?.id !== section.id}
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
         />
       ))}
+
 
       <Button variant="outline" onClick={() => addSection("custom")}>
         <Plus className="h-4 w-4" /> Add new section
