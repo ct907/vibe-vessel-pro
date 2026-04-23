@@ -1305,15 +1305,17 @@ function useCellPx(): number {
   return px;
 }
 
-export function LyricsTab() {
-  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
+interface LyricsTabProps {
+  sortMode?: boolean;
+}
+
+export function LyricsTab({ sortMode = false }: LyricsTabProps) {
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
-  // Track section drag-and-drop state.
-  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     // Basket steals focus: while it has items, the chord picker cannot open.
@@ -1374,19 +1376,7 @@ export function LyricsTab() {
           onChordDrop={handleChordDrop}
           chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
           onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
-          onSectionDragStart={(id) => setSectionDrag({ id })}
-          onSectionDragOver={(overId) => {
-            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
-          }}
-          onSectionDragEnd={() => {
-            const sd = sectionDrag;
-            if (sd && sd.overId && sd.overId !== sd.id) {
-              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
-              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
-            }
-            setSectionDrag(null);
-          }}
-          isSectionDragOver={sectionDrag?.overId === sec.id && sectionDrag?.id !== sec.id}
+          sortMode={sortMode}
         />
       ))}
 
