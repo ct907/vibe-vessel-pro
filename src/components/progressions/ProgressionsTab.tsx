@@ -610,35 +610,19 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
         </Button>
       </div>
 
-      {groupedSections.map(({ section, blocks }) => (
+      {groupedSections.map(({ section, blocks }, sIdx) => (
         <SectionGroup
           key={section.id}
           sectionId={section.id}
           displayName={getSectionDisplayName(sections, section.id)}
           blocks={blocks}
-          totalSections={sections.length}
+          totalSections={groupedSections.length}
+          sectionIndex={sIdx}
           allPatterns={progression}
           onPickerOpen={openPicker}
-          onDragChordStart={(fromPatternId, chordId) => setDrag({ fromPatternId, chordId })}
-          onDragChordEnd={() => setDrag(null)}
-          onDropChordOnPattern={handleDropChord}
-          draggingChordId={drag?.chordId ?? null}
-          draggingFromPatternId={drag?.fromPatternId ?? null}
-          onSectionDragStart={(id) => setSectionDrag({ id })}
-          onSectionDragOver={(overId) => {
-            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
-          }}
-          onSectionDragEnd={() => {
-            const sd = sectionDrag;
-            if (sd && sd.overId && sd.overId !== sd.id) {
-              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
-              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
-            }
-            setSectionDrag(null);
-          }}
-          isSectionDragOver={sectionDrag?.overId === section.id && sectionDrag?.id !== section.id}
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
+          sortMode={sortMode}
         />
       ))}
 
