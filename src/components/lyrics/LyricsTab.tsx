@@ -200,7 +200,11 @@ function LineRow({
 
   // ---------- Chord row interactions ----------
   const focusChord = () => {
-    chordRowRef.current?.focus();
+    if (isMobile && keyHostRef.current) {
+      keyHostRef.current.focus({ preventScroll: true });
+    } else {
+      chordRowRef.current?.focus();
+    }
     setChordFocused(true);
     onChordFocus(line.id);
   };
