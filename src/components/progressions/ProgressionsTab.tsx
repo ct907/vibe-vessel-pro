@@ -686,9 +686,21 @@ export function ProgressionsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in the Lyrics tab.
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-xs text-muted-foreground flex-1">
+          Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in the Lyrics tab.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setAllSectionsCollapsed(!allCollapsed)}
+          aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+          title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+        >
+          {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+          <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
+        </Button>
+      </div>
 
       {groupedSections.map(({ section, blocks }) => (
         <SectionGroup
