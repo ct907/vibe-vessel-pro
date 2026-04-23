@@ -493,6 +493,65 @@ function LineRow({
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
   const selectedIds = Array.from(selected);
 
+  // Pointer-based drag for multi-selected chords (touch + mouse).
+  useEffect(() => {
+    if (!drag) return;
+    const DRAG_THRESHOLD = 6;
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
+
+      // Compute hit-tested target chord row (if any).
+      let targetLineId: string | undefined;
+      let targetCol: number | undefined;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const rowEl = hit?.closest("[data-chord-row]") as HTMLElement | null;
+      if (rowEl) {
+        targetLineId = rowEl.getAttribute("data-chord-row") ?? undefined;
+        const r = rowEl.getBoundingClientRect();
+        targetCol = Math.max(0, Math.round((ev.clientX - r.left) / Math.max(cellPx, 1)));
+      }
+
+      setDrag((prev) => prev ? {
+        ...prev,
+        x: ev.clientX,
+        y: ev.clientY,
+        active: prev.active || moved,
+        targetLineId,
+        targetCol,
+      } : prev);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const cur = dragRef2.current;
+      setDrag(null);
+      if (!cur || !cur.active) return;
+      if (!cur.targetLineId || cur.targetCol == null) return;
+
+      // Determine target section by walking the DOM up from the row el.
+      const rowEl = document.querySelector<HTMLElement>(`[data-chord-row="${cur.targetLineId}"]`);
+      const sectionEl = rowEl?.closest("[data-section-id]") as HTMLElement | null;
+      const toSectionId = sectionEl?.getAttribute("data-section-id") ?? sectionId;
+
+      moveSelectedChordsTo(sectionId, line.id, toSectionId, cur.targetLineId, cur.targetCol, cur.ids);
+      exitSelect();
+    };
+
+    const onCancel = () => setDrag(null);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+  }, [drag?.pointerId]); // re-bind only when a new drag starts
   return (
     <div
       ref={rowRef}
