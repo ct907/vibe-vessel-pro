@@ -185,9 +185,20 @@ function LineRow({
     removeChordAnchorsBatch(sectionId, line.id, Array.from(selected));
     exitSelect();
   };
-  const doPaste = () => {
-    if (!chordClipboard.length) return;
-    pasteChordsAt(sectionId, line.id, chordCaret, chordClipboard);
+  const doPaste = async (atCol?: number) => {
+    const col = atCol ?? chordCaret;
+    // Prefer OS clipboard if it parses into chords (lets users paste typed
+    // chord runs like "Amaj7 G#maj7 Dmaj7" directly into the row).
+    let clip: ChordClip[] = [];
+    try {
+      const text = await navigator.clipboard?.readText();
+      if (text && text.trim()) {
+        clip = parseChordTextToClips(text);
+      }
+    } catch { /* clipboard read denied — fall back */ }
+    if (!clip.length) clip = chordClipboard;
+    if (!clip.length) return;
+    pasteChordsAt(sectionId, line.id, col, clip);
   };
 
   // Effective row length must account for the visual width of each chord chip,
