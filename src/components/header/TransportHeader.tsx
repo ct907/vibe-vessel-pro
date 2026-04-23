@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
