@@ -48,6 +48,9 @@ function PatternBlock({
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const setStartFromChord = usePlaybackStore((s) => s.setStartFromChord);
+  const setIsPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
+  const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const isFocused = focusedPatternId === pattern.id;
