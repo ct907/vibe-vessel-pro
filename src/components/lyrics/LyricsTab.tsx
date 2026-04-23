@@ -962,17 +962,15 @@ interface SectionCardProps {
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
-  onSectionDragStart: (id: string) => void;
-  onSectionDragOver: (id: string) => void;
-  onSectionDragEnd: () => void;
-  isSectionDragOver?: boolean;
+  sortMode?: boolean;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, sortMode }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
     suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
+    moveSection,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
