@@ -124,13 +124,16 @@ function PatternBlock({
         setSelectMode(true);
         setSelected(new Set([chordId]));
         setActiveChord(null);
-      } else {
+      } else if (!selected.has(chordId)) {
+        // Long-press on an unselected chord adds it.
         setSelected((prev) => {
           const next = new Set(prev);
-          if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
+          next.add(chordId);
           return next;
         });
       }
+      // Long-press on an already-selected chord is a no-op (becomes the
+      // drag-init gesture; HTML5 dragstart fires off the same pointerdown).
     }, 450);
   };
   const cancelPress = () => {
