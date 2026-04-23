@@ -28,9 +28,16 @@ function presetVoice(preset: SoundPreset): { voice: any; opts: any } {
         } as any,
       };
     case "pizz":
+      // PluckSynth isn't Monophonic-compatible with PolySynth; emulate the
+      // pizzicato attack with a fast-decay FMSynth instead.
       return {
-        voice: Tone.PluckSynth,
-        opts: { attackNoise: 0.5, dampening: 4000, resonance: 0.7 } as any,
+        voice: Tone.FMSynth,
+        opts: {
+          harmonicity: 2,
+          modulationIndex: 6,
+          oscillator: { type: "triangle" },
+          modulation: { type: "square" },
+        } as any,
       };
     case "kalimba":
       return {
