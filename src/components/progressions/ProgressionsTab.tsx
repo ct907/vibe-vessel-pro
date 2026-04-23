@@ -533,6 +533,16 @@ function SectionGroup({
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 -ml-1 text-muted-foreground"
+          onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
+          aria-label={collapsed ? "Expand section" : "Collapse section"}
+          title={collapsed ? "Expand section" : "Collapse section"}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
         <span className="font-display text-lg ink-chord font-semibold">{displayName}</span>
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           {blocks.length} block{blocks.length === 1 ? "" : "s"}
