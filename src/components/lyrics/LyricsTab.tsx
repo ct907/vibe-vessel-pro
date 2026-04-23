@@ -737,6 +737,45 @@ function LineRow({
         })()}
       </div>
 
+      {/* Hidden text input — used on mobile so the soft keyboard stays open
+          while the user types/presses Space inside the chord row. */}
+      <input
+        ref={keyHostRef}
+        data-chord-row-keyhost={line.id}
+        aria-hidden
+        tabIndex={-1}
+        inputMode="text"
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        className="absolute opacity-0 pointer-events-none"
+        style={{ left: 0, top: 0, width: 1, height: 1 }}
+        onKeyDown={(e) => handleChordKeyDown(e as unknown as React.KeyboardEvent<HTMLDivElement>)}
+        onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
+        onBlur={() => setChordFocused(false)}
+        onChange={() => { /* swallow — we only consume keydown */ }}
+      />
+
+      {/* Drag insert marker on the target chord row. */}
+      {drag?.active && drag.targetLineId === line.id && drag.targetCol != null && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 h-7 w-px bg-primary pointer-events-none"
+          style={{ left: `${drag.targetCol * cellPx}px` }}
+        />
+      )}
+
+      {/* Floating drag ghost (rendered while this row owns the drag). */}
+      {drag?.active && (
+        <div
+          aria-hidden
+          className="fixed z-[100] pointer-events-none rounded-md border border-primary/60 bg-card/95 shadow-lg px-2 py-1 font-mono-chord text-xs ink-chord"
+          style={{ left: drag.x + 12, top: drag.y + 8 }}
+        >
+          {drag.displays.join(" ")}
+        </div>
+      )}
+
       {selectMode && (
         <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs">
           {/* Row 1: status + action buttons */}
