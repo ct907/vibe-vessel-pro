@@ -66,11 +66,32 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
     }
+
+    // If the user invoked "Play from here" on a specific chord, rotate
+    // events so that chord plays first while the loop length is preserved.
+    const startFromChordId = usePlaybackStore.getState().startFromChordId;
+    let playEvents = events;
+    let playMeta = meta2;
+    if (startFromChordId) {
+      const i = meta2.findIndex((m) => m.patternChordId === startFromChordId);
+      if (i > 0) {
+        const offset = events[i].startBeat;
+        const total = cursorBeat;
+        playEvents = events.map((_, k) => {
+          const src = events[(i + k) % events.length];
+          const rawStart = src.startBeat - offset;
+          const wrapped = rawStart < 0 ? rawStart + total : rawStart;
+          return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats };
+        });
+        playMeta = playEvents.map((_, k) => meta2[(i + k) % meta2.length]);
+      }
+    }
+
     setIsPlaying(true);
     setPlayingStore(true);
-    await playProgression(events, meta.bpm, {
+    await playProgression(playEvents, meta.bpm, {
       loopBeats: cursorBeat,
-      onChordStart: (i) => setCurrent(meta2[i] ?? null),
+      onChordStart: (idx) => setCurrent(playMeta[idx] ?? null),
     });
   };
 
