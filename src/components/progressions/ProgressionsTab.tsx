@@ -504,6 +504,9 @@ function SectionGroup({
   onRequestDeleteSection, onRequestDeleteBlock,
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
+  const updateSection = useSongStore((s) => s.updateSection);
+  const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
+  const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
 
