@@ -1101,10 +1101,6 @@ export function LyricsTab() {
     const advance = Math.max(1, chord.display.length) + 1;
     setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
   };
-  const handleRemove = () => {
-    if (!picker?.anchorId) return;
-    removeChordAnchor(picker.sectionId, picker.lineId, picker.anchorId);
-  };
 
   const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
     dragRef.current = { sectionId, lineId, anchorId };
