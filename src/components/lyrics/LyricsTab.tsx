@@ -962,13 +962,12 @@ interface SectionCardProps {
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
-  onSectionDragStart: (id: string) => void;
-  onSectionDragOver: (id: string) => void;
-  onSectionDragEnd: () => void;
-  isSectionDragOver?: boolean;
+  /** When true: hide line counter & options; show up/down reorder arrows. */
+  sortMode?: boolean;
+  onMoveSection?: (id: string, direction: -1 | 1) => void;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, sortMode, onMoveSection }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
