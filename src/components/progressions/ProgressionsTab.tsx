@@ -426,30 +426,21 @@ interface SectionGroupProps {
   displayName: string;
   blocks: PatternBlockType[];
   totalSections: number;
+  sectionIndex: number;
   allPatterns: PatternBlockType[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
-  onDragChordStart: (fromPatternId: string, chordId: string) => void;
-  onDragChordEnd: () => void;
-  onDropChordOnPattern: (toPatternId: string, toIndex: number) => void;
-  draggingChordId: string | null;
-  draggingFromPatternId: string | null;
-  onSectionDragStart: (id: string) => void;
-  onSectionDragOver: (overId: string) => void;
-  onSectionDragEnd: () => void;
-  isSectionDragOver: boolean;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
+  sortMode?: boolean;
 }
 
 function SectionGroup({
-  sectionId, displayName, blocks, totalSections, allPatterns,
-  onPickerOpen, onDragChordStart, onDragChordEnd, onDropChordOnPattern,
-  draggingChordId, draggingFromPatternId,
-  onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver,
-  onRequestDeleteSection, onRequestDeleteBlock,
+  sectionId, displayName, blocks, totalSections, sectionIndex, allPatterns,
+  onPickerOpen, onRequestDeleteSection, onRequestDeleteBlock, sortMode,
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
+  const moveSection = useSongStore((s) => s.moveSection);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -458,80 +449,65 @@ function SectionGroup({
   return (
     <div
       ref={cardRef}
-      className={cn(
-        "paper-card rounded-xl px-4 py-4 space-y-3 transition-shadow",
-        isSectionDragOver && "ring-2 ring-primary/60",
-      )}
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-pattern-section-id")) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          onSectionDragOver(sectionId);
-        }
-      }}
-      onDrop={(e) => {
-        if (e.dataTransfer.types.includes("application/x-pattern-section-id")) {
-          e.preventDefault();
-          onSectionDragEnd();
-        }
-      }}
+      className="paper-card rounded-xl px-4 py-4 space-y-3 transition-shadow"
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 -ml-1 text-muted-foreground"
-          onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
-          aria-label={collapsed ? "Expand section" : "Collapse section"}
-          title={collapsed ? "Expand section" : "Collapse section"}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
+        {!sortMode && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 -ml-1 text-muted-foreground"
+            onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
+            aria-label={collapsed ? "Expand section" : "Collapse section"}
+            title={collapsed ? "Expand section" : "Collapse section"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        )}
         <span className="font-display text-lg ink-chord font-semibold">{displayName}</span>
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {blocks.length} block{blocks.length === 1 ? "" : "s"}
-        </span>
-        <button
-          type="button"
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("application/x-pattern-section-id", sectionId);
-            if (cardRef.current) {
-              const rect = cardRef.current.getBoundingClientRect();
-              const clone = cardRef.current.cloneNode(true) as HTMLElement;
-              clone.style.position = "absolute";
-              clone.style.top = "-10000px";
-              clone.style.left = "-10000px";
-              clone.style.width = `${rect.width}px`;
-              clone.style.pointerEvents = "none";
-              clone.style.opacity = "0.9";
-              clone.style.transform = "rotate(-1deg)";
-              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
-              document.body.appendChild(clone);
-              try { e.dataTransfer.setDragImage(clone, 24, 24); } catch { /* ignore */ }
-              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
-            }
-            onSectionDragStart(sectionId);
-          }}
-          onDragEnd={onSectionDragEnd}
-          className="ml-auto h-8 w-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
-          aria-label="Drag to reorder section"
-          title="Drag to reorder section"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
-          onClick={() => onRequestDeleteSection(sectionId)}
-          disabled={!canDeleteSection}
-          title="Delete entire section (affects Lyrics tab too)"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {!sortMode && (
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {blocks.length} block{blocks.length === 1 ? "" : "s"}
+          </span>
+        )}
+        {sortMode ? (
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => moveSection(sectionId, -1)}
+              disabled={sectionIndex === 0}
+              aria-label="Move section up"
+              title="Move section up"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => moveSection(sectionId, 1)}
+              disabled={sectionIndex >= totalSections - 1}
+              aria-label="Move section down"
+              title="Move section down"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
+            onClick={() => onRequestDeleteSection(sectionId)}
+            disabled={!canDeleteSection}
+            title="Delete entire section (affects Lyrics tab too)"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Pattern blocks within this section */}
@@ -545,11 +521,6 @@ function SectionGroup({
             .filter((q) => q.id !== p.id)
             .map((q) => ({ id: q.id, label: q.label }))}
           onPickerOpen={onPickerOpen}
-          onDragChordStart={onDragChordStart}
-          onDragChordEnd={onDragChordEnd}
-          onDropChordOnPattern={onDropChordOnPattern}
-          draggingChordId={draggingChordId}
-          draggingFromPatternId={draggingFromPatternId}
           onRequestDeleteBlock={onRequestDeleteBlock}
         />
       ))}
