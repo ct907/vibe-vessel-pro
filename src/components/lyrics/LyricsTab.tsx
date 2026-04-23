@@ -797,7 +797,31 @@ function LineRow({
         })()}
       </div>
 
-      {/* Hidden text input — used on mobile so the soft keyboard stays open
+      {/* Long-press paste popover for empty chord-row spaces. */}
+      {pastePopover && (
+        <div
+          className="absolute z-[80] mt-1 flex items-center gap-1 rounded-md border border-border bg-popover px-1.5 py-1 shadow-lg text-xs"
+          style={{ left: `${pastePopover.x}px`, top: "100%" }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={async () => {
+              const col = pastePopover.col;
+              setPastePopover(null);
+              await doPaste(col);
+            }}
+          >
+            <ClipboardPaste className="h-3.5 w-3.5" /> Paste chords
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPastePopover(null)}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
           while the user types/presses Space inside the chord row. */}
       <input
         ref={keyHostRef}
