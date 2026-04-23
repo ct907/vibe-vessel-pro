@@ -962,15 +962,17 @@ interface SectionCardProps {
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
-  sortMode?: boolean;
+  onSectionDragStart: (id: string) => void;
+  onSectionDragOver: (id: string) => void;
+  onSectionDragEnd: () => void;
+  isSectionDragOver?: boolean;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, sortMode }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
     suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
-    moveSection,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
@@ -1045,7 +1047,24 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
     <div
       ref={cardRef}
       data-section-id={section.id}
-      className="paper-card rounded-xl px-5 py-5 transition-shadow"
+      className={cn(
+        "paper-card rounded-xl px-5 py-5 transition-shadow",
+        isSectionDragOver && "ring-2 ring-primary/60",
+      )}
+      onDragOver={(e) => {
+        // Accept section drops anywhere on the card
+        if (e.dataTransfer.types.includes("application/x-section-id")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          onSectionDragOver(section.id);
+        }
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.types.includes("application/x-section-id")) {
+          e.preventDefault();
+          onSectionDragEnd();
+        }
+      }}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
@@ -1081,79 +1100,84 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           </Button>
         )}
 
-        {!sortMode && (
-          <span className="text-xs text-muted-foreground ml-1">
-            {section.lines.length} line{section.lines.length === 1 ? "" : "s"}
-          </span>
-        )}
+        <span className="text-xs text-muted-foreground ml-1">
+          {section.lines.length} line{section.lines.length === 1 ? "" : "s"}
+        </span>
 
-        {sortMode ? (
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              onClick={() => moveSection(section.id, -1)}
-              disabled={index === 0}
-              aria-label="Move section up"
-              title="Move section up"
-            >
-              <ArrowUp className="h-4 w-4" />
+        {/* Drag handle — placed to the left of the 3-dot menu with a 12px gap */}
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/x-section-id", section.id);
+            // Use the entire section card as the drag image (clone snapshot).
+            if (cardRef.current) {
+              const rect = cardRef.current.getBoundingClientRect();
+              const clone = cardRef.current.cloneNode(true) as HTMLElement;
+              clone.style.position = "absolute";
+              clone.style.top = "-10000px";
+              clone.style.left = "-10000px";
+              clone.style.width = `${rect.width}px`;
+              clone.style.pointerEvents = "none";
+              clone.style.opacity = "0.9";
+              clone.style.transform = "rotate(-1deg)";
+              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
+              document.body.appendChild(clone);
+              try {
+                e.dataTransfer.setDragImage(clone, 24, 24);
+              } catch { /* ignore */ }
+              // Remove after the browser has snapshotted it.
+              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
+            }
+            onSectionDragStart(section.id);
+          }}
+          onDragEnd={onSectionDragEnd}
+          className="ml-auto h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Drag to reorder section"
+          title="Drag to reorder section"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-7 w-7" style={{ marginLeft: 12 }}>
+              <MoreVertical className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              onClick={() => moveSection(section.id, 1)}
-              disabled={index >= total - 1}
-              aria-label="Move section down"
-              title="Move section down"
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>Section</DropdownMenuLabel>
+            {section.type === "custom" && (
+              <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
+                <Pencil className="h-4 w-4" /> Rename…
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
+              <Copy className="h-4 w-4" /> Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => {
+                if (suppressCrossTabDeleteWarning) removeSection(section.id);
+                else setConfirmDeleteSection(true);
+              }}
+              disabled={total <= 1}
             >
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Section</DropdownMenuLabel>
-              {section.type === "custom" && (
-                <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
-                  <Pencil className="h-4 w-4" /> Rename…
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
-                <Copy className="h-4 w-4" /> Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => {
-                  if (suppressCrossTabDeleteWarning) removeSection(section.id);
-                  else setConfirmDeleteSection(true);
-                }}
-                disabled={total <= 1}
-              >
-                <Trash2 className="h-4 w-4" /> Delete section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+              <Trash2 className="h-4 w-4" /> Delete section
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Expand/collapse toggle — moved to the right of the header */}
-        {!sortMode && (
-          <button
-            onClick={() => toggleSectionCollapsed(section.id)}
-            className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-            aria-label={section.collapsed ? "Expand section" : "Collapse section"}
-          >
-            {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        )}
+        <button
+          onClick={() => toggleSectionCollapsed(section.id)}
+          className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
+        >
+          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Body */}
@@ -1305,17 +1329,15 @@ function useCellPx(): number {
   return px;
 }
 
-interface LyricsTabProps {
-  sortMode?: boolean;
-}
-
-export function LyricsTab({ sortMode = false }: LyricsTabProps) {
-  const { sections, upsertChordAt, addSection, moveChordAnchor, basket } = useSongStore();
+export function LyricsTab() {
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
+  // Track section drag-and-drop state.
+  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     // Basket steals focus: while it has items, the chord picker cannot open.
@@ -1376,7 +1398,19 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
           onChordDrop={handleChordDrop}
           chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
           onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
-          sortMode={sortMode}
+          onSectionDragStart={(id) => setSectionDrag({ id })}
+          onSectionDragOver={(overId) => {
+            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
+          }}
+          onSectionDragEnd={() => {
+            const sd = sectionDrag;
+            if (sd && sd.overId && sd.overId !== sd.id) {
+              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
+              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
+            }
+            setSectionDrag(null);
+          }}
+          isSectionDragOver={sectionDrag?.overId === sec.id && sectionDrag?.id !== sec.id}
         />
       ))}
 
