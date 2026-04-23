@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2 } from "lucide-react";
+import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2, FileText } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
 import { SoundPanel } from "@/components/sound/SoundPanel";
+import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import { Music2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -30,6 +31,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const isMobile = useIsMobile();
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
@@ -179,6 +181,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                   variant="outline"
                   className="justify-start border border-border"
                   onClick={() => {
+                    setExportOpen(true);
+                    setNavOpen(false);
+                  }}
+                >
+                  <FileText className="h-4 w-4" /> Export Lyrics
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => {
                     downloadProjectJSON(
                       meta.title.replace(/\s+/g, "-").toLowerCase() + ".json",
                     );
@@ -323,6 +335,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
         </div>
       </div>
       <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
+      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
     </header>
   );
 }

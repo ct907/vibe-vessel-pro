@@ -21,7 +21,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare, GripVertical } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -962,13 +962,12 @@ interface SectionCardProps {
   onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
-  onSectionDragStart: (id: string) => void;
-  onSectionDragOver: (id: string) => void;
-  onSectionDragEnd: () => void;
-  isSectionDragOver?: boolean;
+  /** When true: hide line counter & options; show up/down reorder arrows. */
+  sortMode?: boolean;
+  onMoveSection?: (id: string, direction: -1 | 1) => void;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onSectionDragStart, onSectionDragOver, onSectionDragEnd, isSectionDragOver }: SectionCardProps) {
+function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, sortMode, onMoveSection }: SectionCardProps) {
   const {
     addLine, removeLine, updateSection, removeSection, duplicateSection,
     toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
@@ -1049,22 +1048,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
       data-section-id={section.id}
       className={cn(
         "paper-card rounded-xl px-5 py-5 transition-shadow",
-        isSectionDragOver && "ring-2 ring-primary/60",
       )}
-      onDragOver={(e) => {
-        // Accept section drops anywhere on the card
-        if (e.dataTransfer.types.includes("application/x-section-id")) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          onSectionDragOver(section.id);
-        }
-      }}
-      onDrop={(e) => {
-        if (e.dataTransfer.types.includes("application/x-section-id")) {
-          e.preventDefault();
-          onSectionDragEnd();
-        }
-      }}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
@@ -1083,6 +1067,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
               updateSection(section.id, { type: next, label: section.label });
             }
           }}
+          disabled={sortMode}
         >
           <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize">
             <SelectValue>{displayName}</SelectValue>
@@ -1094,90 +1079,85 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           </SelectContent>
         </Select>
 
-        {section.type === "custom" && (
+        {section.type === "custom" && !sortMode && (
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setCustomRenameOpen(true)} aria-label="Rename custom section">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         )}
 
-        <span className="text-xs text-muted-foreground ml-1">
-          {section.lines.length} line{section.lines.length === 1 ? "" : "s"}
-        </span>
+        {!sortMode && (
+          <span className="text-xs text-muted-foreground ml-1">
+            {section.lines.length} line{section.lines.length === 1 ? "" : "s"}
+          </span>
+        )}
 
-        {/* Drag handle — placed to the left of the 3-dot menu with a 12px gap */}
-        <button
-          type="button"
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("application/x-section-id", section.id);
-            // Use the entire section card as the drag image (clone snapshot).
-            if (cardRef.current) {
-              const rect = cardRef.current.getBoundingClientRect();
-              const clone = cardRef.current.cloneNode(true) as HTMLElement;
-              clone.style.position = "absolute";
-              clone.style.top = "-10000px";
-              clone.style.left = "-10000px";
-              clone.style.width = `${rect.width}px`;
-              clone.style.pointerEvents = "none";
-              clone.style.opacity = "0.9";
-              clone.style.transform = "rotate(-1deg)";
-              clone.style.boxShadow = "0 12px 32px -8px rgba(0,0,0,0.35)";
-              document.body.appendChild(clone);
-              try {
-                e.dataTransfer.setDragImage(clone, 24, 24);
-              } catch { /* ignore */ }
-              // Remove after the browser has snapshotted it.
-              setTimeout(() => { try { document.body.removeChild(clone); } catch { /* ignore */ } }, 0);
-            }
-            onSectionDragStart(section.id);
-          }}
-          onDragEnd={onSectionDragEnd}
-          className="ml-auto h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
-          aria-label="Drag to reorder section"
-          title="Drag to reorder section"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-7 w-7" style={{ marginLeft: 12 }}>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Section</DropdownMenuLabel>
-            {section.type === "custom" && (
-              <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
-                <Pencil className="h-4 w-4" /> Rename…
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
-              <Copy className="h-4 w-4" /> Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => {
-                if (suppressCrossTabDeleteWarning) removeSection(section.id);
-                else setConfirmDeleteSection(true);
-              }}
-              disabled={total <= 1}
+        {sortMode ? (
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => onMoveSection?.(section.id, -1)}
+              disabled={index === 0}
+              aria-label="Move section up"
+              title="Move section up"
             >
-              <Trash2 className="h-4 w-4" /> Delete section
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => onMoveSection?.(section.id, 1)}
+              disabled={index >= total - 1}
+              aria-label="Move section down"
+              title="Move section down"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Section</DropdownMenuLabel>
+              {section.type === "custom" && (
+                <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
+                  <Pencil className="h-4 w-4" /> Rename…
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
+                <Copy className="h-4 w-4" /> Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => {
+                  if (suppressCrossTabDeleteWarning) removeSection(section.id);
+                  else setConfirmDeleteSection(true);
+                }}
+                disabled={total <= 1}
+              >
+                <Trash2 className="h-4 w-4" /> Delete section
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
-        {/* Expand/collapse toggle — moved to the right of the header */}
-        <button
-          onClick={() => toggleSectionCollapsed(section.id)}
-          className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
-        >
-          {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
+        {/* Expand/collapse toggle — hidden in sort mode (sections forced collapsed). */}
+        {!sortMode && (
+          <button
+            onClick={() => toggleSectionCollapsed(section.id)}
+            className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+            aria-label={section.collapsed ? "Expand section" : "Collapse section"}
+          >
+            {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -1329,15 +1309,17 @@ function useCellPx(): number {
   return px;
 }
 
-export function LyricsTab() {
-  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
+interface LyricsTabProps {
+  sortMode?: boolean;
+}
+
+export function LyricsTab({ sortMode = false }: LyricsTabProps) {
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, moveSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
-  // Track section drag-and-drop state.
-  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     // Basket steals focus: while it has items, the chord picker cannot open.
@@ -1365,10 +1347,6 @@ export function LyricsTab() {
     if (!picker) return;
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
     setPickerQuery("");
-    // After committing, drop the anchor so subsequent typing creates a NEW
-    // chord instead of editing the one we just placed. Advance the caret
-    // past the placed chord (display width + 1 space) so the next chord
-    // appears next to it rather than overlapping.
     const advance = Math.max(1, chord.display.length) + 1;
     setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
   };
@@ -1398,21 +1376,11 @@ export function LyricsTab() {
           onChordDrop={handleChordDrop}
           chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
           onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
-          onSectionDragStart={(id) => setSectionDrag({ id })}
-          onSectionDragOver={(overId) => {
-            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
-          }}
-          onSectionDragEnd={() => {
-            const sd = sectionDrag;
-            if (sd && sd.overId && sd.overId !== sd.id) {
-              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
-              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
-            }
-            setSectionDrag(null);
-          }}
-          isSectionDragOver={sectionDrag?.overId === sec.id && sectionDrag?.id !== sec.id}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
         />
       ))}
+
 
       <div className={cn("flex flex-wrap items-center gap-2")}>
         <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
