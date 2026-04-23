@@ -11,8 +11,8 @@
   :root {
     color-scheme: light;
     /* Paper & ink */
-    --background: 41 38% 92%;        /* warm cream paper */
-    --foreground: 25 25% 18%;        /* dark sepia ink */
+    --background: 41 38% 92%; /* warm cream paper */
+    --foreground: 25 25% 18%; /* dark sepia ink */
 
     --card: 40 45% 96%;
     --card-foreground: 25 25% 18%;
@@ -21,7 +21,7 @@
     --popover-foreground: 25 25% 18%;
 
     /* Amber accent (the one warm pop) */
-    --primary: 28 78% 48%;           /* burnt amber */
+    --primary: 28 78% 48%; /* burnt amber */
     --primary-foreground: 40 50% 97%;
 
     --secondary: 38 30% 86%;
@@ -30,7 +30,7 @@
     --muted: 38 25% 88%;
     --muted-foreground: 30 15% 38%;
 
-    --accent: 28 60% 90%;            /* faint amber wash */
+    --accent: 28 60% 90%; /* faint amber wash */
     --accent-foreground: 28 60% 25%;
 
     --destructive: 0 65% 48%;
@@ -45,11 +45,11 @@
     /* Notebook specifics */
     --paper: 41 38% 92%;
     --paper-shade: 38 30% 86%;
-    --rule: 30 30% 70%;              /* ruled line color */
-    --margin-line: 0 55% 55%;        /* red left margin */
+    --rule: 30 30% 70%; /* ruled line color */
+    --margin-line: 0 55% 55%; /* red left margin */
     --ink-soft: 30 15% 38%;
-    --chord-ink: 28 78% 38%;         /* deep amber for chord glyphs */
-    --chord-chip: 28 90% 60%;        /* warm orange chord chip background */
+    --chord-ink: 28 78% 38%; /* deep amber for chord glyphs */
+    --chord-chip: 28 90% 60%; /* warm orange chord chip background */
     --chord-chip-foreground: 25 30% 15%;
 
     --shadow-paper: 0 1px 0 hsl(35 25% 78% / 0.6), 0 8px 24px -12px hsl(25 25% 18% / 0.18);
@@ -98,31 +98,50 @@
 }
 
 @layer base {
-  * { @apply border-border; }
+  * {
+    @apply border-border;
+  }
 
-  html, body, #root { height: 100%; }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4 {
-    font-family: 'Fraunces', Georgia, serif;
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Fraunces", Georgia, serif;
     font-optical-sizing: auto;
     letter-spacing: -0.01em;
   }
 }
 
 @layer utilities {
-  .font-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
-  .font-mono-chord { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .font-display {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+  }
+  .font-mono-chord {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
 
   /* Ruled paper background — used in lyrics editor */
   .paper-ruled {
     background-color: hsl(var(--paper));
-    background-image:
-      linear-gradient(to bottom, transparent 0, transparent calc(2.25rem - 1px), hsl(var(--rule) / 0.55) calc(2.25rem - 1px), hsl(var(--rule) / 0.55) 2.25rem);
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(2.25rem - 1px),
+      hsl(var(--rule) / 0.55) calc(2.25rem - 1px),
+      hsl(var(--rule) / 0.55) 2.25rem
+    );
     background-size: 100% 2.25rem;
     background-position: 0 1.5rem;
   }
@@ -130,11 +149,13 @@
     box-shadow: inset 3.25rem 0 0 -3.125rem hsl(var(--margin-line) / 0.55);
   }
 
-  .ink-chord { color: hsl(var(--chord-ink)); }
+  .ink-chord {
+    color: hsl(var(--chord-ink));
+  }
 
   .paper-card {
     background-color: hsl(var(--card));
     box-shadow: var(--shadow-paper);
-    border: 1px solid hsl(var(--border));
+    border: 0px solid hsl(var(--border));
   }
 }
