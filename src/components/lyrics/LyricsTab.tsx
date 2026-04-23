@@ -30,6 +30,21 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
+/** Parse "Amaj7 G#maj7 Dmaj7" (or comma/newline separated) into chord clips. */
+function parseChordTextToClips(text: string): ChordClip[] {
+  const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
+  const clips: ChordClip[] = [];
+  let cursor = 0;
+  for (const tok of tokens) {
+    const c = parseChord(tok);
+    if (!c) continue;
+    const w = Math.max(1, c.display.length) + 1;
+    clips.push({ chord: c, relCol: cursor, widthCh: w });
+    cursor += w;
+  }
+  return clips;
+}
+
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
 const colOf = (a: { chordCol?: number; offset?: number }) => a.chordCol ?? a.offset ?? 0;
