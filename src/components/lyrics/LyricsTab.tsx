@@ -82,6 +82,21 @@ function LineRow({
   const lastSelectedRef = useRef<string | null>(null);
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
+  // Pointer-based multi-chord drag state.
+  const [drag, setDrag] = useState<null | {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    active: boolean;
+    ids: string[];
+    displays: string[];
+    targetLineId?: string;
+    targetCol?: number;
+  }>(null);
+  const dragRef2 = useRef<typeof drag>(null);
+  dragRef2.current = drag;
 
   // Auto-resize lyric textarea to fit wrapped content.
   useLayoutEffect(() => {
