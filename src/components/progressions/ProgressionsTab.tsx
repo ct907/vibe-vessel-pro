@@ -249,27 +249,7 @@ function PatternBlock({
       )}
 
       <div className="relative">
-        <div
-          className={cn(
-            "relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch",
-            draggingChordId && draggingFromPatternId !== pattern.id && "ring-2 ring-primary/40",
-          )}
-          onDragOver={(e) => {
-            if (!draggingChordId) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-          }}
-          onDragLeave={(e) => {
-            if (e.currentTarget === e.target) setDropIndicator(null);
-          }}
-          onDrop={(e) => {
-            if (!draggingChordId) return;
-            e.preventDefault();
-            const idx = dropIndicator ?? sortedChords.length;
-            setDropIndicator(null);
-            onDropChordOnPattern(pattern.id, idx);
-          }}
-        >
+        <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch">
           {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
             <div
               key={`bar-${i}`}
@@ -278,29 +258,12 @@ function PatternBlock({
             />
           ))}
 
-          {sortedChords.map((c, idx) => {
+          {sortedChords.map((c) => {
             const isSel = selected.has(c.id);
             const widthPct = (c.lengthBeats / totalBeats) * 100;
-            const isBeingDragged = draggingChordId === c.id;
             return (
               <button
                 key={c.id}
-                draggable
-                onDragStart={(e) => {
-                  e.stopPropagation();
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", c.chord.display);
-                  onDragChordStart(pattern.id, c.id);
-                }}
-                onDragEnd={() => { onDragChordEnd(); setDropIndicator(null); }}
-                onDragOver={(e) => {
-                  if (!draggingChordId) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  const half = (e.clientX - rect.left) < rect.width / 2;
-                  setDropIndicator(half ? idx : idx + 1);
-                }}
                 onMouseDown={(e) => { e.stopPropagation(); startPress(c.id); }}
                 onMouseUp={cancelPress}
                 onMouseLeave={cancelPress}
@@ -316,16 +279,9 @@ function PatternBlock({
                   "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
                   !selectMode && activeChord === c.id && "ring-2 ring-primary",
                   selectMode && isSel && "ring-2 ring-primary",
-                  isBeingDragged && "opacity-40",
                 )}
                 style={{ width: `calc(${widthPct}% - 4px)`, minWidth: 32 }}
               >
-                {dropIndicator === idx && draggingChordId && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
-                {dropIndicator === idx + 1 && draggingChordId && (
-                  <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                   {c.chord.display}
                 </span>
@@ -339,11 +295,6 @@ function PatternBlock({
           <button
             type="button"
             onClick={() => onPickerOpen(pattern.id, usedBeats)}
-            onDragOver={(e) => {
-              if (!draggingChordId) return;
-              e.preventDefault();
-              setDropIndicator(sortedChords.length);
-            }}
             className="flex-1 min-w-0 my-1 mx-0.5 rounded-md border border-dashed border-border/70 text-[11px] text-muted-foreground hover:bg-accent/40 transition-colors"
             style={{ display: freeBeats > 0 ? "block" : "none" }}
             aria-label="Add chord at end"
