@@ -101,6 +101,18 @@ function LineRow({
   // Long-press-on-empty-space paste popover.
   const [pastePopover, setPastePopover] = useState<null | { col: number; x: number }>(null);
   const pastePressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Outside-tap closes the paste popover.
+  useEffect(() => {
+    if (!pastePopover) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (rowRef.current && rowRef.current.contains(t)) return;
+      setPastePopover(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [pastePopover]);
   // Pointer-based multi-chord drag state.
   const [drag, setDrag] = useState<null | {
     pointerId: number;
