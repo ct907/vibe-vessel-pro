@@ -822,6 +822,7 @@ function LineRow({
         </div>
       )}
 
+      {/* Hidden text input — used on mobile so the soft keyboard stays open
           while the user types/presses Space inside the chord row. */}
       <input
         ref={keyHostRef}
