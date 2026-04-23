@@ -1,71 +1,61 @@
 
 
-## Sections with multiple pattern blocks + safer deletes + variation suggestions (revised)
+## Mobile/keyboard polish, header tightening, and chord drag-to-move
 
-Same overall plan as before, with three changes per your clarifications.
+### 1. Keep the active chord row in view when the mobile keyboard opens
+`src/components/lyrics/LyricsTab.tsx` — `LineRow`'s `useEffect` that scrolls the active row currently runs once on activation, before the soft keyboard is up. Change it so that on mobile we:
+- Wait for `visualViewport` `resize` events (keyboard appearing shrinks `vv.height`).
+- After each viewport change while `active === true`, recompute the row's `getBoundingClientRect()` and scroll so the row sits ~80px below `vv.offsetTop`, accounting for the new (shorter) viewport height. Use `window.scrollBy({ top: rect.top - (vv.offsetTop + 80) })`.
+- Also fire once on `focus` of the chord row and once after a 200 ms settle to catch late keyboard animations.
 
-### 1. Data model: section → many pattern blocks
-`src/store/song.ts`
-- Add `sectionId: string` to `PatternBlock`. Migrate legacy songs by setting `sectionId = pattern.id` on load.
-- Mirror/anchor lookups switch from "match by id" to "match by sectionId".
-- New actions: `addPatternToSection(sectionId)`, `removePatternBlock(patternId)` (blocks removing the last block in a section), `getSectionPatterns(sectionId)`.
-- `placeMirroredChord` walks all pattern blocks in the section, only creating a new continuation block when none have room.
+### 2. Don't dismiss the mobile keyboard when pressing Space in the chord row
+The chord row is a focusable `<div>`, not an input. When the user taps Space, mobile browsers blur the focused soft-keyboard target. Fix:
+- Mount a hidden `<input data-chord-row-keyhost>` (1×1, opacity 0, `inputMode="text"`, `autoCapitalize="off"`, `autoCorrect="off"`) inside each `LineRow` and focus IT (instead of the `div`) on mobile when `focusChord()` runs. Keyboard events bubble from this input into the existing `handleChordKeyDown`.
+- In `handleChordKeyDown`, on Space we already `preventDefault()` — keeping focus on a real input means the keyboard stays up.
+- Desktop behavior unchanged (still focuses the div if `useIsMobile()` is false).
 
-### 2. Pattern bar reduction → spillover within section
-When `updatePattern` reduces bars, overflow chords (in order, lengths preserved, `mirrorId` preserved) get appended to the next pattern block in the same section. A new block is created only if no existing block in the section has room.
+### 3. Remove the "Remove chord" button from the chord picker sheet
+`src/components/chord/ChordPickerSheet.tsx` — delete the trailing `{onRemove && …}` block (lines ~236–242) and drop the `onRemove` prop. In `LyricsTab.tsx`, drop the `onRemove={…}` and `handleRemove` plumbing. Backspace/Delete on the chord row already deletes (already implemented in `handleChordKeyDown`).
 
-### 3. Section naming consistent with lyrics tab
-Progressions tab uses `getSectionDisplayName(...)` so labels read "Verse 1 / Chorus 2 / …". Multiple blocks in one section are visually grouped under one section header card; per-block subtitle reads "Block 1 / Block 2". Each section card has an "+ Add pattern block" button.
+### 4. BPM input width hugs three digits
+`src/components/header/TransportHeader.tsx` — change the BPM `<Input>` from `w-16` to `w-14` and add `text-center px-1`. Three-digit values like `120` fit; remove the spinner overhead by adding `[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`.
 
-### 4. Separate delete options in Progressions tab
-- Trash icon on each pattern block → "Delete pattern block" (disabled when it's the only block in its section).
-- Trash icon on the section header → "Delete entire section" (removes section, all its pattern blocks, and all its lyric lines).
+### 5. Tighter Transpose group so Sound fits on mobile
+`TransportHeader.tsx`:
+- Reduce gap on the Transpose cluster from `gap-1` to `gap-0.5`.
+- Shrink the −/+ buttons to `h-7 w-7` and the offset readout to `w-6 text-xs`.
+- Trim the "Transpose" label to mobile: hide the word on `< sm` (`hidden sm:inline`) and show only an icon (e.g. ⇅) on mobile.
+- Reduce the outer row gap from `gap-3` to `gap-2`.
+- This frees enough horizontal space for the `Sound` button at 384 px viewport.
 
-### 5. Cross-tab delete confirmation dialog (revised)
-New `src/components/common/ConfirmDeleteDialog.tsx` using `AlertDialog` + `Checkbox`.
-- Body explains the cross-tab effect.
-- Checkbox label: **"Don't show this again"** (acknowledgement = suppress future dialogs, NOT a gate to confirm).
-- Confirm button is always enabled. If the checkbox is ticked when confirming, we set `suppressCrossTabDeleteWarning: true` in the song store.
-- Persistence: this flag is part of the song JSON (added to `loadFromJSON` / `toJSON`), so it travels with save files as you asked. It's also kept in the in-memory store so it applies for the rest of the session.
-- Wired into:
-  - Lyrics tab section "Delete section" (cross-tab dialog).
-  - Lyrics tab line "Delete line" (lighter dialog, no cross-tab note, no checkbox).
-  - Progressions tab "Delete section" (cross-tab dialog, same suppress flag).
-  - Progressions tab "Delete pattern block" (lighter dialog, no checkbox — only affects that block).
-- Whenever `suppressCrossTabDeleteWarning` is true, cross-tab deletes skip the dialog and run immediately.
+### 6. Drag-to-move chords (touch + mouse) for multi-selected chords
+Today drag uses HTML5 `draggable`, which works on desktop but not reliably on touch and doesn't move multi-selections. Replace the chip-level drag with a Pointer Events implementation in `LineRow`:
+- On chip `pointerdown` while `selectMode` is active and the chip is in `selected`:
+  - Capture the pointer (`setPointerCapture`), record start coords.
+  - After ~6 px movement, enter "drag" state. Render a floating ghost (a small absolutely-positioned div listing selected chord displays) that follows the pointer.
+  - On `pointermove`, `document.elementFromPoint` finds the chord row under the pointer (`[data-chord-row]`); compute target column from `pointer.x − rect.left` ÷ `cellPx`. Highlight the target row and draw a vertical insert marker.
+  - On `pointerup`: call a new store action `moveSelectedChordsTo(fromSectionId, fromLineId, toSectionId, toLineId, toCol, ids)` that removes the chords from the source row and inserts them at `toCol` on the target row, preserving relative columns and `mirrorId` links.
+- Keep a fallback path: single-chord drag (no `selectMode`) continues to use the existing HTML5 drag for unchanged desktop UX, OR collapse to the same Pointer flow with a 1-element selection — we'll pick Pointer-only to unify behavior on touch.
 
-### 6. Chord-progression variation suggestions (revised — no AI)
-New collapsible "Suggest variations" panel at the bottom of each pattern block.
+`src/store/song.ts` — add `moveSelectedChordsTo(...)`:
+- Source side: remove the anchors; if same row, account for column shifts.
+- Target side: insert each chord at `toCol + (origCol − minOrigCol)` clamped to row length; extend `chordRowLen` if needed; preserve `mirrorId`s so progression patterns stay synced.
 
-`src/lib/music/suggestions.ts` (new, deterministic, rule-based)
-- Reads the pattern's chord sequence + song key/mode.
-- Generates up to **4** variations using diatonic substitutions: relative major/minor swap, tritone sub on dominants, ii–V insertion before V, IV↔ii substitution, deceptive V→vi, secondary dominants, simple tasteful re-orderings that preserve tonal function.
-- **Each variation keeps the exact chord lengths of the source pattern** (same number of slots, same `lengthBeats` per slot — only the chord identities change).
-- Each suggestion: `{ label, chords: ChordSymbol[] }`.
+### 7. Don't deselect when long-pressing on a chip during select-mode
+`LineRow` chip handlers — currently, the long-press handler calls `toggleSelected(a.id)` while in select-mode, which is what causes a held chip to drop out of the selection right before the user starts dragging. Change behavior:
+- If `selectMode` is active and the chip is already in `selected`, long-press becomes the "begin drag" gesture (no toggle, no deselect).
+- If `selectMode` is active and the chip is NOT selected, long-press still toggles (adds it).
+- If `selectMode` is inactive, long-press still enters select-mode and selects the chip (unchanged).
+- Also add a guard in the document-level `pointerdown` outside-tap effect so taps that originate from a chip in `selected` while a drag is in progress don't exit select-mode.
 
-UI (`src/components/progressions/SuggestionsPanel.tsx`):
-- Up to 4 suggestion rows. Each row shows the chord chips inline + a small **play button on the right** that plays only that suggestion (uses existing `playProgression` with the suggestion's chord list and the pattern's beat layout). Pressing again stops it.
-- Each row also has a "Replace" action that swaps the pattern's chords for the suggestion's chords (lengths already match, so this is a 1:1 swap).
-- **Empty state**: if the generator returns zero suggestions, show a small inline message:
-  > "No variations found for this progression."
-  
-  with a single link button **"Search Google for similar progressions"**. The link opens a new tab to a Google search built from the chord list, e.g.
-  ```
-  https://www.google.com/search?q=chord+progression+similar+to+C+G+Am+F+in+key+of+C+major
-  ```
-  (chords joined with `+`, key + mode appended for context).
-- No AI calls anywhere — purely client-side music theory rules + a Google fallback link.
+### Files touched
+- `src/components/lyrics/LyricsTab.tsx` — viewport scroll fix, hidden key-host input, drag-to-move pointer logic, long-press behavior in select-mode, drop the `onRemove` plumbing.
+- `src/components/chord/ChordPickerSheet.tsx` — remove the "Remove chord" footer + prop.
+- `src/components/header/TransportHeader.tsx` — BPM width, Transpose tightening, responsive label.
+- `src/store/song.ts` — `moveSelectedChordsTo` action.
 
-### Files touched / new
-- `src/store/song.ts` — model change, spillover, new pattern actions, `suppressCrossTabDeleteWarning` flag (in JSON + store).
-- `src/components/progressions/ProgressionsTab.tsx` — section grouping, dual delete buttons, suggestions hookup, display-name fix, section drag/sort preserved.
-- `src/components/lyrics/LyricsTab.tsx` — wire confirm dialog for section + line deletes.
-- `src/components/common/ConfirmDeleteDialog.tsx` — new shared confirm with "Don't show again" checkbox.
-- `src/lib/music/suggestions.ts` — new rule-based generator (preserves chord lengths).
-- `src/components/progressions/SuggestionsPanel.tsx` — new UI with per-row play button + Google fallback.
-
-### Risks / notes
-- Existing saved songs migrate automatically (`sectionId` fallback).
-- Suppressing the dialog is reversible: we'll add a "Reset delete warnings" item to the nav menu sheet (next to Dark mode) so users can re-enable it.
-- Suggestions are deterministic and offline; quality depends on the rule set, which we can extend over time.
+### Notes
+- No data-model changes; mirror links are preserved through the move.
+- Drag ghost renders via `position: fixed`, so it works across section cards.
+- All keyboard shortcuts (⌘A/C/X/V, Backspace, Space) keep working through the hidden input host on mobile and the focusable div on desktop.
 
