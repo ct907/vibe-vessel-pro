@@ -910,6 +910,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   return (
     <div
       ref={cardRef}
+      data-section-id={section.id}
       className={cn(
         "paper-card rounded-xl px-5 py-5 transition-shadow",
         isSectionDragOver && "ring-2 ring-primary/60",
