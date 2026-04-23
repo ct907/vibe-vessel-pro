@@ -8,20 +8,47 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-  DropdownMenuSeparator, DropdownMenuLabel,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare } from "lucide-react";
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  Copy,
+  ArrowUp,
+  ArrowDown,
+  Pencil,
+  MessageSquare,
+  Scissors,
+  ClipboardPaste,
+  CheckSquare,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -32,7 +59,10 @@ let chordClipboard: ChordClip[] = [];
 
 /** Parse "Amaj7 G#maj7 Dmaj7" (or comma/newline separated) into chord clips. */
 function parseChordTextToClips(text: string): ChordClip[] {
-  const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
+  const tokens = text
+    .split(/[\s,;|\n\r\t]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
   const clips: ChordClip[] = [];
   let cursor = 0;
   for (const tok of tokens) {
@@ -55,7 +85,12 @@ interface LineRowProps {
   active?: boolean;
   isFirst: boolean;
   onAddLineAfter: () => string | void;
-  onMergeUp: (kind: "lyric" | "chord", currentRowText: string, currentRowChordsCount: number, currentRowLen: number) => boolean;
+  onMergeUp: (
+    kind: "lyric" | "chord",
+    currentRowText: string,
+    currentRowChordsCount: number,
+    currentRowLen: number,
+  ) => boolean;
   onPickerOpen: (lineId: string, col: number, anchorId?: string) => void;
   /** col-cell width in px, computed from a hidden measurer */
   cellPx: number;
@@ -72,15 +107,34 @@ interface LineRowProps {
 }
 
 function LineRow({
-  sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
-  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onMultiDragStart,
+  sectionId,
+  line,
+  active,
+  isFirst,
+  onAddLineAfter,
+  onMergeUp,
+  onPickerOpen,
+  cellPx,
+  onChordFocus,
+  onChordDragStart,
+  onChordDrop,
+  chordRowQuery,
+  onChordRowQueryChange,
+  onMultiDragStart,
 }: LineRowProps) {
   const {
-    setLineText, upsertChordAt,
-    removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
-    setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
+    setLineText,
+    upsertChordAt,
+    removeChordAnchor,
+    removeChordAnchorsBatch,
+    moveSelectedChordsByOrder,
+    setChordRowLen,
+    insertChordSpaceAt,
+    removeChordCellAt,
+    pasteChordsAt,
     moveSelectedChordsTo,
-    undo, redo,
+    undo,
+    redo,
   } = useSongStore();
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -187,7 +241,9 @@ function LineRow({
         .map((c) => c.chord.display)
         .join(" ");
       void navigator.clipboard?.writeText(text);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   const doCopy = () => {
@@ -210,7 +266,9 @@ function LineRow({
       if (text && text.trim()) {
         clip = parseChordTextToClips(text);
       }
-    } catch { /* clipboard read denied — fall back */ }
+    } catch {
+      /* clipboard read denied — fall back */
+    }
     if (!clip.length) clip = chordClipboard;
     if (!clip.length) return;
     pasteChordsAt(sectionId, line.id, col, clip);
@@ -224,14 +282,13 @@ function LineRow({
   const chordVisualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
   const chordEndCol = (a: { chordCol?: number; offset?: number; chord: { display: string } }) =>
     colOf(a) + chordVisualWidth(a.chord.display);
-  const len = Math.max(
-    line.chordRowLen ?? 0,
-    ...line.chords.map(chordEndCol),
-    1,
-  );
+  const len = Math.max(line.chordRowLen ?? 0, ...line.chords.map(chordEndCol), 1);
 
   useEffect(() => {
-    if (selectMode && line.chords.length === 0) { setSelectMode(false); setSelected(new Set()); }
+    if (selectMode && line.chords.length === 0) {
+      setSelectMode(false);
+      setSelected(new Set());
+    }
   }, [line.chords.length, selectMode]);
 
   // Auto-exit select mode when the user has deselected the last chord.
@@ -268,9 +325,7 @@ function LineRow({
     onChordFocus(line.id);
   };
 
-  const sortedChords = [...line.chords].sort(
-    (a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0),
-  );
+  const sortedChords = [...line.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
 
   const selectRangeTo = (anchorId: string, additive: boolean) => {
     const anchor = lastSelectedRef.current;
@@ -321,23 +376,31 @@ function LineRow({
       const rect = chordRowRef.current?.getBoundingClientRect();
       if (!rect) return;
       const x = ev.clientX - rect.left;
-      setAreaSel((prev) => prev ? { ...prev, x2: x } : prev);
+      setAreaSel((prev) => (prev ? { ...prev, x2: x } : prev));
     };
     const onUp = () => {
       const start = areaStartRef.current;
       const cur = areaSel;
       setAreaSel(null);
-      if (!start || !cur) { areaStartRef.current = null; return; }
+      if (!start || !cur) {
+        areaStartRef.current = null;
+        return;
+      }
       const [x1, x2] = [Math.min(cur.x1, cur.x2), Math.max(cur.x1, cur.x2)];
-      if (Math.abs(cur.x2 - cur.x1) < 4) { areaStartRef.current = null; return; }
+      if (Math.abs(cur.x2 - cur.x1) < 4) {
+        areaStartRef.current = null;
+        return;
+      }
       const cellWidth = Math.max(cellPx, 1);
       const c1 = x1 / cellWidth;
       const c2 = x2 / cellWidth;
-      const hits = sortedChords.filter((c) => {
-        const cc = c.chordCol ?? c.offset ?? 0;
-        const cEnd = cc + Math.max(1, c.chord.display.length);
-        return cc <= c2 && cEnd >= c1;
-      }).map((c) => c.id);
+      const hits = sortedChords
+        .filter((c) => {
+          const cc = c.chordCol ?? c.offset ?? 0;
+          const cEnd = cc + Math.max(1, c.chord.display.length);
+          return cc <= c2 && cEnd >= c1;
+        })
+        .map((c) => c.id);
       if (hits.length) {
         setSelectMode(true);
         setSelected((prev) => {
@@ -348,7 +411,9 @@ function LineRow({
         lastSelectedRef.current = hits[hits.length - 1];
       }
       // Defer clearing so the click handler can see we just dragged
-      setTimeout(() => { areaStartRef.current = null; }, 0);
+      setTimeout(() => {
+        areaStartRef.current = null;
+      }, 0);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp, { once: true });
@@ -389,7 +454,8 @@ function LineRow({
     // Undo / Redo (chord-row history). Cmd/Ctrl+Z = undo; Cmd/Ctrl+Y or Cmd/Ctrl+Shift+Z = redo.
     if (mod && (k === "z" || k === "Z")) {
       e.preventDefault();
-      if (e.shiftKey) redo(); else undo();
+      if (e.shiftKey) redo();
+      else undo();
       return;
     }
     if (mod && (k === "y" || k === "Y")) {
@@ -405,13 +471,23 @@ function LineRow({
       return;
     }
     if (mod && (k === "c" || k === "C")) {
-      if (selected.size > 0) { e.preventDefault(); doCopy(); return; }
+      if (selected.size > 0) {
+        e.preventDefault();
+        doCopy();
+        return;
+      }
     }
     if (mod && (k === "x" || k === "X")) {
-      if (selected.size > 0) { e.preventDefault(); doCut(); return; }
+      if (selected.size > 0) {
+        e.preventDefault();
+        doCut();
+        return;
+      }
     }
     if (mod && (k === "v" || k === "V")) {
-      e.preventDefault(); doPaste(); return;
+      e.preventDefault();
+      doPaste();
+      return;
     }
 
     if (selectMode) return;
@@ -463,9 +539,11 @@ function LineRow({
       e.preventDefault();
       setChordCaret((c) => Math.min(len, c + 1));
     } else if (k === "Home") {
-      e.preventDefault(); setChordCaret(0);
+      e.preventDefault();
+      setChordCaret(0);
     } else if (k === "End") {
-      e.preventDefault(); setChordCaret(len);
+      e.preventDefault();
+      setChordCaret(len);
     } else if (k === "Backspace") {
       e.preventDefault();
       if (chordCaret === 0) {
@@ -513,7 +591,11 @@ function LineRow({
           document.querySelector<HTMLInputElement>(`[data-lyric-input="${newId}"]`)?.focus();
         }, 10);
       }
-    } else if (e.key === "Backspace" && lyricInputRef.current?.selectionStart === 0 && lyricInputRef.current.selectionEnd === 0) {
+    } else if (
+      e.key === "Backspace" &&
+      lyricInputRef.current?.selectionStart === 0 &&
+      lyricInputRef.current.selectionEnd === 0
+    ) {
       if (line.text === "") {
         e.preventDefault();
         // If chord row has content, confirm; else merge silently
@@ -523,15 +605,22 @@ function LineRow({
     }
   };
 
-  const enterSelect = (anchorId: string) => { setSelectMode(true); setSelected(new Set([anchorId])); };
+  const enterSelect = (anchorId: string) => {
+    setSelectMode(true);
+    setSelected(new Set([anchorId]));
+  };
   const toggleSelected = (anchorId: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(anchorId)) next.delete(anchorId); else next.add(anchorId);
+      if (next.has(anchorId)) next.delete(anchorId);
+      else next.add(anchorId);
       return next;
     });
   };
-  const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
   const selectedIds = Array.from(selected);
 
   // Pointer-based drag for multi-selected chords (touch + mouse).
@@ -556,14 +645,18 @@ function LineRow({
         targetCol = Math.max(0, Math.round((ev.clientX - r.left) / Math.max(cellPx, 1)));
       }
 
-      setDrag((prev) => prev ? {
-        ...prev,
-        x: ev.clientX,
-        y: ev.clientY,
-        active: prev.active || moved,
-        targetLineId,
-        targetCol,
-      } : prev);
+      setDrag((prev) =>
+        prev
+          ? {
+              ...prev,
+              x: ev.clientX,
+              y: ev.clientY,
+              active: prev.active || moved,
+              targetLineId,
+              targetCol,
+            }
+          : prev,
+      );
     };
 
     const onUp = (ev: PointerEvent) => {
@@ -598,9 +691,7 @@ function LineRow({
       ref={rowRef}
       className={cn(
         "group py-1 transition-colors",
-        active
-          ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
-          : "relative",
+        active ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg" : "relative",
       )}
       data-line-id={line.id}
     >
@@ -612,7 +703,10 @@ function LineRow({
         onMouseDown={handleRowMouseDown}
         onClick={handleChordRowClick}
         onKeyDown={handleChordKeyDown}
-        onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
+        onFocus={() => {
+          setChordFocused(true);
+          onChordFocus(line.id);
+        }}
         onBlur={() => setChordFocused(false)}
         onPointerDown={(e) => {
           // Long-press on empty space (not on a chip) opens the paste menu.
@@ -627,13 +721,22 @@ function LineRow({
           }, 500);
         }}
         onPointerMove={() => {
-          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+          if (pastePressTimerRef.current) {
+            clearTimeout(pastePressTimerRef.current);
+            pastePressTimerRef.current = null;
+          }
         }}
         onPointerUp={() => {
-          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+          if (pastePressTimerRef.current) {
+            clearTimeout(pastePressTimerRef.current);
+            pastePressTimerRef.current = null;
+          }
         }}
         onPointerCancel={() => {
-          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+          if (pastePressTimerRef.current) {
+            clearTimeout(pastePressTimerRef.current);
+            pastePressTimerRef.current = null;
+          }
         }}
         onContextMenu={(e) => {
           // Right-click also opens the paste popover (desktop convenience).
@@ -645,7 +748,10 @@ function LineRow({
           const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
           setPastePopover({ col, x: px });
         }}
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
         onDrop={(e) => {
           e.preventDefault();
           const rect = chordRowRef.current!.getBoundingClientRect();
@@ -674,30 +780,31 @@ function LineRow({
           />
         )}
         {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord, with a downward arrow on top */}
-        {playingAnchorId && (() => {
-          const playing = line.chords.find((a) => a.id === playingAnchorId);
-          if (!playing) return null;
-          return (
-            <div
-              aria-hidden
-              className="absolute top-0 bottom-0 pointer-events-none animate-pulse"
-              style={{ left: `${colOf(playing) * cellPx - 1}px`, width: "3px" }}
-            >
-              <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
-              <span
-                className="absolute top-0 left-1/2 -translate-x-1/2"
-                style={{
-                  width: 0,
-                  height: 0,
-                  borderLeft: "5px solid transparent",
-                  borderRight: "5px solid transparent",
-                  borderTop: "7px solid hsl(var(--chord-chip))",
-                  filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
-                }}
-              />
-            </div>
-          );
-        })()}
+        {playingAnchorId &&
+          (() => {
+            const playing = line.chords.find((a) => a.id === playingAnchorId);
+            if (!playing) return null;
+            return (
+              <div
+                aria-hidden
+                className="absolute top-0 bottom-0 pointer-events-none animate-pulse"
+                style={{ left: `${colOf(playing) * cellPx - 1}px`, width: "3px" }}
+              >
+                <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
+                <span
+                  className="absolute top-0 left-1/2 -translate-x-1/2"
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeft: "5px solid transparent",
+                    borderRight: "5px solid transparent",
+                    borderTop: "7px solid hsl(var(--chord-chip))",
+                    filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
+                  }}
+                />
+              </div>
+            );
+          })()}
         {/* Chord chips at columns */}
         {line.chords.map((a) => {
           const col = colOf(a);
@@ -722,9 +829,7 @@ function LineRow({
             if (!selectMode || !selected.has(a.id)) return;
             // Use selected set as the drag payload.
             const ids = Array.from(selected);
-            const displays = sortedChords
-              .filter((c) => selected.has(c.id))
-              .map((c) => c.chord.display);
+            const displays = sortedChords.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
             (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
             setDrag({
               pointerId: e.pointerId,
@@ -754,7 +859,11 @@ function LineRow({
               onPointerDown={beginPointerDrag}
               onClick={(e) => {
                 // Suppress click if we just dragged.
-                if (drag?.active) { e.stopPropagation(); e.preventDefault(); return; }
+                if (drag?.active) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  return;
+                }
                 e.stopPropagation();
                 handleChipTap(e);
               }}
@@ -780,33 +889,35 @@ function LineRow({
           );
         })}
         {/* Caret + live chord query (mirrored from picker input) */}
-        {chordFocused && !selectMode && (() => {
-          // Hide the ghost overlay if the query matches an existing chord at the caret —
-          // i.e. the picker was opened to edit, not to type a new chord. This prevents
-          // a stale "clone" of the chord display from rendering at the old position.
-          const editingExisting = !!sortedChords.find(
-            (c) => colOf(c) === chordCaret && c.chord.display === chordRowQuery,
-          );
-          const showOverlay = !!(active && chordRowQuery && chordRowQuery.length > 0 && !editingExisting);
-          return (
-            <>
-              {showOverlay && (
+        {chordFocused &&
+          !selectMode &&
+          (() => {
+            // Hide the ghost overlay if the query matches an existing chord at the caret —
+            // i.e. the picker was opened to edit, not to type a new chord. This prevents
+            // a stale "clone" of the chord display from rendering at the old position.
+            const editingExisting = !!sortedChords.find(
+              (c) => colOf(c) === chordCaret && c.chord.display === chordRowQuery,
+            );
+            const showOverlay = !!(active && chordRowQuery && chordRowQuery.length > 0 && !editingExisting);
+            return (
+              <>
+                {showOverlay && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
+                    style={{ left: `${chordCaret * cellPx}px` }}
+                  >
+                    {chordRowQuery}
+                  </span>
+                )}
                 <span
                   aria-hidden
-                  className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
-                  style={{ left: `${chordCaret * cellPx}px` }}
-                >
-                  {chordRowQuery}
-                </span>
-              )}
-              <span
-                aria-hidden
-                className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-                style={{ left: `${(chordCaret + (showOverlay ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
-              />
-            </>
-          );
-        })()}
+                  className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
+                  style={{ left: `${(chordCaret + (showOverlay ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
+                />
+              </>
+            );
+          })()}
       </div>
 
       {/* Long-press paste popover for empty chord-row spaces. */}
@@ -848,9 +959,14 @@ function LineRow({
         className="absolute opacity-0 pointer-events-none"
         style={{ left: 0, top: 0, width: 1, height: 1 }}
         onKeyDown={(e) => handleChordKeyDown(e as unknown as React.KeyboardEvent<HTMLDivElement>)}
-        onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
+        onFocus={() => {
+          setChordFocused(true);
+          onChordFocus(line.id);
+        }}
         onBlur={() => setChordFocused(false)}
-        onChange={() => { /* swallow — we only consume keydown */ }}
+        onChange={() => {
+          /* swallow — we only consume keydown */
+        }}
       />
 
       {/* Drag insert marker on the target chord row. */}
@@ -878,38 +994,87 @@ function LineRow({
           {/* Row 1: status + action buttons */}
           <div className="flex flex-wrap items-center gap-[10px]">
             <span className="text-muted-foreground">{selectedIds.length} selected</span>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={selectAll}
-              aria-label="Select all chords" title="Select all (⌘/Ctrl+A)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={selectAll}
+              aria-label="Select all chords"
+              title="Select all (⌘/Ctrl+A)"
+            >
               <CheckSquare className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-              onClick={doCut} aria-label="Cut" title="Cut (⌘/Ctrl+X)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={!selectedIds.length}
+              onClick={doCut}
+              aria-label="Cut"
+              title="Cut (⌘/Ctrl+X)"
+            >
               <Scissors className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-              onClick={doCopy} aria-label="Copy" title="Copy (⌘/Ctrl+C)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={!selectedIds.length}
+              onClick={doCopy}
+              aria-label="Copy"
+              title="Copy (⌘/Ctrl+C)"
+            >
               <Copy className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7"
-              onClick={() => doPaste()} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => doPaste()}
+              aria-label="Paste"
+              title="Paste (⌘/Ctrl+V)"
+            >
               <ClipboardPaste className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
-              onClick={() => { removeChordAnchorsBatch(sectionId, line.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive"
+              disabled={!selectedIds.length}
+              onClick={() => {
+                removeChordAnchorsBatch(sectionId, line.id, selectedIds);
+                exitSelect();
+              }}
+              aria-label="Delete selected"
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
           {/* Row 2: arrows + Done */}
           <div className="flex flex-wrap items-center gap-[10px]">
-            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)} aria-label="Move chord left (by order)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={!selectedIds.length}
+              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)}
+              aria-label="Move chord left (by order)"
+            >
               <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)} aria-label="Move chord right (by order)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={!selectedIds.length}
+              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)}
+              aria-label="Move chord right (by order)"
+            >
               <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>Done</Button>
+            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>
+              Done
+            </Button>
           </div>
         </div>
       )}
@@ -967,11 +1132,32 @@ interface SectionCardProps {
   onMoveSection?: (id: string, direction: -1 | 1) => void;
 }
 
-function SectionCard({ section, index, total, displayName, activeLineId, onPickerOpen, onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, sortMode, onMoveSection }: SectionCardProps) {
+function SectionCard({
+  section,
+  index,
+  total,
+  displayName,
+  activeLineId,
+  onPickerOpen,
+  onChordDragStart,
+  onChordDrop,
+  chordRowQuery,
+  onChordRowQueryChange,
+  sortMode,
+  onMoveSection,
+}: SectionCardProps) {
   const {
-    addLine, removeLine, updateSection, removeSection, duplicateSection,
-    toggleSectionCollapsed, upsertChordAt, basket, setSectionComment,
-    suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
+    addLine,
+    removeLine,
+    updateSection,
+    removeSection,
+    duplicateSection,
+    toggleSectionCollapsed,
+    upsertChordAt,
+    basket,
+    setSectionComment,
+    suppressCrossTabDeleteWarning,
+    setSuppressCrossTabDeleteWarning,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
@@ -983,7 +1169,9 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const cellPx = useCellPx();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setDraftLabel(section.label); }, [section.label]);
+  useEffect(() => {
+    setDraftLabel(section.label);
+  }, [section.label]);
 
   const acceptCustomName = () => {
     const trimmed = draftLabel.trim() || "Section";
@@ -1008,10 +1196,18 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
     setTimeout(() => {
       if (kind === "chord") {
         const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${prev.id}"]`);
-        if (el) { el.focus(); const end = el.value.length; el.setSelectionRange(end, end); }
+        if (el) {
+          el.focus();
+          const end = el.value.length;
+          el.setSelectionRange(end, end);
+        }
       } else {
         const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${prev.id}"]`);
-        if (el) { el.focus(); const end = el.value.length; el.setSelectionRange(end, end); }
+        if (el) {
+          el.focus();
+          const end = el.value.length;
+          el.setSelectionRange(end, end);
+        }
       }
     }, 10);
   };
@@ -1021,9 +1217,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
     if (idx <= 0) return; // can't merge above the first line of section
     const line = section.lines[idx];
     const hasOpposite =
-      kind === "lyric"
-        ? (line.chords.length > 0 || (line.chordRowLen ?? 0) > 0)
-        : line.text.trim().length > 0;
+      kind === "lyric" ? line.chords.length > 0 || (line.chordRowLen ?? 0) > 0 : line.text.trim().length > 0;
     if (hasOpposite) {
       setConfirm({ lineId, kind });
     } else {
@@ -1043,13 +1237,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div
-      ref={cardRef}
-      data-section-id={section.id}
-      className={cn(
-        "paper-card rounded-xl px-5 py-5 transition-shadow",
-      )}
-    >
+    <div ref={cardRef} data-section-id={section.id} className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}>
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
@@ -1074,13 +1262,21 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
           </SelectTrigger>
           <SelectContent>
             {SECTION_TYPES.map((t) => (
-              <SelectItem key={t} value={t} className="text-xs capitalize">{t}</SelectItem>
+              <SelectItem key={t} value={t} className="text-xs capitalize">
+                {t}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         {section.type === "custom" && !sortMode && (
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setCustomRenameOpen(true)} aria-label="Rename custom section">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => setCustomRenameOpen(true)}
+            aria-label="Rename custom section"
+          >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         )}
@@ -1172,10 +1368,15 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
                 isFirst={i === 0}
                 active={activeLineId === line.id}
                 onAddLineAfter={() => addLine(section.id, line.id)}
-                onMergeUp={(kind) => { handleMergeUp(line.id, kind); return true; }}
+                onMergeUp={(kind) => {
+                  handleMergeUp(line.id, kind);
+                  return true;
+                }}
                 onPickerOpen={(lineId, col, anchorId) => onPickerOpen(section.id, lineId, col, anchorId)}
                 cellPx={cellPx}
-                onChordFocus={() => { /* parent handles via picker */ }}
+                onChordFocus={() => {
+                  /* parent handles via picker */
+                }}
                 onChordDragStart={(anchorId) => onChordDragStart(section.id, line.id, anchorId)}
                 onChordDrop={(toLineId, toCol) => onChordDrop(section.id, toLineId, toCol)}
                 chordRowQuery={activeLineId === line.id ? chordRowQuery : undefined}
@@ -1215,9 +1416,13 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
               className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
             >
               {hasComment ? (
-                <><MessageSquare className="h-3.5 w-3.5" /> Comment</>
+                <>
+                  <MessageSquare className="h-3.5 w-3.5" /> Comment
+                </>
               ) : (
-                <><Plus className="h-3.5 w-3.5" /> add comment</>
+                <>
+                  <Plus className="h-3.5 w-3.5" /> add comment
+                </>
               )}
               <ChevronDown className={cn("h-3 w-3 transition-transform", commentOpen && "rotate-180")} />
             </button>
@@ -1236,7 +1441,13 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
       )}
 
       {/* Custom name dialog */}
-      <Dialog open={customRenameOpen} onOpenChange={(o) => { if (!o) cancelCustomName(); else setCustomRenameOpen(true); }}>
+      <Dialog
+        open={customRenameOpen}
+        onOpenChange={(o) => {
+          if (!o) cancelCustomName();
+          else setCustomRenameOpen(true);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Name this section</DialogTitle>
@@ -1245,19 +1456,28 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
             autoFocus
             value={draftLabel}
             onChange={(e) => setDraftLabel(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") acceptCustomName(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") acceptCustomName();
+            }}
             placeholder="e.g. Refrain, Tag, Solo…"
             className="font-display text-base"
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={cancelCustomName}>Cancel</Button>
+            <Button variant="ghost" onClick={cancelCustomName}>
+              Cancel
+            </Button>
             <Button onClick={acceptCustomName}>Accept</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Confirm row delete (cross-row backspace) */}
-      <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
+      <AlertDialog
+        open={!!confirm}
+        onOpenChange={(o) => {
+          if (!o) setConfirm(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this row?</AlertDialogTitle>
@@ -1315,7 +1535,9 @@ interface LyricsTabProps {
 
 export function LyricsTab({ sortMode = false }: LyricsTabProps) {
   const { sections, upsertChordAt, addSection, moveChordAnchor, basket, moveSection } = useSongStore();
-  const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
+  const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(
+    null,
+  );
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
@@ -1348,7 +1570,7 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
     setPickerQuery("");
     const advance = Math.max(1, chord.display.length) + 1;
-    setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
+    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev));
   };
 
   const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
@@ -1381,7 +1603,6 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
         />
       ))}
 
-
       <div className={cn("flex flex-wrap items-center gap-2")}>
         <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
         {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
@@ -1396,7 +1617,9 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
 
       <ChordPickerSheet
         open={!!picker}
-        onOpenChange={(o) => { if (!o) setPicker(null); }}
+        onOpenChange={(o) => {
+          if (!o) setPicker(null);
+        }}
         initialChord={initialChord}
         onPick={handlePick}
         activeLineId={picker?.lineId}

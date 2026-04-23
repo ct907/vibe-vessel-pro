@@ -24,7 +24,9 @@ const Index = () => {
 
   const enterSortMode = (which: "lyrics" | "progressions") => {
     const snap: Record<string, boolean> = {};
-    sections.forEach((s) => { snap[s.id] = !!s.collapsed; });
+    sections.forEach((s) => {
+      snap[s.id] = !!s.collapsed;
+    });
     setPriorCollapsed(snap);
     setSortMode(which);
     setAllSectionsCollapsed(true);
@@ -112,10 +114,7 @@ const Index = () => {
         </Tabs>
       </main>
 
-      <BasketBar
-        onSendToLyrics={() => setTab("lyrics")}
-        onSendToProgressions={() => setTab("progressions")}
-      />
+      <BasketBar onSendToLyrics={() => setTab("lyrics")} onSendToProgressions={() => setTab("progressions")} />
     </div>
   );
 };

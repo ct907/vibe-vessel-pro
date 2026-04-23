@@ -153,17 +153,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
         {/* Row 1: Logo + Title + Nav menu */}
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 ink-chord" />
-          <span className="font-display text-xl font-bold">Notebook</span>
-          <span className="text-muted-foreground">›</span>
           <Input
             value={meta.title}
             onChange={(e) => setTitle(e.target.value)}
-            className="h-8 flex-1 min-w-0 max-w-xs font-display text-base bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
+            placeholder="Enter song title..."
+            className="text-center h-10 flex-1 min-w-0 max-w-xs font-display text-lg bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
           />
           {/* Nav menu (top right of first row) */}
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8 ml-auto" aria-label="Open menu">
+              <Button variant="outline" size="icon" className="h-10 w-10 ml-auto" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
@@ -276,7 +275,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             <Button
               size="icon"
               variant="outline"
-              className="h-8 w-8"
+              className="h-10 w-10"
               onClick={() => undo()}
               disabled={!canUndo()}
               aria-label="Undo"
@@ -287,7 +286,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             <Button
               size="icon"
               variant="outline"
-              className="h-8 w-8"
+              className="h-10 w-10"
               onClick={() => redo()}
               disabled={!canRedo()}
               aria-label="Redo"
@@ -312,7 +311,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground uppercase tracking-wide">Key</span>
             <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
-              <SelectTrigger className="h-8 w-auto min-w-0 px-2 gap-1 font-mono-chord">
+              <SelectTrigger className="h-10 w-auto min-w-0 px-2 gap-1 font-mono-chord">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -324,7 +323,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               </SelectContent>
             </Select>
             <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
-              <SelectTrigger className="h-8 w-[140px]">
+              <SelectTrigger className="h-10 w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -345,7 +344,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               max={220}
               value={meta.bpm}
               onChange={(e) => setBpm(Number(e.target.value))}
-              className="h-8 w-14 px-1 text-center font-mono-chord [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="h-10 w-14 px-1 text-center font-mono-chord [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>
