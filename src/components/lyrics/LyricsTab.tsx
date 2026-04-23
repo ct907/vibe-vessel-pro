@@ -52,11 +52,13 @@ interface LineRowProps {
   /** Live query from the chord picker (only meaningful when active). */
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
+  /** Multi-chord pointer-based drag-and-drop across rows. */
+  onMultiDragStart?: (sectionId: string, lineId: string, anchorIds: string[]) => void;
 }
 
 function LineRow({
   sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
-  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange,
+  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onMultiDragStart,
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
