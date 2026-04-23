@@ -602,6 +602,37 @@ function LineRow({
         onKeyDown={handleChordKeyDown}
         onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
         onBlur={() => setChordFocused(false)}
+        onPointerDown={(e) => {
+          // Long-press on empty space (not on a chip) opens the paste menu.
+          const t = e.target as HTMLElement;
+          if (t.closest("[data-chip-anchor]")) return;
+          if (pastePressTimerRef.current) clearTimeout(pastePressTimerRef.current);
+          const rect = chordRowRef.current!.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
+          pastePressTimerRef.current = setTimeout(() => {
+            setPastePopover({ col, x: px });
+          }, 500);
+        }}
+        onPointerMove={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onPointerUp={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onPointerCancel={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onContextMenu={(e) => {
+          // Right-click also opens the paste popover (desktop convenience).
+          const t = e.target as HTMLElement;
+          if (t.closest("[data-chip-anchor]")) return;
+          e.preventDefault();
+          const rect = chordRowRef.current!.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
+          setPastePopover({ col, x: px });
+        }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
         onDrop={(e) => {
           e.preventDefault();
