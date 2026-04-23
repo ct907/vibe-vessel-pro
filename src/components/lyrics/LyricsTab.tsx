@@ -64,6 +64,7 @@ function LineRow({
     setLineText, upsertChordAt,
     removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
+    moveSelectedChordsTo,
     undo, redo,
   } = useSongStore();
   const playbackCurrent = usePlaybackStore((s) => s.current);
