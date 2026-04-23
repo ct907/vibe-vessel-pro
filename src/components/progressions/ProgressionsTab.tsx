@@ -220,6 +220,17 @@ function PatternBlock({
             onClick={() => shiftPatternChords(pattern.id, selectedIds, 1)} aria-label="Shift later">
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
+          <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP)}
+            aria-label="Decrease length" title="Decrease length">
+            <Minus className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP)}
+            aria-label="Increase length (overflows to next block)" title="Increase length · overflows to next block">
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
           <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
             onClick={() => { removePatternChordsBatch(pattern.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
             <Trash2 className="h-3.5 w-3.5" />
