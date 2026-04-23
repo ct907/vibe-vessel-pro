@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
@@ -66,11 +66,32 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
     }
+
+    // If the user invoked "Play from here" on a specific chord, rotate
+    // events so that chord plays first while the loop length is preserved.
+    const startFromChordId = usePlaybackStore.getState().startFromChordId;
+    let playEvents = events;
+    let playMeta = meta2;
+    if (startFromChordId) {
+      const i = meta2.findIndex((m) => m.patternChordId === startFromChordId);
+      if (i > 0) {
+        const offset = events[i].startBeat;
+        const total = cursorBeat;
+        playEvents = events.map((_, k) => {
+          const src = events[(i + k) % events.length];
+          const rawStart = src.startBeat - offset;
+          const wrapped = rawStart < 0 ? rawStart + total : rawStart;
+          return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats };
+        });
+        playMeta = playEvents.map((_, k) => meta2[(i + k) % meta2.length]);
+      }
+    }
+
     setIsPlaying(true);
     setPlayingStore(true);
-    await playProgression(events, meta.bpm, {
+    await playProgression(playEvents, meta.bpm, {
       loopBeats: cursorBeat,
-      onChordStart: (i) => setCurrent(meta2[i] ?? null),
+      onChordStart: (idx) => setCurrent(playMeta[idx] ?? null),
     });
   };
 
@@ -80,6 +101,14 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     setPlayingStore(false);
     setCurrent(null);
   };
+
+  // Allow other components (e.g. ProgressionsTab "Play from here") to trigger playback.
+  useEffect(() => {
+    const onReq = () => { handlePlay(); };
+    window.addEventListener("lovable:request-play", onReq);
+    return () => window.removeEventListener("lovable:request-play", onReq);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progression, focusedPatternId, meta.bpm]);
 
   const handleLoad = async (file?: File) => {
     if (!file) return;

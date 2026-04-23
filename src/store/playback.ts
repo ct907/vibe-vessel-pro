@@ -18,10 +18,13 @@ interface PlaybackState {
   isPlaying: boolean;
   /** Pattern block currently focused as the playback start point. */
   focusedPatternId: string | null;
+  /** Optional chord-level start point inside the focused pattern. */
+  startFromChordId: string | null;
   /** Currently sounding chord (drives the orange playhead). */
   current: PlaybackEvent | null;
 
   setFocusedPattern: (id: string | null) => void;
+  setStartFromChord: (patternId: string | null, chordId: string | null) => void;
   setIsPlaying: (b: boolean) => void;
   setCurrent: (e: PlaybackEvent | null) => void;
   reset: () => void;
@@ -30,9 +33,12 @@ interface PlaybackState {
 export const usePlaybackStore = create<PlaybackState>((set) => ({
   isPlaying: false,
   focusedPatternId: null,
+  startFromChordId: null,
   current: null,
-  setFocusedPattern: (id) => set({ focusedPatternId: id }),
+  setFocusedPattern: (id) => set({ focusedPatternId: id, startFromChordId: null }),
+  setStartFromChord: (patternId, chordId) =>
+    set({ focusedPatternId: patternId, startFromChordId: chordId }),
   setIsPlaying: (b) => set({ isPlaying: b, ...(b ? {} : { current: null }) }),
   setCurrent: (e) => set({ current: e }),
-  reset: () => set({ isPlaying: false, current: null }),
+  reset: () => set({ isPlaying: false, current: null, startFromChordId: null }),
 }));

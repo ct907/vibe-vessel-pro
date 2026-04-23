@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical, Play } from "lucide-react";
+import { ensureAudio } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,9 @@ function PatternBlock({
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
+  const setStartFromChord = usePlaybackStore((s) => s.setStartFromChord);
+  const setIsPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
+  const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const isFocused = focusedPatternId === pattern.id;
@@ -161,9 +165,8 @@ function PatternBlock({
   return (
     <div
       ref={blockRef}
-      onClick={() => setFocusedPattern(pattern.id)}
       className={cn(
-        "rounded-lg border bg-card/60 p-3 transition-shadow cursor-pointer",
+        "rounded-lg border bg-card/60 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
       )}
     >
@@ -382,6 +385,24 @@ function PatternBlock({
               className="absolute top-full mt-1 flex items-center gap-1 rounded-md border border-border bg-card px-1 py-1 shadow-sm z-10"
               style={{ left: `calc(${leftPct}% + ${widthPct / 2}%)`, transform: "translateX(-50%)" }}
             >
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 px-2 text-xs"
+                onClick={async () => {
+                  await ensureAudio();
+                  setStartFromChord(pattern.id, c.id);
+                  setActiveChord(null);
+                  // Stop any current playback then request a fresh play.
+                  setIsPlayingStore(false);
+                  setCurrent(null);
+                  window.dispatchEvent(new Event("lovable:request-play"));
+                }}
+                aria-label="Play from here"
+                title="Play from here"
+              >
+                <Play className="h-3.5 w-3.5" /> Play from here
+              </Button>
               <Button size="icon" variant="ghost" className="h-7 w-7"
                 onClick={() => movePatternChord(pattern.id, c.id, -1)} aria-label="Move earlier" title="Move earlier">
                 <ArrowLeft className="h-3.5 w-3.5" />
