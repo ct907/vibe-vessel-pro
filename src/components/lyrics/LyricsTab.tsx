@@ -585,20 +585,44 @@ function LineRow({
             focusChord();
             onPickerOpen(line.id, col, a.id);
           };
+          // Begin a pointer drag from this chip when in selectMode and chip is selected.
+          const beginPointerDrag = (e: React.PointerEvent) => {
+            if (!selectMode || !selected.has(a.id)) return;
+            // Use selected set as the drag payload.
+            const ids = Array.from(selected);
+            const displays = sortedChords
+              .filter((c) => selected.has(c.id))
+              .map((c) => c.chord.display);
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            setDrag({
+              pointerId: e.pointerId,
+              startX: e.clientX,
+              startY: e.clientY,
+              x: e.clientX,
+              y: e.clientY,
+              active: false,
+              ids,
+              displays,
+            });
+            onMultiDragStart?.(sectionId, line.id, ids);
+          };
           return (
             <div
               key={a.id}
               data-chip-anchor={a.id}
               className="absolute top-0 leading-7"
               style={{ left: `${col * cellPx}px` }}
-              draggable
+              draggable={!selectMode}
               onDragStart={(e) => {
                 e.stopPropagation();
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", a.chord.display);
                 onChordDragStart(a.id);
               }}
+              onPointerDown={beginPointerDrag}
               onClick={(e) => {
+                // Suppress click if we just dragged.
+                if (drag?.active) { e.stopPropagation(); e.preventDefault(); return; }
                 e.stopPropagation();
                 handleChipTap(e);
               }}
@@ -610,7 +634,13 @@ function LineRow({
                 selected={selectMode && isSel}
                 audition
                 onLongPress={() => {
-                  if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
+                  if (selectMode) {
+                    // If already selected, do nothing — the user is about to drag.
+                    if (selected.has(a.id)) return;
+                    toggleSelected(a.id);
+                  } else {
+                    enterSelect(a.id);
+                  }
                   lastSelectedRef.current = a.id;
                 }}
               />
