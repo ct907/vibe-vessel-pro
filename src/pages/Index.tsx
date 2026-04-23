@@ -6,23 +6,56 @@ import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
-import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import { Button } from "@/components/ui/button";
-import { FileText, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, ArrowUpDown } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
+  const updateSection = useSongStore((s) => s.updateSection);
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
+
+  // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
+  // states so we can restore them when exiting sort mode.
+  const [sortMode, setSortMode] = useState<null | "lyrics" | "progressions">(null);
+  const [priorCollapsed, setPriorCollapsed] = useState<Record<string, boolean>>({});
+
+  const enterSortMode = (which: "lyrics" | "progressions") => {
+    const snap: Record<string, boolean> = {};
+    sections.forEach((s) => { snap[s.id] = !!s.collapsed; });
+    setPriorCollapsed(snap);
+    setSortMode(which);
+    setAllSectionsCollapsed(true);
+  };
+  const exitSortMode = () => {
+    sections.forEach((s) => {
+      const prev = priorCollapsed[s.id];
+      if (prev === undefined) return;
+      if (!!s.collapsed !== prev) updateSection(s.id, { collapsed: prev });
+    });
+    setSortMode(null);
+    setPriorCollapsed({});
+  };
+  const toggleSortMode = (which: "lyrics" | "progressions") => {
+    if (sortMode === which) exitSortMode();
+    else enterSortMode(which);
+  };
+
+  // Auto-exit sort mode if the user switches tabs.
+  useEffect(() => {
+    if (sortMode && sortMode !== tab) exitSortMode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   useEffect(() => {
     hydrateFromStorage();
     const unsub = startAutosave();
     return () => unsub();
   }, []);
+
+  const showSortButton = tab === "lyrics" || tab === "progressions";
 
   return (
     <div className="min-h-screen bg-paper text-foreground flex flex-col">
@@ -41,6 +74,7 @@ const Index = () => {
                 onClick={() => setAllSectionsCollapsed(!allCollapsed)}
                 aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
                 title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+                disabled={!!sortMode}
               >
                 {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
                 <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
@@ -51,27 +85,29 @@ const Index = () => {
               <TabsTrigger value="chords">Chords</TabsTrigger>
               <TabsTrigger value="progressions">Progressions</TabsTrigger>
             </TabsList>
-            {tab === "lyrics" && (
+            {showSortButton && (
               <Button
                 size="sm"
-                variant="outline"
+                variant={sortMode === tab ? "default" : "outline"}
                 className="absolute right-0"
-                onClick={() => setExportOpen(true)}
+                onClick={() => toggleSortMode(tab as "lyrics" | "progressions")}
+                aria-label={sortMode === tab ? "Exit sort mode" : "Enter sort mode"}
+                title={sortMode === tab ? "Exit sort mode" : "Reorder sections"}
               >
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Export Lyrics</span>
+                <ArrowUpDown className="h-4 w-4" />
+                <span className="hidden sm:inline">{sortMode === tab ? "Done" : "Sort"}</span>
               </Button>
             )}
           </div>
 
           <TabsContent value="lyrics" className="mt-4">
-            <LyricsTab />
+            <LyricsTab sortMode={sortMode === "lyrics"} />
           </TabsContent>
           <TabsContent value="chords" className="mt-4">
             <ChordsTab />
           </TabsContent>
           <TabsContent value="progressions" className="mt-4">
-            <ProgressionsTab />
+            <ProgressionsTab sortMode={sortMode === "progressions"} />
           </TabsContent>
         </Tabs>
       </main>
@@ -80,8 +116,6 @@ const Index = () => {
         onSendToLyrics={() => setTab("lyrics")}
         onSendToProgressions={() => setTab("progressions")}
       />
-
-      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
     </div>
   );
 };
