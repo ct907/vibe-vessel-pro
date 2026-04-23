@@ -72,7 +72,9 @@ function LineRow({
   const playingAnchorId = isPlaying && playbackCurrent?.mirrorId ? playbackCurrent.mirrorId : null;
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
+  const keyHostRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [chordCaret, setChordCaret] = useState(0); // column index in chord row
   const [chordFocused, setChordFocused] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
