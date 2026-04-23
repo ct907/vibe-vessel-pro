@@ -140,6 +140,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                   variant="outline"
                   className="justify-start border border-border"
                   onClick={() => {
+                    setSoundOpen(true);
+                    setNavOpen(false);
+                  }}
+                >
+                  <Music2 className="h-4 w-4" /> Sound
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => {
                     downloadProjectJSON(
                       meta.title.replace(/\s+/g, "-").toLowerCase() + ".json",
                     );
