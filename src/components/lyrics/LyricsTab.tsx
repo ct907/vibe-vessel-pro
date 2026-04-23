@@ -91,16 +91,34 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll the active row to ~80px below the top of the visual viewport
-  // whenever it becomes the active (picker-open) row.
+  // Scroll the active row into view, recomputing as the visualViewport changes
+  // (e.g. when the mobile soft keyboard appears and shrinks vv.height).
   useEffect(() => {
     if (!active || !rowRef.current) return;
     const el = rowRef.current;
-    const rect = el.getBoundingClientRect();
-    const targetTop = 80;
-    const delta = rect.top - targetTop;
-    // Use the visualViewport offset if present so mobile keyboards behave.
-    window.scrollBy({ top: delta, behavior: "smooth" });
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const scrollIntoView = () => {
+      if (!el.isConnected) return;
+      const rect = el.getBoundingClientRect();
+      const vvTop = vv?.offsetTop ?? 0;
+      const targetTop = vvTop + 80;
+      const delta = rect.top - targetTop;
+      if (Math.abs(delta) < 2) return;
+      window.scrollBy({ top: delta, behavior: "smooth" });
+    };
+    scrollIntoView();
+    const settle = window.setTimeout(scrollIntoView, 200);
+    if (vv) {
+      vv.addEventListener("resize", scrollIntoView);
+      vv.addEventListener("scroll", scrollIntoView);
+    }
+    return () => {
+      window.clearTimeout(settle);
+      if (vv) {
+        vv.removeEventListener("resize", scrollIntoView);
+        vv.removeEventListener("scroll", scrollIntoView);
+      }
+    };
   }, [active]);
 
   // Build a clipboard payload from the current selection.
