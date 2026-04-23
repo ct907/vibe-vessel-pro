@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical, Play } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical, Play, ChevronsDownUp, ChevronsUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { ensureAudio } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,7 @@ function PatternBlock({
     updatePattern, basket, addChordToPattern,
     setPatternChordLength, movePatternChord,
     removePatternChordsBatch, shiftPatternChords, movePatternChordsTo,
+    resizePatternChordsWithOverflow,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -123,13 +124,16 @@ function PatternBlock({
         setSelectMode(true);
         setSelected(new Set([chordId]));
         setActiveChord(null);
-      } else {
+      } else if (!selected.has(chordId)) {
+        // Long-press on an unselected chord adds it.
         setSelected((prev) => {
           const next = new Set(prev);
-          if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
+          next.add(chordId);
           return next;
         });
       }
+      // Long-press on an already-selected chord is a no-op (becomes the
+      // drag-init gesture; HTML5 dragstart fires off the same pointerdown).
     }, 450);
   };
   const cancelPress = () => {
@@ -215,6 +219,17 @@ function PatternBlock({
           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
             onClick={() => shiftPatternChords(pattern.id, selectedIds, 1)} aria-label="Shift later">
             <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+          <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP)}
+            aria-label="Decrease length" title="Decrease length">
+            <Minus className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
+            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP)}
+            aria-label="Increase length (overflows to next block)" title="Increase length · overflows to next block">
+            <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
             onClick={() => { removePatternChordsBatch(pattern.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
@@ -415,9 +430,16 @@ function PatternBlock({
               <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
                 {formatBeats(c.lengthBeats)}b
               </span>
-              <Button size="icon" variant="outline" className="h-7 w-7" disabled={!canIncrease}
-                onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP)}
-                aria-label="Increase length" title="Increase length (+)">
+              <Button size="icon" variant="outline" className="h-7 w-7"
+                onClick={() => {
+                  if (canIncrease) {
+                    setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+                  } else {
+                    // No room left — overflow into the next pattern block.
+                    resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
+                  }
+                }}
+                aria-label="Increase length" title={canIncrease ? "Increase length (+)" : "Increase · overflow to next block"}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
               <Button size="icon" variant="ghost" className="h-7 w-7"
@@ -482,6 +504,9 @@ function SectionGroup({
   onRequestDeleteSection, onRequestDeleteBlock,
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
+  const updateSection = useSongStore((s) => s.updateSection);
+  const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
+  const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
 
@@ -508,6 +533,16 @@ function SectionGroup({
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 -ml-1 text-muted-foreground"
+          onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
+          aria-label={collapsed ? "Expand section" : "Collapse section"}
+          title={collapsed ? "Expand section" : "Collapse section"}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
         <span className="font-display text-lg ink-chord font-semibold">{displayName}</span>
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           {blocks.length} block{blocks.length === 1 ? "" : "s"}
@@ -555,7 +590,7 @@ function SectionGroup({
       </div>
 
       {/* Pattern blocks within this section */}
-      {blocks.map((p, i) => (
+      {!collapsed && blocks.map((p, i) => (
         <PatternBlock
           key={p.id}
           pattern={p}
@@ -574,14 +609,16 @@ function SectionGroup({
         />
       ))}
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => addPatternToSection(sectionId)}
-      >
-        <Plus className="h-3.5 w-3.5" /> Add pattern block
-      </Button>
+      {!collapsed && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => addPatternToSection(sectionId)}
+        >
+          <Plus className="h-3.5 w-3.5" /> Add pattern block
+        </Button>
+      )}
     </div>
   );
 }
@@ -592,7 +629,9 @@ export function ProgressionsTab() {
     basket, reorderPatternChord, movePatternChordToPatternAt, reorderSection,
     removeSection, removePatternBlock,
     suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
+    setAllSectionsCollapsed,
   } = useSongStore();
+  const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [drag, setDrag] = useState<{ fromPatternId: string; chordId: string } | null>(null);
   const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
@@ -647,9 +686,21 @@ export function ProgressionsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in the Lyrics tab.
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-xs text-muted-foreground flex-1">
+          Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in the Lyrics tab.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setAllSectionsCollapsed(!allCollapsed)}
+          aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+          title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+        >
+          {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+          <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
+        </Button>
+      </div>
 
       {groupedSections.map(({ section, blocks }) => (
         <SectionGroup

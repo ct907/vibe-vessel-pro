@@ -134,6 +134,13 @@ export interface SongState {
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
+  /**
+   * Grow or shrink one or more chords' lengths by `deltaBeats` each. If the new
+   * total exceeds the pattern's capacity, the rightmost chords overflow into the
+   * next pattern block in the same section (creating room by pushing existing
+   * chords right and cascading overflow further down if needed).
+   */
+  resizePatternChordsWithOverflow: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
@@ -1266,6 +1273,121 @@ export const useSongStore = create<SongState>((set, get) => ({
       return { ...p, chords: repackChords(next, totalBeats) };
     });
     return { progression };
+  }),
+
+  resizePatternChordsWithOverflow: (patternId, chordIds, deltaBeats) => set((s) => {
+    if (!chordIds.length || deltaBeats === 0) return {};
+    const sourcePattern = s.progression.find((p) => p.id === patternId);
+    if (!sourcePattern) return {};
+    const sectionId = sourcePattern.sectionId;
+    const sectionPatterns = s.progression.filter((p) => p.sectionId === sectionId);
+    const sourceIdx = sectionPatterns.findIndex((p) => p.id === patternId);
+
+    // 1) Apply delta to each selected chord (clamp to >= 0.5).
+    const idSet = new Set(chordIds);
+    const grown = sourcePattern.chords.map((c) =>
+      idSet.has(c.id) ? { ...c, lengthBeats: Math.max(0.5, c.lengthBeats + deltaBeats) } : c,
+    );
+    const sortedGrown = [...grown].sort((a, b) => a.startBeat - b.startBeat);
+
+    // 2) Re-pack left-to-right; anything that doesn't fit overflows.
+    const totalBeats = sourcePattern.bars * sourcePattern.beatsPerBar;
+    const fitted: PatternChord[] = [];
+    const overflow: PatternChord[] = [];
+    let cursor = 0;
+    for (const c of sortedGrown) {
+      const remaining = totalBeats - cursor;
+      if (remaining <= 0) {
+        overflow.push({ ...c });
+        continue;
+      }
+      if (c.lengthBeats <= remaining + 1e-9) {
+        fitted.push({ ...c, startBeat: cursor });
+        cursor += c.lengthBeats;
+      } else {
+        // Split: fit a prefix in this block, overflow the rest as a new chord.
+        // To keep the model simple we drop the prefix and push the FULL chord
+        // to the next block (preserves chord identity & mirrorId).
+        overflow.push({ ...c });
+      }
+    }
+
+    // 3) Build new section pattern list, distributing overflow into subsequent blocks.
+    const newPatterns: PatternBlock[] = sectionPatterns.map((p) => p);
+    newPatterns[sourceIdx] = { ...sourcePattern, chords: fitted };
+
+    let pending = overflow;
+    for (let i = sourceIdx + 1; i < newPatterns.length && pending.length > 0; i++) {
+      const blk = newPatterns[i];
+      const cap = blk.bars * blk.beatsPerBar;
+      // Prepend pending chords, then push existing chords right, repack, and
+      // any new overflow continues to the next block.
+      const merged = [
+        ...pending.map((c) => ({ ...c })),
+        ...blk.chords.map((c) => ({ ...c })),
+      ];
+      // Re-sequence sequentially (ignore startBeat) since we're prepending.
+      let cur = 0;
+      const fit2: PatternChord[] = [];
+      const over2: PatternChord[] = [];
+      for (const c of merged) {
+        const remaining = cap - cur;
+        if (remaining <= 0) { over2.push(c); continue; }
+        if (c.lengthBeats <= remaining + 1e-9) {
+          fit2.push({ ...c, startBeat: cur });
+          cur += c.lengthBeats;
+        } else {
+          over2.push(c);
+        }
+      }
+      newPatterns[i] = { ...blk, chords: fit2 };
+      pending = over2;
+    }
+
+    // 4) If still overflowing, append a new block at end of section to absorb it.
+    if (pending.length > 0) {
+      const lastInSection = newPatterns[newPatterns.length - 1];
+      const newId = nanoid();
+      const cap = (lastInSection?.bars ?? 4) * (lastInSection?.beatsPerBar ?? 4);
+      let cur = 0;
+      const fit3: PatternChord[] = [];
+      for (const c of pending) {
+        const remaining = cap - cur;
+        if (remaining <= 0) break;
+        const len = Math.min(c.lengthBeats, remaining);
+        fit3.push({ ...c, startBeat: cur, lengthBeats: len });
+        cur += len;
+      }
+      const newBlock: PatternBlock = {
+        id: newId,
+        sectionId,
+        label: `${lastInSection?.label ?? "Pattern"} +`,
+        bars: lastInSection?.bars ?? 4,
+        beatsPerBar: lastInSection?.beatsPerBar ?? 4,
+        chords: fit3,
+      };
+      newPatterns.push(newBlock);
+    }
+
+    // 5) Splice the rebuilt section back into the global progression in place,
+    //    preserving original positions of other-section blocks.
+    const sectionBlockIds = new Set(sectionPatterns.map((p) => p.id));
+    const rebuilt: PatternBlock[] = [];
+    let inserted = false;
+    for (const p of s.progression) {
+      if (sectionBlockIds.has(p.id)) {
+        if (!inserted) {
+          rebuilt.push(...newPatterns);
+          inserted = true;
+        }
+        // skip — already added via newPatterns
+      } else {
+        rebuilt.push(p);
+      }
+    }
+    if (!inserted) rebuilt.push(...newPatterns);
+
+    return { progression: rebuilt };
   }),
 
   reorderPatternChord: (patternId, chordId, toIndex) => set((s) => {
