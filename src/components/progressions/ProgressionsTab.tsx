@@ -629,7 +629,9 @@ export function ProgressionsTab() {
     basket, reorderPatternChord, movePatternChordToPatternAt, reorderSection,
     removeSection, removePatternBlock,
     suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning,
+    setAllSectionsCollapsed,
   } = useSongStore();
+  const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [drag, setDrag] = useState<{ fromPatternId: string; chordId: string } | null>(null);
   const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
