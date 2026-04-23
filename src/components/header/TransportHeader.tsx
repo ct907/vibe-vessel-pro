@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Play, Square, Minus, Plus, Save, Upload, BookOpen, Menu, Sun, Moon } from "lucide-react";
+import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2 } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { Music2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   isPlaying: boolean;
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
-  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning } = useSongStore();
+  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning, undo, redo, canUndo, canRedo } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
@@ -29,6 +30,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
+  const isMobile = useIsMobile();
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
 
@@ -138,6 +140,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                   variant="outline"
                   className="justify-start border border-border"
                   onClick={() => {
+                    setSoundOpen(true);
+                    setNavOpen(false);
+                  }}
+                >
+                  <Music2 className="h-4 w-4" /> Sound
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => {
                     downloadProjectJSON(
                       meta.title.replace(/\s+/g, "-").toLowerCase() + ".json",
                     );
@@ -179,35 +191,55 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           </Sheet>
         </div>
 
-        {/* Row 2 (was row 3): Transpose + Play */}
+        {/* Row 2 (was row 3): Transpose + Play + Undo/Redo */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1 hidden sm:inline">Transpose</span>
-            <span className="text-xs text-muted-foreground mr-0.5 sm:hidden" aria-hidden>⇅</span>
             <Button
               variant="outline"
               size="icon"
               className="h-7 w-7"
               onClick={() => stepTranspose(-1)}
-              aria-label="Down semitone"
+              aria-label="Transpose down semitone"
             >
-              <Minus className="h-3.5 w-3.5" />
+              <span aria-hidden className="text-base leading-none">−</span>
             </Button>
-            <span className="font-mono-chord text-xs w-6 text-center tabular-nums">
-              {fmtOffset(transposeOffset)}
+            <span className="font-mono-chord text-xs px-1.5 text-center tabular-nums whitespace-nowrap">
+              {isMobile ? "Transp" : "Transpose"} {fmtOffset(transposeOffset)}
             </span>
             <Button
               variant="outline"
               size="icon"
               className="h-7 w-7"
               onClick={() => stepTranspose(1)}
-              aria-label="Up semitone"
+              aria-label="Transpose up semitone"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <span aria-hidden className="text-base leading-none">+</span>
             </Button>
           </div>
 
           <div className="flex items-center gap-1 ml-auto">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => undo()}
+              disabled={!canUndo()}
+              aria-label="Undo"
+              title="Undo (⌘/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => redo()}
+              disabled={!canRedo()}
+              aria-label="Redo"
+              title="Redo (⌘/Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
             {!isPlaying ? (
               <Button size="sm" onClick={handlePlay}>
                 <Play className="h-4 w-4" /> Play
@@ -217,9 +249,6 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 <Square className="h-4 w-4" /> Stop
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setSoundOpen(true)} aria-label="Sound settings">
-              <Music2 className="h-4 w-4" /> Sound
-            </Button>
           </div>
         </div>
 

@@ -30,6 +30,21 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
+/** Parse "Amaj7 G#maj7 Dmaj7" (or comma/newline separated) into chord clips. */
+function parseChordTextToClips(text: string): ChordClip[] {
+  const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
+  const clips: ChordClip[] = [];
+  let cursor = 0;
+  for (const tok of tokens) {
+    const c = parseChord(tok);
+    if (!c) continue;
+    const w = Math.max(1, c.display.length) + 1;
+    clips.push({ chord: c, relCol: cursor, widthCh: w });
+    cursor += w;
+  }
+  return clips;
+}
+
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
 const colOf = (a: { chordCol?: number; offset?: number }) => a.chordCol ?? a.offset ?? 0;
@@ -83,6 +98,21 @@ function LineRow({
   const lastSelectedRef = useRef<string | null>(null);
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
+  // Long-press-on-empty-space paste popover.
+  const [pastePopover, setPastePopover] = useState<null | { col: number; x: number }>(null);
+  const pastePressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Outside-tap closes the paste popover.
+  useEffect(() => {
+    if (!pastePopover) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (rowRef.current && rowRef.current.contains(t)) return;
+      setPastePopover(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [pastePopover]);
   // Pointer-based multi-chord drag state.
   const [drag, setDrag] = useState<null | {
     pointerId: number;
@@ -170,9 +200,20 @@ function LineRow({
     removeChordAnchorsBatch(sectionId, line.id, Array.from(selected));
     exitSelect();
   };
-  const doPaste = () => {
-    if (!chordClipboard.length) return;
-    pasteChordsAt(sectionId, line.id, chordCaret, chordClipboard);
+  const doPaste = async (atCol?: number) => {
+    const col = atCol ?? chordCaret;
+    // Prefer OS clipboard if it parses into chords (lets users paste typed
+    // chord runs like "Amaj7 G#maj7 Dmaj7" directly into the row).
+    let clip: ChordClip[] = [];
+    try {
+      const text = await navigator.clipboard?.readText();
+      if (text && text.trim()) {
+        clip = parseChordTextToClips(text);
+      }
+    } catch { /* clipboard read denied — fall back */ }
+    if (!clip.length) clip = chordClipboard;
+    if (!clip.length) return;
+    pasteChordsAt(sectionId, line.id, col, clip);
   };
 
   // Effective row length must account for the visual width of each chord chip,
@@ -573,6 +614,37 @@ function LineRow({
         onKeyDown={handleChordKeyDown}
         onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
         onBlur={() => setChordFocused(false)}
+        onPointerDown={(e) => {
+          // Long-press on empty space (not on a chip) opens the paste menu.
+          const t = e.target as HTMLElement;
+          if (t.closest("[data-chip-anchor]")) return;
+          if (pastePressTimerRef.current) clearTimeout(pastePressTimerRef.current);
+          const rect = chordRowRef.current!.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
+          pastePressTimerRef.current = setTimeout(() => {
+            setPastePopover({ col, x: px });
+          }, 500);
+        }}
+        onPointerMove={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onPointerUp={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onPointerCancel={() => {
+          if (pastePressTimerRef.current) { clearTimeout(pastePressTimerRef.current); pastePressTimerRef.current = null; }
+        }}
+        onContextMenu={(e) => {
+          // Right-click also opens the paste popover (desktop convenience).
+          const t = e.target as HTMLElement;
+          if (t.closest("[data-chip-anchor]")) return;
+          e.preventDefault();
+          const rect = chordRowRef.current!.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
+          setPastePopover({ col, x: px });
+        }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
         onDrop={(e) => {
           e.preventDefault();
@@ -737,6 +809,31 @@ function LineRow({
         })()}
       </div>
 
+      {/* Long-press paste popover for empty chord-row spaces. */}
+      {pastePopover && (
+        <div
+          className="absolute z-[80] mt-1 flex items-center gap-1 rounded-md border border-border bg-popover px-1.5 py-1 shadow-lg text-xs"
+          style={{ left: `${pastePopover.x}px`, top: "100%" }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={async () => {
+              const col = pastePopover.col;
+              setPastePopover(null);
+              await doPaste(col);
+            }}
+          >
+            <ClipboardPaste className="h-3.5 w-3.5" /> Paste chords
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPastePopover(null)}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
       {/* Hidden text input — used on mobile so the soft keyboard stays open
           while the user types/presses Space inside the chord row. */}
       <input
@@ -794,7 +891,7 @@ function LineRow({
               <Copy className="h-3.5 w-3.5" />
             </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7"
-              onClick={doPaste} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
+              onClick={() => doPaste()} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
               <ClipboardPaste className="h-3.5 w-3.5" />
             </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
@@ -970,7 +1067,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
       }}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2 mb-3 -ml-4">
+      <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
           value={section.type}
           onValueChange={(v) => {
