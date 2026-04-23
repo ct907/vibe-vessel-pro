@@ -203,6 +203,8 @@ function LineRow({
     const onDocPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
+      // Suppress outside-tap-exit while a pointer drag is in progress.
+      if (dragRef2.current) return;
       if (rowRef.current && rowRef.current.contains(t)) return;
       // Allow interactions with the picker sheet too (so users can switch).
       if (t.closest("[data-radix-dialog-content]")) return;
