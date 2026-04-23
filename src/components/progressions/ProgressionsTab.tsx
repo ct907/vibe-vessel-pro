@@ -430,9 +430,16 @@ function PatternBlock({
               <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
                 {formatBeats(c.lengthBeats)}b
               </span>
-              <Button size="icon" variant="outline" className="h-7 w-7" disabled={!canIncrease}
-                onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP)}
-                aria-label="Increase length" title="Increase length (+)">
+              <Button size="icon" variant="outline" className="h-7 w-7"
+                onClick={() => {
+                  if (canIncrease) {
+                    setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+                  } else {
+                    // No room left — overflow into the next pattern block.
+                    resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
+                  }
+                }}
+                aria-label="Increase length" title={canIncrease ? "Increase length (+)" : "Increase · overflow to next block"}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
               <Button size="icon" variant="ghost" className="h-7 w-7"
