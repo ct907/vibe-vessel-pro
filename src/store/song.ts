@@ -134,6 +134,13 @@ export interface SongState {
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
+  /**
+   * Grow or shrink one or more chords' lengths by `deltaBeats` each. If the new
+   * total exceeds the pattern's capacity, the rightmost chords overflow into the
+   * next pattern block in the same section (creating room by pushing existing
+   * chords right and cascading overflow further down if needed).
+   */
+  resizePatternChordsWithOverflow: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
