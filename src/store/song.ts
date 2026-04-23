@@ -109,6 +109,11 @@ export interface SongState {
     fromSectionId: string, fromLineId: string, anchorId: string,
     toSectionId: string, toLineId: string, toCol: number,
   ) => void;
+  moveSelectedChordsTo: (
+    fromSectionId: string, fromLineId: string,
+    toSectionId: string, toLineId: string, toCol: number,
+    anchorIds: string[],
+  ) => void;
   pasteChordsAt: (
     sectionId: string, lineId: string, atCol: number,
     chords: { chord: ChordSymbol; relCol: number; widthCh: number }[],
