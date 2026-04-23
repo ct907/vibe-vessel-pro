@@ -151,7 +151,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     <header className="border-b border-border bg-paper/85">
       <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3">
         {/* Row 1: Logo + Title + Nav menu */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-between">
           <BookOpen className="h-5 w-5 ink-chord" />
           <Input
             value={meta.title}
@@ -162,7 +162,13 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           {/* Nav menu (top right of first row) */}
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-10 w-10 ml-auto" aria-label="Open menu">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10
+                "
+                aria-label="Open menu"
+              >
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
