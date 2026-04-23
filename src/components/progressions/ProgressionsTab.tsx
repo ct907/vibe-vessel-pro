@@ -385,6 +385,24 @@ function PatternBlock({
               className="absolute top-full mt-1 flex items-center gap-1 rounded-md border border-border bg-card px-1 py-1 shadow-sm z-10"
               style={{ left: `calc(${leftPct}% + ${widthPct / 2}%)`, transform: "translateX(-50%)" }}
             >
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 px-2 text-xs"
+                onClick={async () => {
+                  await ensureAudio();
+                  setStartFromChord(pattern.id, c.id);
+                  setActiveChord(null);
+                  // Stop any current playback then request a fresh play.
+                  setIsPlayingStore(false);
+                  setCurrent(null);
+                  window.dispatchEvent(new Event("lovable:request-play"));
+                }}
+                aria-label="Play from here"
+                title="Play from here"
+              >
+                <Play className="h-3.5 w-3.5" /> Play from here
+              </Button>
               <Button size="icon" variant="ghost" className="h-7 w-7"
                 onClick={() => movePatternChord(pattern.id, c.id, -1)} aria-label="Move earlier" title="Move earlier">
                 <ArrowLeft className="h-3.5 w-3.5" />
