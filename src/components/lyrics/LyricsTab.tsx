@@ -820,7 +820,7 @@ function LineRow({
               <Copy className="h-3.5 w-3.5" />
             </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7"
-              onClick={doPaste} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
+              onClick={() => doPaste()} aria-label="Paste" title="Paste (⌘/Ctrl+V)">
               <ClipboardPaste className="h-3.5 w-3.5" />
             </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
