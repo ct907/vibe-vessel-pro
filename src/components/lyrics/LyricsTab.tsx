@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ChevronDown, ChevronRight, MoreVertical, Copy, ArrowUp, ArrowDown, Pencil, MessageSquare, Scissors, ClipboardPaste, CheckSquare, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
@@ -51,16 +52,19 @@ interface LineRowProps {
   /** Live query from the chord picker (only meaningful when active). */
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
+  /** Multi-chord pointer-based drag-and-drop across rows. */
+  onMultiDragStart?: (sectionId: string, lineId: string, anchorIds: string[]) => void;
 }
 
 function LineRow({
   sectionId, line, active, isFirst, onAddLineAfter, onMergeUp, onPickerOpen, cellPx, onChordFocus,
-  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange,
+  onChordDragStart, onChordDrop, chordRowQuery, onChordRowQueryChange, onMultiDragStart,
 }: LineRowProps) {
   const {
     setLineText, upsertChordAt,
     removeChordAnchor, removeChordAnchorsBatch, moveSelectedChordsByOrder,
     setChordRowLen, insertChordSpaceAt, removeChordCellAt, pasteChordsAt,
+    moveSelectedChordsTo,
     undo, redo,
   } = useSongStore();
   const playbackCurrent = usePlaybackStore((s) => s.current);
@@ -69,7 +73,9 @@ function LineRow({
   const playingAnchorId = isPlaying && playbackCurrent?.mirrorId ? playbackCurrent.mirrorId : null;
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const chordRowRef = useRef<HTMLDivElement>(null);
+  const keyHostRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [chordCaret, setChordCaret] = useState(0); // column index in chord row
   const [chordFocused, setChordFocused] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -77,6 +83,21 @@ function LineRow({
   const lastSelectedRef = useRef<string | null>(null);
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
+  // Pointer-based multi-chord drag state.
+  const [drag, setDrag] = useState<null | {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    active: boolean;
+    ids: string[];
+    displays: string[];
+    targetLineId?: string;
+    targetCol?: number;
+  }>(null);
+  const dragRef2 = useRef<typeof drag>(null);
+  dragRef2.current = drag;
 
   // Auto-resize lyric textarea to fit wrapped content.
   useLayoutEffect(() => {
@@ -86,16 +107,34 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll the active row to ~80px below the top of the visual viewport
-  // whenever it becomes the active (picker-open) row.
+  // Scroll the active row into view, recomputing as the visualViewport changes
+  // (e.g. when the mobile soft keyboard appears and shrinks vv.height).
   useEffect(() => {
     if (!active || !rowRef.current) return;
     const el = rowRef.current;
-    const rect = el.getBoundingClientRect();
-    const targetTop = 80;
-    const delta = rect.top - targetTop;
-    // Use the visualViewport offset if present so mobile keyboards behave.
-    window.scrollBy({ top: delta, behavior: "smooth" });
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const scrollIntoView = () => {
+      if (!el.isConnected) return;
+      const rect = el.getBoundingClientRect();
+      const vvTop = vv?.offsetTop ?? 0;
+      const targetTop = vvTop + 80;
+      const delta = rect.top - targetTop;
+      if (Math.abs(delta) < 2) return;
+      window.scrollBy({ top: delta, behavior: "smooth" });
+    };
+    scrollIntoView();
+    const settle = window.setTimeout(scrollIntoView, 200);
+    if (vv) {
+      vv.addEventListener("resize", scrollIntoView);
+      vv.addEventListener("scroll", scrollIntoView);
+    }
+    return () => {
+      window.clearTimeout(settle);
+      if (vv) {
+        vv.removeEventListener("resize", scrollIntoView);
+        vv.removeEventListener("scroll", scrollIntoView);
+      }
+    };
   }, [active]);
 
   // Build a clipboard payload from the current selection.
@@ -165,6 +204,8 @@ function LineRow({
     const onDocPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
+      // Suppress outside-tap-exit while a pointer drag is in progress.
+      if (dragRef2.current) return;
       if (rowRef.current && rowRef.current.contains(t)) return;
       // Allow interactions with the picker sheet too (so users can switch).
       if (t.closest("[data-radix-dialog-content]")) return;
@@ -177,7 +218,11 @@ function LineRow({
 
   // ---------- Chord row interactions ----------
   const focusChord = () => {
-    chordRowRef.current?.focus();
+    if (isMobile && keyHostRef.current) {
+      keyHostRef.current.focus({ preventScroll: true });
+    } else {
+      chordRowRef.current?.focus();
+    }
     setChordFocused(true);
     onChordFocus(line.id);
   };
@@ -448,6 +493,65 @@ function LineRow({
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
   const selectedIds = Array.from(selected);
 
+  // Pointer-based drag for multi-selected chords (touch + mouse).
+  useEffect(() => {
+    if (!drag) return;
+    const DRAG_THRESHOLD = 6;
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
+
+      // Compute hit-tested target chord row (if any).
+      let targetLineId: string | undefined;
+      let targetCol: number | undefined;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const rowEl = hit?.closest("[data-chord-row]") as HTMLElement | null;
+      if (rowEl) {
+        targetLineId = rowEl.getAttribute("data-chord-row") ?? undefined;
+        const r = rowEl.getBoundingClientRect();
+        targetCol = Math.max(0, Math.round((ev.clientX - r.left) / Math.max(cellPx, 1)));
+      }
+
+      setDrag((prev) => prev ? {
+        ...prev,
+        x: ev.clientX,
+        y: ev.clientY,
+        active: prev.active || moved,
+        targetLineId,
+        targetCol,
+      } : prev);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const cur = dragRef2.current;
+      setDrag(null);
+      if (!cur || !cur.active) return;
+      if (!cur.targetLineId || cur.targetCol == null) return;
+
+      // Determine target section by walking the DOM up from the row el.
+      const rowEl = document.querySelector<HTMLElement>(`[data-chord-row="${cur.targetLineId}"]`);
+      const sectionEl = rowEl?.closest("[data-section-id]") as HTMLElement | null;
+      const toSectionId = sectionEl?.getAttribute("data-section-id") ?? sectionId;
+
+      moveSelectedChordsTo(sectionId, line.id, toSectionId, cur.targetLineId, cur.targetCol, cur.ids);
+      exitSelect();
+    };
+
+    const onCancel = () => setDrag(null);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+  }, [drag?.pointerId]); // re-bind only when a new drag starts
   return (
     <div
       ref={rowRef}
@@ -541,20 +645,44 @@ function LineRow({
             focusChord();
             onPickerOpen(line.id, col, a.id);
           };
+          // Begin a pointer drag from this chip when in selectMode and chip is selected.
+          const beginPointerDrag = (e: React.PointerEvent) => {
+            if (!selectMode || !selected.has(a.id)) return;
+            // Use selected set as the drag payload.
+            const ids = Array.from(selected);
+            const displays = sortedChords
+              .filter((c) => selected.has(c.id))
+              .map((c) => c.chord.display);
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            setDrag({
+              pointerId: e.pointerId,
+              startX: e.clientX,
+              startY: e.clientY,
+              x: e.clientX,
+              y: e.clientY,
+              active: false,
+              ids,
+              displays,
+            });
+            onMultiDragStart?.(sectionId, line.id, ids);
+          };
           return (
             <div
               key={a.id}
               data-chip-anchor={a.id}
               className="absolute top-0 leading-7"
               style={{ left: `${col * cellPx}px` }}
-              draggable
+              draggable={!selectMode}
               onDragStart={(e) => {
                 e.stopPropagation();
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", a.chord.display);
                 onChordDragStart(a.id);
               }}
+              onPointerDown={beginPointerDrag}
               onClick={(e) => {
+                // Suppress click if we just dragged.
+                if (drag?.active) { e.stopPropagation(); e.preventDefault(); return; }
                 e.stopPropagation();
                 handleChipTap(e);
               }}
@@ -566,7 +694,13 @@ function LineRow({
                 selected={selectMode && isSel}
                 audition
                 onLongPress={() => {
-                  if (selectMode) toggleSelected(a.id); else enterSelect(a.id);
+                  if (selectMode) {
+                    // If already selected, do nothing — the user is about to drag.
+                    if (selected.has(a.id)) return;
+                    toggleSelected(a.id);
+                  } else {
+                    enterSelect(a.id);
+                  }
                   lastSelectedRef.current = a.id;
                 }}
               />
@@ -602,6 +736,45 @@ function LineRow({
           );
         })()}
       </div>
+
+      {/* Hidden text input — used on mobile so the soft keyboard stays open
+          while the user types/presses Space inside the chord row. */}
+      <input
+        ref={keyHostRef}
+        data-chord-row-keyhost={line.id}
+        aria-hidden
+        tabIndex={-1}
+        inputMode="text"
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        className="absolute opacity-0 pointer-events-none"
+        style={{ left: 0, top: 0, width: 1, height: 1 }}
+        onKeyDown={(e) => handleChordKeyDown(e as unknown as React.KeyboardEvent<HTMLDivElement>)}
+        onFocus={() => { setChordFocused(true); onChordFocus(line.id); }}
+        onBlur={() => setChordFocused(false)}
+        onChange={() => { /* swallow — we only consume keydown */ }}
+      />
+
+      {/* Drag insert marker on the target chord row. */}
+      {drag?.active && drag.targetLineId === line.id && drag.targetCol != null && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 h-7 w-px bg-primary pointer-events-none"
+          style={{ left: `${drag.targetCol * cellPx}px` }}
+        />
+      )}
+
+      {/* Floating drag ghost (rendered while this row owns the drag). */}
+      {drag?.active && (
+        <div
+          aria-hidden
+          className="fixed z-[100] pointer-events-none rounded-md border border-primary/60 bg-card/95 shadow-lg px-2 py-1 font-mono-chord text-xs ink-chord"
+          style={{ left: drag.x + 12, top: drag.y + 8 }}
+        >
+          {drag.displays.join(" ")}
+        </div>
+      )}
 
       {selectMode && (
         <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs">
@@ -776,6 +949,7 @@ function SectionCard({ section, index, total, displayName, activeLineId, onPicke
   return (
     <div
       ref={cardRef}
+      data-section-id={section.id}
       className={cn(
         "paper-card rounded-xl px-5 py-5 transition-shadow",
         isSectionDragOver && "ring-2 ring-primary/60",
@@ -1059,7 +1233,7 @@ function useCellPx(): number {
 }
 
 export function LyricsTab() {
-  const { sections, upsertChordAt, removeChordAnchor, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
@@ -1100,10 +1274,6 @@ export function LyricsTab() {
     // appears next to it rather than overlapping.
     const advance = Math.max(1, chord.display.length) + 1;
     setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
-  };
-  const handleRemove = () => {
-    if (!picker?.anchorId) return;
-    removeChordAnchor(picker.sectionId, picker.lineId, picker.anchorId);
   };
 
   const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
@@ -1164,7 +1334,6 @@ export function LyricsTab() {
         onOpenChange={(o) => { if (!o) setPicker(null); }}
         initialChord={initialChord}
         onPick={handlePick}
-        onRemove={picker?.anchorId ? handleRemove : undefined}
         activeLineId={picker?.lineId}
         query={pickerQuery}
         onQueryChange={setPickerQuery}

@@ -180,29 +180,30 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
         </div>
 
         {/* Row 2 (was row 3): Transpose + Play */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Transpose</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1 hidden sm:inline">Transpose</span>
+            <span className="text-xs text-muted-foreground mr-0.5 sm:hidden" aria-hidden>⇅</span>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={() => stepTranspose(-1)}
               aria-label="Down semitone"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-3.5 w-3.5" />
             </Button>
-            <span className="font-mono-chord text-sm w-8 text-center tabular-nums">
+            <span className="font-mono-chord text-xs w-6 text-center tabular-nums">
               {fmtOffset(transposeOffset)}
             </span>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={() => stepTranspose(1)}
               aria-label="Up semitone"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
 
@@ -258,7 +259,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               max={220}
               value={meta.bpm}
               onChange={(e) => setBpm(Number(e.target.value))}
-              className="h-8 w-16 font-mono-chord"
+              className="h-8 w-14 px-1 text-center font-mono-chord [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>

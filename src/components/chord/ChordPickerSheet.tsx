@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
-import { Trash2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
@@ -17,7 +17,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   initialChord?: ChordSymbol;
   onPick: (chord: ChordSymbol) => void;
-  onRemove?: () => void;
   /** Active chord row's line id — used so ArrowUp/Down can refocus it. */
   activeLineId?: string;
   /** Optional controlled query (kept in sync with the active chord row). */
@@ -25,7 +24,7 @@ interface Props {
   onQueryChange?: (q: string) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onRemove, activeLineId, query: queryProp, onQueryChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, query: queryProp, onQueryChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -233,13 +232,6 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onR
             </div>
           )}
 
-          {onRemove && (
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <Button variant="ghost" size="sm" onClick={() => { onRemove(); onOpenChange(false); }}>
-                <Trash2 className="h-4 w-4" /> Remove chord
-              </Button>
-            </div>
-          )}
         </div>
       </SheetContent>
     </Sheet>
