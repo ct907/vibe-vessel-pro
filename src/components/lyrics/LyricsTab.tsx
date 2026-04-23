@@ -1309,15 +1309,17 @@ function useCellPx(): number {
   return px;
 }
 
-export function LyricsTab() {
-  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, reorderSection } = useSongStore();
+interface LyricsTabProps {
+  sortMode?: boolean;
+}
+
+export function LyricsTab({ sortMode = false }: LyricsTabProps) {
+  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, moveSection } = useSongStore();
   const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(null);
   // Shared chord query: typed in either the picker input OR the active chord row.
   const [pickerQuery, setPickerQuery] = useState("");
   // Track which chord chip is being dragged (across rows / sections).
   const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
-  // Track section drag-and-drop state.
-  const [sectionDrag, setSectionDrag] = useState<{ id: string; overId?: string } | null>(null);
 
   const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
     // Basket steals focus: while it has items, the chord picker cannot open.
@@ -1345,10 +1347,6 @@ export function LyricsTab() {
     if (!picker) return;
     upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
     setPickerQuery("");
-    // After committing, drop the anchor so subsequent typing creates a NEW
-    // chord instead of editing the one we just placed. Advance the caret
-    // past the placed chord (display width + 1 space) so the next chord
-    // appears next to it rather than overlapping.
     const advance = Math.max(1, chord.display.length) + 1;
     setPicker((prev) => prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev);
   };
@@ -1378,21 +1376,11 @@ export function LyricsTab() {
           onChordDrop={handleChordDrop}
           chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
           onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
-          onSectionDragStart={(id) => setSectionDrag({ id })}
-          onSectionDragOver={(overId) => {
-            setSectionDrag((prev) => (prev && prev.overId !== overId ? { ...prev, overId } : prev));
-          }}
-          onSectionDragEnd={() => {
-            const sd = sectionDrag;
-            if (sd && sd.overId && sd.overId !== sd.id) {
-              const targetIdx = sections.findIndex((x) => x.id === sd.overId);
-              if (targetIdx >= 0) reorderSection(sd.id, targetIdx);
-            }
-            setSectionDrag(null);
-          }}
-          isSectionDragOver={sectionDrag?.overId === sec.id && sectionDrag?.id !== sec.id}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
         />
       ))}
+
 
       <div className={cn("flex flex-wrap items-center gap-2")}>
         <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
