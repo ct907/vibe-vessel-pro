@@ -590,7 +590,7 @@ function SectionGroup({
       </div>
 
       {/* Pattern blocks within this section */}
-      {blocks.map((p, i) => (
+      {!collapsed && blocks.map((p, i) => (
         <PatternBlock
           key={p.id}
           pattern={p}
@@ -609,14 +609,16 @@ function SectionGroup({
         />
       ))}
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => addPatternToSection(sectionId)}
-      >
-        <Plus className="h-3.5 w-3.5" /> Add pattern block
-      </Button>
+      {!collapsed && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => addPatternToSection(sectionId)}
+        >
+          <Plus className="h-3.5 w-3.5" /> Add pattern block
+        </Button>
+      )}
     </div>
   );
 }
