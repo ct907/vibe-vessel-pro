@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
-  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning } = useSongStore();
+  const { meta, setTitle, setKey, setBpm, transposeSong, progression, suppressCrossTabDeleteWarning, setSuppressCrossTabDeleteWarning, undo, redo, canUndo, canRedo } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
@@ -30,6 +30,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
+  const isMobile = useIsMobile();
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
 
