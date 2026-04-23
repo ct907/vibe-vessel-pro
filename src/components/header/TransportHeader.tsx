@@ -181,35 +181,55 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           </Sheet>
         </div>
 
-        {/* Row 2 (was row 3): Transpose + Play */}
+        {/* Row 2 (was row 3): Transpose + Play + Undo/Redo */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1 hidden sm:inline">Transpose</span>
-            <span className="text-xs text-muted-foreground mr-0.5 sm:hidden" aria-hidden>⇅</span>
             <Button
               variant="outline"
               size="icon"
               className="h-7 w-7"
               onClick={() => stepTranspose(-1)}
-              aria-label="Down semitone"
+              aria-label="Transpose down semitone"
             >
-              <Minus className="h-3.5 w-3.5" />
+              <span aria-hidden className="text-base leading-none">−</span>
             </Button>
-            <span className="font-mono-chord text-xs w-6 text-center tabular-nums">
-              {fmtOffset(transposeOffset)}
+            <span className="font-mono-chord text-xs px-1.5 text-center tabular-nums whitespace-nowrap">
+              {isMobile ? "Transp" : "Transpose"} {fmtOffset(transposeOffset)}
             </span>
             <Button
               variant="outline"
               size="icon"
               className="h-7 w-7"
               onClick={() => stepTranspose(1)}
-              aria-label="Up semitone"
+              aria-label="Transpose up semitone"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <span aria-hidden className="text-base leading-none">+</span>
             </Button>
           </div>
 
           <div className="flex items-center gap-1 ml-auto">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => undo()}
+              disabled={!canUndo()}
+              aria-label="Undo"
+              title="Undo (⌘/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => redo()}
+              disabled={!canRedo()}
+              aria-label="Redo"
+              title="Redo (⌘/Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
             {!isPlaying ? (
               <Button size="sm" onClick={handlePlay}>
                 <Play className="h-4 w-4" /> Play
@@ -219,9 +239,6 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 <Square className="h-4 w-4" /> Stop
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setSoundOpen(true)} aria-label="Sound settings">
-              <Music2 className="h-4 w-4" /> Sound
-            </Button>
           </div>
         </div>
 
