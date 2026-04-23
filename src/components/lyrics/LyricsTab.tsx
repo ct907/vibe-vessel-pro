@@ -98,6 +98,9 @@ function LineRow({
   const lastSelectedRef = useRef<string | null>(null);
   const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
   const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
+  // Long-press-on-empty-space paste popover.
+  const [pastePopover, setPastePopover] = useState<null | { col: number; x: number }>(null);
+  const pastePressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Pointer-based multi-chord drag state.
   const [drag, setDrag] = useState<null | {
     pointerId: number;
