@@ -52,7 +52,7 @@
     --chord-chip: 28 90% 60%; /* warm orange chord chip background */
     --chord-chip-foreground: 25 30% 15%;
 
-    --shadow-paper: 0 1px 0 hsl(35 25% 78% / 0.6), 0 8px 24px -12px hsl(25 25% 18% / 0.18);
+    --shadow-paper: -16px 0 0 hsl(var(--card)), 16px 0 0 hsl(var(--card)), 0 8px 24px -12px hsl(25 25% 18% / 0.18);
 
     /* Sidebar (unused but kept for shadcn) */
     --sidebar-background: 40 45% 96%;
