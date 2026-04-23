@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, GripVertical, Play } from "lucide-react";
+import { ensureAudio } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
 
