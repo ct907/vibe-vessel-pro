@@ -776,7 +776,7 @@ function LineRow({
       >
         {/* Placeholder */}
         {line.chords.length === 0 && (line.chordRowLen ?? 0) === 0 && !chordFocused && (
-          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none">
+          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-6">
             add your chords here
           </span>
         )}
@@ -1275,8 +1275,10 @@ function SectionCard({
           }}
           disabled={sortMode}
         >
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6
-          ">
+          <SelectTrigger
+            className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6
+          "
+          >
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
