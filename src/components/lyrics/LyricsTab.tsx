@@ -374,7 +374,7 @@ function LineRow({
                               "w-full h-full flex items-center justify-center px-0.5",
                               hideForMulti && "opacity-30",
                             )}
-                            style={{ ...dragProvided.draggableProps.style }}
+                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (e.shiftKey) {
