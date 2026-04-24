@@ -321,50 +321,7 @@ function PatternBlock({
         </Button>
       </div>
 
-      {selectMode && (
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs">
-          <span className="font-medium">{selectedIds.length} selected</span>
-          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => shiftPatternChords(pattern.id, selectedIds, -1)} aria-label="Shift earlier">
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => shiftPatternChords(pattern.id, selectedIds, 1)} aria-label="Shift later">
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground ml-1">Length</span>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP)}
-            aria-label="Decrease length" title="Decrease length">
-            <Minus className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP)}
-            aria-label="Increase length (overflows to next block)" title="Increase length · overflows to next block">
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
-            onClick={() => { removePatternChordsBatch(pattern.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-          {otherPatterns.length > 0 && (
-            <Select
-              value=""
-              onValueChange={(toId) => { movePatternChordsTo(pattern.id, toId, selectedIds); exitSelect(); }}
-            >
-              <SelectTrigger className="h-7 w-[140px] text-xs" disabled={!selectedIds.length}>
-                <SelectValue placeholder="Move to…" />
-              </SelectTrigger>
-              <SelectContent>
-                {otherPatterns.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={exitSelect}>Done</Button>
-        </div>
-      )}
+      {/* Toolbar moved below the pattern grid (#7). */}
 
       <div className="relative">
         <div
