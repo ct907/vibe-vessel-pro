@@ -715,11 +715,6 @@ function PatternBlock({
         );
       })()}
 
-      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-        Tap to focus & audition · Long-press / Shift-click to multi-select · Double-tap to edit · Drag selection across
-        blocks · Del to delete
-      </p>
-
       {basket.length > 0 && (
         <div className="mt-3">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">From basket</p>
