@@ -1,5 +1,21 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useSongStore, getSectionDisplayName, type LyricLine, type Section, type SectionType } from "@/store/song";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+  type DraggableProvided,
+  type DraggableStateSnapshot,
+} from "@hello-pangea/dnd";
+import {
+  useSongStore,
+  getSectionDisplayName,
+  CHORD_ROW_SLOTS,
+  type LyricLine,
+  type Section,
+  type SectionType,
+  type ChordAnchor,
+} from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
@@ -13,7 +29,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -45,26 +60,21 @@ import {
   ArrowDown,
   Pencil,
   MessageSquare,
-  Scissors,
   ClipboardPaste,
-  CheckSquare,
-  Brush,
+  Scissors,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
+import { useDndSelection } from "@/hooks/use-dnd-selection";
 
-// Module-scoped chord clipboard (cut/copy/paste across rows).
+// Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
+// shape as before so OS-clipboard chord parsing still works the same way.
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
-/** Parse "Amaj7 G#maj7 Dmaj7" (or comma/newline separated) into chord clips. */
 function parseChordTextToClips(text: string): ChordClip[] {
-  const tokens = text
-    .split(/[\s,;|\n\r\t]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
   const clips: ChordClip[] = [];
   let cursor = 0;
   for (const tok of tokens) {
@@ -79,7 +89,23 @@ function parseChordTextToClips(text: string): ChordClip[] {
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
-const colOf = (a: { chordCol?: number; offset?: number }) => a.chordCol ?? a.offset ?? 0;
+// Used by sortAnchors-style fallbacks during legacy reads.
+const slotOf = (a: ChordAnchor): number =>
+  a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
+
+/** Build a slot → chord map for one line. Slots without a chord map to undefined. */
+function chordsBySlot(line: LyricLine): (ChordAnchor | undefined)[] {
+  const out: (ChordAnchor | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
+  line.chords.forEach((c) => {
+    const s = c.slotIndex;
+    if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) out[s] = c;
+  });
+  return out;
+}
+
+// =============================================================================
+//                                LineRow
+// =============================================================================
 
 interface LineRowProps {
   sectionId: string;
@@ -87,55 +113,36 @@ interface LineRowProps {
   active?: boolean;
   isFirst: boolean;
   onAddLineAfter: () => string | void;
-  onMergeUp: (
-    kind: "lyric" | "chord",
-    currentRowText: string,
-    currentRowChordsCount: number,
-    currentRowLen: number,
-  ) => boolean;
-  onPickerOpen: (lineId: string, col: number, anchorId?: string) => void;
-  /** col-cell width in px, computed from a hidden measurer */
-  cellPx: number;
-  /** Tell parent which row is focused on chord side, for picker context */
+  onMergeUp: (kind: "lyric" | "chord") => void;
+  onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
+  /** Selection state lives in the section card so cross-row drags work. */
+  selection: ReturnType<typeof useDndSelection<string>>;
+  /** Notify parent which row is "active" for picker purposes. */
   onChordFocus: (lineId: string) => void;
-  /** Drag a chord chip from this row onto another row */
-  onChordDragStart: (anchorId: string) => void;
-  onChordDrop: (toLineId: string, toCol: number) => void;
-  /** Live query from the chord picker (only meaningful when active). */
-  chordRowQuery?: string;
-  onChordRowQueryChange?: (q: string) => void;
-  /** Multi-chord pointer-based drag-and-drop across rows. */
-  onMultiDragStart?: (sectionId: string, lineId: string, anchorIds: string[]) => void;
+  /** Currently-dragging anchor ids (so chips drop under the moving ghost). */
+  draggingIds: Set<string>;
+  /** True while ANY pangea drag is in flight (used for slot outline visuals). */
+  isAnyDragging: boolean;
 }
 
 function LineRow({
   sectionId,
   line,
   active,
-  isFirst,
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
-  cellPx,
+  selection,
   onChordFocus,
-  onChordDragStart,
-  onChordDrop,
-  chordRowQuery,
-  onChordRowQueryChange,
-  onMultiDragStart,
+  draggingIds,
+  isAnyDragging,
 }: LineRowProps) {
   const {
     setLineText,
-    upsertChordAt,
-    removeChordAnchor,
     removeChordAnchorsBatch,
-    moveSelectedChordsByOrder,
-    setChordRowLen,
-    insertChordSpaceAt,
-    removeChordCellAt,
     pasteChordsAt,
-    moveSelectedChordsTo,
-    moveChordWordSlot,
+    moveChordToSlot,
+    placeChordInSlot,
     undo,
     redo,
   } = useSongStore();
@@ -143,50 +150,11 @@ function LineRow({
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playingAnchorId = isPlaying && playbackCurrent?.mirrorId ? playbackCurrent.mirrorId : null;
-  const lyricInputRef = useRef<HTMLTextAreaElement>(null);
-  const chordRowRef = useRef<HTMLDivElement>(null);
-  const keyHostRef = useRef<HTMLInputElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-  const [chordCaret, setChordCaret] = useState(0); // column index in chord row
-  const [chordFocused, setChordFocused] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const lastSelectedRef = useRef<string | null>(null);
-  const [areaSel, setAreaSel] = useState<{ x1: number; x2: number } | null>(null);
-  const areaStartRef = useRef<{ x: number; additive: boolean } | null>(null);
-  // Long-press-on-empty-space paste popover.
-  const [pastePopover, setPastePopover] = useState<null | { col: number; x: number }>(null);
-  const pastePressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Outside-tap closes the paste popover.
-  useEffect(() => {
-    if (!pastePopover) return;
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (rowRef.current && rowRef.current.contains(t)) return;
-      setPastePopover(null);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [pastePopover]);
-  // Pointer-based multi-chord drag state.
-  const [drag, setDrag] = useState<null | {
-    pointerId: number;
-    startX: number;
-    startY: number;
-    x: number;
-    y: number;
-    active: boolean;
-    ids: string[];
-    displays: string[];
-    targetLineId?: string;
-    targetCol?: number;
-  }>(null);
-  const dragRef2 = useRef<typeof drag>(null);
-  dragRef2.current = drag;
 
-  // Auto-resize lyric textarea to fit wrapped content.
+  const lyricInputRef = useRef<HTMLTextAreaElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Auto-resize lyric textarea.
   useLayoutEffect(() => {
     const ta = lyricInputRef.current;
     if (!ta) return;
@@ -194,8 +162,7 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll the active row into view, recomputing as the visualViewport changes
-  // (e.g. when the mobile soft keyboard appears and shrinks vv.height).
+  // Scroll active row into view (handles mobile keyboard appearing).
   useEffect(() => {
     if (!active || !rowRef.current) return;
     const el = rowRef.current;
@@ -203,8 +170,7 @@ function LineRow({
     const scrollIntoView = () => {
       if (!el.isConnected) return;
       const rect = el.getBoundingClientRect();
-      const vvTop = vv?.offsetTop ?? 0;
-      const targetTop = vvTop + 80;
+      const targetTop = (vv?.offsetTop ?? 0) + 80;
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 2) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
@@ -224,18 +190,17 @@ function LineRow({
     };
   }, [active]);
 
-  // Build a clipboard payload from the current selection.
+  // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
     const sel = line.chords.filter((c) => ids.includes(c.id));
     if (!sel.length) return [];
-    const minCol = Math.min(...sel.map((c) => colOf(c)));
+    const minSlot = Math.min(...sel.map(slotOf));
     return sel.map((c) => ({
       chord: c.chord,
-      relCol: colOf(c) - minCol,
+      relCol: slotOf(c) - minSlot,
       widthCh: Math.max(1, c.chord.display.length),
     }));
   };
-
   const writeOSClipboard = (clip: ChordClip[]) => {
     if (!clip.length) return;
     try {
@@ -248,88 +213,35 @@ function LineRow({
       /* ignore */
     }
   };
-
   const doCopy = () => {
-    chordClipboard = collectClip(Array.from(selected));
+    const ids = Array.from(selection.selected).filter((id) => line.chords.some((c) => c.id === id));
+    chordClipboard = collectClip(ids);
     writeOSClipboard(chordClipboard);
   };
   const doCut = () => {
-    chordClipboard = collectClip(Array.from(selected));
+    const ids = Array.from(selection.selected).filter((id) => line.chords.some((c) => c.id === id));
+    chordClipboard = collectClip(ids);
     writeOSClipboard(chordClipboard);
-    removeChordAnchorsBatch(sectionId, line.id, Array.from(selected));
-    exitSelect();
+    if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
+    selection.clear();
   };
-  const doPaste = async (atCol?: number) => {
-    const col = atCol ?? chordCaret;
-    // Prefer OS clipboard if it parses into chords (lets users paste typed
-    // chord runs like "Amaj7 G#maj7 Dmaj7" directly into the row).
+  const doPaste = async (atSlot?: number) => {
+    const slot = atSlot ?? 0;
     let clip: ChordClip[] = [];
     try {
       const text = await navigator.clipboard?.readText();
-      if (text && text.trim()) {
-        clip = parseChordTextToClips(text);
-      }
+      if (text && text.trim()) clip = parseChordTextToClips(text);
     } catch {
-      /* clipboard read denied — fall back */
+      /* ignore */
     }
     if (!clip.length) clip = chordClipboard;
     if (!clip.length) return;
-    pasteChordsAt(sectionId, line.id, col, clip);
+    pasteChordsAt(sectionId, line.id, slot, clip);
   };
 
-  // Effective row length must account for the visual width of each chord chip,
-  // including the chip's horizontal padding (px-2 ≈ 2ch each side ≈ 4ch total).
-  // Without this padding budget, neighboring chips visually overlap even though
-  // their starting columns are technically distinct.
-  const CHIP_PAD_CH = 4;
-  const chordVisualWidth = (display: string) => Math.max(1, display.length) + CHIP_PAD_CH;
-  const chordEndCol = (a: { chordCol?: number; offset?: number; chord: { display: string } }) =>
-    colOf(a) + chordVisualWidth(a.chord.display);
-  const len = Math.max(line.chordRowLen ?? 0, ...line.chords.map(chordEndCol), 1);
-
-  useEffect(() => {
-    if (selectMode && line.chords.length === 0) {
-      setSelectMode(false);
-      setSelected(new Set());
-    }
-  }, [line.chords.length, selectMode]);
-
-  // Auto-exit select mode when the user has deselected the last chord.
-  useEffect(() => {
-    if (selectMode && selected.size === 0) setSelectMode(false);
-  }, [selected, selectMode]);
-
-  // Outside-tap closes the chord-row context menu (select mode).
-  useEffect(() => {
-    if (!selectMode) return;
-    const onDocPointerDown = (e: PointerEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      // Suppress outside-tap-exit while a pointer drag is in progress.
-      if (dragRef2.current) return;
-      if (rowRef.current && rowRef.current.contains(t)) return;
-      // Allow interactions with the picker sheet too (so users can switch).
-      if (t.closest("[data-radix-dialog-content]")) return;
-      setSelectMode(false);
-      setSelected(new Set());
-    };
-    document.addEventListener("pointerdown", onDocPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
-  }, [selectMode]);
-
-  // ---------- Chord row interactions ----------
-  const focusChord = () => {
-    if (isMobile && keyHostRef.current) {
-      keyHostRef.current.focus({ preventScroll: true });
-    } else {
-      chordRowRef.current?.focus();
-    }
-    setChordFocused(true);
-    onChordFocus(line.id);
-  };
-
-  const sortedChords = [...line.chords].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-
+  // ---- Selection helpers (range-select via shift) ----
+  const sortedChords = [...line.chords].sort((a, b) => slotOf(a) - slotOf(b));
+  const lastSelectedRef = useRef<string | null>(null);
   const selectRangeTo = (anchorId: string, additive: boolean) => {
     const anchor = lastSelectedRef.current;
     const ids = sortedChords.map((c) => c.id);
@@ -338,182 +250,15 @@ function LineRow({
     const i1 = anchor ? ids.indexOf(anchor) : i2;
     const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
     const range = ids.slice(from, to + 1);
-    setSelectMode(true);
-    setSelected((prev) => {
-      const next = additive ? new Set(prev) : new Set<string>();
-      range.forEach((id) => next.add(id));
-      return next;
-    });
+    if (!additive) selection.set(range);
+    else range.forEach((id) => selection.add(id));
     lastSelectedRef.current = anchorId;
   };
 
-  // Word-position measurement: mirror the textarea's wrapped layout in a hidden
-  // div so we can read each word's pixel (left, top) and place chord chips on top.
-  const mirrorRef = useRef<HTMLDivElement>(null);
-  const [wordRects, setWordRects] = useState<{ left: number; top: number; width: number }[]>([]);
-  const [chordRowHeight, setChordRowHeight] = useState(0);
-  const lineWords = useMemo(() => {
-    const re = /\S+/g;
-    const out: { index: number; start: number; end: number; text: string }[] = [];
-    let m: RegExpExecArray | null;
-    let i = 0;
-    while ((m = re.exec(line.text)) !== null) {
-      out.push({ index: i++, start: m.index, end: m.index + m[0].length, text: m[0] });
-    }
-    return out;
-  }, [line.text]);
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      const root = mirrorRef.current;
-      if (!root) return;
-      const containerRect = root.getBoundingClientRect();
-      const spans = Array.from(root.querySelectorAll<HTMLSpanElement>("[data-word-i]"));
-      const rects = spans.map((s) => {
-        const r = s.getBoundingClientRect();
-        return { left: r.left - containerRect.left, top: r.top - containerRect.top, width: r.width };
-      });
-      setWordRects(rects);
-      // Row height tracks the wrapped line height of the lyric textarea.
-      setChordRowHeight(containerRect.height || 28);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (mirrorRef.current) ro.observe(mirrorRef.current);
-    if (lyricInputRef.current) ro.observe(lyricInputRef.current);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [line.text]);
-
-  /** Pick the word index closest to a click point inside the chord row. */
-  const wordIndexNear = (clientX: number, clientY: number): number => {
-    if (!chordRowRef.current || lineWords.length === 0) return 0;
-    const rect = chordRowRef.current.getBoundingClientRect();
-    const px = clientX - rect.left;
-    const py = clientY - rect.top;
-    let best = 0;
-    let bestDist = Infinity;
-    wordRects.forEach((r, i) => {
-      // Penalize different visual rows so wrapped lyric lines pick the correct word.
-      const dy = Math.abs(py - r.top);
-      const dx = Math.abs(px - r.left);
-      const d = dx + dy * 4;
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
-    });
-    return best;
-  };
-
-  const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (selectMode) return;
-    if (areaStartRef.current) return;
-    setFocusedPattern(null);
-    const wi = wordIndexNear(e.clientX, e.clientY);
-    onChordFocus(line.id);
-    onPickerOpen(line.id, wi);
-    if (chordRowRef.current && document.activeElement === chordRowRef.current) {
-      chordRowRef.current.blur();
-    }
-  };
-
-  // Drag-area select on empty chord row — uses chip element rects directly.
-  const handleRowMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-chip-anchor]")) return;
-    const rect = chordRowRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    areaStartRef.current = { x, additive: e.shiftKey || e.metaKey || e.ctrlKey };
-    setAreaSel({ x1: x, x2: x });
-  };
-
-  useEffect(() => {
-    if (!areaSel) return;
-    const onMove = (ev: MouseEvent) => {
-      const rect = chordRowRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = ev.clientX - rect.left;
-      setAreaSel((prev) => (prev ? { ...prev, x2: x } : prev));
-    };
-    const onUp = () => {
-      const start = areaStartRef.current;
-      const cur = areaSel;
-      setAreaSel(null);
-      if (!start || !cur) {
-        areaStartRef.current = null;
-        return;
-      }
-      const [x1, x2] = [Math.min(cur.x1, cur.x2), Math.max(cur.x1, cur.x2)];
-      if (Math.abs(cur.x2 - cur.x1) < 4) {
-        areaStartRef.current = null;
-        return;
-      }
-      // Hit-test against actual chip elements in this row.
-      const rowRect = chordRowRef.current?.getBoundingClientRect();
-      const hits: string[] = [];
-      if (rowRect) {
-        const chips = chordRowRef.current!.querySelectorAll<HTMLElement>("[data-chip-anchor]");
-        chips.forEach((el) => {
-          const r = el.getBoundingClientRect();
-          const cx1 = r.left - rowRect.left;
-          const cx2 = r.right - rowRect.left;
-          if (cx1 <= x2 && cx2 >= x1) {
-            const id = el.getAttribute("data-chip-anchor");
-            if (id) hits.push(id);
-          }
-        });
-      }
-      if (hits.length) {
-        setSelectMode(true);
-        setSelected((prev) => {
-          const next = start.additive ? new Set(prev) : new Set<string>();
-          hits.forEach((id) => next.add(id));
-          return next;
-        });
-        lastSelectedRef.current = hits[hits.length - 1];
-      }
-      setTimeout(() => { areaStartRef.current = null; }, 0);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp, { once: true });
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [areaSel]);
-
-  const selectAll = () => {
-    if (line.chords.length === 0) return;
-    setSelectMode(true);
-    setSelected(new Set(line.chords.map((c) => c.id)));
-  };
-
-  // Global Ctrl/Cmd+A: select all chords in this row when the row is "active".
-  useEffect(() => {
-    if (!chordFocused && !selectMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod || (e.key !== "a" && e.key !== "A")) return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (!selectMode && (tag === "INPUT" || tag === "TEXTAREA")) return;
-      e.preventDefault();
-      selectAll();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [chordFocused, selectMode, line.chords]);
-
-
-  const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  // ---- Slot row keyboard (Ctrl/Cmd+A / undo / redo / clipboard) ----
+  const onRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const k = e.key;
     const mod = e.metaKey || e.ctrlKey;
-
-    // Undo / Redo (chord-row history).
     if (mod && (k === "z" || k === "Z")) {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -525,164 +270,30 @@ function LineRow({
       redo();
       return;
     }
-
-    // Selection / clipboard shortcuts.
     if (mod && (k === "a" || k === "A")) {
       e.preventDefault();
-      selectAll();
+      selection.set(line.chords.map((c) => c.id));
       return;
     }
-    if (mod && (k === "c" || k === "C")) {
-      if (selected.size > 0) { e.preventDefault(); doCopy(); return; }
+    if (mod && (k === "c" || k === "C") && selection.size > 0) {
+      e.preventDefault();
+      doCopy();
+      return;
     }
-    if (mod && (k === "x" || k === "X")) {
-      if (selected.size > 0) { e.preventDefault(); doCut(); return; }
+    if (mod && (k === "x" || k === "X") && selection.size > 0) {
+      e.preventDefault();
+      doCut();
+      return;
     }
     if (mod && (k === "v" || k === "V")) {
       e.preventDefault();
-      doPaste();
+      void doPaste();
       return;
     }
-
-    if (selectMode) return;
-    if (active) return; // picker open — let it own input
-
-    // Enter on the chord row creates a new lyric line.
-    if (k === "Enter") {
-      e.preventDefault();
-      const newId = onAddLineAfter();
-      if (typeof newId === "string") {
-        setTimeout(() => {
-          document.querySelector<HTMLDivElement>(`[data-chord-row="${newId}"]`)?.focus();
-        }, 10);
-      }
-      return;
-    }
-
-    // Backspace on an empty chord row merges with previous row.
-    if (k === "Backspace" && line.chords.length === 0) {
-      e.preventDefault();
-      onMergeUp("chord", line.text, 0, 0);
-      return;
-    }
-
-    // Letter typed → open the chord picker pre-seeded with that letter.
-    if (k.length === 1 && /[A-Za-z]/.test(k)) {
-      e.preventDefault();
-      onChordRowQueryChange?.(k);
-      onPickerOpen(line.id, 0);
-    }
   };
 
-  // ---------- Lyric input interactions ----------
-  const handleLyricChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLineText(sectionId, line.id, e.target.value);
-  };
+  const slots = chordsBySlot(line);
 
-  const handleLyricKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const newId = onAddLineAfter();
-      if (typeof newId === "string") {
-        setTimeout(() => {
-          document.querySelector<HTMLInputElement>(`[data-lyric-input="${newId}"]`)?.focus();
-        }, 10);
-      }
-    } else if (
-      e.key === "Backspace" &&
-      lyricInputRef.current?.selectionStart === 0 &&
-      lyricInputRef.current.selectionEnd === 0
-    ) {
-      if (line.text === "") {
-        e.preventDefault();
-        // If chord row has content, confirm; else merge silently
-        const hasChordContent = line.chords.length > 0 || (line.chordRowLen ?? 0) > 0;
-        onMergeUp("lyric", "", line.chords.length, line.chordRowLen ?? 0);
-      }
-    }
-  };
-
-  const enterSelect = (anchorId: string) => {
-    setSelectMode(true);
-    setSelected(new Set([anchorId]));
-  };
-  const toggleSelected = (anchorId: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(anchorId)) next.delete(anchorId);
-      else next.add(anchorId);
-      return next;
-    });
-  };
-  const exitSelect = () => {
-    setSelectMode(false);
-    setSelected(new Set());
-  };
-  const selectedIds = Array.from(selected);
-
-  // Pointer-based drag for multi-selected chords (touch + mouse).
-  useEffect(() => {
-    if (!drag) return;
-    const DRAG_THRESHOLD = 6;
-
-    const onMove = (ev: PointerEvent) => {
-      if (ev.pointerId !== drag.pointerId) return;
-      const dx = ev.clientX - drag.startX;
-      const dy = ev.clientY - drag.startY;
-      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
-
-      // Compute hit-tested target chord row (if any).
-      let targetLineId: string | undefined;
-      let targetCol: number | undefined;
-      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
-      const rowEl = hit?.closest("[data-chord-row]") as HTMLElement | null;
-      if (rowEl) {
-        targetLineId = rowEl.getAttribute("data-chord-row") ?? undefined;
-        const r = rowEl.getBoundingClientRect();
-        targetCol = Math.max(0, Math.round((ev.clientX - r.left) / Math.max(cellPx, 1)));
-      }
-
-      setDrag((prev) =>
-        prev
-          ? {
-              ...prev,
-              x: ev.clientX,
-              y: ev.clientY,
-              active: prev.active || moved,
-              targetLineId,
-              targetCol,
-            }
-          : prev,
-      );
-    };
-
-    const onUp = (ev: PointerEvent) => {
-      if (ev.pointerId !== drag.pointerId) return;
-      const cur = dragRef2.current;
-      setDrag(null);
-      if (!cur || !cur.active) return;
-      if (!cur.targetLineId || cur.targetCol == null) return;
-
-      // Determine target section by walking the DOM up from the row el.
-      const rowEl = document.querySelector<HTMLElement>(`[data-chord-row="${cur.targetLineId}"]`);
-      const sectionEl = rowEl?.closest("[data-section-id]") as HTMLElement | null;
-      const toSectionId = sectionEl?.getAttribute("data-section-id") ?? sectionId;
-
-      moveSelectedChordsTo(sectionId, line.id, toSectionId, cur.targetLineId, cur.targetCol, cur.ids);
-      exitSelect();
-    };
-
-    const onCancel = () => setDrag(null);
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-    };
-  }, [drag?.pointerId]); // re-bind only when a new drag starts
   return (
     <div
       ref={rowRef}
@@ -692,443 +303,239 @@ function LineRow({
       )}
       data-line-id={line.id}
     >
-      {/* CHORD ROW (focusable, like a text cursor) */}
-      <div
-        ref={chordRowRef}
-        data-chord-row={line.id}
-        tabIndex={0}
-        onMouseDown={handleRowMouseDown}
-        onClick={handleChordRowClick}
-        onKeyDown={handleChordKeyDown}
-        onFocus={() => {
-          setChordFocused(true);
-          onChordFocus(line.id);
-        }}
-        onBlur={() => setChordFocused(false)}
-        onPointerDown={(e) => {
-          // Long-press on empty space (not on a chip) opens the paste menu.
-          const t = e.target as HTMLElement;
-          if (t.closest("[data-chip-anchor]")) return;
-          if (pastePressTimerRef.current) clearTimeout(pastePressTimerRef.current);
-          const rect = chordRowRef.current!.getBoundingClientRect();
-          const px = e.clientX - rect.left;
-          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
-          pastePressTimerRef.current = setTimeout(() => {
-            setPastePopover({ col, x: px });
-          }, 500);
-        }}
-        onPointerMove={() => {
-          if (pastePressTimerRef.current) {
-            clearTimeout(pastePressTimerRef.current);
-            pastePressTimerRef.current = null;
-          }
-        }}
-        onPointerUp={() => {
-          if (pastePressTimerRef.current) {
-            clearTimeout(pastePressTimerRef.current);
-            pastePressTimerRef.current = null;
-          }
-        }}
-        onPointerCancel={() => {
-          if (pastePressTimerRef.current) {
-            clearTimeout(pastePressTimerRef.current);
-            pastePressTimerRef.current = null;
-          }
-        }}
-        onContextMenu={(e) => {
-          // Right-click also opens the paste popover (desktop convenience).
-          const t = e.target as HTMLElement;
-          if (t.closest("[data-chip-anchor]")) return;
-          e.preventDefault();
-          const rect = chordRowRef.current!.getBoundingClientRect();
-          const px = e.clientX - rect.left;
-          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
-          setPastePopover({ col, x: px });
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          const rect = chordRowRef.current!.getBoundingClientRect();
-          const px = e.clientX - rect.left;
-          const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
-          onChordDrop(line.id, col);
-        }}
-        className="relative cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
-        style={{ minHeight: `${Math.max(chordRowHeight, 28)}px` }}
-      >
-        {/* Placeholder */}
-        {line.chords.length === 0 && !chordFocused && (
-          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-3">
-            add your chords here
-          </span>
-        )}
-        {/* Drag-area visual rectangle */}
-        {areaSel && (
-          <span
-            aria-hidden
-            className="absolute top-0 bottom-0 bg-primary/20 border border-primary/50 rounded-sm pointer-events-none"
-            style={{
-              left: `${Math.min(areaSel.x1, areaSel.x2)}px`,
-              width: `${Math.abs(areaSel.x2 - areaSel.x1)}px`,
+      {/* CHORD ROW: 20 equal-width slots, one Droppable. */}
+      <Droppable droppableId={`row:${sectionId}:${line.id}`} direction="horizontal" type="chord">
+        {(droppableProvided, droppableSnapshot) => (
+          <div
+            ref={(el) => {
+              droppableProvided.innerRef(el);
             }}
-          />
-        )}
-        {/* Playback playhead — bright orange marker at the playing chord's word position. */}
-        {playingAnchorId &&
-          (() => {
-            const playing = line.chords.find((a) => a.id === playingAnchorId);
-            if (!playing) return null;
-            const wr = playing.wordIndex != null ? wordRects[playing.wordIndex] : undefined;
-            const left = wr ? wr.left - 1 : 0;
-            const top = wr ? wr.top : 0;
-            return (
-              <div
-                aria-hidden
-                className="absolute pointer-events-none animate-pulse"
-                style={{ left: `${left}px`, top: `${top}px`, height: "28px", width: "3px" }}
-              >
-                <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
-                <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2"
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderLeft: "5px solid transparent",
-                    borderRight: "5px solid transparent",
-                    borderTop: "7px solid hsl(var(--chord-chip))",
-                    filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
-                  }}
-                />
-              </div>
-            );
-          })()}
-        {/* Chord chips: absolutely positioned over word starts when bound; floating chips render in a flex row at the right. */}
-        {(() => {
-          const ordered = [...line.chords].sort((a, b) => {
-            const aw = a.wordIndex ?? Number.POSITIVE_INFINITY;
-            const bw = b.wordIndex ?? Number.POSITIVE_INFINITY;
-            if (aw !== bw) return aw - bw;
-            return colOf(a) - colOf(b);
-          });
-          const noWords = lineWords.length === 0;
-          const bound = ordered.filter((a) => a.wordIndex != null && wordRects[a.wordIndex!]);
-          const floating = ordered.filter((a) => a.wordIndex == null || !wordRects[a.wordIndex!]);
-
-          const renderChip = (a: typeof ordered[number], style?: React.CSSProperties) => {
-            const isSel = selected.has(a.id);
-            const handleChipTap = (e?: React.MouseEvent) => {
-              if (e && e.shiftKey) {
-                selectRangeTo(a.id, true);
-                return;
-              }
-              if (selectMode) {
-                toggleSelected(a.id);
-                lastSelectedRef.current = a.id;
-                return;
-              }
-              focusChord();
-              onPickerOpen(line.id, a.wordIndex ?? 0, a.id);
-            };
-            const beginPointerDrag = (e: React.PointerEvent) => {
-              if (!selectMode || !selected.has(a.id)) return;
-              const ids = Array.from(selected);
-              const displays = ordered.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
-              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-              setDrag({
-                pointerId: e.pointerId,
-                startX: e.clientX,
-                startY: e.clientY,
-                x: e.clientX,
-                y: e.clientY,
-                active: false,
-                ids,
-                displays,
-              });
-              onMultiDragStart?.(sectionId, line.id, ids);
-            };
-            const isFloating = a.wordIndex == null;
-            return (
-              <div
-                key={a.id}
-                data-chip-anchor={a.id}
-                className={cn("leading-7", style ? "absolute top-0" : "")}
-                style={style}
-                draggable={!selectMode}
-                onDragStart={(e) => {
-                  e.stopPropagation();
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", a.chord.display);
-                  onChordDragStart(a.id);
-                }}
-                onPointerDown={beginPointerDrag}
-                onClick={(e) => {
-                  if (drag?.active) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    return;
-                  }
-                  e.stopPropagation();
-                  handleChipTap(e);
-                }}
-              >
-                <div className={cn(isFloating && "rounded-md border border-dashed border-muted-foreground/40")}>
-                  <ChordChip
-                    chord={a.chord}
-                    variant="ink"
-                    size="sm"
-                    selected={selectMode && isSel}
-                    audition
-                    onLongPress={() => {
-                      if (selectMode) {
-                        if (selected.has(a.id)) return;
-                        toggleSelected(a.id);
-                      } else {
-                        enterSelect(a.id);
-                      }
-                      lastSelectedRef.current = a.id;
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          };
-
-          return (
-            <>
-              {/* Bound chips: absolute, anchored to word pixel positions. */}
-              {bound.map((a) =>
-                renderChip(a, { left: `${wordRects[a.wordIndex!].left}px`, top: `${wordRects[a.wordIndex!].top}px` }),
-              )}
-              {/* Floating chips: flex row. When line has no words, fill the row from the left;
-                  otherwise render at the right end as "unanchored". */}
-              {floating.length > 0 && (
-                <div
-                  className={cn(
-                    "flex items-center gap-2",
-                    noWords ? "absolute left-0 top-0" : "absolute right-1 top-0",
-                  )}
-                >
-                  {floating.map((a) => renderChip(a))}
-                </div>
-              )}
-            </>
-          );
-        })()}
-
-        {/* Hidden mirror of the lyric textarea — used to measure each word's pixel
-            position so chord chips can align to word starts. */}
-        <div
-          ref={mirrorRef}
-          aria-hidden
-          className="absolute left-0 top-0 w-full font-display text-lg leading-9 px-1 ml-1 break-words whitespace-pre-wrap pointer-events-none invisible"
-        >
-          {lineWords.length === 0
-            ? "\u00A0"
-            : (() => {
-                const parts: React.ReactNode[] = [];
-                let cursor = 0;
-                lineWords.forEach((w, i) => {
-                  if (w.start > cursor) parts.push(line.text.slice(cursor, w.start));
-                  parts.push(
-                    <span key={`w-${i}`} data-word-i={i}>
-                      {w.text}
-                    </span>,
-                  );
-                  cursor = w.end;
-                });
-                if (cursor < line.text.length) parts.push(line.text.slice(cursor));
-                return parts;
-              })()}
-        </div>
-      </div>
-
-      {/* Long-press paste popover for empty chord-row spaces. */}
-      {pastePopover && (
-        <div
-          className="absolute z-[80] mt-1 flex items-center gap-1 rounded-md border border-border bg-popover px-1.5 py-1 shadow-lg text-xs"
-          style={{ left: `${pastePopover.x}px`, top: "100%" }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2"
-            onClick={async () => {
-              const col = pastePopover.col;
-              setPastePopover(null);
-              await doPaste(col);
+            {...droppableProvided.droppableProps}
+            data-chord-row={line.id}
+            tabIndex={0}
+            onFocus={() => onChordFocus(line.id)}
+            onKeyDown={onRowKeyDown}
+            onClick={(e) => {
+              // Click on empty area of the row opens picker at slot 0 (or near pointer).
+              const t = e.target as HTMLElement;
+              if (t.closest("[data-chip-anchor]")) return;
+              if (t.closest("[data-slot-index]")) return; // slot's own click handles this
+              setFocusedPattern(null);
+              onChordFocus(line.id);
+              onPickerOpen(line.id, 0);
             }}
+            className={cn(
+              "relative flex items-stretch w-full rounded-sm bg-accent/20 outline-none",
+              droppableSnapshot.isDraggingOver && "bg-accent/40",
+            )}
+            style={{ minHeight: 36 }}
           >
-            <ClipboardPaste className="h-3.5 w-3.5" /> Paste chords
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPastePopover(null)}>
-            Cancel
-          </Button>
-        </div>
-      )}
+            {/* Placeholder text when row is empty. */}
+            {line.chords.length === 0 && !isAnyDragging && (
+              <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
+                add your chords here
+              </span>
+            )}
 
-      {/* Hidden text input — used on mobile so the soft keyboard stays open
-          while the user types/presses Space inside the chord row. */}
-      <input
-        ref={keyHostRef}
-        data-chord-row-keyhost={line.id}
-        aria-hidden
-        tabIndex={-1}
-        inputMode="text"
-        autoCapitalize="off"
-        autoCorrect="off"
-        autoComplete="off"
-        className="absolute opacity-0 pointer-events-none"
-        style={{ left: 0, top: 0, width: 1, height: 1 }}
-        onKeyDown={(e) => handleChordKeyDown(e as unknown as React.KeyboardEvent<HTMLDivElement>)}
-        onFocus={() => {
-          setChordFocused(true);
-          onChordFocus(line.id);
-        }}
-        onBlur={() => setChordFocused(false)}
-        onChange={() => {
-          /* swallow — we only consume keydown */
-        }}
-      />
+            {/*
+              We render 20 stable slot wrappers as the Droppable's children, with
+              chips placed inside their slot wrapper. Each chip is its own
+              Draggable keyed by anchor id and indexed by slotIndex (0..19), so
+              pangea's `destination.index` IS the destination slot.
 
-      {/* Drag insert marker on the target chord row. */}
-      {drag?.active && drag.targetLineId === line.id && drag.targetCol != null && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-0 h-7 w-px bg-primary pointer-events-none"
-          style={{ left: `${drag.targetCol * cellPx}px` }}
-        />
-      )}
+              The library expects every Draggable's `index` to be unique within
+              the Droppable — by using `slotIndex` directly we guarantee that.
+            */}
+            {slots.map((anchor, slotIdx) => {
+              const occupied = !!anchor;
+              const isPlaying = !!anchor && playingAnchorId === anchor.id;
+              return (
+                <div
+                  key={`slot-${slotIdx}`}
+                  data-slot-index={slotIdx}
+                  className={cn(
+                    "relative flex-1 min-w-0 h-9 flex items-center justify-center",
+                    isAnyDragging &&
+                      !occupied &&
+                      "border border-dashed border-muted-foreground/30 rounded-sm",
+                  )}
+                  onClick={(e) => {
+                    if (occupied) return;
+                    e.stopPropagation();
+                    onChordFocus(line.id);
+                    onPickerOpen(line.id, slotIdx);
+                  }}
+                >
+                  {occupied && (
+                    <Draggable draggableId={anchor!.id} index={slotIdx}>
+                      {(dragProvided, dragSnapshot) => {
+                        const beingDragged = draggingIds.has(anchor!.id);
+                        const isPrimary = dragSnapshot.isDragging;
+                        // Hide non-primary multi-drag chips (they "ride along").
+                        const hideForMulti = beingDragged && !isPrimary;
+                        return (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            {...dragProvided.dragHandleProps}
+                            data-chip-anchor={anchor!.id}
+                            className={cn(
+                              "w-full h-full flex items-center justify-center px-0.5",
+                              hideForMulti && "opacity-30",
+                            )}
+                            style={{
+                              ...dragProvided.draggableProps.style,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.shiftKey) {
+                                selectRangeTo(anchor!.id, true);
+                                return;
+                              }
+                              if (e.metaKey || e.ctrlKey) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              if (selection.size > 0) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              onChordFocus(line.id);
+                              onPickerOpen(line.id, slotIdx, anchor!.id);
+                            }}
+                          >
+                            <div className="relative">
+                              <ChordChip
+                                chord={anchor!.chord}
+                                variant="ink"
+                                size="sm"
+                                selected={selection.has(anchor!.id)}
+                                audition
+                                onLongPress={() => {
+                                  selection.toggle(anchor!.id);
+                                  lastSelectedRef.current = anchor!.id;
+                                }}
+                              />
+                              {/* Multi-drag count badge on the dragging clone. */}
+                              {isPrimary && draggingIds.size > 1 && (
+                                <span
+                                  className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
+                                  aria-label={`${draggingIds.size} chords selected`}
+                                >
+                                  +{draggingIds.size - 1}
+                                </span>
+                              )}
+                              {isPlaying && (
+                                <span
+                                  aria-hidden
+                                  className="absolute inset-0 rounded-md ring-2 ring-[hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    </Draggable>
+                  )}
+                </div>
+              );
+            })}
+            {droppableProvided.placeholder}
+          </div>
+        )}
+      </Droppable>
 
-      {/* Floating drag ghost (rendered while this row owns the drag). */}
-      {drag?.active && (
-        <div
-          aria-hidden
-          className="fixed z-[100] pointer-events-none rounded-md border border-primary/60 bg-card/95 shadow-lg px-2 py-1 font-mono-chord text-xs ink-chord"
-          style={{ left: drag.x + 12, top: drag.y + 8 }}
-        >
-          {drag.displays.join(" ")}
-        </div>
-      )}
-
-      {selectMode && (
-        <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs max-w-[400px]">
-          {/* Row 1: status + action buttons */}
-          <div className="flex flex-wrap items-center gap-[10px]">
-            <span className="text-muted-foreground">{selectedIds.length} selected</span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={selectAll}
-              aria-label="Select all chords"
-              title="Select all (⌘/Ctrl+A)"
-            >
-              <CheckSquare className="h-3.5 w-3.5" />
+      {/* SELECTION TOOLBAR (only when something is selected on this row) */}
+      {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
+        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow">
+          <span className="text-muted-foreground">{selection.size} selected</span>
+          <div className="ml-auto flex items-center gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
+              <Copy className="h-3.5 w-3.5" /> Copy
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
+              <Scissors className="h-3.5 w-3.5" /> Cut
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
+              <ClipboardPaste className="h-3.5 w-3.5" /> Paste
             </Button>
             <Button
-              size="icon"
+              size="sm"
               variant="ghost"
-              className="h-7 w-7"
-              disabled={!selectedIds.length}
-              onClick={doCut}
-              aria-label="Cut"
-              title="Cut (⌘/Ctrl+X)"
-            >
-              <Scissors className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={!selectedIds.length}
-              onClick={doCopy}
-              aria-label="Copy"
-              title="Copy (⌘/Ctrl+C)"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => doPaste()}
-              aria-label="Paste"
-              title="Paste (⌘/Ctrl+V)"
-            >
-              <ClipboardPaste className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-destructive"
-              disabled={!selectedIds.length}
+              className="h-7 px-2 text-destructive"
               onClick={() => {
-                removeChordAnchorsBatch(sectionId, line.id, selectedIds);
-                exitSelect();
+                const ids = Array.from(selection.selected).filter((id) =>
+                  line.chords.some((c) => c.id === id),
+                );
+                if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
+                selection.clear();
               }}
-              aria-label="Delete selected"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => {
+                // Move selection ←: each selected chord steps to slotIndex-1.
+                const ids = Array.from(selection.selected)
+                  .map((id) => line.chords.find((c) => c.id === id))
+                  .filter((c): c is ChordAnchor => !!c)
+                  .sort((a, b) => slotOf(a) - slotOf(b));
+                ids.forEach((c) => {
+                  const next = (c.slotIndex ?? 0) - 1;
+                  if (next >= 0) moveChordToSlot(sectionId, line.id, c.id, next);
+                });
+              }}
+              aria-label="Move selection left"
+            >
+              <ArrowUp className="h-3.5 w-3.5 rotate-[-90deg]" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => {
+                const ids = Array.from(selection.selected)
+                  .map((id) => line.chords.find((c) => c.id === id))
+                  .filter((c): c is ChordAnchor => !!c)
+                  .sort((a, b) => slotOf(b) - slotOf(a));
+                ids.forEach((c) => {
+                  const next = (c.slotIndex ?? 0) + 1;
+                  if (next < CHORD_ROW_SLOTS) moveChordToSlot(sectionId, line.id, c.id, next);
+                });
+              }}
+              aria-label="Move selection right"
+            >
+              <ArrowDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => selection.clear()}>
               Done
             </Button>
           </div>
-          {/* Row 2: full-width arrows */}
-          <div className="flex items-center gap-[10px]">
-            <Button
-              variant="outline"
-              className="h-8 flex-1"
-              disabled={!selectedIds.length}
-              onClick={() => {
-                const ordered = [...line.chords]
-                  .filter((c) => selectedIds.includes(c.id))
-                  .sort((a, b) => (a.wordIndex ?? colOf(a)) - (b.wordIndex ?? colOf(b)));
-                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, -1));
-              }}
-              aria-label="Move chord left (by word slot)"
-            >
-              <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
-            <Button
-              variant="outline"
-              className="h-8 flex-1"
-              disabled={!selectedIds.length}
-              onClick={() => {
-                const ordered = [...line.chords]
-                  .filter((c) => selectedIds.includes(c.id))
-                  .sort((a, b) => (b.wordIndex ?? colOf(b)) - (a.wordIndex ?? colOf(a)));
-                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, 1));
-              }}
-              aria-label="Move chord right (by word slot)"
-            >
-              <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
-          </div>
         </div>
       )}
 
-      {/* LYRIC INPUT — textarea so long lines wrap to new visual lines within the same lyric row */}
+      {/* LYRIC INPUT */}
       <div className="relative rounded-sm bg-accent/10">
         <textarea
           ref={lyricInputRef}
           data-lyric-input={line.id}
           value={line.text}
           rows={1}
-          onChange={(e) => {
-            setLineText(sectionId, line.id, e.target.value);
-          }}
+          onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               const newId = onAddLineAfter();
               if (typeof newId === "string") {
                 setTimeout(() => {
-                  document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${newId}"]`)?.focus();
+                  document
+                    .querySelector<HTMLTextAreaElement>(`[data-lyric-input="${newId}"]`)
+                    ?.focus();
                 }, 10);
               }
             } else if (
@@ -1138,7 +545,7 @@ function LineRow({
               line.text === ""
             ) {
               e.preventDefault();
-              onMergeUp("lyric", "", line.chords.length, line.chordRowLen ?? 0);
+              onMergeUp("lyric");
             }
           }}
           placeholder="Write your lyric line…"
@@ -1149,18 +556,23 @@ function LineRow({
   );
 }
 
+// =============================================================================
+//                               SectionCard
+// =============================================================================
+
 interface SectionCardProps {
   section: Section;
   index: number;
   total: number;
   displayName: string;
   activeLineId?: string;
-  onPickerOpen: (sectionId: string, lineId: string, col: number, anchorId?: string) => void;
-  onChordDragStart: (sectionId: string, lineId: string, anchorId: string) => void;
-  onChordDrop: (toSectionId: string, toLineId: string, toCol: number) => void;
-  chordRowQuery?: string;
-  onChordRowQueryChange?: (q: string) => void;
-  /** When true: hide line counter & options; show up/down reorder arrows. */
+  onPickerOpen: (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => void;
+  /** True while ANY pangea drag is in flight (passed down from LyricsTab). */
+  isAnyDragging: boolean;
+  /** Currently-dragging anchor ids (multi-select aware). */
+  draggingIds: Set<string>;
+  /** Selection state — shared per-section so cross-row drags carry the set. */
+  selection: ReturnType<typeof useDndSelection<string>>;
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
 }
@@ -1172,10 +584,9 @@ function SectionCard({
   displayName,
   activeLineId,
   onPickerOpen,
-  onChordDragStart,
-  onChordDrop,
-  chordRowQuery,
-  onChordRowQueryChange,
+  isAnyDragging,
+  draggingIds,
+  selection,
   sortMode,
   onMoveSection,
 }: SectionCardProps) {
@@ -1200,8 +611,6 @@ function SectionCard({
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
-  const cellPx = useCellPx();
-  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDraftLabel(section.label);
@@ -1213,9 +622,7 @@ function SectionCard({
     prevTypeRef.current = null;
     setCustomRenameOpen(false);
   };
-
   const cancelCustomName = () => {
-    // Revert to the previous section type/label if Custom was just selected
     if (prevTypeRef.current && prevTypeRef.current !== "custom") {
       updateSection(section.id, { type: prevTypeRef.current, label: prevLabelRef.current });
     }
@@ -1223,56 +630,46 @@ function SectionCard({
     setCustomRenameOpen(false);
   };
 
-  const focusPrevLine = (lineId: string, kind: "lyric" | "chord") => {
+  const focusPrevLine = (lineId: string) => {
     const idx = section.lines.findIndex((l) => l.id === lineId);
     if (idx <= 0) return;
     const prev = section.lines[idx - 1];
     setTimeout(() => {
-      if (kind === "chord") {
-        const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${prev.id}"]`);
-        if (el) {
-          el.focus();
-          const end = el.value.length;
-          el.setSelectionRange(end, end);
-        }
-      } else {
-        const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${prev.id}"]`);
-        if (el) {
-          el.focus();
-          const end = el.value.length;
-          el.setSelectionRange(end, end);
-        }
+      const el = document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${prev.id}"]`);
+      if (el) {
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
       }
     }, 10);
   };
 
   const handleMergeUp = (lineId: string, kind: "lyric" | "chord") => {
     const idx = section.lines.findIndex((l) => l.id === lineId);
-    if (idx <= 0) return; // can't merge above the first line of section
+    if (idx <= 0) return;
     const line = section.lines[idx];
     const hasOpposite =
-      kind === "lyric" ? line.chords.length > 0 || (line.chordRowLen ?? 0) > 0 : line.text.trim().length > 0;
+      kind === "lyric" ? line.chords.length > 0 : line.text.trim().length > 0;
     if (hasOpposite) {
       setConfirm({ lineId, kind });
     } else {
       removeLine(section.id, lineId);
-      focusPrevLine(lineId, kind);
+      focusPrevLine(lineId);
     }
   };
 
   const confirmDelete = () => {
     if (!confirm) return;
-    const { lineId, kind } = confirm;
+    const { lineId } = confirm;
     setConfirm(null);
     removeLine(section.id, lineId);
-    focusPrevLine(lineId, kind);
+    focusPrevLine(lineId);
   };
 
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
     <div
-      ref={cardRef}
       data-section-id={section.id}
       style={sectionTintStyle(section.color)}
       className={cn("paper-card rounded-xl px-2 py-2 transition-shadow")}
@@ -1284,7 +681,6 @@ function SectionCard({
           onValueChange={(v) => {
             const next = v as SectionType;
             if (next === "custom") {
-              // Stash previous so Cancel can revert
               prevTypeRef.current = section.type;
               prevLabelRef.current = section.label;
               updateSection(section.id, { type: next, label: section.label || "Section" });
@@ -1296,10 +692,7 @@ function SectionCard({
           }}
           disabled={sortMode}
         >
-          <SelectTrigger
-            className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6
-          "
-          >
+          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6">
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -1338,7 +731,6 @@ function SectionCard({
               onClick={() => onMoveSection?.(section.id, -1)}
               disabled={index === 0}
               aria-label="Move section up"
-              title="Move section up"
             >
               <ArrowUp className="h-4 w-4" />
             </Button>
@@ -1349,7 +741,6 @@ function SectionCard({
               onClick={() => onMoveSection?.(section.id, 1)}
               disabled={index >= total - 1}
               aria-label="Move section down"
-              title="Move section down"
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
@@ -1420,7 +811,6 @@ function SectionCard({
           </DropdownMenu>
         )}
 
-        {/* Expand/collapse toggle — hidden in sort mode (sections forced collapsed). */}
         {!sortMode && (
           <button
             onClick={() => toggleSectionCollapsed(section.id)}
@@ -1444,19 +834,14 @@ function SectionCard({
                 isFirst={i === 0}
                 active={activeLineId === line.id}
                 onAddLineAfter={() => addLine(section.id, line.id)}
-                onMergeUp={(kind) => {
-                  handleMergeUp(line.id, kind);
-                  return true;
-                }}
-                onPickerOpen={(lineId, col, anchorId) => onPickerOpen(section.id, lineId, col, anchorId)}
-                cellPx={cellPx}
+                onMergeUp={(kind) => handleMergeUp(line.id, kind)}
+                onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
+                selection={selection}
                 onChordFocus={() => {
                   /* parent handles via picker */
                 }}
-                onChordDragStart={(anchorId) => onChordDragStart(section.id, line.id, anchorId)}
-                onChordDrop={(toLineId, toCol) => onChordDrop(section.id, toLineId, toCol)}
-                chordRowQuery={activeLineId === line.id ? chordRowQuery : undefined}
-                onChordRowQueryChange={activeLineId === line.id ? onChordRowQueryChange : undefined}
+                draggingIds={draggingIds}
+                isAnyDragging={isAnyDragging}
               />
             ))}
           </div>
@@ -1475,8 +860,18 @@ function SectionCard({
                     onClick={() => {
                       const last = section.lines[section.lines.length - 1];
                       if (last) {
-                        const nextCol = (last.chordRowLen ?? 0) > 0 ? (last.chordRowLen ?? 0) + 1 : 0;
-                        upsertChordAt(section.id, last.id, nextCol, b.chord);
+                        // Append into the next free slot of the last line.
+                        const used = new Set(
+                          last.chords.map((c) => c.slotIndex).filter((s): s is number => s != null),
+                        );
+                        let target = 0;
+                        for (let i = 0; i < CHORD_ROW_SLOTS; i++) {
+                          if (!used.has(i)) {
+                            target = i;
+                            break;
+                          }
+                        }
+                        useSongStore.getState().placeChordInSlot(section.id, last.id, target, b.chord);
                       }
                     }}
                   />
@@ -1547,7 +942,7 @@ function SectionCard({
         </DialogContent>
       </Dialog>
 
-      {/* Confirm row delete (cross-row backspace) */}
+      {/* Confirm row delete */}
       <AlertDialog
         open={!!confirm}
         onOpenChange={(o) => {
@@ -1587,45 +982,48 @@ function SectionCard({
   );
 }
 
-/** Measure the width of a single monospace "ch" using the chord-row font. */
-function useCellPx(): number {
-  const [px, setPx] = useState(8);
-  useLayoutEffect(() => {
-    const probe = document.createElement("span");
-    probe.className = "font-mono-chord text-sm font-semibold";
-    probe.style.position = "absolute";
-    probe.style.visibility = "hidden";
-    probe.style.whiteSpace = "pre";
-    probe.textContent = " ".repeat(20);
-    document.body.appendChild(probe);
-    const w = probe.getBoundingClientRect().width / 20;
-    document.body.removeChild(probe);
-    if (w > 0) setPx(w);
-  }, []);
-  return px;
-}
+// =============================================================================
+//                                LyricsTab
+// =============================================================================
 
 interface LyricsTabProps {
   sortMode?: boolean;
 }
 
 export function LyricsTab({ sortMode = false }: LyricsTabProps) {
-  const { sections, upsertChordAt, addSection, moveChordAnchor, basket, moveSection } = useSongStore();
-  const [picker, setPicker] = useState<{ sectionId: string; lineId: string; col: number; anchorId?: string } | null>(
-    null,
-  );
-  // Shared chord query: typed in either the picker input OR the active chord row.
-  const [pickerQuery, setPickerQuery] = useState("");
-  // Track which chord chip is being dragged (across rows / sections).
-  const dragRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
+  const {
+    sections,
+    upsertChordAt,
+    addSection,
+    moveSection,
+    basket,
+    moveChordToSlot,
+    moveChordsAcrossLines,
+    placeChordInSlot,
+    appendChordToLine,
+  } = useSongStore();
 
-  const openPicker = (sectionId: string, lineId: string, col: number, anchorId?: string) => {
-    // Basket steals focus: while it has items, the chord picker cannot open.
+  const [picker, setPicker] = useState<{
+    sectionId: string;
+    lineId: string;
+    /** Target slot in the chord row (0..19). */
+    slotIndex: number;
+    anchorId?: string;
+  } | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
+
+  // Selection lives at the tab level so cross-row drags can read it.
+  const selection = useDndSelection<string>();
+
+  // Track the in-flight pangea drag (which ids ride along, are we dragging at all).
+  const [draggingIds, setDraggingIds] = useState<Set<string>>(new Set());
+  const isAnyDragging = draggingIds.size > 0;
+
+  const openPicker = (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => {
     if (basket.length > 0) return;
-    setPicker({ sectionId, lineId, col, anchorId });
+    setPicker({ sectionId, lineId, slotIndex, anchorId });
   };
 
-  // If basket becomes non-empty while picker is open, close it.
   useEffect(() => {
     if (basket.length > 0 && picker) setPicker(null);
   }, [basket.length, picker]);
@@ -1634,7 +1032,6 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
   const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
 
-  // Seed the shared query when the picker opens onto a specific chord.
   useEffect(() => {
     if (picker) setPickerQuery(initialChord?.display ?? "");
     else setPickerQuery("");
@@ -1645,72 +1042,106 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
     if (!picker) return;
     const sec = sections.find((s) => s.id === picker.sectionId);
     const line = sec?.lines.find((l) => l.id === picker.lineId);
-    const wordCount = line ? (line.text.match(/\S+/g)?.length ?? 0) : 0;
+    if (!sec || !line) return;
     if (picker.anchorId) {
-      // Editing an existing chord — keep its slot, just swap the chord symbol.
-      upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
-    } else if (wordCount === 0) {
-      useSongStore.getState().appendChordToLine(picker.sectionId, picker.lineId, chord);
+      // Editing existing chord: keep its slot, swap symbol.
+      upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, chord, picker.anchorId);
     } else {
-      useSongStore.getState().upsertChordAtWord(picker.sectionId, picker.lineId, picker.col, chord);
+      // Placing new chord into the requested slot.
+      placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
     }
     setPickerQuery("");
-    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + 1 } : prev));
+    // Step picker to the next slot for fast successive entry.
+    setPicker((prev) =>
+      prev
+        ? {
+            ...prev,
+            anchorId: undefined,
+            slotIndex: Math.min(CHORD_ROW_SLOTS - 1, prev.slotIndex + 1),
+          }
+        : prev,
+    );
   };
 
-  const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
-    dragRef.current = { sectionId, lineId, anchorId };
+  // ---- Drag handlers ----
+  const onDragStart = (start: { draggableId: string }) => {
+    // If the dragged chip is part of the current selection, drag the whole set.
+    // Otherwise clear selection and drag just that chip.
+    if (selection.has(start.draggableId)) {
+      setDraggingIds(new Set(selection.selected));
+    } else {
+      selection.clear();
+      setDraggingIds(new Set([start.draggableId]));
+    }
   };
-  const handleChordDrop = (toSectionId: string, toLineId: string, toCol: number) => {
-    const src = dragRef.current;
-    dragRef.current = null;
-    if (!src) return;
-    moveChordAnchor(src.sectionId, src.lineId, src.anchorId, toSectionId, toLineId, toCol);
+
+  const onDragEnd = (result: DropResult) => {
+    const ids = Array.from(draggingIds);
+    setDraggingIds(new Set());
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+    // Parse droppableId: row:<sectionId>:<lineId>
+    const [, fromSectionId, fromLineId] = source.droppableId.split(":");
+    const [, toSectionId, toLineId] = destination.droppableId.split(":");
+    const toSlot = destination.index;
+
+    if (ids.length > 1) {
+      moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);
+      selection.clear();
+      return;
+    }
+
+    if (fromSectionId === toSectionId && fromLineId === toLineId) {
+      moveChordToSlot(fromSectionId, fromLineId, draggableId, toSlot);
+    } else {
+      moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, [draggableId], toSlot);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      {sections.map((sec, i) => (
-        <SectionCard
-          key={sec.id}
-          section={sec}
-          index={i}
-          total={sections.length}
-          displayName={getSectionDisplayName(sections, sec.id)}
-          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
-          onPickerOpen={openPicker}
-          onChordDragStart={handleChordDragStart}
-          onChordDrop={handleChordDrop}
-          chordRowQuery={picker?.sectionId === sec.id ? pickerQuery : undefined}
-          onChordRowQueryChange={picker?.sectionId === sec.id ? setPickerQuery : undefined}
-          sortMode={sortMode}
-          onMoveSection={(id, direction) => moveSection(id, direction)}
-        />
-      ))}
-
-      <div className={cn("flex flex-wrap items-center gap-2")}>
-        <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
-        {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-          <Button key={t} size="sm" variant="outline" onClick={() => addSection(t)} className="capitalize">
-            <Plus className="h-3.5 w-3.5" /> {t}
-          </Button>
+    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <div className="space-y-4">
+        {sections.map((sec, i) => (
+          <SectionCard
+            key={sec.id}
+            section={sec}
+            index={i}
+            total={sections.length}
+            displayName={getSectionDisplayName(sections, sec.id)}
+            activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
+            onPickerOpen={openPicker}
+            isAnyDragging={isAnyDragging}
+            draggingIds={draggingIds}
+            selection={selection}
+            sortMode={sortMode}
+            onMoveSection={(id, direction) => moveSection(id, direction)}
+          />
         ))}
-        <Button size="sm" variant="ghost" onClick={() => addSection("custom")}>
-          <Plus className="h-3.5 w-3.5" /> Custom…
-        </Button>
-      </div>
 
-      <ChordPickerSheet
-        open={!!picker}
-        onOpenChange={(o) => {
-          if (!o) setPicker(null);
-        }}
-        initialChord={initialChord}
-        onPick={handlePick}
-        activeLineId={picker?.lineId}
-        query={pickerQuery}
-        onQueryChange={setPickerQuery}
-      />
-    </div>
+        <div className={cn("flex flex-wrap items-center gap-2")}>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
+          {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+            <Button key={t} size="sm" variant="outline" onClick={() => addSection(t)} className="capitalize">
+              <Plus className="h-3.5 w-3.5" /> {t}
+            </Button>
+          ))}
+          <Button size="sm" variant="ghost" onClick={() => addSection("custom")}>
+            <Plus className="h-3.5 w-3.5" /> Custom…
+          </Button>
+        </div>
+
+        <ChordPickerSheet
+          open={!!picker}
+          onOpenChange={(o) => {
+            if (!o) setPicker(null);
+          }}
+          initialChord={initialChord}
+          onPick={handlePick}
+          activeLineId={picker?.lineId}
+          query={pickerQuery}
+          onQueryChange={setPickerQuery}
+        />
+      </div>
+    </DragDropContext>
   );
 }
