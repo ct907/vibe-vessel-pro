@@ -131,10 +131,8 @@ export function ChordsTab() {
                 type="button"
                 onClick={() => toggleNumeral(d.numeral)}
                 className={cn(
-                  "rounded-md p-2 text-center transition-colors",
-                  active
-                    ? "border-primary bg-accent ring-1 ring-primary"
-                    : "border-border bg-muted/50 hover:bg-accent/60",
+                  "rounded-md p-1 text-center transition-colors",
+                  active ? "border-primary bg-accent ring-1 ring-primary" : "bg-muted/50 hover:bg-accent/60",
                 )}
               >
                 <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
