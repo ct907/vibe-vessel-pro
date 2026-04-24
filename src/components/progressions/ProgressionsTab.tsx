@@ -281,29 +281,9 @@ function PatternBlock({
         <span className="text-xs text-muted-foreground">·</span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           Bars
-          <Input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={pattern.bars === 0 ? "" : String(pattern.bars)}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/[^0-9]/g, "");
-              if (raw === "") {
-                // Allow temporarily empty value while editing.
-                updatePattern(pattern.id, { bars: 0 } as any);
-                return;
-              }
-              const n = Number(raw);
-              updatePattern(pattern.id, { bars: Math.max(0, Math.min(32, n)) });
-            }}
-            onBlur={(e) => {
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n) || n < 1) {
-                updatePattern(pattern.id, { bars: 1 });
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="h-7 w-14 font-mono-chord"
+          <BarsInput
+            value={pattern.bars}
+            onCommit={(n) => updatePattern(pattern.id, { bars: Math.max(1, Math.min(32, n)) })}
           />
         </div>
         <span className="text-[11px] text-muted-foreground">
