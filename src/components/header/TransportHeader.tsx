@@ -6,7 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2, FileText, Settings, FilePlus } from "lucide-react";
+import {
+  Play,
+  Square,
+  Save,
+  Upload,
+  BookOpen,
+  Menu,
+  Sun,
+  Moon,
+  Undo2,
+  Redo2,
+  FileText,
+  Settings,
+  FilePlus,
+} from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
@@ -316,7 +330,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             </Button>
             {!isPlaying ? (
               <Button size="sm" onClick={handlePlay}>
-                <Play className="h-4 w-4" /> Play
+                <Play className="h-4 w-4 shadow-lg shadow-primary/50" /> Play
               </Button>
             ) : (
               <Button size="sm" variant="secondary" onClick={handleStop}>
