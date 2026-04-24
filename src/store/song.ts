@@ -10,8 +10,10 @@ export interface ChordAnchor {
   id: string;
   /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
-  /** New: column position in the chord row (in monospace cells). Independent from lyric text. */
+  /** Legacy: column position in the chord row (in monospace cells). Now used only as a fallback ordering hint. */
   chordCol?: number;
+  /** New: index of the lyric word this chord is bound to. `undefined` = floating (no word binding). */
+  wordIndex?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
@@ -21,7 +23,7 @@ export interface LyricLine {
   id: string;
   text: string;
   chords: ChordAnchor[];
-  /** Number of cursor cells in the chord row (>= max chord col + 1). */
+  /** Legacy: number of cursor cells in the chord row. Unused by the new word-anchored renderer. */
   chordRowLen?: number;
 }
 
