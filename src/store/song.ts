@@ -247,6 +247,79 @@ export function getSectionDisplayName(sections: Section[], sectionId: string): s
   return `${base} ${idx + 1}`;
 }
 
+// ---------- Word-anchor helpers ----------
+/** Words in a lyric line, with their character-offset start position. */
+export function getWords(text: string): { index: number; start: number; end: number; text: string }[] {
+  const out: { index: number; start: number; end: number; text: string }[] = [];
+  const re = /\S+/g;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ index: idx, start: m.index, end: m.index + m[0].length, text: m[0] });
+    idx++;
+  }
+  return out;
+}
+
+/** Sort anchors for left-to-right display: bound chords by wordIndex, floating by chordCol. */
+function sortAnchors(chords: ChordAnchor[]): ChordAnchor[] {
+  return [...chords].sort((a, b) => {
+    const aw = a.wordIndex ?? Number.POSITIVE_INFINITY;
+    const bw = b.wordIndex ?? Number.POSITIVE_INFINITY;
+    if (aw !== bw) return aw - bw;
+    const ac = a.chordCol ?? a.offset ?? 0;
+    const bc = b.chordCol ?? b.offset ?? 0;
+    return ac - bc;
+  });
+}
+
+/**
+ * Snap each chord in a line to a unique word slot, in the chord's existing
+ * left-to-right order. Leftover chords stay floating (wordIndex undefined).
+ */
+function snapLineToWords(line: LyricLine): LyricLine {
+  const words = getWords(line.text);
+  if (!words.length) {
+    const cleared = sortAnchors(line.chords).map((c, i) => ({
+      ...c,
+      wordIndex: undefined as number | undefined,
+      chordCol: i * 4,
+      offset: i * 4,
+    }));
+    return { ...line, chords: cleared };
+  }
+  const ordered = sortAnchors(line.chords);
+  const used = new Set<number>();
+  const result: ChordAnchor[] = [];
+  for (const c of ordered) {
+    let target: number | undefined;
+    const desired = c.wordIndex;
+    if (desired != null && desired >= 0 && desired < words.length && !used.has(desired)) {
+      target = desired;
+    } else {
+      const probe = desired != null ? desired : result.length;
+      let best: number | undefined;
+      let bestDist = Infinity;
+      for (let i = 0; i < words.length; i++) {
+        if (used.has(i)) continue;
+        const d = Math.abs(i - probe);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      target = best;
+    }
+    if (target == null) {
+      result.push({ ...c, wordIndex: undefined });
+    } else {
+      used.add(target);
+      result.push({ ...c, wordIndex: target, chordCol: words[target].start, offset: words[target].start });
+    }
+  }
+  return { ...line, chords: result };
+}
+
 // ---------- Sync helpers ----------
 // Find the next free start beat in a pattern (after the last chord's end).
 function nextFreeBeat(pattern: PatternBlock): number {
