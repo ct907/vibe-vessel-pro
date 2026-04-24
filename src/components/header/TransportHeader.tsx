@@ -157,7 +157,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             value={meta.title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter song title..."
-            className="text-center h-10 flex-1 min-w-0 max-w-xs font-display text-lg bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
+            className="text-center h-10 flex-1 min-w-0 max-w-xs font-display text-2xl bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
           />
           {/* Nav menu (top right of first row) */}
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
