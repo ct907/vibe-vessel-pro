@@ -395,6 +395,7 @@ function PatternBlock({
                           flexShrink: c.lengthBeats,
                           flexBasis: 0,
                           minWidth: 32,
+                          touchAction: "none",
                           ...dragProvided.draggableProps.style,
                         }}
                       >

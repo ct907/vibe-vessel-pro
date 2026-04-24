@@ -20,6 +20,7 @@ import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
+import { playChord } from "@/lib/music/audio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -374,7 +375,7 @@ function LineRow({
                               "w-full h-full flex items-center justify-center px-0.5",
                               hideForMulti && "opacity-30",
                             )}
-                            style={{ ...dragProvided.draggableProps.style }}
+                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (e.shiftKey) {
@@ -391,21 +392,18 @@ function LineRow({
                                 lastSelectedRef.current = anchor!.id;
                                 return;
                               }
+                              void playChord(anchor!.chord);
                               onChordFocus(line.id);
                               onPickerOpen(line.id, slotIdx, anchor!.id);
                             }}
                           >
-                            <div className="relative">
+                            <div className="relative pointer-events-none">
                               <ChordChip
                                 chord={anchor!.chord}
                                 variant="ink"
                                 size="sm"
                                 selected={selection.has(anchor!.id)}
-                                audition
-                                onLongPress={() => {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                }}
+                                audition={false}
                               />
                               {isPrimary && draggingIds.size > 1 && (
                                 <span
@@ -437,7 +435,7 @@ function LineRow({
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow">
+        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow max-w-[400px]">
           <span className="text-muted-foreground">{selection.size} selected</span>
           <div className="ml-auto flex items-center gap-1">
             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
