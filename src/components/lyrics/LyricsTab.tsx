@@ -499,6 +499,9 @@ function LineRow({
     }
 
     if (selectMode) return;
+    // When the picker (modal sheet) is open, it owns text input. Don't also
+    // process letter/backspace/space here, otherwise typing happens twice.
+    if (active) return;
     // Picker is "live" when this row is active and the parent passed query handlers.
     const pickerLive = !!(active && onChordRowQueryChange);
     const liveQuery = chordRowQuery ?? "";
