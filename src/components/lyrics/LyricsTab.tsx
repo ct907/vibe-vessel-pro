@@ -395,17 +395,13 @@ function LineRow({
                               onPickerOpen(line.id, slotIdx, anchor!.id);
                             }}
                           >
-                            <div className="relative">
+                            <div className="relative pointer-events-none">
                               <ChordChip
                                 chord={anchor!.chord}
                                 variant="ink"
                                 size="sm"
                                 selected={selection.has(anchor!.id)}
-                                audition
-                                onLongPress={() => {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                }}
+                                audition={false}
                               />
                               {isPrimary && draggingIds.size > 1 && (
                                 <span
