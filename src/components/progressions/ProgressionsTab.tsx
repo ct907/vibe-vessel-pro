@@ -45,11 +45,6 @@ interface PatternProps {
   blocksInSection: number;
   otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
-  onDragChordStart: (fromPatternId: string, chordId: string) => void;
-  onDragChordEnd: () => void;
-  onDropChordOnPattern: (toPatternId: string, toIndex: number) => void;
-  draggingChordId: string | null;
-  draggingFromPatternId: string | null;
   onRequestDeleteBlock: (patternId: string) => void;
 }
 
@@ -63,11 +58,6 @@ function PatternBlock({
   blocksInSection,
   otherPatterns,
   onPickerOpen,
-  onDragChordStart,
-  onDragChordEnd,
-  onDropChordOnPattern,
-  draggingChordId,
-  draggingFromPatternId,
   onRequestDeleteBlock,
 }: PatternProps) {
   const {
