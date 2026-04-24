@@ -739,8 +739,56 @@ export const useSongStore = create<SongState>((set, get) => ({
       if (sec.id !== sectionId) return sec;
       return {
         ...sec,
-        // Chord row is now decoupled from lyric text; just update the text.
-        lines: sec.lines.map((l) => (l.id === id ? { ...l, text } : l)),
+        // Chord row is decoupled from lyric text; reflow word-anchored chords so:
+        //  • newly-typed words pick up floating chords on their left,
+        //  • deleted words leave their chord as floating (it falls beside its neighbor),
+        //  • bound chords keep their wordIndex when their word still exists.
+        lines: sec.lines.map((l) => {
+          if (l.id !== id) return l;
+          const prevWords = getWords(l.text);
+          const nextWords = getWords(text);
+          const sorted = sortAnchors(l.chords);
+          const occupied = new Set<number>();
+          // First pass: keep chords still bound to a valid word.
+          const reflowed = sorted.map((c) => {
+            if (c.wordIndex == null) return c;
+            const oldWord = prevWords[c.wordIndex];
+            if (!oldWord) {
+              // Word removed — orphan becomes floating.
+              return { ...c, wordIndex: undefined as number | undefined };
+            }
+            // Try to find the same word text at the same index in the new list first.
+            const sameIdx = nextWords[c.wordIndex];
+            if (sameIdx && sameIdx.text === oldWord.text && !occupied.has(sameIdx.index)) {
+              occupied.add(sameIdx.index);
+              return { ...c, chordCol: sameIdx.start, offset: sameIdx.start };
+            }
+            // Otherwise look for the same word text elsewhere (handles inserted words).
+            const match = nextWords.find((w) => w.text === oldWord.text && !occupied.has(w.index));
+            if (match) {
+              occupied.add(match.index);
+              return { ...c, wordIndex: match.index, chordCol: match.start, offset: match.start };
+            }
+            // Word vanished — orphan, becomes floating.
+            return { ...c, wordIndex: undefined as number | undefined };
+          });
+          // Second pass: floating chords (in display order) snap into the nearest free
+          // word slot to the right of their previous neighbor — this is what makes
+          // typing a new lyric "pull" leftover chords onto the new words.
+          const final = reflowed.map((c) => {
+            if (c.wordIndex != null) return c;
+            // Scan word slots left→right for the first free one.
+            for (let i = 0; i < nextWords.length; i++) {
+              if (!occupied.has(i)) {
+                occupied.add(i);
+                const w = nextWords[i];
+                return { ...c, wordIndex: i, chordCol: w.start, offset: w.start };
+              }
+            }
+            return c; // remains floating if no free word
+          });
+          return { ...l, text, chords: sortAnchors(final) };
+        }),
       };
     }),
   })); },
@@ -1381,7 +1429,16 @@ export const useSongStore = create<SongState>((set, get) => ({
                 if (!occupied.has(i)) { target = i; break; }
               }
             }
-            if (target == null) return l;
+            if (target == null) {
+              // Going right past the last word: detach into floating (right side).
+              if (direction === 1) {
+                const updated = l.chords.map((c) =>
+                  c.id === cur.id ? { ...c, wordIndex: undefined as number | undefined } : c,
+                );
+                return { ...l, chords: sortAnchors(updated) };
+              }
+              return l;
+            }
             const updated = l.chords.map((c) =>
               c.id === cur.id
                 ? { ...c, wordIndex: target, chordCol: words[target!].start, offset: words[target!].start }

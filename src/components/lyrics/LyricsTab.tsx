@@ -1015,7 +1015,7 @@ function LineRow({
       )}
 
       {selectMode && (
-        <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs">
+        <div className="mt-5 mb-1 flex flex-col gap-[10px] rounded-md border border-border bg-card px-2 py-2 shadow-sm text-xs max-w-[400px]">
           {/* Row 1: status + action buttons */}
           <div className="flex flex-wrap items-center gap-[10px]">
             <span className="text-muted-foreground">{selectedIds.length} selected</span>
@@ -1074,16 +1074,17 @@ function LineRow({
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>
+              Done
+            </Button>
           </div>
-          {/* Row 2: arrows + Done */}
-          <div className="flex flex-wrap items-center gap-[10px]">
+          {/* Row 2: full-width arrows */}
+          <div className="flex items-center gap-[10px]">
             <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
+              variant="outline"
+              className="h-8 flex-1"
               disabled={!selectedIds.length}
               onClick={() => {
-                // Move each selected chord one word slot left (left-to-right order).
                 const ordered = [...line.chords]
                   .filter((c) => selectedIds.includes(c.id))
                   .sort((a, b) => (a.wordIndex ?? colOf(a)) - (b.wordIndex ?? colOf(b)));
@@ -1094,9 +1095,8 @@ function LineRow({
               <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
             </Button>
             <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
+              variant="outline"
+              className="h-8 flex-1"
               disabled={!selectedIds.length}
               onClick={() => {
                 const ordered = [...line.chords]
@@ -1107,9 +1107,6 @@ function LineRow({
               aria-label="Move chord right (by word slot)"
             >
               <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-3 ml-auto" onClick={exitSelect}>
-              Done
             </Button>
           </div>
         </div>
