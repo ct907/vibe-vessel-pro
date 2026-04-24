@@ -1,76 +1,106 @@
 ## Goal
 
-Make chord chips visually anchor to the start of lyric words instead of being placed on a free monospace grid. Replace the per-character chord-row caret/typing with a word-slot model + a manual "Format Chords" action.
+Adopt `@hello-pangea/dnd` (already installed) for both DnD surfaces by switching layouts so they are friendly to a normal flex/list flow:
 
-Also fix the build error in `ChordsTab.tsx` (`size="md"` → `size="default"`, lines 199 & 206 — `Button` only allows `default | sm | lg | icon`).
+1. **Chord row (lyrics tab)** — render a flex row of **20 fixed-equal-width slots**. Chord chips live inside slots; dragging snaps a chord into whichever slot it's released over. Word-anchored absolute positioning is removed. 
+2. **Pattern block (progressions tab)** — keep the existing beat-proportional sizing, but encode it via `flex-basis` on each chord rather than `width: calc(% - 4px); position: absolute`. The container becomes `display: flex; width: 100%`, items are normal flex children, so `@hello-pangea/dnd` can reorder them.
 
-## Data model (`src/store/song.ts`)
+Chord resize (length editing) stays out of DnD scope — it's its own pointer handler that updates `lengthBeats`/`flex` only.
 
-Keep existing `ChordAnchor` shape but reinterpret:
+---
 
-- `chordCol` becomes the **word index** the anchor is bound to (0-based index into the line's word list). `null`/`undefined` = unbound (floating).
-- Add an explicit `order: number` per anchor for left-to-right display order. (Bound chords sort by `wordIndex`, then `order`; floating chords sort by `order` only and render after bound ones, OR — see fallback below — render at default gap-2 positions when there are no words at all.)
-- Migration: existing `chordCol` (column) → treat as `order`, leave `wordIndex` undefined until user runs Format Chords.
+## 1) Chord row → 20 equal slots
 
-New helpers:
+### Data model (`src/store/song.ts`)
 
-- `getWords(text: string): { index: number; start: number; end: number; text: string }[]` — split by `/\S+/` (start col of each word in the raw string).
-- `formatChordsForLine(line)`: pure function that walks chords in `order`, snaps each to the **closest unused** word (by current visual position vs word start col), skipping words that already have a chord assigned to them in this pass; leftover chords keep their previous `wordIndex` (or stay floating).
+- Add `slotIndex?: number` (0..19) to `ChordAnchor`. New canonical position field for the chord row.
+- Keep `wordIndex` and `chordCol` for one release as legacy fields (used only by migration / "Format Chords"); stop reading them in the renderer.
+- Constant `CHORD_ROW_SLOTS = 20`.
+- New / changed actions:
+  - `placeChordInSlot(sectionId, lineId, chord, slotIndex)` — if slot is taken, push to nearest free slot (search outward, prefer right). Used by the picker.
+  - `moveChordToSlot(sectionId, lineId, anchorId, slotIndex)` — used by drop. If destination is occupied, swap with the occupant.
+  - `moveChordsAcrossLines(fromLineId, toLineId, anchorIds, dropSlotIndex)` — multi-select cross-row drop; lays selected chords starting at `dropSlotIndex`, pushing collisions right.
+  - Replace `moveChordWordSlot` arrow behavior with `slotIndex - 1` / `slotIndex + 1` swap-or-move (free → move, occupied → swap).
+- Migration in `loadFromJSON`: for each anchor without `slotIndex`, derive one from `wordIndex` (clamp to 0..19) or from previous left-to-right `order` (index by sort position).
+- "Format Chords" (broom) becomes: snap each chord's `slotIndex` to the slot whose center is closest to the corresponding lyric word's measured x position (still uses the mirror-div word-rect measurement code, just outputs slot indices instead of pixel `left`s). When multiple chords contend for the same slot, the closest wins; losers walk right to next free slot.
 
-New / modified store actions:
+### Renderer (`src/components/lyrics/LyricsTab.tsx`)
 
-- `formatChordsInLine(sectionId, lineId)` — runs the snap above, pushes history.
-- `formatChordsInSection(sectionId)` and `formatChordsInSong()` — convenience wrappers used by the toolbar button (button next to "Expand all" applies to all sections).
-- `moveChordWordSlot(sectionId, lineId, anchorId, direction: -1 | 1)` — context-menu ←/→: move binding to the previous/next word. If the target word is occupied by another chord, **swap** the two anchors' `wordIndex` (and adjust `order`). If no target word exists in that direction, swap order with the neighboring chord instead (covers the floating case + ensures rule 4).
-- Remove/retire `insertChordSpaceAt`, `removeChordCellAt`, `setChordRowLen` callers from the lyrics tab. Keep the actions for now to avoid touching exports broadly; mark deprecated in a comment.
+- Delete:
+  - `wordRects` state, mirror-div, `ResizeObserver`, `wordIndexNear`, absolute-positioned `bound`/`floating` rendering, `cellPx` math, drop-indicator pixel column, custom pointer-drag (`pdrag`), drag ghost, `onPointerDown`/`onPointerMove`/`onPointerUp` block, the floating chips container.
+- Add:
+  - `<DragDropContext>` at the lyrics tab root (one context wraps every line's chord row + every other line so cross-row drops work as nested droppables).
+  - For each line, render the chord row as `<Droppable droppableId={`row:${lineId}`} direction="horizontal" type="chord">` containing 20 `<div className="flex-1 min-w-0 h-9 ...">` slot cells. Chips inside slots are `<Draggable>` items keyed by anchorId.
+  - Because @hello-pangea/dnd Droppables are **lists**, not grids, model each row's children as 20 placeholder items + chips inserted at their slot. Use a single Droppable per row whose children array is length 20 (slot wrappers) — chips are absolutely-positioned inside their slot wrapper so the library still sees the slot list as stable while chips are draggable.
+  - Drag end: `result.destination.droppableId` → target lineId, `result.destination.index` → target slotIndex (0..19). Dispatch `moveChordToSlot` (same row) or `moveChordsAcrossLines` (different row).
+  - Multi-select drag: pangea is single-item; wrap with the standard "selected item count" pattern — on drag start, hide other selected chips and overlay a count badge on the dragged ghost; on drop, dispatch the batch action with all selected ids and the dest slot.
+  - Tap (no drag) on an empty slot still opens the picker; chosen chord goes to that slot via `placeChordInSlot`. Tap on a chip still plays + opens picker as today.
+- Visuals:
+  - Slot grid uses `grid-cols-20` (or `flex` with `flex-1`); empty slots are transparent (no borders by default), with a faint dashed outline only while a drag is in progress, and a strong primary outline on `snapshot.isDraggingOver`.
+  - Chord chip occupies its slot with `w-full` so width is uniform.
 
-## Lyrics tab (`src/components/lyrics/LyricsTab.tsx`)
+### Context menu
 
-Rewrite the chord-row rendering for each `LineRow`:
+- ←/→ now call `moveChordToSlot(anchorId, slotIndex ± 1)` (with swap on collision, clamp at 0 and 19). The "move past last word" requirement from the prior round is naturally satisfied — chord just keeps walking right through slots.
 
-- Stop using `cellPx` / monospace columns / caret / area-drag-by-pixels for placement. Remove the `chordCaret`, `chordRowLen`, `insertChordSpaceAt`, `removeChordCellAt` plumbing in this component.
-- Render the chord row as an absolutely positioned overlay aligned to the lyric `<textarea>`/measurement layer:
-  - Use a hidden mirror `<div>` that mirrors the textarea's wrapped layout (same font, width, padding, white-space: pre-wrap) with one `<span data-word-index={i}>` per word.
-  - After layout, read each word span's `getBoundingClientRect()` relative to the row container to get the pixel `left` of each word.
-  - Place each chord chip via `style={{ position: "absolute", left: wordLeftPx[anchor.wordIndex] }}`.
-- **Fallback when the line has no words yet**: render chips inline (flex row) with `gap-2`, in `order` sequence (rule 2).
-- **Rule 1 enforcement**: when the user adds a chord via the picker, choose target word index = first word that has no chord bound to it; if all words are taken, append as floating (no `wordIndex`).
-- Remove the typing caret visual (`|`) and per-character spaces in the chord row. Tap-on-empty-row still opens the picker, but no caret position is shown — the picker just appends.
-- Keep chord chip click = play/audition + open picker for that chord (unchanged behavior).
-- Drag-to-rearrange across rows (`moveSelectedChordsTo`) keeps working but the destination is "which row" + "append-or-insert into word slots" rather than a pixel column. Simpler: drop = move to target line and run the line's `formatChordsForLine` with the moved chords appended.
+---
 
-Add a **"Format Chords"** button in the section/lyrics toolbar:
+## 2) Pattern block → flex-basis + pangea reorder
 
-- Place beside the existing "Expand all" / collapse-all button at the top of the lyrics tab (search for `setAllSectionsCollapsed` usage).
-- Icon: `Brush` (broom) from `lucide-react`.
-- Disabled state: enabled iff at least one line in the song contains words AND at least one chord exists. Otherwise grey out with a tooltip "Type lyrics first".
-- onClick: dispatch `formatChordsInSong()`.
+### Layout switch (`src/components/progressions/ProgressionsTab.tsx`, `PatternBlock`)
 
-Per-line context-menu changes (the existing chord-row select-mode menu):
+- Container becomes `display: flex; width: 100%; height: 5rem` (no `overflow-hidden` change). Bar separators stay absolute (they're aligned to `bars`, not to chord positions, so they don't conflict with flex children).
+- Each chord renders as a flex child with:
+  ```tsx
+  style={{ flexGrow: c.lengthBeats, flexShrink: c.lengthBeats, flexBasis: 0, minWidth: 32 }}
+  ```
+  No more `width: calc(% - 4px)`. Margins (`mx-0.5 my-1`) stay for the chord chip's visual gutter.
+- The trailing "tap to add" button stays as a flex child, only when `usedBeats < totalBeats`. Its `flex` value mirrors the remaining beats (`totalBeats - usedBeats`) so visually it fills the residual bar room exactly like before.
+- Resize handles (length editor) stay as today — they update `lengthBeats` via `setPatternChordLength`, which directly drives the new `flex-grow`. No DnD coupling.
 
-- ← / → buttons rebind to `moveChordWordSlot(..., -1 | +1)` for the focused anchor (or each in selection, in left-to-right order to preserve relative order).
-- Remove the column-shift behavior of `moveSelectedChordsByOrder` from these buttons (action stays in store but is no longer wired here).
+### DnD wiring
 
-## Progressions tab
+- Wrap the progressions tab in `<DragDropContext>`. Each `PatternBlock` exposes a `<Droppable droppableId={`pattern:${pattern.id}`} direction="horizontal" type="pattern-chord">`.
+- Each chord becomes `<Draggable draggableId={c.id} index={idx}>`.
+- Drop result:
+  - Same pattern: `reorderPatternChord(pattern.id, chordId, destination.index)` (already exists). After reorder, `repackChords` re-flows `startBeat`s — no further math needed.
+  - Different pattern: `movePatternChordToPatternAt(fromPatternId, toPatternId, chordId, destination.index)` (already exists).
+- Multi-select drop: same "selected count badge" pattern as above; dispatch `movePatternChordsTo` and then `reorderPatternChord` per id in destination order, OR add a thin new action `reorderPatternChordsBatch(patternId, chordIds, toIndex)` that splices the array in one shot (preferred — single history entry).
+- Remove all native HTML5 `draggable`/`onDragStart`/`onDragOver`/`onDrop` handlers and the `dropIndicator` state (pangea draws its own placeholder).
+- Remove `pdrag` pointer-drag block in `PatternBlock` (cross-block is now pangea).
 
-No data-model change reaches here directly. `chordCol` is no longer a pixel column but it never was rendered in the progression tab anyway — it only uses `mirrorId`. No edits expected beyond keeping `syncPatternFromAnchors` working: update `anchorsInVisualOrder` to sort by `(wordIndex ?? Infinity, order)` so cross-tab ordering stays stable.
+### Trailing tap-to-add slot
 
-## Migration / persistence
+- This is not a Draggable; it lives outside the Droppable's children list (rendered after `{provided.placeholder}`). Otherwise pangea would treat it as a draggable index.
 
-In `loadFromJSON` (search `version: 2` block in `song.ts`), for each anchor: if `chordCol !== undefined && wordIndex === undefined`, copy `chordCol → order` and leave `wordIndex` undefined (user will Format Chords to snap). Bump `version` to `3` for new saves; still load v2.
+---
 
-## Build-fix (independent, immediate)
+## 3) Cross-cutting
 
-`src/components/chords/ChordsTab.tsx` lines 199 and 206: change `size="md"` to `size="default"`. The component already specifies `h-12` so the visual size is preserved.
+- Add `pangea` `<DragDropContext>` once per tab (lyrics, progressions). Don't try to share a context across tabs.
+- Selection model: introduce a small `useDndSelection<T extends string>()` hook (in `src/hooks/`) that holds `Set<id>` and exposes `toggle/clear/has`. Both tabs reuse it. On drag start, if the dragged id is in the selection, the drag operates on the whole set; otherwise it clears the selection and operates on just the dragged id.
+- Multi-drag visuals: render a small badge (`+N`) on the dragging clone via `renderClone` on the Draggable.
+- Keyboard / accessibility: pangea provides default keyboard DnD — keep it on, no extra work.
+- Tests: update `src/test/example.test.ts` if it touches chord-row column math; add a focused unit test for `placeChordInSlot` / `moveChordToSlot` collision behavior.
+
+---
 
 ## Files touched
 
-- `src/store/song.ts` — add `wordIndex`/`order` semantics, `formatChordsForLine`, `formatChordsInSong`, `moveChordWordSlot`, migration in `loadFromJSON`, update `anchorsInVisualOrder`.
-- `src/components/lyrics/LyricsTab.tsx` — rewrite `LineRow` chord-row rendering (word-anchored overlay + flex-fallback), drop caret/character-cell logic, add Format Chords button in the top toolbar, rewire ←/→ in the chord-row context menu.
-- `src/components/chords/ChordsTab.tsx` — fix `size="md"` build error.
+- `src/store/song.ts` — add `slotIndex` + new actions, migration, deprecate `wordIndex`/`chordCol` reads.
+- `src/components/lyrics/LyricsTab.tsx` — large rewrite of chord row: slot grid + DragDropContext/Droppable/Draggable, remove mirror-div/`pdrag`/wordRects/cellPx.
+- `src/components/progressions/ProgressionsTab.tsx` — switch chord layout to `flex-basis`, remove HTML5 DnD + `pdrag`, wrap with pangea.
+- `src/pages/Index.tsx` — Format Chords button: behavior unchanged from the user's POV (still snaps), under-the-hood writes `slotIndex`.
+- `src/hooks/use-dnd-selection.ts` (new) — small selection hook.
+- `src/test/*` — minor test updates.
 
 ## Open questions / decisions made
 
-- **What "closest" means for the broom snap**: nearest by current pixel position of the chip vs word's pixel start, measured in the live layout. Ties broken left-first.
-- **Floating chords after format**: chords that can't snap retain whatever previous position they had (rule 3) — rendered after bound ones in a small floating row at the right end of the line, with a subtle dotted outline to signal "unanchored".
-- **Pixel measurement**: uses a hidden mirror div + `getBoundingClientRect`. Recomputed via `ResizeObserver` on the line container and on `line.text` change.
+- **Why 20 slots?** — directly per the user's spec. Width per slot at 1013px viewport ≈ 50px, comfortably fits a chord chip. Mobile keeps the same 20 (chips shrink with `min-w-0` and use `truncate`).
+- **What happens to a chord whose `slotIndex` collides on load?** — collisions during migration are resolved left-to-right by walking right to the next free slot.
+- **Floating chords (>20 chords on a line)** — disallow: the picker / drop refuses placement when all 20 are full and shows a toast "Row is full". This is a behavior change from "floating chips at the end" (acceptable because flat slot grids don't support overflow gracefully).
+- **Resize in pattern blocks** — out of DnD scope; existing edge-drag handlers continue to work because they only mutate `lengthBeats`, which now drives `flex-grow` directly.
+- **Bar separators** — keep absolute-positioned overlays inside the (now flex) container; they don't interfere with flex children layout because they're `pointer-events-none`.  
+
+  ## Enable multi-select and multi-drag behaviour for chord items
+  &nbsp;

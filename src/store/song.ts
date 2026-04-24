@@ -6,14 +6,19 @@ import { getDefaults } from "@/store/defaults";
 
 // ---------- Types ----------
 
+/** Number of fixed equal-width slots in a chord row. */
+export const CHORD_ROW_SLOTS = 20;
+
 export interface ChordAnchor {
   id: string;
   /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
   /** Legacy: column position in the chord row (in monospace cells). Now used only as a fallback ordering hint. */
   chordCol?: number;
-  /** New: index of the lyric word this chord is bound to. `undefined` = floating (no word binding). */
+  /** Legacy: index of the lyric word this chord is bound to. Used by Format Chords + migration. */
   wordIndex?: number;
+  /** Canonical position: 0..CHORD_ROW_SLOTS-1. The chord row is a fixed grid of equal slots. */
+  slotIndex?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
@@ -138,6 +143,16 @@ export interface SongState {
   formatChordsInSong: () => void;
   /** Re-bind a chord's word slot by ±1, swapping with the chord at the target slot if any. */
   moveChordWordSlot: (sectionId: string, lineId: string, anchorId: string, direction: -1 | 1) => void;
+  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
+  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
+  /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
+  moveChordToSlot: (sectionId: string, lineId: string, anchorId: string, slotIndex: number) => void;
+  /** Move a set of anchors to a different row, starting at dropSlot, pushing collisions right. */
+  moveChordsAcrossLines: (
+    fromSectionId: string, fromLineId: string,
+    toSectionId: string, toLineId: string,
+    anchorIds: string[], dropSlot: number,
+  ) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -318,6 +333,50 @@ function snapLineToWords(line: LyricLine): LyricLine {
     }
   }
   return { ...line, chords: result };
+}
+
+// ---------- Slot helpers (20-slot chord row) ----------
+
+/** Find the nearest free slot starting from `desired`, scanning right then left. Returns -1 if all 20 are full. */
+export function nearestFreeSlot(occupied: Set<number>, desired: number, total = CHORD_ROW_SLOTS): number {
+  const start = Math.max(0, Math.min(total - 1, desired));
+  if (!occupied.has(start)) return start;
+  for (let off = 1; off < total; off++) {
+    const r = start + off;
+    if (r < total && !occupied.has(r)) return r;
+    const l = start - off;
+    if (l >= 0 && !occupied.has(l)) return l;
+  }
+  return -1;
+}
+
+/** Derive a slotIndex for a legacy anchor (uses wordIndex if present, else order). */
+function deriveSlotIndex(anchor: ChordAnchor, fallbackOrder: number): number {
+  if (anchor.wordIndex != null) return Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, anchor.wordIndex));
+  return Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, fallbackOrder));
+}
+
+/** Ensure every chord on a line has a unique slotIndex in [0, 20). Resolves collisions left-to-right. */
+function ensureSlotsForLine(line: LyricLine): LyricLine {
+  const ordered = [...line.chords].sort((a, b) => {
+    const aw = a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
+    const bw = b.slotIndex ?? b.wordIndex ?? b.chordCol ?? b.offset ?? 0;
+    return aw - bw;
+  });
+  const used = new Set<number>();
+  const next: ChordAnchor[] = [];
+  ordered.forEach((c, i) => {
+    const desired = c.slotIndex != null ? c.slotIndex : deriveSlotIndex(c, i);
+    const slot = nearestFreeSlot(used, desired);
+    if (slot < 0) {
+      // Row full → keep without slot (renderer will hide; should be rare).
+      next.push({ ...c, slotIndex: undefined });
+    } else {
+      used.add(slot);
+      next.push({ ...c, slotIndex: slot });
+    }
+  });
+  return { ...line, chords: next };
 }
 
 // ---------- Sync helpers ----------
@@ -1454,6 +1513,178 @@ export const useSongStore = create<SongState>((set, get) => ({
     });
   },
 
+  // -------- Slot-based chord row (20 fixed slots) --------
+  placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
+    pushHistory(get);
+    set((s) => {
+      let createdAnchorId: string | null = null;
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const occupied = new Set<number>();
+            l.chords.forEach((c) => { if (c.slotIndex != null) occupied.add(c.slotIndex); });
+            const slot = nearestFreeSlot(occupied, slotIndex);
+            if (slot < 0) return l; // row full — silently drop
+            const id = nanoid();
+            createdAnchorId = id;
+            const newAnchor: ChordAnchor = { id, offset: 0, slotIndex: slot, chord };
+            return { ...l, chords: [...l.chords, newAnchor].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
+          }),
+        };
+      });
+      // Mirror to pattern.
+      let progression = s.progression;
+      let finalSections = sections;
+      if (createdAnchorId) {
+        const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
+        progression = placed.progression;
+        const pcId = placed.chordId;
+        if (pcId) {
+          finalSections = sections.map((sec) => {
+            if (sec.id !== sectionId) return sec;
+            return {
+              ...sec,
+              lines: sec.lines.map((l) => ({
+                ...l,
+                chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
+              })),
+            };
+          });
+        }
+        const updatedSection = finalSections.find((x) => x.id === sectionId);
+        if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
+      }
+      return { sections: finalSections, progression };
+    });
+  },
+
+  moveChordToSlot: (sectionId, lineId, anchorId, slotIndex) => {
+    pushHistory(get);
+    set((s) => {
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
+            const me = l.chords.find((c) => c.id === anchorId);
+            if (!me) return l;
+            if (me.slotIndex === target) return l;
+            const occupant = l.chords.find((c) => c.id !== anchorId && c.slotIndex === target);
+            const myPrev = me.slotIndex;
+            const chords = l.chords.map((c) => {
+              if (c.id === anchorId) return { ...c, slotIndex: target };
+              if (occupant && c.id === occupant.id) return { ...c, slotIndex: myPrev };
+              return c;
+            });
+            return { ...l, chords: chords.sort((a, b) => (a.slotIndex ?? 99) - (b.slotIndex ?? 99)) };
+          }),
+        };
+      });
+      const sec = sections.find((x) => x.id === sectionId);
+      const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
+      return { sections, progression };
+    });
+  },
+
+  moveChordsAcrossLines: (fromSectionId, fromLineId, toSectionId, toLineId, anchorIds, dropSlot) => {
+    pushHistory(get);
+    set((s) => {
+      const fromSec = s.sections.find((x) => x.id === fromSectionId);
+      const fromLine = fromSec?.lines.find((l) => l.id === fromLineId);
+      if (!fromSec || !fromLine) return s;
+      // Same row → fall back to single-anchor moves.
+      if (fromSectionId === toSectionId && fromLineId === toLineId) {
+        // Lay out selection starting at dropSlot, push others right.
+        const moving = anchorIds
+          .map((id) => fromLine.chords.find((c) => c.id === id))
+          .filter((c): c is ChordAnchor => !!c)
+          .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+        const others = fromLine.chords.filter((c) => !anchorIds.includes(c.id));
+        const used = new Set<number>();
+        const placedMoving: ChordAnchor[] = [];
+        let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+        for (const m of moving) {
+          const slot = nearestFreeSlot(used, cursor);
+          if (slot < 0) break;
+          used.add(slot);
+          placedMoving.push({ ...m, slotIndex: slot });
+          cursor = slot + 1;
+        }
+        // Now place others in their original slot, walking right on collision.
+        const placedOthers: ChordAnchor[] = [];
+        for (const o of others.sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))) {
+          const slot = nearestFreeSlot(used, o.slotIndex ?? 0);
+          if (slot < 0) continue;
+          used.add(slot);
+          placedOthers.push({ ...o, slotIndex: slot });
+        }
+        const sections = s.sections.map((sec) =>
+          sec.id !== fromSectionId
+            ? sec
+            : {
+                ...sec,
+                lines: sec.lines.map((l) =>
+                  l.id !== fromLineId
+                    ? l
+                    : { ...l, chords: [...placedOthers, ...placedMoving].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) },
+                ),
+              },
+        );
+        const sec = sections.find((x) => x.id === fromSectionId);
+        const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
+        return { sections, progression };
+      }
+      // Cross-line: remove from source, insert into target.
+      const moving = anchorIds
+        .map((id) => fromLine.chords.find((c) => c.id === id))
+        .filter((c): c is ChordAnchor => !!c)
+        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+      if (!moving.length) return s;
+      const sections = s.sections.map((sec) => {
+        if (sec.id === fromSectionId) {
+          return {
+            ...sec,
+            lines: sec.lines.map((l) =>
+              l.id !== fromLineId ? l : { ...l, chords: l.chords.filter((c) => !anchorIds.includes(c.id)) },
+            ),
+          };
+        }
+        return sec;
+      }).map((sec) => {
+        if (sec.id !== toSectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== toLineId) return l;
+            const used = new Set<number>();
+            l.chords.forEach((c) => { if (c.slotIndex != null) used.add(c.slotIndex); });
+            const placed: ChordAnchor[] = [];
+            let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+            for (const m of moving) {
+              const slot = nearestFreeSlot(used, cursor);
+              if (slot < 0) break;
+              used.add(slot);
+              placed.push({ ...m, slotIndex: slot });
+              cursor = slot + 1;
+            }
+            return { ...l, chords: [...l.chords, ...placed].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
+          }),
+        };
+      });
+      let progression = s.progression;
+      const fromSecNew = sections.find((x) => x.id === fromSectionId);
+      if (fromSecNew) progression = syncPatternFromAnchors(progression, fromSecNew);
+      const toSecNew = sections.find((x) => x.id === toSectionId);
+      if (toSecNew) progression = syncPatternFromAnchors(progression, toSecNew);
+      return { sections, progression };
+    });
+  },
+
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
   })),
@@ -2097,7 +2328,12 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
 
     if (parsed.version !== 2) return;
-    const sectionsLoaded: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
+    const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
+    // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
+    const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
+      ...sec,
+      lines: sec.lines.map((l) => ensureSlotsForLine(l)),
+    }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
     const migratedProgression = progressionLoaded.map((p) => ({
