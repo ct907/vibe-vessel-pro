@@ -22,10 +22,7 @@ export function SuggestionsPanel({ pattern }: Props) {
   const [open, setOpen] = useState(false);
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
 
-  const sortedChords = useMemo(
-    () => [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat),
-    [pattern.chords],
-  );
+  const sortedChords = useMemo(() => [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat), [pattern.chords]);
 
   const suggestions = useMemo(
     () =>
@@ -42,7 +39,10 @@ export function SuggestionsPanel({ pattern }: Props) {
     setPlayingIdx(null);
   };
 
-  const playSuggestion = async (idx: number, chords: ReturnType<typeof generateProgressionSuggestions>[number]["chords"]) => {
+  const playSuggestion = async (
+    idx: number,
+    chords: ReturnType<typeof generateProgressionSuggestions>[number]["chords"],
+  ) => {
     if (playingIdx === idx) {
       stopPreview();
       return;
@@ -79,27 +79,26 @@ export function SuggestionsPanel({ pattern }: Props) {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="w-auto flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
         >
           <span className="inline-flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5" />
             Suggest variations
           </span>
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+          <ChevronDown className={cn("w-auto px-2 h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2 space-y-1.5">
         {suggestions.length === 0 ? (
           <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground space-y-2">
             <p>No variations found for this progression.</p>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-            >
+            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
               <a
-                href={buildGoogleSearchUrl(sortedChords.map((c) => c.chord), meta.keyRoot, meta.keyMode)}
+                href={buildGoogleSearchUrl(
+                  sortedChords.map((c) => c.chord),
+                  meta.keyRoot,
+                  meta.keyMode,
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -111,14 +110,9 @@ export function SuggestionsPanel({ pattern }: Props) {
           suggestions.map((s, idx) => {
             const isPlaying = playingIdx === idx;
             return (
-              <div
-                key={idx}
-                className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5"
-              >
+              <div key={idx} className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
-                    {s.label}
-                  </p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{s.label}</p>
                   <div className="flex flex-wrap gap-1 mt-0.5">
                     {s.chords.map((c, i) => (
                       <span
