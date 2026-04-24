@@ -6,14 +6,19 @@ import { getDefaults } from "@/store/defaults";
 
 // ---------- Types ----------
 
+/** Number of fixed equal-width slots in a chord row. */
+export const CHORD_ROW_SLOTS = 20;
+
 export interface ChordAnchor {
   id: string;
   /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
   /** Legacy: column position in the chord row (in monospace cells). Now used only as a fallback ordering hint. */
   chordCol?: number;
-  /** New: index of the lyric word this chord is bound to. `undefined` = floating (no word binding). */
+  /** Legacy: index of the lyric word this chord is bound to. Used by Format Chords + migration. */
   wordIndex?: number;
+  /** Canonical position: 0..CHORD_ROW_SLOTS-1. The chord row is a fixed grid of equal slots. */
+  slotIndex?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
