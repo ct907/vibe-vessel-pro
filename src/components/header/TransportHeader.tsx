@@ -289,7 +289,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                 −
               </span>
             </Button>
-            <span className="font-mono-chord text-xs px-1.5 text-center tabular-nums whitespace-nowrap">
+            <span className="font-mono-chord text-xs px-1.5 pt-1 text-center tabular-nums whitespace-nowrap">
               {isMobile ? "Transp" : "Transpose"} {fmtOffset(transposeOffset)}
             </span>
             <Button
