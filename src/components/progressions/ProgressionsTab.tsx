@@ -38,6 +38,38 @@ import { MoreVertical } from "lucide-react";
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
 
+/** Bars number input that allows the field to be temporarily empty while typing. */
+function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^0-9]/g, "");
+        setDraft(raw);
+        if (raw === "") return;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 1) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (!draft || !Number.isFinite(n) || n < 1) {
+          setDraft("1");
+          onCommit(1);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-7 w-14 font-mono-chord"
+    />
+  );
+}
+
 interface PatternProps {
   pattern: PatternBlockType;
   blockIndex: number;
