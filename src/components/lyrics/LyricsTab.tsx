@@ -986,6 +986,31 @@ function LineRow({
           );
         })()}
 
+        {/* Hidden mirror of the lyric textarea — used to measure each word's pixel
+            position so chord chips can align to word starts. */}
+        <div
+          ref={mirrorRef}
+          aria-hidden
+          className="absolute left-0 top-0 w-full font-display text-lg leading-9 px-1 ml-1 break-words whitespace-pre-wrap pointer-events-none invisible"
+        >
+          {lineWords.length === 0
+            ? "\u00A0"
+            : (() => {
+                const parts: React.ReactNode[] = [];
+                let cursor = 0;
+                lineWords.forEach((w, i) => {
+                  if (w.start > cursor) parts.push(line.text.slice(cursor, w.start));
+                  parts.push(
+                    <span key={`w-${i}`} data-word-i={i}>
+                      {w.text}
+                    </span>,
+                  );
+                  cursor = w.end;
+                });
+                if (cursor < line.text.length) parts.push(line.text.slice(cursor));
+                return parts;
+              })()}
+        </div>
       </div>
 
       {/* Long-press paste popover for empty chord-row spaces. */}
