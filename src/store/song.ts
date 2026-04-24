@@ -34,6 +34,8 @@ export interface Section {
   lines: LyricLine[];
   /** Optional notes/comment for this section. */
   comment?: string;
+  /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
+  color?: string | null;
 }
 
 export interface PatternChord {
@@ -92,6 +94,9 @@ export interface SongState {
   toggleSectionCollapsed: (id: string) => void;
   setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
+  setSectionColor: (id: string, color: string | null) => void;
+  /** Wipe all song state and replace with a single empty verse section (factory reset). */
+  resetSong: () => void;
 
   // ---- lyrics (line-level) ----
   addLine: (sectionId: string, afterId?: string) => string;
