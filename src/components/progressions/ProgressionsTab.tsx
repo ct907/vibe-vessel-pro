@@ -494,7 +494,7 @@ function PatternBlock({
                   {c.chord.display}
                 </span>
                 <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
-                  {formatBeats(c.lengthBeats)}beats
+                  {formatBeats(c.lengthBeats)} beats
                 </span>
               </button>
             );
@@ -639,7 +639,7 @@ function PatternBlock({
             </Button>
             {showSingle && c && (
               <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
-                {formatBeats(c.lengthBeats)}beats
+                {formatBeats(c.lengthBeats)} beats
               </span>
             )}
             <Button
