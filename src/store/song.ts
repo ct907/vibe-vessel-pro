@@ -1397,7 +1397,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     });
   },
 
-
+  addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
   })),
   removeFromBasket: (id) => set((s) => ({ basket: s.basket.filter((b) => b.id !== id) })),
