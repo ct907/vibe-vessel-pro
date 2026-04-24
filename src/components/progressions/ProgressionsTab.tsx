@@ -867,7 +867,6 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
-  const [drag, setDrag] = useState<{ fromPatternId: string; chordId: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
@@ -897,14 +896,20 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
     }
   };
 
-  const handleDropChord = (toPatternId: string, toIndex: number) => {
-    if (!drag) return;
-    if (drag.fromPatternId === toPatternId) {
-      reorderPatternChord(toPatternId, drag.chordId, toIndex);
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
+    const toId = destination.droppableId.startsWith("pattern:")
+      ? destination.droppableId.slice("pattern:".length)
+      : null;
+    if (!fromId || !toId) return;
+    if (fromId === toId) {
+      if (source.index === destination.index) return;
+      reorderPatternChord(toId, draggableId, destination.index);
     } else {
-      movePatternChordToPatternAt(drag.fromPatternId, toPatternId, drag.chordId, toIndex);
+      movePatternChordToPatternAt(fromId, toId, draggableId, destination.index);
     }
-    setDrag(null);
   };
 
   const requestDeleteSection = (sectionId: string) => {
