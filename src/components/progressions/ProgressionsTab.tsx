@@ -328,7 +328,7 @@ function PatternBlock({
       ref={blockRef}
       data-pattern-block={pattern.id}
       className={cn(
-        "rounded-lg shadow-primary/40 p-3 transition-shadow",
+        "rounded-lg border shadow-primary/40 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
       )}
     >
@@ -377,7 +377,7 @@ function PatternBlock({
       <div className="relative">
         <div
           className={cn(
-            "relative h-20 rounded-md bg-muted/30 overflow-hidden flex items-stretch",
+            "relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch",
             draggingChordId && draggingFromPatternId !== pattern.id && "ring-2 ring-primary/40",
           )}
           onDragOver={(e) => {
@@ -787,7 +787,7 @@ function SectionGroup({
       ref={cardRef}
       data-section-id={sectionId}
       style={sectionTintStyle(section?.color)}
-      className={cn("rounded-xl py-4 space-y-3 transition-shadow")}
+      className={cn("rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
