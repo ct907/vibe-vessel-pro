@@ -481,67 +481,7 @@ function PatternBlock({
           );
         })()}
 
-        {!selectMode && active && activeIdx >= 0 && (() => {
-          const c = active;
-          const canDecrease = c.lengthBeats > MIN_LEN;
-          const canIncrease = c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9;
-          const leftBeat = sortedChords.slice(0, activeIdx).reduce((s, x) => s + x.lengthBeats, 0);
-          const leftPct = (leftBeat / totalBeats) * 100;
-          const widthPct = (c.lengthBeats / totalBeats) * 100;
-          return (
-            <div
-              className="absolute top-full mt-1 flex items-center gap-1 rounded-md border border-border bg-card px-1 py-1 shadow-sm z-10"
-              style={{ left: `calc(${leftPct}% + ${widthPct / 2}%)`, transform: "translateX(-50%)" }}
-            >
-              <Button
-                size="sm"
-                variant="default"
-                className="h-7 px-2 text-xs"
-                onClick={async () => {
-                  await ensureAudio();
-                  setStartFromChord(pattern.id, c.id);
-                  setActiveChord(null);
-                  // Stop any current playback then request a fresh play.
-                  setIsPlayingStore(false);
-                  setCurrent(null);
-                  window.dispatchEvent(new Event("lovable:request-play"));
-                }}
-                aria-label="Play from here"
-                title="Play from here"
-              >
-                <Play className="h-3.5 w-3.5" /> Play from here
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7"
-                onClick={() => movePatternChord(pattern.id, c.id, -1)} aria-label="Move earlier" title="Move earlier">
-                <ArrowLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="outline" className="h-7 w-7" disabled={!canDecrease}
-                onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP)}
-                aria-label="Decrease length" title="Decrease length (-)">
-                <Minus className="h-3.5 w-3.5" />
-              </Button>
-              <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
-                {formatBeats(c.lengthBeats)}b
-              </span>
-              <Button size="icon" variant="outline" className="h-7 w-7"
-                onClick={() => {
-                  if (canIncrease) {
-                    setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
-                  } else {
-                    // No room left — overflow into the next pattern block.
-                    resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
-                  }
-                }}
-                aria-label="Increase length" title={canIncrease ? "Increase length (+)" : "Increase · overflow to next block"}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7"
-                onClick={() => movePatternChord(pattern.id, c.id, 1)} aria-label="Move later" title="Move later">
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          );
-        })()}
+
       </div>
 
       {/* Unified chord context menu — appears below the pattern block (#7).
