@@ -757,16 +757,60 @@ function SectionGroup({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
-            onClick={() => onRequestDeleteSection(sectionId)}
-            disabled={!canDeleteSection}
-            title="Delete entire section (affects Lyrics tab too)"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                  Color
+                </DropdownMenuLabel>
+                <div className="px-2 pb-2">
+                  <div className="grid grid-cols-8 gap-1">
+                    {SECTION_COLOR_KEYS.map((c) => {
+                      const isActive = section?.color === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSectionColor(sectionId, isActive ? null : c)}
+                          aria-label={`Section color ${c}`}
+                          title={c}
+                          className={cn(
+                            "h-5 w-5 rounded border border-border transition-transform",
+                            isActive && "ring-2 ring-primary scale-110",
+                          )}
+                          style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  {section?.color && (
+                    <button
+                      type="button"
+                      onClick={() => setSectionColor(sectionId, null)}
+                      className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      Clear color
+                    </button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
+              onClick={() => onRequestDeleteSection(sectionId)}
+              disabled={!canDeleteSection}
+              title="Delete entire section (affects Lyrics tab too)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
