@@ -106,10 +106,10 @@ export function ChordsTab() {
   return (
     <div className="space-y-5">
       {/* Nashville header strip */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Music className="h-4 w-4 ink-chord" />
-          <h2 className="font-display text-lg flex-1 min-w-0 truncate">
+          <h2 className="font-display text-sm flex-1 min-w-0 truncate">
             <span className="font-mono-chord">
               {meta.keyRoot}
               {keySuffix}
