@@ -341,14 +341,12 @@ function PatternBlock({
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
                         {...dragProvided.dragHandleProps}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
+                        onMouseDown={() => {
                           startPress(c.id);
                         }}
                         onMouseUp={cancelPress}
                         onMouseLeave={cancelPress}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
+                        onTouchStart={() => {
                           startPress(c.id);
                         }}
                         onTouchEnd={cancelPress}
