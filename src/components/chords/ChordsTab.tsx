@@ -174,7 +174,7 @@ export function ChordsTab() {
                   <div
                     key={c.display}
                     className={cn(
-                      "group relative flex items-center gap-2 rounded-md bg-card px-2 py-1.5 transition-colors",
+                      "group relative flex items-center gap-1 rounded-md bg-card px-2 py-1.5 transition-colors",
                       isSel && "border-primary bg-accent",
                     )}
                   >
