@@ -696,6 +696,7 @@ function SectionGroup({
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
+  const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -704,6 +705,8 @@ function SectionGroup({
   return (
     <div
       ref={cardRef}
+      data-section-id={sectionId}
+      style={sectionTintStyle(section?.color)}
       className={cn(
         "paper-card rounded-xl px-4 py-4 space-y-3 transition-shadow",
       )}
