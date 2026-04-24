@@ -376,13 +376,37 @@ function PatternBlock({
                   const half = (e.clientX - rect.left) < rect.width / 2;
                   setDropIndicator(half ? idx : idx + 1);
                 }}
+                onPointerDown={(e) => {
+                  // If a multi-selection is active and this chord is part of it,
+                  // initiate a pointer-based drag so the whole selection can be
+                  // moved to another pattern block (#4). Skip drag for chords
+                  // outside the selection so long-press/select still works.
+                  if (selectMode && selected.has(c.id) && selectedIds.length >= 1) {
+                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                    setPdrag({
+                      pointerId: e.pointerId,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      x: e.clientX,
+                      y: e.clientY,
+                      active: false,
+                      ids: [...selectedIds],
+                      displays: sortedChords.filter((x) => selected.has(x.id)).map((x) => x.chord.display),
+                    });
+                  }
+                }}
                 onMouseDown={(e) => { e.stopPropagation(); startPress(c.id); }}
                 onMouseUp={cancelPress}
                 onMouseLeave={cancelPress}
                 onTouchStart={(e) => { e.stopPropagation(); startPress(c.id); }}
                 onTouchEnd={cancelPress}
                 onContextMenu={(e) => { e.preventDefault(); }}
-                onClick={(e) => { e.stopPropagation(); handleChordTap(c.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // If a drag just happened, suppress the click.
+                  if (pdrag?.active) { e.preventDefault(); return; }
+                  handleChordTap(c.id, e);
+                }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   onPickerOpen(pattern.id, c.startBeat, c.id);
