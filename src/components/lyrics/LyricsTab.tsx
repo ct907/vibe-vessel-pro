@@ -1249,7 +1249,12 @@ function SectionCard({
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div ref={cardRef} data-section-id={section.id} className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}>
+    <div
+      ref={cardRef}
+      data-section-id={section.id}
+      style={sectionTintStyle(section.color)}
+      className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}
+    >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
