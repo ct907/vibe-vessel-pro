@@ -257,6 +257,16 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
                     <Upload className="h-4 w-4" /> Load
                   </span>
                 </label>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => {
+                    setConfirmNewSong(true);
+                    setNavOpen(false);
+                  }}
+                >
+                  <FilePlus className="h-4 w-4" /> New song
+                </Button>
                 {suppressCrossTabDeleteWarning && (
                   <Button
                     variant="outline"
