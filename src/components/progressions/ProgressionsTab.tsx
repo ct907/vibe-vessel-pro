@@ -280,6 +280,7 @@ function PatternBlock({
   return (
     <div
       ref={blockRef}
+      data-pattern-block={pattern.id}
       className={cn(
         "rounded-lg border bg-card/60 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
