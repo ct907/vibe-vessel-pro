@@ -513,7 +513,7 @@ function LineRow({
     const k = e.key;
     const mod = e.metaKey || e.ctrlKey;
 
-    // Undo / Redo (chord-row history). Cmd/Ctrl+Z = undo; Cmd/Ctrl+Y or Cmd/Ctrl+Shift+Z = redo.
+    // Undo / Redo (chord-row history).
     if (mod && (k === "z" || k === "Z")) {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -526,25 +526,17 @@ function LineRow({
       return;
     }
 
-    // Keyboard shortcuts: Cmd/Ctrl + A / C / X / V — work in or out of selectMode.
+    // Selection / clipboard shortcuts.
     if (mod && (k === "a" || k === "A")) {
       e.preventDefault();
       selectAll();
       return;
     }
     if (mod && (k === "c" || k === "C")) {
-      if (selected.size > 0) {
-        e.preventDefault();
-        doCopy();
-        return;
-      }
+      if (selected.size > 0) { e.preventDefault(); doCopy(); return; }
     }
     if (mod && (k === "x" || k === "X")) {
-      if (selected.size > 0) {
-        e.preventDefault();
-        doCut();
-        return;
-      }
+      if (selected.size > 0) { e.preventDefault(); doCut(); return; }
     }
     if (mod && (k === "v" || k === "V")) {
       e.preventDefault();
@@ -553,80 +545,10 @@ function LineRow({
     }
 
     if (selectMode) return;
-    // When the picker (modal sheet) is open, it owns text input. Don't also
-    // process letter/backspace/space here, otherwise typing happens twice.
-    if (active) return;
-    // Picker is "live" when this row is active and the parent passed query handlers.
-    const pickerLive = !!(active && onChordRowQueryChange);
-    const liveQuery = chordRowQuery ?? "";
+    if (active) return; // picker open — let it own input
 
-    if (k === "ArrowUp" || k === "ArrowDown") {
-      // Shortcut: if the picker sheet is open, toggle focus to its input.
-      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
-      if (pickerInput) {
-        e.preventDefault();
-        pickerInput.focus();
-        return;
-      }
-    }
-    // While the picker is open, treat letter/digit/chord-symbol keys as edits
-    // to the shared chord query (mirrored in the picker input).
-    if (pickerLive && k.length === 1 && /[A-Za-z0-9#b/+°Δø]/.test(k)) {
-      e.preventDefault();
-      onChordRowQueryChange!(liveQuery + k);
-      return;
-    }
-    if (pickerLive && k === "Backspace" && liveQuery.length > 0) {
-      e.preventDefault();
-      onChordRowQueryChange!(liveQuery.slice(0, -1));
-      return;
-    }
-    if (pickerLive && k === "Enter" && liveQuery.trim()) {
-      // Let the picker's own Enter handler commit; forward focus to it.
-      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
-      if (pickerInput) {
-        e.preventDefault();
-        pickerInput.focus();
-        // Synthesize an Enter on the picker input.
-        pickerInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-        return;
-      }
-    }
-
-    if (k === " " || k === "Spacebar") {
-      e.preventDefault();
-      insertChordSpaceAt(sectionId, line.id, chordCaret);
-      setChordCaret((c) => c + 1);
-    } else if (k === "ArrowLeft") {
-      e.preventDefault();
-      setChordCaret((c) => Math.max(0, c - 1));
-    } else if (k === "ArrowRight") {
-      e.preventDefault();
-      setChordCaret((c) => Math.min(len, c + 1));
-    } else if (k === "Home") {
-      e.preventDefault();
-      setChordCaret(0);
-    } else if (k === "End") {
-      e.preventDefault();
-      setChordCaret(len);
-    } else if (k === "Backspace") {
-      e.preventDefault();
-      if (chordCaret === 0) {
-        if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) {
-          onMergeUp("chord", line.text, 0, 0);
-        } else {
-          onMergeUp("chord", line.text, line.chords.length, line.chordRowLen ?? 0);
-        }
-        return;
-      }
-      const target = chordCaret - 1;
-      const removed = removeChordCellAt(sectionId, line.id, target);
-      if (removed) setChordCaret(target);
-    } else if (k === "Delete") {
-      e.preventDefault();
-      if (chordCaret >= len) return;
-      removeChordCellAt(sectionId, line.id, chordCaret);
-    } else if (k === "Enter") {
+    // Enter on the chord row creates a new lyric line.
+    if (k === "Enter") {
       e.preventDefault();
       const newId = onAddLineAfter();
       if (typeof newId === "string") {
@@ -634,11 +556,21 @@ function LineRow({
           document.querySelector<HTMLDivElement>(`[data-chord-row="${newId}"]`)?.focus();
         }, 10);
       }
-    } else if (k.length === 1 && /[A-Za-z]/.test(k)) {
-      // Picker is not yet open — open it and seed the query with this letter.
+      return;
+    }
+
+    // Backspace on an empty chord row merges with previous row.
+    if (k === "Backspace" && line.chords.length === 0) {
+      e.preventDefault();
+      onMergeUp("chord", line.text, 0, 0);
+      return;
+    }
+
+    // Letter typed → open the chord picker pre-seeded with that letter.
+    if (k.length === 1 && /[A-Za-z]/.test(k)) {
       e.preventDefault();
       onChordRowQueryChange?.(k);
-      onPickerOpen(line.id, chordCaret);
+      onPickerOpen(line.id, 0);
     }
   };
 
