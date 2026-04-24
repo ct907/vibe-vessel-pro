@@ -1257,7 +1257,7 @@ function SectionCard({
       className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
+      <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
           value={section.type}
           onValueChange={(v) => {
