@@ -395,6 +395,39 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       </div>
       <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
       <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
+      <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new song?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear all lyrics, chords, and progressions in the current song. Make sure
+              you've saved your work first — unsaved changes can't be recovered.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() =>
+                downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
+              }
+            >
+              <Save className="h-4 w-4" /> Save first
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                resetSong();
+                setTransposeOffset(0);
+                setConfirmNewSong(false);
+                toast({ title: "New song started" });
+              }}
+            >
+              Start new song
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }
