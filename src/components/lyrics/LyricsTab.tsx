@@ -354,8 +354,16 @@ function LineRow({
     const px = e.clientX - rect.left;
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
     setChordCaret(col);
-    focusChord();
+    // Note: tell parent which row to associate the picker with, but DO NOT
+    // focus the chord row itself — the picker (modal sheet) is the typing
+    // surface. Focusing both makes inputs feel "linked" and produces double
+    // entry of letters/backspace.
+    onChordFocus(line.id);
     onPickerOpen(line.id, col);
+    // Ensure the chord row doesn't keep focus from a prior interaction.
+    if (chordRowRef.current && document.activeElement === chordRowRef.current) {
+      chordRowRef.current.blur();
+    }
   };
 
   // ---------- Drag-area select on empty chord row ----------
