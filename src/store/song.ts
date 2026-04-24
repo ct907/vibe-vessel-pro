@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
+import { getDefaults } from "@/store/defaults";
 
 // ---------- Types ----------
 
@@ -34,6 +35,8 @@ export interface Section {
   lines: LyricLine[];
   /** Optional notes/comment for this section. */
   comment?: string;
+  /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
+  color?: string | null;
 }
 
 export interface PatternChord {
@@ -92,6 +95,9 @@ export interface SongState {
   toggleSectionCollapsed: (id: string) => void;
   setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
+  setSectionColor: (id: string, color: string | null) => void;
+  /** Wipe all song state and replace with a single empty verse section (factory reset). */
+  resetSong: () => void;
 
   // ---- lyrics (line-level) ----
   addLine: (sectionId: string, afterId?: string) => string;
@@ -187,6 +193,7 @@ const SECTION_DEFAULT_LABEL: Record<SectionType, string> = {
 function makeSection(type: SectionType = "verse", label?: string): { section: Section; pattern: PatternBlock } {
   const id = nanoid();
   const finalLabel = label ?? SECTION_DEFAULT_LABEL[type];
+  const bars = getDefaults().defaultPatternBars;
   return {
     section: {
       id,
@@ -199,7 +206,7 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
       id,
       sectionId: id,
       label: finalLabel,
-      bars: 4,
+      bars,
       beatsPerBar: 4,
       chords: [],
     },
@@ -353,7 +360,7 @@ function placeMirroredChord(
   chord: ChordSymbol,
   mirrorId: string,
 ): { progression: PatternBlock[]; chordId: string; patternId: string } {
-  const len = 2;
+  const len = getDefaults().defaultChordLengthBeats;
   const sectionBlockIndices = progression
     .map((p, i) => (p.sectionId === sectionId ? i : -1))
     .filter((i) => i >= 0);
@@ -590,6 +597,21 @@ export const useSongStore = create<SongState>((set, get) => ({
   setSectionComment: (id, comment) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),
   })),
+  setSectionColor: (id, color) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, color: color ?? null } : sec)),
+  })),
+  resetSong: () => {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    const fresh = makeSection("verse");
+    set((s) => ({
+      meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
+      sections: [fresh.section],
+      progression: [fresh.pattern],
+      basket: [],
+      suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+    }));
+  },
 
   // ---- lyric lines ----
   addLine: (sectionId, afterId) => {
@@ -1174,7 +1196,8 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
 
   // Add chord into pattern; mirror it back as an anchor at end of last lyric line of bound section.
-  addChordToPattern: (patternId, chord, atBeat, lengthBeats = 4) => set((s) => {
+  addChordToPattern: (patternId, chord, atBeat, lengthBeats) => set((s) => {
+    const effectiveLen = lengthBeats ?? getDefaults().defaultChordLengthBeats;
     const newPcId = nanoid();
     let createdAnchorId: string | null = null;
 
@@ -1208,7 +1231,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         id: newPcId,
         chord,
         startBeat: start,
-        lengthBeats: Math.max(0.5, Math.min(lengthBeats, totalBeats)),
+        lengthBeats: Math.max(0.5, Math.min(effectiveLen, totalBeats)),
         mirrorId: createdAnchorId ?? undefined,
       };
       // Append at end so it packs after existing chords.
@@ -1626,7 +1649,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         id: newId,
         sectionId,
         label: ref.label,
-        bars: ref.bars,
+        bars: getDefaults().defaultPatternBars,
         beatsPerBar: ref.beatsPerBar,
         chords: [],
       };

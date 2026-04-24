@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2, FileText } from "lucide-react";
+import { Play, Square, Save, Upload, BookOpen, Menu, Sun, Moon, Undo2, Redo2, FileText, Settings, FilePlus } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
@@ -14,6 +14,17 @@ import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Link } from "react-router-dom";
 import { Music2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -32,6 +43,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     progression,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
+    resetSong,
     undo,
     redo,
     canUndo,
@@ -45,6 +57,8 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [confirmNewSong, setConfirmNewSong] = useState(false);
+  const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
   // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);

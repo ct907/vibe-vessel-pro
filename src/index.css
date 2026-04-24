@@ -65,6 +65,24 @@
     --sidebar-accent-foreground: 25 25% 18%;
     --sidebar-border: 35 25% 78%;
     --sidebar-ring: 28 78% 48%;
+
+    /* 16 section tint swatches — light mode (lighter shades). */
+    --section-tint-red: 0 75% 78%;
+    --section-tint-orange: 22 85% 75%;
+    --section-tint-amber: 38 85% 72%;
+    --section-tint-yellow: 50 85% 72%;
+    --section-tint-lime: 80 60% 72%;
+    --section-tint-green: 140 45% 72%;
+    --section-tint-teal: 170 45% 70%;
+    --section-tint-cyan: 190 60% 72%;
+    --section-tint-sky: 205 75% 75%;
+    --section-tint-blue: 220 75% 78%;
+    --section-tint-indigo: 240 55% 78%;
+    --section-tint-violet: 265 55% 78%;
+    --section-tint-purple: 285 50% 78%;
+    --section-tint-pink: 320 70% 80%;
+    --section-tint-rose: 345 75% 80%;
+    --section-tint-slate: 220 12% 72%;
   }
 
   .dark {
@@ -96,6 +114,24 @@
     --chord-ink: 28 78% 62%;
     --chord-chip: 28 85% 55%;
     --chord-chip-foreground: 25 18% 10%;
+
+    /* 16 section tint swatches — dark mode (deeper shades for legibility). */
+    --section-tint-red: 0 55% 38%;
+    --section-tint-orange: 22 65% 38%;
+    --section-tint-amber: 38 70% 36%;
+    --section-tint-yellow: 50 65% 32%;
+    --section-tint-lime: 80 45% 30%;
+    --section-tint-green: 140 40% 30%;
+    --section-tint-teal: 170 45% 28%;
+    --section-tint-cyan: 190 50% 30%;
+    --section-tint-sky: 205 55% 32%;
+    --section-tint-blue: 220 55% 38%;
+    --section-tint-indigo: 240 45% 38%;
+    --section-tint-violet: 265 40% 38%;
+    --section-tint-purple: 285 35% 38%;
+    --section-tint-pink: 320 50% 38%;
+    --section-tint-rose: 345 50% 38%;
+    --section-tint-slate: 220 12% 30%;
   }
 }
 
