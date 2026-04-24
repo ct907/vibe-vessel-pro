@@ -110,11 +110,9 @@ function LineRow({
   sectionId,
   line,
   active,
-  isFirst,
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
-  cellPx,
   onChordFocus,
   onChordDragStart,
   onChordDrop,
@@ -124,15 +122,10 @@ function LineRow({
 }: LineRowProps) {
   const {
     setLineText,
-    upsertChordAt,
-    removeChordAnchor,
     removeChordAnchorsBatch,
-    moveSelectedChordsByOrder,
-    setChordRowLen,
-    insertChordSpaceAt,
-    removeChordCellAt,
     pasteChordsAt,
     moveSelectedChordsTo,
+    moveChordWordSlot,
     undo,
     redo,
   } = useSongStore();
