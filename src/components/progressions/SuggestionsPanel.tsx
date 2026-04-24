@@ -85,7 +85,7 @@ export function SuggestionsPanel({ pattern }: Props) {
             <Sparkles className="h-3.5 w-3.5" />
             Suggest variations
           </span>
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform w-auto px-2", open && "rotate-180")} />
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform w-auto px-1", open && "rotate-180")} />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2 space-y-1.5">
