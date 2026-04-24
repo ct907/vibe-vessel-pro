@@ -52,6 +52,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
+import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
@@ -354,8 +355,16 @@ function LineRow({
     const px = e.clientX - rect.left;
     const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
     setChordCaret(col);
-    focusChord();
+    // Note: tell parent which row to associate the picker with, but DO NOT
+    // focus the chord row itself — the picker (modal sheet) is the typing
+    // surface. Focusing both makes inputs feel "linked" and produces double
+    // entry of letters/backspace.
+    onChordFocus(line.id);
     onPickerOpen(line.id, col);
+    // Ensure the chord row doesn't keep focus from a prior interaction.
+    if (chordRowRef.current && document.activeElement === chordRowRef.current) {
+      chordRowRef.current.blur();
+    }
   };
 
   // ---------- Drag-area select on empty chord row ----------
@@ -491,6 +500,9 @@ function LineRow({
     }
 
     if (selectMode) return;
+    // When the picker (modal sheet) is open, it owns text input. Don't also
+    // process letter/backspace/space here, otherwise typing happens twice.
+    if (active) return;
     // Picker is "live" when this row is active and the parent passed query handlers.
     const pickerLive = !!(active && onChordRowQueryChange);
     const liveQuery = chordRowQuery ?? "";
@@ -1156,6 +1168,7 @@ function SectionCard({
     upsertChordAt,
     basket,
     setSectionComment,
+    setSectionColor,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
   } = useSongStore();
@@ -1237,7 +1250,12 @@ function SectionCard({
   const hasComment = !!(section.comment && section.comment.trim().length);
 
   return (
-    <div ref={cardRef} data-section-id={section.id} className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}>
+    <div
+      ref={cardRef}
+      data-section-id={section.id}
+      style={sectionTintStyle(section.color)}
+      className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}
+    >
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
         <Select
@@ -1319,7 +1337,7 @@ function SectionCard({
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Section</DropdownMenuLabel>
               {section.type === "custom" && (
                 <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
@@ -1329,6 +1347,40 @@ function SectionCard({
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                Color
+              </DropdownMenuLabel>
+              <div className="px-2 pb-2">
+                <div className="grid grid-cols-8 gap-1">
+                  {SECTION_COLOR_KEYS.map((c) => {
+                    const isActive = section.color === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSectionColor(section.id, isActive ? null : c)}
+                        aria-label={`Section color ${c}`}
+                        title={c}
+                        className={cn(
+                          "h-5 w-5 rounded border border-border transition-transform",
+                          isActive && "ring-2 ring-primary scale-110",
+                        )}
+                        style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                      />
+                    );
+                  })}
+                </div>
+                {section.color && (
+                  <button
+                    type="button"
+                    onClick={() => setSectionColor(section.id, null)}
+                    className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Clear color
+                  </button>
+                )}
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"

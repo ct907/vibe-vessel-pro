@@ -11,9 +11,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Play, ChevronsDownUp, ChevronsUpDown, ChevronDown, ChevronRight } from "lucide-react";
-import { ensureAudio } from "@/lib/music/audio";
+import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
+import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -65,7 +70,23 @@ function PatternBlock({
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
   const lastTapRef = useRef<{ id: string; t: number } | null>(null);
+  const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+
+  // Pointer-based multi-chord drag (move selection to another pattern block).
+  const [pdrag, setPdrag] = useState<null | {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    active: boolean;
+    ids: string[];
+    displays: string[];
+    targetPatternId?: string;
+  }>(null);
+  const pdragRef = useRef<typeof pdrag>(null);
+  pdragRef.current = pdrag;
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
@@ -75,6 +96,27 @@ function PatternBlock({
   const canDeleteThisBlock = blocksInSection > 1;
 
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+
+  // (#8) Auto-close context menu when nothing is selected.
+  useEffect(() => {
+    if (selectMode && selected.size === 0) setSelectMode(false);
+  }, [selectMode, selected]);
+
+  // Outside-tap closes the select-mode context menu.
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (pdragRef.current) return; // suppress while dragging
+      if (blockRef.current && blockRef.current.contains(t)) return;
+      if (t.closest("[data-radix-dialog-content]")) return;
+      if (t.closest("[data-progression-ctx]")) return;
+      exitSelect();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [selectMode]);
 
   useEffect(() => {
     if (!activeChord) return;
@@ -90,10 +132,26 @@ function PatternBlock({
   }, [activeChord]);
 
   useEffect(() => {
-    if (!activeChord) return;
+    if (!activeChord && !selectMode) return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // (#6) Delete / Backspace removes active chord or all selected chords.
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectMode && selectedIds.length > 0) {
+          e.preventDefault();
+          removePatternChordsBatch(pattern.id, selectedIds);
+          exitSelect();
+          return;
+        }
+        if (activeChord) {
+          e.preventDefault();
+          removePatternChordsBatch(pattern.id, [activeChord]);
+          setActiveChord(null);
+          return;
+        }
+      }
+      if (!activeChord) return;
       const c = sortedChords.find((x) => x.id === activeChord);
       if (!c) return;
       const otherSum = sortedChords.reduce((s, x) => s + (x.id === c.id ? 0 : x.lengthBeats), 0);
@@ -114,7 +172,41 @@ function PatternBlock({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeChord, sortedChords, totalBeats, pattern.id, setPatternChordLength]);
+  }, [activeChord, selectMode, selectedIds, sortedChords, totalBeats, pattern.id, setPatternChordLength, removePatternChordsBatch]);
+
+  // Pointer drag lifecycle for multi-selected chords (#4).
+  useEffect(() => {
+    if (!pdrag) return;
+    const DRAG_THRESHOLD = 6;
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pdrag.pointerId) return;
+      const dx = ev.clientX - pdrag.startX;
+      const dy = ev.clientY - pdrag.startY;
+      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const blk = hit?.closest("[data-pattern-block]") as HTMLElement | null;
+      const targetPatternId = blk?.getAttribute("data-pattern-block") ?? undefined;
+      setPdrag((prev) => prev ? { ...prev, x: ev.clientX, y: ev.clientY, active: prev.active || moved, targetPatternId } : prev);
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pdrag.pointerId) return;
+      const cur = pdragRef.current;
+      setPdrag(null);
+      if (!cur || !cur.active) return;
+      if (!cur.targetPatternId || cur.targetPatternId === pattern.id) return;
+      movePatternChordsTo(pattern.id, cur.targetPatternId, cur.ids);
+      exitSelect();
+    };
+    const onCancel = () => setPdrag(null);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+  }, [pdrag?.pointerId, pattern.id, movePatternChordsTo]);
 
   const startPress = (chordId: string) => {
     longFiredRef.current = false;
@@ -125,29 +217,45 @@ function PatternBlock({
         setSelected(new Set([chordId]));
         setActiveChord(null);
       } else if (!selected.has(chordId)) {
-        // Long-press on an unselected chord adds it.
         setSelected((prev) => {
           const next = new Set(prev);
           next.add(chordId);
           return next;
         });
       }
-      // Long-press on an already-selected chord is a no-op (becomes the
-      // drag-init gesture; HTML5 dragstart fires off the same pointerdown).
+      lastSelectedRef.current = chordId;
     }, 450);
   };
   const cancelPress = () => {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   };
-  const handleChordTap = (chordId: string) => {
+  const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
     if (longFiredRef.current) return;
     setFocusedPattern(pattern.id);
+    // Shift-click: range/multi select.
+    if (e && e.shiftKey) {
+      const ids = sortedChords.map((c) => c.id);
+      const i2 = ids.indexOf(chordId);
+      const anchor = lastSelectedRef.current;
+      const i1 = anchor ? ids.indexOf(anchor) : i2;
+      const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
+      const range = ids.slice(from, to + 1);
+      setSelectMode(true);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        range.forEach((id) => next.add(id));
+        return next;
+      });
+      lastSelectedRef.current = chordId;
+      return;
+    }
     if (selectMode) {
       setSelected((prev) => {
         const next = new Set(prev);
         if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
         return next;
       });
+      lastSelectedRef.current = chordId;
       return;
     }
     const now = Date.now();
@@ -160,6 +268,9 @@ function PatternBlock({
     }
     lastTapRef.current = { id: chordId, t: now };
     setActiveChord(activeChord === chordId ? null : chordId);
+    // (#5) Tap to focus a chord also auditions it.
+    const c = sortedChords.find((x) => x.id === chordId);
+    if (c) void playChord(c.chord);
   };
 
   const active = activeChord ? sortedChords.find((c) => c.id === activeChord) ?? null : null;
@@ -169,6 +280,7 @@ function PatternBlock({
   return (
     <div
       ref={blockRef}
+      data-pattern-block={pattern.id}
       className={cn(
         "rounded-lg border bg-card/60 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
@@ -209,50 +321,7 @@ function PatternBlock({
         </Button>
       </div>
 
-      {selectMode && (
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs">
-          <span className="font-medium">{selectedIds.length} selected</span>
-          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => shiftPatternChords(pattern.id, selectedIds, -1)} aria-label="Shift earlier">
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => shiftPatternChords(pattern.id, selectedIds, 1)} aria-label="Shift later">
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground ml-1">Length</span>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP)}
-            aria-label="Decrease length" title="Decrease length">
-            <Minus className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={!selectedIds.length}
-            onClick={() => resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP)}
-            aria-label="Increase length (overflows to next block)" title="Increase length · overflows to next block">
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={!selectedIds.length}
-            onClick={() => { removePatternChordsBatch(pattern.id, selectedIds); exitSelect(); }} aria-label="Delete selected">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-          {otherPatterns.length > 0 && (
-            <Select
-              value=""
-              onValueChange={(toId) => { movePatternChordsTo(pattern.id, toId, selectedIds); exitSelect(); }}
-            >
-              <SelectTrigger className="h-7 w-[140px] text-xs" disabled={!selectedIds.length}>
-                <SelectValue placeholder="Move to…" />
-              </SelectTrigger>
-              <SelectContent>
-                {otherPatterns.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={exitSelect}>Done</Button>
-        </div>
-      )}
+      {/* Toolbar moved below the pattern grid (#7). */}
 
       <div className="relative">
         <div
@@ -307,13 +376,37 @@ function PatternBlock({
                   const half = (e.clientX - rect.left) < rect.width / 2;
                   setDropIndicator(half ? idx : idx + 1);
                 }}
+                onPointerDown={(e) => {
+                  // If a multi-selection is active and this chord is part of it,
+                  // initiate a pointer-based drag so the whole selection can be
+                  // moved to another pattern block (#4). Skip drag for chords
+                  // outside the selection so long-press/select still works.
+                  if (selectMode && selected.has(c.id) && selectedIds.length >= 1) {
+                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                    setPdrag({
+                      pointerId: e.pointerId,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      x: e.clientX,
+                      y: e.clientY,
+                      active: false,
+                      ids: [...selectedIds],
+                      displays: sortedChords.filter((x) => selected.has(x.id)).map((x) => x.chord.display),
+                    });
+                  }
+                }}
                 onMouseDown={(e) => { e.stopPropagation(); startPress(c.id); }}
                 onMouseUp={cancelPress}
                 onMouseLeave={cancelPress}
                 onTouchStart={(e) => { e.stopPropagation(); startPress(c.id); }}
                 onTouchEnd={cancelPress}
                 onContextMenu={(e) => { e.preventDefault(); }}
-                onClick={(e) => { e.stopPropagation(); handleChordTap(c.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // If a drag just happened, suppress the click.
+                  if (pdrag?.active) { e.preventDefault(); return; }
+                  handleChordTap(c.id, e);
+                }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   onPickerOpen(pattern.id, c.startBeat, c.id);
@@ -388,71 +481,169 @@ function PatternBlock({
           );
         })()}
 
-        {!selectMode && active && activeIdx >= 0 && (() => {
-          const c = active;
-          const canDecrease = c.lengthBeats > MIN_LEN;
-          const canIncrease = c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9;
-          const leftBeat = sortedChords.slice(0, activeIdx).reduce((s, x) => s + x.lengthBeats, 0);
-          const leftPct = (leftBeat / totalBeats) * 100;
-          const widthPct = (c.lengthBeats / totalBeats) * 100;
-          return (
-            <div
-              className="absolute top-full mt-1 flex items-center gap-1 rounded-md border border-border bg-card px-1 py-1 shadow-sm z-10"
-              style={{ left: `calc(${leftPct}% + ${widthPct / 2}%)`, transform: "translateX(-50%)" }}
+
+      </div>
+
+      {/* Unified chord context menu — appears below the pattern block (#7).
+          Shown either when chords are multi-selected OR when a single chord is
+          tapped (active). Multi-select reveals shift/length/move/delete; single
+          chord adds Play-from-here and per-chord length controls. */}
+      {(() => {
+        const showMulti = selectMode && selectedIds.length > 0;
+        const showSingle = !selectMode && !!active && activeIdx >= 0;
+        if (!showMulti && !showSingle) return null;
+        const c = active;
+        const canDecrease = c ? c.lengthBeats > MIN_LEN : false;
+        const canIncrease = c ? c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9 : false;
+        return (
+          <div
+            data-progression-ctx
+            className="mb-2 mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {showMulti ? (
+              <span className="font-medium">{selectedIds.length} selected</span>
+            ) : (
+              <span className="font-medium font-mono-chord">{c?.chord.display}</span>
+            )}
+
+            {/* Play from here — uses the active chord, or first selected chord. */}
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 px-2 text-xs"
+              onClick={async () => {
+                await ensureAudio();
+                const chordId = showSingle ? active!.id : selectedIds[0];
+                setStartFromChord(pattern.id, chordId);
+                setActiveChord(null);
+                setIsPlayingStore(false);
+                setCurrent(null);
+                window.dispatchEvent(new Event("lovable:request-play"));
+              }}
+              aria-label="Play from here"
+              title="Play from here"
             >
-              <Button
-                size="sm"
-                variant="default"
-                className="h-7 px-2 text-xs"
-                onClick={async () => {
-                  await ensureAudio();
-                  setStartFromChord(pattern.id, c.id);
-                  setActiveChord(null);
-                  // Stop any current playback then request a fresh play.
-                  setIsPlayingStore(false);
-                  setCurrent(null);
-                  window.dispatchEvent(new Event("lovable:request-play"));
-                }}
-                aria-label="Play from here"
-                title="Play from here"
-              >
-                <Play className="h-3.5 w-3.5" /> Play from here
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7"
-                onClick={() => movePatternChord(pattern.id, c.id, -1)} aria-label="Move earlier" title="Move earlier">
-                <ArrowLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="outline" className="h-7 w-7" disabled={!canDecrease}
-                onClick={() => setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP)}
-                aria-label="Decrease length" title="Decrease length (-)">
-                <Minus className="h-3.5 w-3.5" />
-              </Button>
+              <Play className="h-3.5 w-3.5" /> Play from here
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
+                else shiftPatternChords(pattern.id, selectedIds, -1);
+              }}
+              aria-label="Move earlier"
+              title="Move earlier"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
+                else shiftPatternChords(pattern.id, selectedIds, 1);
+              }}
+              aria-label="Move later"
+              title="Move later"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+
+            <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7"
+              disabled={showSingle && !canDecrease}
+              onClick={() => {
+                if (showSingle && c) {
+                  if (canDecrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
+                } else {
+                  resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP);
+                }
+              }}
+              aria-label="Decrease length"
+              title="Decrease length"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            {showSingle && c && (
               <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
                 {formatBeats(c.lengthBeats)}b
               </span>
-              <Button size="icon" variant="outline" className="h-7 w-7"
-                onClick={() => {
-                  if (canIncrease) {
-                    setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
-                  } else {
-                    // No room left — overflow into the next pattern block.
-                    resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
-                  }
-                }}
-                aria-label="Increase length" title={canIncrease ? "Increase length (+)" : "Increase · overflow to next block"}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7"
-                onClick={() => movePatternChord(pattern.id, c.id, 1)} aria-label="Move later" title="Move later">
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          );
-        })()}
-      </div>
+            )}
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle && c) {
+                  if (canIncrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+                  else resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
+                } else {
+                  resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP);
+                }
+              }}
+              aria-label="Increase length"
+              title="Increase · overflows to next block"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
 
-      <p className="mt-8 text-[10px] uppercase tracking-wide text-muted-foreground">
-        Tap to focus · Long-press to multi-select · Double-tap to edit · Drag to reorder · +/- keys adjust length
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive"
+              onClick={() => {
+                if (showSingle && c) {
+                  removePatternChordsBatch(pattern.id, [c.id]);
+                  setActiveChord(null);
+                } else {
+                  removePatternChordsBatch(pattern.id, selectedIds);
+                  exitSelect();
+                }
+              }}
+              aria-label="Delete"
+              title="Delete (Del)"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+
+            {showMulti && otherPatterns.length > 0 && (
+              <Select
+                value=""
+                onValueChange={(toId) => { movePatternChordsTo(pattern.id, toId, selectedIds); exitSelect(); }}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectValue placeholder="Move to…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherPatterns.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 ml-auto"
+              onClick={() => { setActiveChord(null); exitSelect(); }}
+            >
+              Done
+            </Button>
+          </div>
+        );
+      })()}
+
+      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Tap to focus & audition · Long-press / Shift-click to multi-select · Double-tap to edit · Drag selection across blocks · Del to delete
       </p>
 
       {basket.length > 0 && (
@@ -505,6 +696,7 @@ function SectionGroup({
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
+  const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -513,6 +705,8 @@ function SectionGroup({
   return (
     <div
       ref={cardRef}
+      data-section-id={sectionId}
+      style={sectionTintStyle(section?.color)}
       className={cn(
         "paper-card rounded-xl px-4 py-4 space-y-3 transition-shadow",
       )}
@@ -563,16 +757,60 @@ function SectionGroup({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
-            onClick={() => onRequestDeleteSection(sectionId)}
-            disabled={!canDeleteSection}
-            title="Delete entire section (affects Lyrics tab too)"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                  Color
+                </DropdownMenuLabel>
+                <div className="px-2 pb-2">
+                  <div className="grid grid-cols-8 gap-1">
+                    {SECTION_COLOR_KEYS.map((c) => {
+                      const isActive = section?.color === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSectionColor(sectionId, isActive ? null : c)}
+                          aria-label={`Section color ${c}`}
+                          title={c}
+                          className={cn(
+                            "h-5 w-5 rounded border border-border transition-transform",
+                            isActive && "ring-2 ring-primary scale-110",
+                          )}
+                          style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  {section?.color && (
+                    <button
+                      type="button"
+                      onClick={() => setSectionColor(sectionId, null)}
+                      className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      Clear color
+                    </button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
+              onClick={() => onRequestDeleteSection(sectionId)}
+              disabled={!canDeleteSection}
+              title="Delete entire section (affects Lyrics tab too)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
