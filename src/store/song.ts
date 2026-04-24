@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
+import { getDefaults } from "@/store/defaults";
 
 // ---------- Types ----------
 
@@ -192,6 +193,7 @@ const SECTION_DEFAULT_LABEL: Record<SectionType, string> = {
 function makeSection(type: SectionType = "verse", label?: string): { section: Section; pattern: PatternBlock } {
   const id = nanoid();
   const finalLabel = label ?? SECTION_DEFAULT_LABEL[type];
+  const bars = getDefaults().defaultPatternBars;
   return {
     section: {
       id,
@@ -204,7 +206,7 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
       id,
       sectionId: id,
       label: finalLabel,
-      bars: 4,
+      bars,
       beatsPerBar: 4,
       chords: [],
     },
@@ -358,7 +360,7 @@ function placeMirroredChord(
   chord: ChordSymbol,
   mirrorId: string,
 ): { progression: PatternBlock[]; chordId: string; patternId: string } {
-  const len = 2;
+  const len = getDefaults().defaultChordLengthBeats;
   const sectionBlockIndices = progression
     .map((p, i) => (p.sectionId === sectionId ? i : -1))
     .filter((i) => i >= 0);
