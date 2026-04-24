@@ -478,33 +478,6 @@ function PatternBlock({
               <Play className="h-3.5 w-3.5" /> Play from here
             </Button>
 
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
-                else shiftPatternChords(pattern.id, selectedIds, -1);
-              }}
-              aria-label="Move earlier"
-              title="Move earlier"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
-                else shiftPatternChords(pattern.id, selectedIds, 1);
-              }}
-              aria-label="Move later"
-              title="Move later"
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-
             <span className="text-[10px] text-muted-foreground ml-1">Length</span>
             <Button
               size="icon"
@@ -585,6 +558,36 @@ function PatternBlock({
                 </SelectContent>
               </Select>
             )}
+           </div>
+
+           {/* Row 2: move arrows + Done */}
+           <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
+                else shiftPatternChords(pattern.id, selectedIds, -1);
+              }}
+              aria-label="Move earlier"
+              title="Move earlier"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
+                else shiftPatternChords(pattern.id, selectedIds, 1);
+              }}
+              aria-label="Move later"
+              title="Move later"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
 
             <Button
               size="sm"
@@ -597,6 +600,7 @@ function PatternBlock({
             >
               Done
             </Button>
+           </div>
           </div>
         );
       })()}
