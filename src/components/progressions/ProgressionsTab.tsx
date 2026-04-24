@@ -84,7 +84,6 @@ function PatternBlock({
   const [activeChord, setActiveChord] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [dropIndicator, setDropIndicator] = useState<number | null>(null);
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
@@ -92,20 +91,6 @@ function PatternBlock({
   const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
 
-  // Pointer-based multi-chord drag (move selection to another pattern block).
-  const [pdrag, setPdrag] = useState<null | {
-    pointerId: number;
-    startX: number;
-    startY: number;
-    x: number;
-    y: number;
-    active: boolean;
-    ids: string[];
-    displays: string[];
-    targetPatternId?: string;
-  }>(null);
-  const pdragRef = useRef<typeof pdrag>(null);
-  pdragRef.current = pdrag;
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
