@@ -1168,6 +1168,7 @@ function SectionCard({
     upsertChordAt,
     basket,
     setSectionComment,
+    setSectionColor,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
   } = useSongStore();
