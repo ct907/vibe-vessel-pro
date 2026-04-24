@@ -1231,7 +1231,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         id: newPcId,
         chord,
         startBeat: start,
-        lengthBeats: Math.max(0.5, Math.min(lengthBeats, totalBeats)),
+        lengthBeats: Math.max(0.5, Math.min(effectiveLen, totalBeats)),
         mirrorId: createdAnchorId ?? undefined,
       };
       // Append at end so it packs after existing chords.
@@ -1649,7 +1649,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         id: newId,
         sectionId,
         label: ref.label,
-        bars: ref.bars,
+        bars: getDefaults().defaultPatternBars,
         beatsPerBar: ref.beatsPerBar,
         chords: [],
       };
