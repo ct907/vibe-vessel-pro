@@ -377,6 +377,9 @@ function ensureSlotsForLine(line: LyricLine): LyricLine {
     }
   });
   return { ...line, chords: next };
+}
+
+// ---------- Sync helpers ----------
 // Find the next free start beat in a pattern (after the last chord's end).
 function nextFreeBeat(pattern: PatternBlock): number {
   if (!pattern.chords.length) return 0;
