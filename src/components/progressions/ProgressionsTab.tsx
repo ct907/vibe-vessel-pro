@@ -683,11 +683,6 @@ interface SectionGroupProps {
   index: number;
   allPatterns: PatternBlockType[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
-  onDragChordStart: (fromPatternId: string, chordId: string) => void;
-  onDragChordEnd: () => void;
-  onDropChordOnPattern: (toPatternId: string, toIndex: number) => void;
-  draggingChordId: string | null;
-  draggingFromPatternId: string | null;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
   /** When true: hide block counter & delete; show up/down reorder arrows. */
@@ -703,11 +698,6 @@ function SectionGroup({
   index,
   allPatterns,
   onPickerOpen,
-  onDragChordStart,
-  onDragChordEnd,
-  onDropChordOnPattern,
-  draggingChordId,
-  draggingFromPatternId,
   onRequestDeleteSection,
   onRequestDeleteBlock,
   sortMode,
