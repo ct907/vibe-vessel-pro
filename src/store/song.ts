@@ -143,6 +143,16 @@ export interface SongState {
   formatChordsInSong: () => void;
   /** Re-bind a chord's word slot by ±1, swapping with the chord at the target slot if any. */
   moveChordWordSlot: (sectionId: string, lineId: string, anchorId: string, direction: -1 | 1) => void;
+  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
+  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
+  /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
+  moveChordToSlot: (sectionId: string, lineId: string, anchorId: string, slotIndex: number) => void;
+  /** Move a set of anchors to a different row, starting at dropSlot, pushing collisions right. */
+  moveChordsAcrossLines: (
+    fromSectionId: string, fromLineId: string,
+    toSectionId: string, toLineId: string,
+    anchorIds: string[], dropSlot: number,
+  ) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
