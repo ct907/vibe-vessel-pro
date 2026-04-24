@@ -1068,10 +1068,16 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
     setDraggingIds(new Set());
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    // Parse droppableId: row:<sectionId>:<lineId>
-    const [, fromSectionId, fromLineId] = source.droppableId.split(":");
-    const [, toSectionId, toLineId] = destination.droppableId.split(":");
-    const toSlot = destination.index;
+    // Parse droppableId: slot:<sectionId>:<lineId>:<slotIdx>
+    const srcParts = source.droppableId.split(":");
+    const dstParts = destination.droppableId.split(":");
+    if (srcParts[0] !== "slot" || dstParts[0] !== "slot") return;
+    const fromSectionId = srcParts[1];
+    const fromLineId = srcParts[2];
+    const toSectionId = dstParts[1];
+    const toLineId = dstParts[2];
+    const toSlot = Number(dstParts[3]);
+    if (Number.isNaN(toSlot)) return;
 
     if (ids.length > 1) {
       moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);
