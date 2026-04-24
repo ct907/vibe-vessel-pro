@@ -1429,7 +1429,16 @@ export const useSongStore = create<SongState>((set, get) => ({
                 if (!occupied.has(i)) { target = i; break; }
               }
             }
-            if (target == null) return l;
+            if (target == null) {
+              // Going right past the last word: detach into floating (right side).
+              if (direction === 1) {
+                const updated = l.chords.map((c) =>
+                  c.id === cur.id ? { ...c, wordIndex: undefined as number | undefined } : c,
+                );
+                return { ...l, chords: sortAnchors(updated) };
+              }
+              return l;
+            }
             const updated = l.chords.map((c) =>
               c.id === cur.id
                 ? { ...c, wordIndex: target, chordCol: words[target!].start, offset: words[target!].start }
