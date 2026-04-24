@@ -48,9 +48,16 @@ export function ChordChip({
   const LONG_PRESS_MS = 500;
 
   const releaseHold = () => {
-    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
     if (releaseRef.current) {
-      try { releaseRef.current(); } catch { /* noop */ }
+      try {
+        releaseRef.current();
+      } catch {
+        /* noop */
+      }
       releaseRef.current = null;
     }
     heldRef.current = false;
@@ -75,7 +82,13 @@ export function ChordChip({
         swallowClickRef.current = true;
         void holdChord(chord, octave).then((rel) => {
           if (heldRef.current) releaseRef.current = rel;
-          else { try { rel(); } catch { /* noop */ } }
+          else {
+            try {
+              rel();
+            } catch {
+              /* noop */
+            }
+          }
         });
       }, SUSTAIN_DELAY_MS);
     }
@@ -93,7 +106,10 @@ export function ChordChip({
   };
 
   const cancel = () => {
-    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
     releaseHold();
   };
 
@@ -109,13 +125,14 @@ export function ChordChip({
     onClick?.();
   };
 
-  const sizeCls = size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
+  const sizeCls =
+    size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
   const variantCls =
     variant === "ink"
-      ? "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 border border-chord-chip/40"
+      ? "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60"
       : variant === "filled"
-      ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
-      : "bg-chord-chip/50 text-chord-chip-foreground border border-chord-chip/40 hover:bg-chord-chip/60";
+        ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
+        : "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60";
 
   return (
     <button
