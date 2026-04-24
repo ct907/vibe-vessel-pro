@@ -1513,7 +1513,179 @@ export const useSongStore = create<SongState>((set, get) => ({
     });
   },
 
-  addToBasket: (chords) => set((s) => ({
+  // -------- Slot-based chord row (20 fixed slots) --------
+  placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
+    pushHistory(get);
+    set((s) => {
+      let createdAnchorId: string | null = null;
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const occupied = new Set<number>();
+            l.chords.forEach((c) => { if (c.slotIndex != null) occupied.add(c.slotIndex); });
+            const slot = nearestFreeSlot(occupied, slotIndex);
+            if (slot < 0) return l; // row full — silently drop
+            const id = nanoid();
+            createdAnchorId = id;
+            const newAnchor: ChordAnchor = { id, offset: 0, slotIndex: slot, chord };
+            return { ...l, chords: [...l.chords, newAnchor].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
+          }),
+        };
+      });
+      // Mirror to pattern.
+      let progression = s.progression;
+      let finalSections = sections;
+      if (createdAnchorId) {
+        const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
+        progression = placed.progression;
+        const pcId = placed.chordId;
+        if (pcId) {
+          finalSections = sections.map((sec) => {
+            if (sec.id !== sectionId) return sec;
+            return {
+              ...sec,
+              lines: sec.lines.map((l) => ({
+                ...l,
+                chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
+              })),
+            };
+          });
+        }
+        const updatedSection = finalSections.find((x) => x.id === sectionId);
+        if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
+      }
+      return { sections: finalSections, progression };
+    });
+  },
+
+  moveChordToSlot: (sectionId, lineId, anchorId, slotIndex) => {
+    pushHistory(get);
+    set((s) => {
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
+            const me = l.chords.find((c) => c.id === anchorId);
+            if (!me) return l;
+            if (me.slotIndex === target) return l;
+            const occupant = l.chords.find((c) => c.id !== anchorId && c.slotIndex === target);
+            const myPrev = me.slotIndex;
+            const chords = l.chords.map((c) => {
+              if (c.id === anchorId) return { ...c, slotIndex: target };
+              if (occupant && c.id === occupant.id) return { ...c, slotIndex: myPrev };
+              return c;
+            });
+            return { ...l, chords: chords.sort((a, b) => (a.slotIndex ?? 99) - (b.slotIndex ?? 99)) };
+          }),
+        };
+      });
+      const sec = sections.find((x) => x.id === sectionId);
+      const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
+      return { sections, progression };
+    });
+  },
+
+  moveChordsAcrossLines: (fromSectionId, fromLineId, toSectionId, toLineId, anchorIds, dropSlot) => {
+    pushHistory(get);
+    set((s) => {
+      const fromSec = s.sections.find((x) => x.id === fromSectionId);
+      const fromLine = fromSec?.lines.find((l) => l.id === fromLineId);
+      if (!fromSec || !fromLine) return s;
+      // Same row → fall back to single-anchor moves.
+      if (fromSectionId === toSectionId && fromLineId === toLineId) {
+        // Lay out selection starting at dropSlot, push others right.
+        const moving = anchorIds
+          .map((id) => fromLine.chords.find((c) => c.id === id))
+          .filter((c): c is ChordAnchor => !!c)
+          .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+        const others = fromLine.chords.filter((c) => !anchorIds.includes(c.id));
+        const used = new Set<number>();
+        const placedMoving: ChordAnchor[] = [];
+        let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+        for (const m of moving) {
+          const slot = nearestFreeSlot(used, cursor);
+          if (slot < 0) break;
+          used.add(slot);
+          placedMoving.push({ ...m, slotIndex: slot });
+          cursor = slot + 1;
+        }
+        // Now place others in their original slot, walking right on collision.
+        const placedOthers: ChordAnchor[] = [];
+        for (const o of others.sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))) {
+          const slot = nearestFreeSlot(used, o.slotIndex ?? 0);
+          if (slot < 0) continue;
+          used.add(slot);
+          placedOthers.push({ ...o, slotIndex: slot });
+        }
+        const sections = s.sections.map((sec) =>
+          sec.id !== fromSectionId
+            ? sec
+            : {
+                ...sec,
+                lines: sec.lines.map((l) =>
+                  l.id !== fromLineId
+                    ? l
+                    : { ...l, chords: [...placedOthers, ...placedMoving].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) },
+                ),
+              },
+        );
+        const sec = sections.find((x) => x.id === fromSectionId);
+        const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
+        return { sections, progression };
+      }
+      // Cross-line: remove from source, insert into target.
+      const moving = anchorIds
+        .map((id) => fromLine.chords.find((c) => c.id === id))
+        .filter((c): c is ChordAnchor => !!c)
+        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+      if (!moving.length) return s;
+      const sections = s.sections.map((sec) => {
+        if (sec.id === fromSectionId) {
+          return {
+            ...sec,
+            lines: sec.lines.map((l) =>
+              l.id !== fromLineId ? l : { ...l, chords: l.chords.filter((c) => !anchorIds.includes(c.id)) },
+            ),
+          };
+        }
+        return sec;
+      }).map((sec) => {
+        if (sec.id !== toSectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== toLineId) return l;
+            const used = new Set<number>();
+            l.chords.forEach((c) => { if (c.slotIndex != null) used.add(c.slotIndex); });
+            const placed: ChordAnchor[] = [];
+            let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+            for (const m of moving) {
+              const slot = nearestFreeSlot(used, cursor);
+              if (slot < 0) break;
+              used.add(slot);
+              placed.push({ ...m, slotIndex: slot });
+              cursor = slot + 1;
+            }
+            return { ...l, chords: [...l.chords, ...placed].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
+          }),
+        };
+      });
+      let progression = s.progression;
+      const fromSecNew = sections.find((x) => x.id === fromSectionId);
+      if (fromSecNew) progression = syncPatternFromAnchors(progression, fromSecNew);
+      const toSecNew = sections.find((x) => x.id === toSectionId);
+      if (toSecNew) progression = syncPatternFromAnchors(progression, toSecNew);
+      return { sections, progression };
+    });
+  },
+
+
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
   })),
   removeFromBasket: (id) => set((s) => ({ basket: s.basket.filter((b) => b.id !== id) })),
