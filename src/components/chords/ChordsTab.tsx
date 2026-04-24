@@ -151,7 +151,22 @@ export function ChordsTab() {
         </div>
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+          Octave
+          <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+            <SelectTrigger className="h-7 w-[72px] px-2 text-xs font-mono-chord" aria-label="Audition octave">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2, 3, 4, 5, 6].map((o) => (
+                <SelectItem key={o} value={String(o)} className="text-xs font-mono-chord">
+                  Oct {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
         <span className="ml-auto text-xs text-muted-foreground">
           Tap to audition · Hold to sustain · Check to multi-select · Esc to cancel
         </span>
