@@ -328,7 +328,7 @@ function PatternBlock({
       ref={blockRef}
       data-pattern-block={pattern.id}
       className={cn(
-        "rounded-lg border bg-card/60 p-3 transition-shadow",
+        "rounded-lg border shadow-primary/40 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
       )}
     >
@@ -787,7 +787,7 @@ function SectionGroup({
       ref={cardRef}
       data-section-id={sectionId}
       style={sectionTintStyle(section?.color)}
-      className={cn("paper-card rounded-xl px-4 py-4 space-y-3 transition-shadow")}
+      className={cn("rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
