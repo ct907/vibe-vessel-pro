@@ -107,7 +107,7 @@ export function ChordsTab() {
     <div className="space-y-5">
       {/* Nashville header strip */}
       <div className="rounded-xl">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb- mt-3 h-8">
           <Music className="h-4 w-4 ink-chord" />
           <h2 className="font-display text-sm flex-1 min-w-0 truncate">
             <span className="font-mono-chord">
