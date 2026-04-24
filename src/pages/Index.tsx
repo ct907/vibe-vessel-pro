@@ -7,7 +7,7 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { Button } from "@/components/ui/button";
-import { ChevronsDownUp, ChevronsUpDown, ArrowUpDown } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, ArrowUpDown, Brush } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
