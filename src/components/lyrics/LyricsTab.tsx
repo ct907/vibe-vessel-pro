@@ -93,12 +93,14 @@ interface LineRowProps {
     currentRowChordsCount: number,
     currentRowLen: number,
   ) => boolean;
-  onPickerOpen: (lineId: string, nearWordIndex: number, anchorId?: string) => void;
+  onPickerOpen: (lineId: string, col: number, anchorId?: string) => void;
+  /** col-cell width in px, computed from a hidden measurer */
+  cellPx: number;
   /** Tell parent which row is focused on chord side, for picker context */
   onChordFocus: (lineId: string) => void;
   /** Drag a chord chip from this row onto another row */
   onChordDragStart: (anchorId: string) => void;
-  onChordDrop: (toLineId: string, toWordIndex: number) => void;
+  onChordDrop: (toLineId: string, toCol: number) => void;
   /** Live query from the chord picker (only meaningful when active). */
   chordRowQuery?: string;
   onChordRowQueryChange?: (q: string) => void;
