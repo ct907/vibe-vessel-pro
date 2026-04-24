@@ -1675,10 +1675,19 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
-    upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    const sec = sections.find((s) => s.id === picker.sectionId);
+    const line = sec?.lines.find((l) => l.id === picker.lineId);
+    const wordCount = line ? (line.text.match(/\S+/g)?.length ?? 0) : 0;
+    if (picker.anchorId) {
+      // Editing an existing chord — keep its slot, just swap the chord symbol.
+      upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    } else if (wordCount === 0) {
+      useSongStore.getState().appendChordToLine(picker.sectionId, picker.lineId, chord);
+    } else {
+      useSongStore.getState().upsertChordAtWord(picker.sectionId, picker.lineId, picker.col, chord);
+    }
     setPickerQuery("");
-    const advance = Math.max(1, chord.display.length) + 1;
-    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev));
+    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + 1 } : prev));
   };
 
   const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {
