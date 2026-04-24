@@ -144,7 +144,7 @@ export function ChordsTab() {
                 )}
               >
                 <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
-                <ChordChip chord={d.chord} variant="ink" size="sm" />
+                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} />
               </button>
             );
           })}
