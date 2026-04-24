@@ -944,27 +944,24 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
         </Button>
       </div>
 
-      {groupedSections.map(({ section, blocks }, i) => (
-        <SectionGroup
-          key={section.id}
-          sectionId={section.id}
-          displayName={getSectionDisplayName(sections, section.id)}
-          blocks={blocks}
-          totalSections={sections.length}
-          index={i}
-          allPatterns={progression}
-          onPickerOpen={openPicker}
-          onDragChordStart={(fromPatternId, chordId) => setDrag({ fromPatternId, chordId })}
-          onDragChordEnd={() => setDrag(null)}
-          onDropChordOnPattern={handleDropChord}
-          draggingChordId={drag?.chordId ?? null}
-          draggingFromPatternId={drag?.fromPatternId ?? null}
-          onRequestDeleteSection={requestDeleteSection}
-          onRequestDeleteBlock={requestDeleteBlock}
-          sortMode={sortMode}
-          onMoveSection={(id, direction) => moveSection(id, direction)}
-        />
-      ))}
+      <DragDropContext onDragEnd={onDragEnd}>
+        {groupedSections.map(({ section, blocks }, i) => (
+          <SectionGroup
+            key={section.id}
+            sectionId={section.id}
+            displayName={getSectionDisplayName(sections, section.id)}
+            blocks={blocks}
+            totalSections={sections.length}
+            index={i}
+            allPatterns={progression}
+            onPickerOpen={openPicker}
+            onRequestDeleteSection={requestDeleteSection}
+            onRequestDeleteBlock={requestDeleteBlock}
+            sortMode={sortMode}
+            onMoveSection={(id, direction) => moveSection(id, direction)}
+          />
+        ))}
+      </DragDropContext>
 
       <Button variant="outline" onClick={() => addSection("custom")}>
         <Plus className="h-4 w-4" /> Add new section
