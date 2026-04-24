@@ -1363,7 +1363,7 @@ function SectionCard({
                         aria-label={`Section color ${c}`}
                         title={c}
                         className={cn(
-                          "h-5 w-5 rounded border border-border transition-transform",
+                          "h-7 w-7 rounded border border-border transition-transform",
                           isActive && "ring-2 ring-primary scale-110",
                         )}
                         style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
