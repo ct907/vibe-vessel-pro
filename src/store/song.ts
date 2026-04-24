@@ -595,6 +595,21 @@ export const useSongStore = create<SongState>((set, get) => ({
   setSectionComment: (id, comment) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),
   })),
+  setSectionColor: (id, color) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, color: color ?? null } : sec)),
+  })),
+  resetSong: () => {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    const fresh = makeSection("verse");
+    set((s) => ({
+      meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
+      sections: [fresh.section],
+      progression: [fresh.pattern],
+      basket: [],
+      suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+    }));
+  },
 
   // ---- lyric lines ----
   addLine: (sectionId, afterId) => {
