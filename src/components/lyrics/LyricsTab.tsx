@@ -1337,7 +1337,7 @@ function SectionCard({
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Section</DropdownMenuLabel>
               {section.type === "custom" && (
                 <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
@@ -1347,6 +1347,40 @@ function SectionCard({
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                Color
+              </DropdownMenuLabel>
+              <div className="px-2 pb-2">
+                <div className="grid grid-cols-8 gap-1">
+                  {SECTION_COLOR_KEYS.map((c) => {
+                    const isActive = section.color === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSectionColor(section.id, isActive ? null : c)}
+                        aria-label={`Section color ${c}`}
+                        title={c}
+                        className={cn(
+                          "h-5 w-5 rounded border border-border transition-transform",
+                          isActive && "ring-2 ring-primary scale-110",
+                        )}
+                        style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                      />
+                    );
+                  })}
+                </div>
+                {section.color && (
+                  <button
+                    type="button"
+                    onClick={() => setSectionColor(section.id, null)}
+                    className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Clear color
+                  </button>
+                )}
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
