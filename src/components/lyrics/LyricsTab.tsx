@@ -392,6 +392,7 @@ function LineRow({
                                 lastSelectedRef.current = anchor!.id;
                                 return;
                               }
+                              void playChord(anchor!.chord);
                               onChordFocus(line.id);
                               onPickerOpen(line.id, slotIdx, anchor!.id);
                             }}
