@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useSongStore, getSectionDisplayName, type PatternBlock as PatternBlockType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
