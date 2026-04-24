@@ -448,9 +448,10 @@ function PatternBlock({
         return (
           <div
             data-progression-ctx
-            className="mb-2 mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs"
+            className="mb-2 mt-2 flex flex-col gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
             onPointerDown={(e) => e.stopPropagation()}
           >
+           <div className="flex items-center gap-2 flex-wrap">
             {showMulti ? (
               <span className="font-medium">{selectedIds.length} selected</span>
             ) : (
