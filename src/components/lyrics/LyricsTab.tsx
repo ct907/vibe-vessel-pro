@@ -303,61 +303,53 @@ function LineRow({
       )}
       data-line-id={line.id}
     >
-      {/* CHORD ROW: 20 equal-width slots, one Droppable. */}
-      <Droppable droppableId={`row:${sectionId}:${line.id}`} direction="horizontal" type="chord">
-        {(droppableProvided, droppableSnapshot) => (
-          <div
-            ref={(el) => {
-              droppableProvided.innerRef(el);
-            }}
-            {...droppableProvided.droppableProps}
-            data-chord-row={line.id}
-            tabIndex={0}
-            onFocus={() => onChordFocus(line.id)}
-            onKeyDown={onRowKeyDown}
-            onClick={(e) => {
-              // Click on empty area of the row opens picker at slot 0 (or near pointer).
-              const t = e.target as HTMLElement;
-              if (t.closest("[data-chip-anchor]")) return;
-              if (t.closest("[data-slot-index]")) return; // slot's own click handles this
-              setFocusedPattern(null);
-              onChordFocus(line.id);
-              onPickerOpen(line.id, 0);
-            }}
-            className={cn(
-              "relative flex items-stretch w-full rounded-sm bg-accent/20 outline-none",
-              droppableSnapshot.isDraggingOver && "bg-accent/40",
-            )}
-            style={{ minHeight: 36 }}
-          >
-            {/* Placeholder text when row is empty. */}
-            {line.chords.length === 0 && !isAnyDragging && (
-              <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
-                add your chords here
-              </span>
-            )}
+      {/* CHORD ROW: 20 equal-width slots. Each slot is its own Droppable so
+          pangea's contiguous-index requirement is naturally satisfied (each
+          slot holds at most one Draggable at index 0). */}
+      <div
+        data-chord-row={line.id}
+        tabIndex={0}
+        onFocus={() => onChordFocus(line.id)}
+        onKeyDown={onRowKeyDown}
+        onClick={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest("[data-chip-anchor]")) return;
+          if (t.closest("[data-slot-index]")) return;
+          setFocusedPattern(null);
+          onChordFocus(line.id);
+          onPickerOpen(line.id, 0);
+        }}
+        className="relative flex items-stretch w-full rounded-sm bg-accent/20 outline-none"
+        style={{ minHeight: 36 }}
+      >
+        {line.chords.length === 0 && !isAnyDragging && (
+          <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
+            add your chords here
+          </span>
+        )}
 
-            {/*
-              We render 20 stable slot wrappers as the Droppable's children, with
-              chips placed inside their slot wrapper. Each chip is its own
-              Draggable keyed by anchor id and indexed by slotIndex (0..19), so
-              pangea's `destination.index` IS the destination slot.
-
-              The library expects every Draggable's `index` to be unique within
-              the Droppable — by using `slotIndex` directly we guarantee that.
-            */}
-            {slots.map((anchor, slotIdx) => {
-              const occupied = !!anchor;
-              const isPlaying = !!anchor && playingAnchorId === anchor.id;
-              return (
+        {slots.map((anchor, slotIdx) => {
+          const occupied = !!anchor;
+          const playing = !!anchor && playingAnchorId === anchor.id;
+          return (
+            <Droppable
+              key={`slot-${slotIdx}`}
+              droppableId={`slot:${sectionId}:${line.id}:${slotIdx}`}
+              direction="horizontal"
+              type="chord"
+              isDropDisabled={false}
+            >
+              {(dropProvided, dropSnapshot) => (
                 <div
-                  key={`slot-${slotIdx}`}
+                  ref={dropProvided.innerRef}
+                  {...dropProvided.droppableProps}
                   data-slot-index={slotIdx}
                   className={cn(
                     "relative flex-1 min-w-0 h-9 flex items-center justify-center",
                     isAnyDragging &&
                       !occupied &&
                       "border border-dashed border-muted-foreground/30 rounded-sm",
+                    dropSnapshot.isDraggingOver && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                   )}
                   onClick={(e) => {
                     if (occupied) return;
@@ -367,11 +359,10 @@ function LineRow({
                   }}
                 >
                   {occupied && (
-                    <Draggable draggableId={anchor!.id} index={slotIdx}>
+                    <Draggable draggableId={anchor!.id} index={0}>
                       {(dragProvided, dragSnapshot) => {
                         const beingDragged = draggingIds.has(anchor!.id);
                         const isPrimary = dragSnapshot.isDragging;
-                        // Hide non-primary multi-drag chips (they "ride along").
                         const hideForMulti = beingDragged && !isPrimary;
                         return (
                           <div
@@ -383,9 +374,7 @@ function LineRow({
                               "w-full h-full flex items-center justify-center px-0.5",
                               hideForMulti && "opacity-30",
                             )}
-                            style={{
-                              ...dragProvided.draggableProps.style,
-                            }}
+                            style={{ ...dragProvided.draggableProps.style }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (e.shiftKey) {
@@ -418,7 +407,6 @@ function LineRow({
                                   lastSelectedRef.current = anchor!.id;
                                 }}
                               />
-                              {/* Multi-drag count badge on the dragging clone. */}
                               {isPrimary && draggingIds.size > 1 && (
                                 <span
                                   className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
@@ -427,7 +415,7 @@ function LineRow({
                                   +{draggingIds.size - 1}
                                 </span>
                               )}
-                              {isPlaying && (
+                              {playing && (
                                 <span
                                   aria-hidden
                                   className="absolute inset-0 rounded-md ring-2 ring-[hsl(var(--chord-chip))] animate-pulse pointer-events-none"
@@ -439,13 +427,13 @@ function LineRow({
                       }}
                     </Draggable>
                   )}
+                  {dropProvided.placeholder}
                 </div>
-              );
-            })}
-            {droppableProvided.placeholder}
-          </div>
-        )}
-      </Droppable>
+              )}
+            </Droppable>
+          );
+        })}
+      </div>
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
@@ -1080,10 +1068,16 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
     setDraggingIds(new Set());
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    // Parse droppableId: row:<sectionId>:<lineId>
-    const [, fromSectionId, fromLineId] = source.droppableId.split(":");
-    const [, toSectionId, toLineId] = destination.droppableId.split(":");
-    const toSlot = destination.index;
+    // Parse droppableId: slot:<sectionId>:<lineId>:<slotIdx>
+    const srcParts = source.droppableId.split(":");
+    const dstParts = destination.droppableId.split(":");
+    if (srcParts[0] !== "slot" || dstParts[0] !== "slot") return;
+    const fromSectionId = srcParts[1];
+    const fromLineId = srcParts[2];
+    const toSectionId = dstParts[1];
+    const toLineId = dstParts[2];
+    const toSlot = Number(dstParts[3]);
+    if (Number.isNaN(toSlot)) return;
 
     if (ids.length > 1) {
       moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);

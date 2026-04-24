@@ -4,8 +4,9 @@ import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode } from "
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Music, X, Filter } from "lucide-react";
+import { Plus, Music, X } from "lucide-react";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
@@ -37,6 +38,8 @@ export function ChordsTab() {
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
   // Numeral filter: when non-empty, only rows whose numeral is selected are shown.
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
+  // Audition octave applied to every chord chip in this tab.
+  const [octave, setOctave] = useState<number>(4);
 
   // Build rows with all qualities. Dedupe variants WITHIN each row by their
   // canonical (parsed) display so e.g. "Dm" never appears twice.
@@ -141,14 +144,29 @@ export function ChordsTab() {
                 )}
               >
                 <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
-                <ChordChip chord={d.chord} variant="ink" size="sm" />
+                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} />
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+          Octave
+          <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+            <SelectTrigger className="h-7 w-[72px] px-2 text-xs font-mono-chord" aria-label="Audition octave">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2, 3, 4, 5, 6].map((o) => (
+                <SelectItem key={o} value={String(o)} className="text-xs font-mono-chord">
+                  Oct {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
         <span className="ml-auto text-xs text-muted-foreground">
           Tap to audition · Hold to sustain · Check to multi-select · Esc to cancel
         </span>
@@ -183,7 +201,7 @@ export function ChordsTab() {
                       onCheckedChange={() => toggleSelect(c)}
                       aria-label={`Select ${c.display}`}
                     />
-                    <ChordChip chord={c} variant="ink" />
+                    <ChordChip chord={c} variant="ink" octave={octave} />
                   </div>
                 );
               })}

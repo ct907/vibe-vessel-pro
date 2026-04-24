@@ -197,14 +197,15 @@
     border: 0px solid hsl(var(--border));
   }
 
-  /* Neumorphic Play button — primary-tinted base with soft inner/outer shadows. */
+  /* Neumorphic Play button — primary-tinted base with light orange stroke and dark orange inset shadow. */
   .btn-neumorphic-play {
     color: hsl(var(--primary-foreground));
     background-color: hsl(var(--primary));
-    border: 1px solid hsl(var(--primary));
+    border: 1px solid hsl(28 90% 70%); /* light orange stroke */
     box-shadow:
       6px 6px 12px hsl(var(--primary) / 0.45),
-      -6px -6px 12px hsl(var(--primary) / 0.15);
+      -6px -6px 12px hsl(var(--primary) / 0.15),
+      inset 0 2px 6px hsl(20 85% 25% / 0.55); /* dark orange inset shadow */
     transition: all 0.2s ease;
   }
   .btn-neumorphic-play:hover {
@@ -215,7 +216,7 @@
     box-shadow:
       0 0 0 hsl(var(--primary) / 0.45),
       0 0 0 hsl(var(--primary) / 0.15),
-      inset 4px 4px 12px hsl(var(--primary) / 0.55),
+      inset 4px 4px 12px hsl(20 85% 25% / 0.7),
       inset -4px -4px 12px hsl(var(--primary) / 0.2);
   }
 }

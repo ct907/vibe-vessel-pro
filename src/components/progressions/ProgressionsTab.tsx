@@ -38,6 +38,38 @@ import { MoreVertical } from "lucide-react";
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
 
+/** Bars number input that allows the field to be temporarily empty while typing. */
+function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^0-9]/g, "");
+        setDraft(raw);
+        if (raw === "") return;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 1) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (!draft || !Number.isFinite(n) || n < 1) {
+          setDraft("1");
+          onCommit(1);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-7 w-14 font-mono-chord"
+    />
+  );
+}
+
 interface PatternProps {
   pattern: PatternBlockType;
   blockIndex: number;
@@ -281,16 +313,9 @@ function PatternBlock({
         <span className="text-xs text-muted-foreground">·</span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           Bars
-          <Input
-            type="number"
-            min={1}
-            max={32}
+          <BarsInput
             value={pattern.bars}
-            onChange={(e) =>
-              updatePattern(pattern.id, { bars: Math.max(1, Math.min(32, Number(e.target.value) || 1)) })
-            }
-            onClick={(e) => e.stopPropagation()}
-            className="h-7 w-14 font-mono-chord"
+            onCommit={(n) => updatePattern(pattern.id, { bars: Math.max(1, Math.min(32, n)) })}
           />
         </div>
         <span className="text-[11px] text-muted-foreground">
@@ -341,14 +366,12 @@ function PatternBlock({
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
                         {...dragProvided.dragHandleProps}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
+                        onMouseDown={() => {
                           startPress(c.id);
                         }}
                         onMouseUp={cancelPress}
                         onMouseLeave={cancelPress}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
+                        onTouchStart={() => {
                           startPress(c.id);
                         }}
                         onTouchEnd={cancelPress}
@@ -450,9 +473,10 @@ function PatternBlock({
         return (
           <div
             data-progression-ctx
-            className="mb-2 mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs"
+            className="mb-2 mt-2 flex flex-col gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
             onPointerDown={(e) => e.stopPropagation()}
           >
+           <div className="flex items-center gap-2 flex-wrap">
             {showMulti ? (
               <span className="font-medium">{selectedIds.length} selected</span>
             ) : (
@@ -477,33 +501,6 @@ function PatternBlock({
               title="Play from here"
             >
               <Play className="h-3.5 w-3.5" /> Play from here
-            </Button>
-
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
-                else shiftPatternChords(pattern.id, selectedIds, -1);
-              }}
-              aria-label="Move earlier"
-              title="Move earlier"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
-                else shiftPatternChords(pattern.id, selectedIds, 1);
-              }}
-              aria-label="Move later"
-              title="Move later"
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
             </Button>
 
             <span className="text-[10px] text-muted-foreground ml-1">Length</span>
@@ -586,6 +583,36 @@ function PatternBlock({
                 </SelectContent>
               </Select>
             )}
+           </div>
+
+           {/* Row 2: move arrows + Done */}
+           <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
+                else shiftPatternChords(pattern.id, selectedIds, -1);
+              }}
+              aria-label="Move earlier"
+              title="Move earlier"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
+                else shiftPatternChords(pattern.id, selectedIds, 1);
+              }}
+              aria-label="Move later"
+              title="Move later"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
 
             <Button
               size="sm"
@@ -598,6 +625,7 @@ function PatternBlock({
             >
               Done
             </Button>
+           </div>
           </div>
         );
       })()}
