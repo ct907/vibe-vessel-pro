@@ -335,7 +335,48 @@ function snapLineToWords(line: LyricLine): LyricLine {
   return { ...line, chords: result };
 }
 
-// ---------- Sync helpers ----------
+// ---------- Slot helpers (20-slot chord row) ----------
+
+/** Find the nearest free slot starting from `desired`, scanning right then left. Returns -1 if all 20 are full. */
+export function nearestFreeSlot(occupied: Set<number>, desired: number, total = CHORD_ROW_SLOTS): number {
+  const start = Math.max(0, Math.min(total - 1, desired));
+  if (!occupied.has(start)) return start;
+  for (let off = 1; off < total; off++) {
+    const r = start + off;
+    if (r < total && !occupied.has(r)) return r;
+    const l = start - off;
+    if (l >= 0 && !occupied.has(l)) return l;
+  }
+  return -1;
+}
+
+/** Derive a slotIndex for a legacy anchor (uses wordIndex if present, else order). */
+function deriveSlotIndex(anchor: ChordAnchor, fallbackOrder: number): number {
+  if (anchor.wordIndex != null) return Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, anchor.wordIndex));
+  return Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, fallbackOrder));
+}
+
+/** Ensure every chord on a line has a unique slotIndex in [0, 20). Resolves collisions left-to-right. */
+function ensureSlotsForLine(line: LyricLine): LyricLine {
+  const ordered = [...line.chords].sort((a, b) => {
+    const aw = a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
+    const bw = b.slotIndex ?? b.wordIndex ?? b.chordCol ?? b.offset ?? 0;
+    return aw - bw;
+  });
+  const used = new Set<number>();
+  const next: ChordAnchor[] = [];
+  ordered.forEach((c, i) => {
+    const desired = c.slotIndex != null ? c.slotIndex : deriveSlotIndex(c, i);
+    const slot = nearestFreeSlot(used, desired);
+    if (slot < 0) {
+      // Row full → keep without slot (renderer will hide; should be rare).
+      next.push({ ...c, slotIndex: undefined });
+    } else {
+      used.add(slot);
+      next.push({ ...c, slotIndex: slot });
+    }
+  });
+  return { ...line, chords: next };
 // Find the next free start beat in a pattern (after the last chord's end).
 function nextFreeBeat(pattern: PatternBlock): number {
   if (!pattern.chords.length) return 0;
