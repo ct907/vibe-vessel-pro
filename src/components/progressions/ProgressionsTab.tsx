@@ -544,8 +544,166 @@ function PatternBlock({
         })()}
       </div>
 
-      <p className="mt-8 text-[10px] uppercase tracking-wide text-muted-foreground">
-        Tap to focus · Long-press to multi-select · Double-tap to edit · Drag to reorder · +/- keys adjust length
+      {/* Unified chord context menu — appears below the pattern block (#7).
+          Shown either when chords are multi-selected OR when a single chord is
+          tapped (active). Multi-select reveals shift/length/move/delete; single
+          chord adds Play-from-here and per-chord length controls. */}
+      {(() => {
+        const showMulti = selectMode && selectedIds.length > 0;
+        const showSingle = !selectMode && !!active && activeIdx >= 0;
+        if (!showMulti && !showSingle) return null;
+        const c = active;
+        const canDecrease = c ? c.lengthBeats > MIN_LEN : false;
+        const canIncrease = c ? c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9 : false;
+        return (
+          <div
+            data-progression-ctx
+            className="mb-2 mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm flex-wrap text-xs"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {showMulti ? (
+              <span className="font-medium">{selectedIds.length} selected</span>
+            ) : (
+              <span className="font-medium font-mono-chord">{c?.chord.display}</span>
+            )}
+
+            {/* Play from here — uses the active chord, or first selected chord. */}
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 px-2 text-xs"
+              onClick={async () => {
+                await ensureAudio();
+                const chordId = showSingle ? active!.id : selectedIds[0];
+                setStartFromChord(pattern.id, chordId);
+                setActiveChord(null);
+                setIsPlayingStore(false);
+                setCurrent(null);
+                window.dispatchEvent(new Event("lovable:request-play"));
+              }}
+              aria-label="Play from here"
+              title="Play from here"
+            >
+              <Play className="h-3.5 w-3.5" /> Play from here
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
+                else shiftPatternChords(pattern.id, selectedIds, -1);
+              }}
+              aria-label="Move earlier"
+              title="Move earlier"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
+                else shiftPatternChords(pattern.id, selectedIds, 1);
+              }}
+              aria-label="Move later"
+              title="Move later"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+
+            <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7"
+              disabled={showSingle && !canDecrease}
+              onClick={() => {
+                if (showSingle && c) {
+                  if (canDecrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
+                } else {
+                  resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP);
+                }
+              }}
+              aria-label="Decrease length"
+              title="Decrease length"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            {showSingle && c && (
+              <span className="font-mono-chord text-[10px] text-muted-foreground px-1 min-w-[28px] text-center">
+                {formatBeats(c.lengthBeats)}b
+              </span>
+            )}
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7"
+              onClick={() => {
+                if (showSingle && c) {
+                  if (canIncrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+                  else resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
+                } else {
+                  resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP);
+                }
+              }}
+              aria-label="Increase length"
+              title="Increase · overflows to next block"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive"
+              onClick={() => {
+                if (showSingle && c) {
+                  removePatternChordsBatch(pattern.id, [c.id]);
+                  setActiveChord(null);
+                } else {
+                  removePatternChordsBatch(pattern.id, selectedIds);
+                  exitSelect();
+                }
+              }}
+              aria-label="Delete"
+              title="Delete (Del)"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+
+            {showMulti && otherPatterns.length > 0 && (
+              <Select
+                value=""
+                onValueChange={(toId) => { movePatternChordsTo(pattern.id, toId, selectedIds); exitSelect(); }}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectValue placeholder="Move to…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherPatterns.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 ml-auto"
+              onClick={() => { setActiveChord(null); exitSelect(); }}
+            >
+              Done
+            </Button>
+          </div>
+        );
+      })()}
+
+      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Tap to focus & audition · Long-press / Shift-click to multi-select · Double-tap to edit · Drag selection across blocks · Del to delete
       </p>
 
       {basket.length > 0 && (
