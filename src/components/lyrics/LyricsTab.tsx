@@ -870,119 +870,119 @@ function LineRow({
               </div>
             );
           })()}
-        {/* Chord chips at columns */}
-        {line.chords.map((a) => {
-          const col = colOf(a);
-          const isSel = selected.has(a.id);
-          const handleChipTap = (e?: React.MouseEvent) => {
-            // Shift+click = range select (works in or out of selectMode)
-            if (e && e.shiftKey) {
-              selectRangeTo(a.id, true);
-              return;
-            }
-            if (selectMode) {
-              toggleSelected(a.id);
-              lastSelectedRef.current = a.id;
-              return;
-            }
-            setChordCaret(col);
-            focusChord();
-            onPickerOpen(line.id, col, a.id);
-          };
-          // Begin a pointer drag from this chip when in selectMode and chip is selected.
-          const beginPointerDrag = (e: React.PointerEvent) => {
-            if (!selectMode || !selected.has(a.id)) return;
-            // Use selected set as the drag payload.
-            const ids = Array.from(selected);
-            const displays = sortedChords.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-            setDrag({
-              pointerId: e.pointerId,
-              startX: e.clientX,
-              startY: e.clientY,
-              x: e.clientX,
-              y: e.clientY,
-              active: false,
-              ids,
-              displays,
-            });
-            onMultiDragStart?.(sectionId, line.id, ids);
-          };
-          return (
-            <div
-              key={a.id}
-              data-chip-anchor={a.id}
-              className="absolute top-0 leading-7"
-              style={{ left: `${col * cellPx}px` }}
-              draggable={!selectMode}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", a.chord.display);
-                onChordDragStart(a.id);
-              }}
-              onPointerDown={beginPointerDrag}
-              onClick={(e) => {
-                // Suppress click if we just dragged.
-                if (drag?.active) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  return;
-                }
-                e.stopPropagation();
-                handleChipTap(e);
-              }}
-            >
-              <ChordChip
-                chord={a.chord}
-                variant="ink"
-                size="sm"
-                selected={selectMode && isSel}
-                audition
-                onLongPress={() => {
-                  if (selectMode) {
-                    // If already selected, do nothing — the user is about to drag.
-                    if (selected.has(a.id)) return;
-                    toggleSelected(a.id);
-                  } else {
-                    enterSelect(a.id);
-                  }
-                  lastSelectedRef.current = a.id;
-                }}
-              />
-            </div>
-          );
-        })}
-        {/* Caret + live chord query (mirrored from picker input) */}
-        {chordFocused &&
-          !selectMode &&
-          (() => {
-            // Hide the ghost overlay if the query matches an existing chord at the caret —
-            // i.e. the picker was opened to edit, not to type a new chord. This prevents
-            // a stale "clone" of the chord display from rendering at the old position.
-            const editingExisting = !!sortedChords.find(
-              (c) => colOf(c) === chordCaret && c.chord.display === chordRowQuery,
-            );
-            const showOverlay = !!(active && chordRowQuery && chordRowQuery.length > 0 && !editingExisting);
+        {/* Chord chips: absolutely positioned over word starts when bound; floating chips render in a flex row at the right. */}
+        {(() => {
+          const ordered = [...line.chords].sort((a, b) => {
+            const aw = a.wordIndex ?? Number.POSITIVE_INFINITY;
+            const bw = b.wordIndex ?? Number.POSITIVE_INFINITY;
+            if (aw !== bw) return aw - bw;
+            return colOf(a) - colOf(b);
+          });
+          const noWords = lineWords.length === 0;
+          const bound = ordered.filter((a) => a.wordIndex != null && wordRects[a.wordIndex!]);
+          const floating = ordered.filter((a) => a.wordIndex == null || !wordRects[a.wordIndex!]);
+
+          const renderChip = (a: typeof ordered[number], style?: React.CSSProperties) => {
+            const isSel = selected.has(a.id);
+            const handleChipTap = (e?: React.MouseEvent) => {
+              if (e && e.shiftKey) {
+                selectRangeTo(a.id, true);
+                return;
+              }
+              if (selectMode) {
+                toggleSelected(a.id);
+                lastSelectedRef.current = a.id;
+                return;
+              }
+              focusChord();
+              onPickerOpen(line.id, a.wordIndex ?? 0, a.id);
+            };
+            const beginPointerDrag = (e: React.PointerEvent) => {
+              if (!selectMode || !selected.has(a.id)) return;
+              const ids = Array.from(selected);
+              const displays = ordered.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+              setDrag({
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                x: e.clientX,
+                y: e.clientY,
+                active: false,
+                ids,
+                displays,
+              });
+              onMultiDragStart?.(sectionId, line.id, ids);
+            };
+            const isFloating = a.wordIndex == null;
             return (
-              <>
-                {showOverlay && (
-                  <span
-                    aria-hidden
-                    className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
-                    style={{ left: `${chordCaret * cellPx}px` }}
-                  >
-                    {chordRowQuery}
-                  </span>
-                )}
-                <span
-                  aria-hidden
-                  className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-                  style={{ left: `${(chordCaret + (showOverlay ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
-                />
-              </>
+              <div
+                key={a.id}
+                data-chip-anchor={a.id}
+                className={cn("leading-7", style ? "absolute top-0" : "")}
+                style={style}
+                draggable={!selectMode}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", a.chord.display);
+                  onChordDragStart(a.id);
+                }}
+                onPointerDown={beginPointerDrag}
+                onClick={(e) => {
+                  if (drag?.active) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                  }
+                  e.stopPropagation();
+                  handleChipTap(e);
+                }}
+              >
+                <div className={cn(isFloating && "rounded-md border border-dashed border-muted-foreground/40")}>
+                  <ChordChip
+                    chord={a.chord}
+                    variant="ink"
+                    size="sm"
+                    selected={selectMode && isSel}
+                    audition
+                    onLongPress={() => {
+                      if (selectMode) {
+                        if (selected.has(a.id)) return;
+                        toggleSelected(a.id);
+                      } else {
+                        enterSelect(a.id);
+                      }
+                      lastSelectedRef.current = a.id;
+                    }}
+                  />
+                </div>
+              </div>
             );
-          })()}
+          };
+
+          return (
+            <>
+              {/* Bound chips: absolute, anchored to word pixel positions. */}
+              {bound.map((a) =>
+                renderChip(a, { left: `${wordRects[a.wordIndex!].left}px`, top: `${wordRects[a.wordIndex!].top}px` }),
+              )}
+              {/* Floating chips: flex row. When line has no words, fill the row from the left;
+                  otherwise render at the right end as "unanchored". */}
+              {floating.length > 0 && (
+                <div
+                  className={cn(
+                    "flex items-center gap-2",
+                    noWords ? "absolute left-0 top-0" : "absolute right-1 top-0",
+                  )}
+                >
+                  {floating.map((a) => renderChip(a))}
+                </div>
+              )}
+            </>
+          );
+        })()}
+
       </div>
 
       {/* Long-press paste popover for empty chord-row spaces. */}
