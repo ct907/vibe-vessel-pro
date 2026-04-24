@@ -11,9 +11,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, Minus, Trash2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Play, ChevronsDownUp, ChevronsUpDown, ChevronDown, ChevronRight } from "lucide-react";
-import { ensureAudio } from "@/lib/music/audio";
+import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
+import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
