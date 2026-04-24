@@ -1196,7 +1196,8 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
 
   // Add chord into pattern; mirror it back as an anchor at end of last lyric line of bound section.
-  addChordToPattern: (patternId, chord, atBeat, lengthBeats = 4) => set((s) => {
+  addChordToPattern: (patternId, chord, atBeat, lengthBeats) => set((s) => {
+    const effectiveLen = lengthBeats ?? getDefaults().defaultChordLengthBeats;
     const newPcId = nanoid();
     let createdAnchorId: string | null = null;
 
