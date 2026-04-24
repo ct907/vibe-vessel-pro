@@ -824,11 +824,11 @@ function LineRow({
           const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
           onChordDrop(line.id, col);
         }}
-        className="relative h-7 cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
-        style={{ minWidth: `${Math.max(len + 1, 8) * cellPx}px` }}
+        className="relative cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
+        style={{ minHeight: `${Math.max(chordRowHeight, 28)}px` }}
       >
         {/* Placeholder */}
-        {line.chords.length === 0 && (line.chordRowLen ?? 0) === 0 && !chordFocused && (
+        {line.chords.length === 0 && !chordFocused && (
           <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-3">
             add your chords here
           </span>
@@ -844,16 +844,19 @@ function LineRow({
             }}
           />
         )}
-        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord, with a downward arrow on top */}
+        {/* Playback playhead — bright orange marker at the playing chord's word position. */}
         {playingAnchorId &&
           (() => {
             const playing = line.chords.find((a) => a.id === playingAnchorId);
             if (!playing) return null;
+            const wr = playing.wordIndex != null ? wordRects[playing.wordIndex] : undefined;
+            const left = wr ? wr.left - 1 : 0;
+            const top = wr ? wr.top : 0;
             return (
               <div
                 aria-hidden
-                className="absolute top-0 bottom-0 pointer-events-none animate-pulse"
-                style={{ left: `${colOf(playing) * cellPx - 1}px`, width: "3px" }}
+                className="absolute pointer-events-none animate-pulse"
+                style={{ left: `${left}px`, top: `${top}px`, height: "28px", width: "3px" }}
               >
                 <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
                 <span
