@@ -190,42 +190,6 @@ function PatternBlock({
     removePatternChordsBatch,
   ]);
 
-  // Pointer drag lifecycle for multi-selected chords (#4).
-  useEffect(() => {
-    if (!pdrag) return;
-    const DRAG_THRESHOLD = 6;
-    const onMove = (ev: PointerEvent) => {
-      if (ev.pointerId !== pdrag.pointerId) return;
-      const dx = ev.clientX - pdrag.startX;
-      const dy = ev.clientY - pdrag.startY;
-      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
-      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
-      const blk = hit?.closest("[data-pattern-block]") as HTMLElement | null;
-      const targetPatternId = blk?.getAttribute("data-pattern-block") ?? undefined;
-      setPdrag((prev) =>
-        prev ? { ...prev, x: ev.clientX, y: ev.clientY, active: prev.active || moved, targetPatternId } : prev,
-      );
-    };
-    const onUp = (ev: PointerEvent) => {
-      if (ev.pointerId !== pdrag.pointerId) return;
-      const cur = pdragRef.current;
-      setPdrag(null);
-      if (!cur || !cur.active) return;
-      if (!cur.targetPatternId || cur.targetPatternId === pattern.id) return;
-      movePatternChordsTo(pattern.id, cur.targetPatternId, cur.ids);
-      exitSelect();
-    };
-    const onCancel = () => setPdrag(null);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-    };
-  }, [pdrag?.pointerId, pattern.id, movePatternChordsTo]);
-
   const startPress = (chordId: string) => {
     longFiredRef.current = false;
     pressTimer.current = setTimeout(() => {
