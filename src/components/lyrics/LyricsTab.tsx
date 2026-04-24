@@ -513,7 +513,7 @@ function LineRow({
     const k = e.key;
     const mod = e.metaKey || e.ctrlKey;
 
-    // Undo / Redo (chord-row history). Cmd/Ctrl+Z = undo; Cmd/Ctrl+Y or Cmd/Ctrl+Shift+Z = redo.
+    // Undo / Redo (chord-row history).
     if (mod && (k === "z" || k === "Z")) {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -526,25 +526,17 @@ function LineRow({
       return;
     }
 
-    // Keyboard shortcuts: Cmd/Ctrl + A / C / X / V — work in or out of selectMode.
+    // Selection / clipboard shortcuts.
     if (mod && (k === "a" || k === "A")) {
       e.preventDefault();
       selectAll();
       return;
     }
     if (mod && (k === "c" || k === "C")) {
-      if (selected.size > 0) {
-        e.preventDefault();
-        doCopy();
-        return;
-      }
+      if (selected.size > 0) { e.preventDefault(); doCopy(); return; }
     }
     if (mod && (k === "x" || k === "X")) {
-      if (selected.size > 0) {
-        e.preventDefault();
-        doCut();
-        return;
-      }
+      if (selected.size > 0) { e.preventDefault(); doCut(); return; }
     }
     if (mod && (k === "v" || k === "V")) {
       e.preventDefault();
@@ -553,80 +545,10 @@ function LineRow({
     }
 
     if (selectMode) return;
-    // When the picker (modal sheet) is open, it owns text input. Don't also
-    // process letter/backspace/space here, otherwise typing happens twice.
-    if (active) return;
-    // Picker is "live" when this row is active and the parent passed query handlers.
-    const pickerLive = !!(active && onChordRowQueryChange);
-    const liveQuery = chordRowQuery ?? "";
+    if (active) return; // picker open — let it own input
 
-    if (k === "ArrowUp" || k === "ArrowDown") {
-      // Shortcut: if the picker sheet is open, toggle focus to its input.
-      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
-      if (pickerInput) {
-        e.preventDefault();
-        pickerInput.focus();
-        return;
-      }
-    }
-    // While the picker is open, treat letter/digit/chord-symbol keys as edits
-    // to the shared chord query (mirrored in the picker input).
-    if (pickerLive && k.length === 1 && /[A-Za-z0-9#b/+°Δø]/.test(k)) {
-      e.preventDefault();
-      onChordRowQueryChange!(liveQuery + k);
-      return;
-    }
-    if (pickerLive && k === "Backspace" && liveQuery.length > 0) {
-      e.preventDefault();
-      onChordRowQueryChange!(liveQuery.slice(0, -1));
-      return;
-    }
-    if (pickerLive && k === "Enter" && liveQuery.trim()) {
-      // Let the picker's own Enter handler commit; forward focus to it.
-      const pickerInput = document.querySelector<HTMLInputElement>("[data-chord-picker-input]");
-      if (pickerInput) {
-        e.preventDefault();
-        pickerInput.focus();
-        // Synthesize an Enter on the picker input.
-        pickerInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-        return;
-      }
-    }
-
-    if (k === " " || k === "Spacebar") {
-      e.preventDefault();
-      insertChordSpaceAt(sectionId, line.id, chordCaret);
-      setChordCaret((c) => c + 1);
-    } else if (k === "ArrowLeft") {
-      e.preventDefault();
-      setChordCaret((c) => Math.max(0, c - 1));
-    } else if (k === "ArrowRight") {
-      e.preventDefault();
-      setChordCaret((c) => Math.min(len, c + 1));
-    } else if (k === "Home") {
-      e.preventDefault();
-      setChordCaret(0);
-    } else if (k === "End") {
-      e.preventDefault();
-      setChordCaret(len);
-    } else if (k === "Backspace") {
-      e.preventDefault();
-      if (chordCaret === 0) {
-        if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) {
-          onMergeUp("chord", line.text, 0, 0);
-        } else {
-          onMergeUp("chord", line.text, line.chords.length, line.chordRowLen ?? 0);
-        }
-        return;
-      }
-      const target = chordCaret - 1;
-      const removed = removeChordCellAt(sectionId, line.id, target);
-      if (removed) setChordCaret(target);
-    } else if (k === "Delete") {
-      e.preventDefault();
-      if (chordCaret >= len) return;
-      removeChordCellAt(sectionId, line.id, chordCaret);
-    } else if (k === "Enter") {
+    // Enter on the chord row creates a new lyric line.
+    if (k === "Enter") {
       e.preventDefault();
       const newId = onAddLineAfter();
       if (typeof newId === "string") {
@@ -634,11 +556,21 @@ function LineRow({
           document.querySelector<HTMLDivElement>(`[data-chord-row="${newId}"]`)?.focus();
         }, 10);
       }
-    } else if (k.length === 1 && /[A-Za-z]/.test(k)) {
-      // Picker is not yet open — open it and seed the query with this letter.
+      return;
+    }
+
+    // Backspace on an empty chord row merges with previous row.
+    if (k === "Backspace" && line.chords.length === 0) {
+      e.preventDefault();
+      onMergeUp("chord", line.text, 0, 0);
+      return;
+    }
+
+    // Letter typed → open the chord picker pre-seeded with that letter.
+    if (k.length === 1 && /[A-Za-z]/.test(k)) {
       e.preventDefault();
       onChordRowQueryChange?.(k);
-      onPickerOpen(line.id, chordCaret);
+      onPickerOpen(line.id, 0);
     }
   };
 
@@ -824,11 +756,11 @@ function LineRow({
           const col = Math.max(0, Math.round(px / Math.max(cellPx, 1)));
           onChordDrop(line.id, col);
         }}
-        className="relative h-7 cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
-        style={{ minWidth: `${Math.max(len + 1, 8) * cellPx}px` }}
+        className="relative cursor-text outline-none rounded-sm bg-accent/20 focus:bg-accent/40"
+        style={{ minHeight: `${Math.max(chordRowHeight, 28)}px` }}
       >
         {/* Placeholder */}
-        {line.chords.length === 0 && (line.chordRowLen ?? 0) === 0 && !chordFocused && (
+        {line.chords.length === 0 && !chordFocused && (
           <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-3">
             add your chords here
           </span>
@@ -844,16 +776,19 @@ function LineRow({
             }}
           />
         )}
-        {/* Playback playhead — bright orange typing-cursor stick at left of currently-playing chord, with a downward arrow on top */}
+        {/* Playback playhead — bright orange marker at the playing chord's word position. */}
         {playingAnchorId &&
           (() => {
             const playing = line.chords.find((a) => a.id === playingAnchorId);
             if (!playing) return null;
+            const wr = playing.wordIndex != null ? wordRects[playing.wordIndex] : undefined;
+            const left = wr ? wr.left - 1 : 0;
+            const top = wr ? wr.top : 0;
             return (
               <div
                 aria-hidden
-                className="absolute top-0 bottom-0 pointer-events-none animate-pulse"
-                style={{ left: `${colOf(playing) * cellPx - 1}px`, width: "3px" }}
+                className="absolute pointer-events-none animate-pulse"
+                style={{ left: `${left}px`, top: `${top}px`, height: "28px", width: "3px" }}
               >
                 <span className="absolute left-0 right-0 top-[7px] bottom-0 rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
                 <span
@@ -870,119 +805,144 @@ function LineRow({
               </div>
             );
           })()}
-        {/* Chord chips at columns */}
-        {line.chords.map((a) => {
-          const col = colOf(a);
-          const isSel = selected.has(a.id);
-          const handleChipTap = (e?: React.MouseEvent) => {
-            // Shift+click = range select (works in or out of selectMode)
-            if (e && e.shiftKey) {
-              selectRangeTo(a.id, true);
-              return;
-            }
-            if (selectMode) {
-              toggleSelected(a.id);
-              lastSelectedRef.current = a.id;
-              return;
-            }
-            setChordCaret(col);
-            focusChord();
-            onPickerOpen(line.id, col, a.id);
-          };
-          // Begin a pointer drag from this chip when in selectMode and chip is selected.
-          const beginPointerDrag = (e: React.PointerEvent) => {
-            if (!selectMode || !selected.has(a.id)) return;
-            // Use selected set as the drag payload.
-            const ids = Array.from(selected);
-            const displays = sortedChords.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-            setDrag({
-              pointerId: e.pointerId,
-              startX: e.clientX,
-              startY: e.clientY,
-              x: e.clientX,
-              y: e.clientY,
-              active: false,
-              ids,
-              displays,
-            });
-            onMultiDragStart?.(sectionId, line.id, ids);
-          };
-          return (
-            <div
-              key={a.id}
-              data-chip-anchor={a.id}
-              className="absolute top-0 leading-7"
-              style={{ left: `${col * cellPx}px` }}
-              draggable={!selectMode}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", a.chord.display);
-                onChordDragStart(a.id);
-              }}
-              onPointerDown={beginPointerDrag}
-              onClick={(e) => {
-                // Suppress click if we just dragged.
-                if (drag?.active) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  return;
-                }
-                e.stopPropagation();
-                handleChipTap(e);
-              }}
-            >
-              <ChordChip
-                chord={a.chord}
-                variant="ink"
-                size="sm"
-                selected={selectMode && isSel}
-                audition
-                onLongPress={() => {
-                  if (selectMode) {
-                    // If already selected, do nothing — the user is about to drag.
-                    if (selected.has(a.id)) return;
-                    toggleSelected(a.id);
-                  } else {
-                    enterSelect(a.id);
-                  }
-                  lastSelectedRef.current = a.id;
-                }}
-              />
-            </div>
-          );
-        })}
-        {/* Caret + live chord query (mirrored from picker input) */}
-        {chordFocused &&
-          !selectMode &&
-          (() => {
-            // Hide the ghost overlay if the query matches an existing chord at the caret —
-            // i.e. the picker was opened to edit, not to type a new chord. This prevents
-            // a stale "clone" of the chord display from rendering at the old position.
-            const editingExisting = !!sortedChords.find(
-              (c) => colOf(c) === chordCaret && c.chord.display === chordRowQuery,
-            );
-            const showOverlay = !!(active && chordRowQuery && chordRowQuery.length > 0 && !editingExisting);
+        {/* Chord chips: absolutely positioned over word starts when bound; floating chips render in a flex row at the right. */}
+        {(() => {
+          const ordered = [...line.chords].sort((a, b) => {
+            const aw = a.wordIndex ?? Number.POSITIVE_INFINITY;
+            const bw = b.wordIndex ?? Number.POSITIVE_INFINITY;
+            if (aw !== bw) return aw - bw;
+            return colOf(a) - colOf(b);
+          });
+          const noWords = lineWords.length === 0;
+          const bound = ordered.filter((a) => a.wordIndex != null && wordRects[a.wordIndex!]);
+          const floating = ordered.filter((a) => a.wordIndex == null || !wordRects[a.wordIndex!]);
+
+          const renderChip = (a: typeof ordered[number], style?: React.CSSProperties) => {
+            const isSel = selected.has(a.id);
+            const handleChipTap = (e?: React.MouseEvent) => {
+              if (e && e.shiftKey) {
+                selectRangeTo(a.id, true);
+                return;
+              }
+              if (selectMode) {
+                toggleSelected(a.id);
+                lastSelectedRef.current = a.id;
+                return;
+              }
+              focusChord();
+              onPickerOpen(line.id, a.wordIndex ?? 0, a.id);
+            };
+            const beginPointerDrag = (e: React.PointerEvent) => {
+              if (!selectMode || !selected.has(a.id)) return;
+              const ids = Array.from(selected);
+              const displays = ordered.filter((c) => selected.has(c.id)).map((c) => c.chord.display);
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+              setDrag({
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                x: e.clientX,
+                y: e.clientY,
+                active: false,
+                ids,
+                displays,
+              });
+              onMultiDragStart?.(sectionId, line.id, ids);
+            };
+            const isFloating = a.wordIndex == null;
             return (
-              <>
-                {showOverlay && (
-                  <span
-                    aria-hidden
-                    className="absolute top-0 leading-7 font-mono-chord text-sm font-semibold text-primary/80 pointer-events-none whitespace-pre"
-                    style={{ left: `${chordCaret * cellPx}px` }}
-                  >
-                    {chordRowQuery}
-                  </span>
-                )}
-                <span
-                  aria-hidden
-                  className="absolute top-1 bottom-1 w-px bg-primary animate-pulse pointer-events-none"
-                  style={{ left: `${(chordCaret + (showOverlay ? (chordRowQuery?.length ?? 0) : 0)) * cellPx}px` }}
-                />
-              </>
+              <div
+                key={a.id}
+                data-chip-anchor={a.id}
+                className={cn("leading-7", style ? "absolute top-0" : "")}
+                style={style}
+                draggable={!selectMode}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", a.chord.display);
+                  onChordDragStart(a.id);
+                }}
+                onPointerDown={beginPointerDrag}
+                onClick={(e) => {
+                  if (drag?.active) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                  }
+                  e.stopPropagation();
+                  handleChipTap(e);
+                }}
+              >
+                <div className={cn(isFloating && "rounded-md border border-dashed border-muted-foreground/40")}>
+                  <ChordChip
+                    chord={a.chord}
+                    variant="ink"
+                    size="sm"
+                    selected={selectMode && isSel}
+                    audition
+                    onLongPress={() => {
+                      if (selectMode) {
+                        if (selected.has(a.id)) return;
+                        toggleSelected(a.id);
+                      } else {
+                        enterSelect(a.id);
+                      }
+                      lastSelectedRef.current = a.id;
+                    }}
+                  />
+                </div>
+              </div>
             );
-          })()}
+          };
+
+          return (
+            <>
+              {/* Bound chips: absolute, anchored to word pixel positions. */}
+              {bound.map((a) =>
+                renderChip(a, { left: `${wordRects[a.wordIndex!].left}px`, top: `${wordRects[a.wordIndex!].top}px` }),
+              )}
+              {/* Floating chips: flex row. When line has no words, fill the row from the left;
+                  otherwise render at the right end as "unanchored". */}
+              {floating.length > 0 && (
+                <div
+                  className={cn(
+                    "flex items-center gap-2",
+                    noWords ? "absolute left-0 top-0" : "absolute right-1 top-0",
+                  )}
+                >
+                  {floating.map((a) => renderChip(a))}
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+        {/* Hidden mirror of the lyric textarea — used to measure each word's pixel
+            position so chord chips can align to word starts. */}
+        <div
+          ref={mirrorRef}
+          aria-hidden
+          className="absolute left-0 top-0 w-full font-display text-lg leading-9 px-1 ml-1 break-words whitespace-pre-wrap pointer-events-none invisible"
+        >
+          {lineWords.length === 0
+            ? "\u00A0"
+            : (() => {
+                const parts: React.ReactNode[] = [];
+                let cursor = 0;
+                lineWords.forEach((w, i) => {
+                  if (w.start > cursor) parts.push(line.text.slice(cursor, w.start));
+                  parts.push(
+                    <span key={`w-${i}`} data-word-i={i}>
+                      {w.text}
+                    </span>,
+                  );
+                  cursor = w.end;
+                });
+                if (cursor < line.text.length) parts.push(line.text.slice(cursor));
+                return parts;
+              })()}
+        </div>
       </div>
 
       {/* Long-press paste popover for empty chord-row spaces. */}
@@ -1122,8 +1082,14 @@ function LineRow({
               variant="ghost"
               className="h-7 w-7"
               disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)}
-              aria-label="Move chord left (by order)"
+              onClick={() => {
+                // Move each selected chord one word slot left (left-to-right order).
+                const ordered = [...line.chords]
+                  .filter((c) => selectedIds.includes(c.id))
+                  .sort((a, b) => (a.wordIndex ?? colOf(a)) - (b.wordIndex ?? colOf(b)));
+                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, -1));
+              }}
+              aria-label="Move chord left (by word slot)"
             >
               <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
             </Button>
@@ -1132,8 +1098,13 @@ function LineRow({
               variant="ghost"
               className="h-7 w-7"
               disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)}
-              aria-label="Move chord right (by order)"
+              onClick={() => {
+                const ordered = [...line.chords]
+                  .filter((c) => selectedIds.includes(c.id))
+                  .sort((a, b) => (b.wordIndex ?? colOf(b)) - (a.wordIndex ?? colOf(a)));
+                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, 1));
+              }}
+              aria-label="Move chord right (by word slot)"
             >
               <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
             </Button>
@@ -1675,10 +1646,19 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
-    upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    const sec = sections.find((s) => s.id === picker.sectionId);
+    const line = sec?.lines.find((l) => l.id === picker.lineId);
+    const wordCount = line ? (line.text.match(/\S+/g)?.length ?? 0) : 0;
+    if (picker.anchorId) {
+      // Editing an existing chord — keep its slot, just swap the chord symbol.
+      upsertChordAt(picker.sectionId, picker.lineId, picker.col, chord, picker.anchorId);
+    } else if (wordCount === 0) {
+      useSongStore.getState().appendChordToLine(picker.sectionId, picker.lineId, chord);
+    } else {
+      useSongStore.getState().upsertChordAtWord(picker.sectionId, picker.lineId, picker.col, chord);
+    }
     setPickerQuery("");
-    const advance = Math.max(1, chord.display.length) + 1;
-    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + advance } : prev));
+    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, col: prev.col + 1 } : prev));
   };
 
   const handleChordDragStart = (sectionId: string, lineId: string, anchorId: string) => {

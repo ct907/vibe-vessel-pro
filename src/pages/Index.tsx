@@ -7,7 +7,7 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { Button } from "@/components/ui/button";
-import { ChevronsDownUp, ChevronsUpDown, ArrowUpDown } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, ArrowUpDown, Brush } from "lucide-react";
 
 const Index = () => {
   const [tab, setTab] = useState<string>("lyrics");
@@ -15,7 +15,12 @@ const Index = () => {
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
   const updateSection = useSongStore((s) => s.updateSection);
+  const formatChordsInSong = useSongStore((s) => s.formatChordsInSong);
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
+  // Format Chords is enabled iff the song has both at least one word and at least one chord anchor.
+  const canFormat = sections.some(
+    (s) => s.lines.some((l) => /\S/.test(l.text)) && s.lines.some((l) => l.chords.length > 0),
+  );
 
   // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
   // states so we can restore them when exiting sort mode.
@@ -69,18 +74,30 @@ const Index = () => {
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="relative flex justify-center items-center">
             {tab === "lyrics" && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="absolute left-0"
-                onClick={() => setAllSectionsCollapsed(!allCollapsed)}
-                aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
-                title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
-                disabled={!!sortMode}
-              >
-                {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
-                <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
-              </Button>
+              <div className="absolute left-0 flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAllSectionsCollapsed(!allCollapsed)}
+                  aria-label={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+                  title={allCollapsed ? "Expand all sections" : "Collapse all sections"}
+                  disabled={!!sortMode}
+                >
+                  {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{allCollapsed ? "Expand all" : "Collapse all"}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => formatChordsInSong()}
+                  disabled={!!sortMode || !canFormat}
+                  aria-label="Format chords — snap to lyric words"
+                  title={canFormat ? "Snap chords to lyric words" : "Type lyrics first"}
+                >
+                  <Brush className="h-4 w-4" />
+                  <span className="hidden sm:inline">Format</span>
+                </Button>
+              </div>
             )}
             <TabsList className="bg-paper-shade/70">
               <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
