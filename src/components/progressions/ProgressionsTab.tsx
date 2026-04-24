@@ -831,11 +831,6 @@ function SectionGroup({
             blocksInSection={blocks.length}
             otherPatterns={allPatterns.filter((q) => q.id !== p.id).map((q) => ({ id: q.id, label: q.label }))}
             onPickerOpen={onPickerOpen}
-            onDragChordStart={onDragChordStart}
-            onDragChordEnd={onDragChordEnd}
-            onDropChordOnPattern={onDropChordOnPattern}
-            draggingChordId={draggingChordId}
-            draggingFromPatternId={draggingFromPatternId}
             onRequestDeleteBlock={onRequestDeleteBlock}
           />
         ))}
