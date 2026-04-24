@@ -201,7 +201,7 @@ export function ChordsTab() {
                       onCheckedChange={() => toggleSelect(c)}
                       aria-label={`Select ${c.display}`}
                     />
-                    <ChordChip chord={c} variant="ink" />
+                    <ChordChip chord={c} variant="ink" octave={octave} />
                   </div>
                 );
               })}
