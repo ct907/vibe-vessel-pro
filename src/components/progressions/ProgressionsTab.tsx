@@ -376,146 +376,94 @@ function PatternBlock({
       {/* Toolbar moved below the pattern grid (#7). */}
 
       <div className="relative">
-        <div
-          className={cn(
-            "relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch",
-            draggingChordId && draggingFromPatternId !== pattern.id && "ring-2 ring-primary/40",
-          )}
-          onDragOver={(e) => {
-            if (!draggingChordId) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-          }}
-          onDragLeave={(e) => {
-            if (e.currentTarget === e.target) setDropIndicator(null);
-          }}
-          onDrop={(e) => {
-            if (!draggingChordId) return;
-            e.preventDefault();
-            const idx = dropIndicator ?? sortedChords.length;
-            setDropIndicator(null);
-            onDropChordOnPattern(pattern.id, idx);
-          }}
-        >
-          {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
+        <Droppable droppableId={`pattern:${pattern.id}`} direction="horizontal" type="pattern-chord">
+          {(dropProvided, dropSnapshot) => (
             <div
-              key={`bar-${i}`}
-              className="absolute top-0 bottom-0 border-l border-border/70 pointer-events-none"
-              style={{ left: `${(i / pattern.bars) * 100}%` }}
-            />
-          ))}
+              ref={dropProvided.innerRef}
+              {...dropProvided.droppableProps}
+              className={cn(
+                "relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full",
+                dropSnapshot.isDraggingOver && "ring-2 ring-primary/40",
+              )}
+            >
+              {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
+                <div
+                  key={`bar-${i}`}
+                  className="absolute top-0 bottom-0 border-l border-border/70 pointer-events-none z-0"
+                  style={{ left: `${(i / pattern.bars) * 100}%` }}
+                />
+              ))}
 
-          {sortedChords.map((c, idx) => {
-            const isSel = selected.has(c.id);
-            const widthPct = (c.lengthBeats / totalBeats) * 100;
-            const isBeingDragged = draggingChordId === c.id;
-            return (
-              <button
-                key={c.id}
-                draggable
-                onDragStart={(e) => {
-                  e.stopPropagation();
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", c.chord.display);
-                  onDragChordStart(pattern.id, c.id);
-                }}
-                onDragEnd={() => {
-                  onDragChordEnd();
-                  setDropIndicator(null);
-                }}
-                onDragOver={(e) => {
-                  if (!draggingChordId) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  const half = e.clientX - rect.left < rect.width / 2;
-                  setDropIndicator(half ? idx : idx + 1);
-                }}
-                onPointerDown={(e) => {
-                  // If a multi-selection is active and this chord is part of it,
-                  // initiate a pointer-based drag so the whole selection can be
-                  // moved to another pattern block (#4). Skip drag for chords
-                  // outside the selection so long-press/select still works.
-                  if (selectMode && selected.has(c.id) && selectedIds.length >= 1) {
-                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-                    setPdrag({
-                      pointerId: e.pointerId,
-                      startX: e.clientX,
-                      startY: e.clientY,
-                      x: e.clientX,
-                      y: e.clientY,
-                      active: false,
-                      ids: [...selectedIds],
-                      displays: sortedChords.filter((x) => selected.has(x.id)).map((x) => x.chord.display),
-                    });
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  startPress(c.id);
-                }}
-                onMouseUp={cancelPress}
-                onMouseLeave={cancelPress}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                  startPress(c.id);
-                }}
-                onTouchEnd={cancelPress}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // If a drag just happened, suppress the click.
-                  if (pdrag?.active) {
-                    e.preventDefault();
-                    return;
-                  }
-                  handleChordTap(c.id, e);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onPickerOpen(pattern.id, c.startBeat, c.id);
-                }}
-                className={cn(
-                  "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                  !selectMode && activeChord === c.id && "ring-2 ring-primary",
-                  selectMode && isSel && "ring-2 ring-primary",
-                  isBeingDragged && "opacity-40",
-                )}
-                style={{ width: `calc(${widthPct}% - 4px)`, minWidth: 32 }}
-              >
-                {dropIndicator === idx && draggingChordId && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
-                {dropIndicator === idx + 1 && draggingChordId && (
-                  <span className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
-                <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                  {c.chord.display}
-                </span>
-                <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
-                  {formatBeats(c.lengthBeats)} beats
-                </span>
-              </button>
-            );
-          })}
+              {sortedChords.map((c, idx) => {
+                const isSel = selected.has(c.id);
+                return (
+                  <Draggable key={c.id} draggableId={c.id} index={idx}>
+                    {(dragProvided, dragSnapshot) => (
+                      <button
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        {...dragProvided.dragHandleProps}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          startPress(c.id);
+                        }}
+                        onMouseUp={cancelPress}
+                        onMouseLeave={cancelPress}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          startPress(c.id);
+                        }}
+                        onTouchEnd={cancelPress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleChordTap(c.id, e);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          onPickerOpen(pattern.id, c.startBeat, c.id);
+                        }}
+                        className={cn(
+                          "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors z-10",
+                          !selectMode && activeChord === c.id && "ring-2 ring-primary",
+                          selectMode && isSel && "ring-2 ring-primary",
+                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
+                        )}
+                        style={{
+                          flexGrow: c.lengthBeats,
+                          flexShrink: c.lengthBeats,
+                          flexBasis: 0,
+                          minWidth: 32,
+                          ...dragProvided.draggableProps.style,
+                        }}
+                      >
+                        <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
+                          {c.chord.display}
+                        </span>
+                        <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
+                          {formatBeats(c.lengthBeats)} beats
+                        </span>
+                      </button>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {dropProvided.placeholder}
 
-          <button
-            type="button"
-            onClick={() => onPickerOpen(pattern.id, usedBeats)}
-            onDragOver={(e) => {
-              if (!draggingChordId) return;
-              e.preventDefault();
-              setDropIndicator(sortedChords.length);
-            }}
-            className="flex-1 min-w-0 my-1 mx-0.5 rounded-md border border-dashed border-border/70 text-[11px] text-muted-foreground hover:bg-accent/40 transition-colors"
-            style={{ display: freeBeats > 0 ? "block" : "none" }}
-            aria-label="Add chord at end"
-          >
-            {sortedChords.length === 0 ? "Click to add a chord" : `+ ${formatBeats(freeBeats)}b`}
-          </button>
-        </div>
+              {freeBeats > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onPickerOpen(pattern.id, usedBeats)}
+                  className="my-1 mx-0.5 rounded-md border border-dashed border-border/70 text-[11px] text-muted-foreground hover:bg-accent/40 transition-colors z-10"
+                  style={{ flexGrow: freeBeats, flexShrink: freeBeats, flexBasis: 0, minWidth: 32 }}
+                  aria-label="Add chord at end"
+                >
+                  {sortedChords.length === 0 ? "Click to add a chord" : `+ ${formatBeats(freeBeats)}b`}
+                </button>
+              )}
+            </div>
+          )}
+        </Droppable>
 
         {playingChordId &&
           (() => {
