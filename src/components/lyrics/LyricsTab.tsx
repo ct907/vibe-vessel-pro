@@ -776,7 +776,7 @@ function LineRow({
       >
         {/* Placeholder */}
         {line.chords.length === 0 && (line.chordRowLen ?? 0) === 0 && !chordFocused && (
-          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-6">
+          <span className="absolute left-0 top-0 text-xs italic text-muted-foreground/60 leading-7 pointer-events-none select-none ml-4">
             add your chords here
           </span>
         )}
