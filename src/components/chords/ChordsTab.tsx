@@ -4,8 +4,9 @@ import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode } from "
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Music, X, Filter } from "lucide-react";
+import { Plus, Music, X } from "lucide-react";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
