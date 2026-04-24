@@ -52,6 +52,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
+import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows).
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
