@@ -119,7 +119,7 @@ export function ChordsTab() {
           {numeralFilter.size > 0 && (
             <Button
               size="sm"
-              className="bg-primary h-4"
+              className="bg-primary/40 h-6"
               variant="secondary"
               onClick={() => setNumeralFilter(new Set())}
             >
