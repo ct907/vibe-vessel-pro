@@ -437,7 +437,7 @@ function LineRow({
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow">
+        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow max-w-[400px]">
           <span className="text-muted-foreground">{selection.size} selected</span>
           <div className="ml-auto flex items-center gap-1">
             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
