@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSongStore, getSectionDisplayName, type LyricLine, type Section, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -48,6 +48,7 @@ import {
   Scissors,
   ClipboardPaste,
   CheckSquare,
+  Brush,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -134,6 +135,7 @@ function LineRow({
     removeChordCellAt,
     pasteChordsAt,
     moveSelectedChordsTo,
+    moveChordWordSlot,
     undo,
     redo,
   } = useSongStore();
@@ -345,33 +347,84 @@ function LineRow({
     lastSelectedRef.current = anchorId;
   };
 
+  // Word-position measurement: mirror the textarea's wrapped layout in a hidden
+  // div so we can read each word's pixel (left, top) and place chord chips on top.
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const [wordRects, setWordRects] = useState<{ left: number; top: number; width: number }[]>([]);
+  const [chordRowHeight, setChordRowHeight] = useState(0);
+  const lineWords = useMemo(() => {
+    const re = /\S+/g;
+    const out: { index: number; start: number; end: number; text: string }[] = [];
+    let m: RegExpExecArray | null;
+    let i = 0;
+    while ((m = re.exec(line.text)) !== null) {
+      out.push({ index: i++, start: m.index, end: m.index + m[0].length, text: m[0] });
+    }
+    return out;
+  }, [line.text]);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const root = mirrorRef.current;
+      if (!root) return;
+      const containerRect = root.getBoundingClientRect();
+      const spans = Array.from(root.querySelectorAll<HTMLSpanElement>("[data-word-i]"));
+      const rects = spans.map((s) => {
+        const r = s.getBoundingClientRect();
+        return { left: r.left - containerRect.left, top: r.top - containerRect.top, width: r.width };
+      });
+      setWordRects(rects);
+      // Row height tracks the wrapped line height of the lyric textarea.
+      setChordRowHeight(containerRect.height || 28);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (mirrorRef.current) ro.observe(mirrorRef.current);
+    if (lyricInputRef.current) ro.observe(lyricInputRef.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [line.text]);
+
+  /** Pick the word index closest to a click point inside the chord row. */
+  const wordIndexNear = (clientX: number, clientY: number): number => {
+    if (!chordRowRef.current || lineWords.length === 0) return 0;
+    const rect = chordRowRef.current.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    let best = 0;
+    let bestDist = Infinity;
+    wordRects.forEach((r, i) => {
+      // Penalize different visual rows so wrapped lyric lines pick the correct word.
+      const dy = Math.abs(py - r.top);
+      const dx = Math.abs(px - r.left);
+      const d = dx + dy * 4;
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
   const handleChordRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (selectMode) return;
-    if (areaStartRef.current) return; // a drag just ended — skip caret
-    // Interacting with a chord row in lyrics clears any pattern-block focus
-    // so global play resumes from the start of the progression.
+    if (areaStartRef.current) return;
     setFocusedPattern(null);
-    const rect = chordRowRef.current!.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const col = Math.max(0, Math.min(len, Math.round(px / Math.max(cellPx, 1))));
-    setChordCaret(col);
-    // Note: tell parent which row to associate the picker with, but DO NOT
-    // focus the chord row itself — the picker (modal sheet) is the typing
-    // surface. Focusing both makes inputs feel "linked" and produces double
-    // entry of letters/backspace.
+    const wi = wordIndexNear(e.clientX, e.clientY);
     onChordFocus(line.id);
-    onPickerOpen(line.id, col);
-    // Ensure the chord row doesn't keep focus from a prior interaction.
+    onPickerOpen(line.id, wi);
     if (chordRowRef.current && document.activeElement === chordRowRef.current) {
       chordRowRef.current.blur();
     }
   };
 
-  // ---------- Drag-area select on empty chord row ----------
+  // Drag-area select on empty chord row — uses chip element rects directly.
   const handleRowMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    // Skip if mousedown started on a chip (chip wrapper has data-chip-anchor)
     if (target.closest("[data-chip-anchor]")) return;
     const rect = chordRowRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -400,16 +453,21 @@ function LineRow({
         areaStartRef.current = null;
         return;
       }
-      const cellWidth = Math.max(cellPx, 1);
-      const c1 = x1 / cellWidth;
-      const c2 = x2 / cellWidth;
-      const hits = sortedChords
-        .filter((c) => {
-          const cc = c.chordCol ?? c.offset ?? 0;
-          const cEnd = cc + Math.max(1, c.chord.display.length);
-          return cc <= c2 && cEnd >= c1;
-        })
-        .map((c) => c.id);
+      // Hit-test against actual chip elements in this row.
+      const rowRect = chordRowRef.current?.getBoundingClientRect();
+      const hits: string[] = [];
+      if (rowRect) {
+        const chips = chordRowRef.current!.querySelectorAll<HTMLElement>("[data-chip-anchor]");
+        chips.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const cx1 = r.left - rowRect.left;
+          const cx2 = r.right - rowRect.left;
+          if (cx1 <= x2 && cx2 >= x1) {
+            const id = el.getAttribute("data-chip-anchor");
+            if (id) hits.push(id);
+          }
+        });
+      }
       if (hits.length) {
         setSelectMode(true);
         setSelected((prev) => {
@@ -419,10 +477,7 @@ function LineRow({
         });
         lastSelectedRef.current = hits[hits.length - 1];
       }
-      // Defer clearing so the click handler can see we just dragged
-      setTimeout(() => {
-        areaStartRef.current = null;
-      }, 0);
+      setTimeout(() => { areaStartRef.current = null; }, 0);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp, { once: true });
@@ -430,7 +485,7 @@ function LineRow({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [areaSel, cellPx, sortedChords]);
+  }, [areaSel]);
 
   const selectAll = () => {
     if (line.chords.length === 0) return;
@@ -438,15 +493,12 @@ function LineRow({
     setSelected(new Set(line.chords.map((c) => c.id)));
   };
 
-  // Global Ctrl/Cmd+A: select all chords in this row when the row is "active"
-  // (chord row focused OR already in select mode). Works even if focus drifted
-  // to the picker, lyric input, or elsewhere on the page.
+  // Global Ctrl/Cmd+A: select all chords in this row when the row is "active".
   useEffect(() => {
     if (!chordFocused && !selectMode) return;
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || (e.key !== "a" && e.key !== "A")) return;
-      // Don't hijack ⌘A inside an input/textarea unless we're in selectMode.
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (!selectMode && (tag === "INPUT" || tag === "TEXTAREA")) return;
       e.preventDefault();
@@ -455,6 +507,7 @@ function LineRow({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [chordFocused, selectMode, line.chords]);
+
 
   const handleChordKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const k = e.key;

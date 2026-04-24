@@ -10,8 +10,10 @@ export interface ChordAnchor {
   id: string;
   /** Legacy: character offset within the lyric line (kept for migration). */
   offset: number;
-  /** New: column position in the chord row (in monospace cells). Independent from lyric text. */
+  /** Legacy: column position in the chord row (in monospace cells). Now used only as a fallback ordering hint. */
   chordCol?: number;
+  /** New: index of the lyric word this chord is bound to. `undefined` = floating (no word binding). */
+  wordIndex?: number;
   chord: ChordSymbol;
   /** Optional: id of the corresponding pattern chord this is mirrored to. */
   mirrorId?: string;
@@ -21,7 +23,7 @@ export interface LyricLine {
   id: string;
   text: string;
   chords: ChordAnchor[];
-  /** Number of cursor cells in the chord row (>= max chord col + 1). */
+  /** Legacy: number of cursor cells in the chord row. Unused by the new word-anchored renderer. */
   chordRowLen?: number;
 }
 
@@ -124,6 +126,18 @@ export interface SongState {
     sectionId: string, lineId: string, atCol: number,
     chords: { chord: ChordSymbol; relCol: number; widthCh: number }[],
   ) => void;
+  /** Word-anchored: insert a chord bound to the word nearest `nearWordIndex` (skipping occupied words to the right). */
+  upsertChordAtWord: (
+    sectionId: string, lineId: string, nearWordIndex: number, chord: ChordSymbol, anchorId?: string,
+  ) => void;
+  /** Append a chord to the end of a line (used when the line has no words yet). */
+  appendChordToLine: (sectionId: string, lineId: string, chord: ChordSymbol, anchorId?: string) => void;
+  /** Snap each chord in a line to the closest unused word, preserving overall order. */
+  formatChordsInLine: (sectionId: string, lineId: string) => void;
+  /** Run formatChordsInLine on every line of every section. */
+  formatChordsInSong: () => void;
+  /** Re-bind a chord's word slot by ±1, swapping with the chord at the target slot if any. */
+  moveChordWordSlot: (sectionId: string, lineId: string, anchorId: string, direction: -1 | 1) => void;
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -231,6 +245,79 @@ export function getSectionDisplayName(sections: Section[], sectionId: string): s
   const base = SECTION_DEFAULT_LABEL[sec.type];
   // Always number verse/chorus/bridge/pre-chorus starting at 1
   return `${base} ${idx + 1}`;
+}
+
+// ---------- Word-anchor helpers ----------
+/** Words in a lyric line, with their character-offset start position. */
+export function getWords(text: string): { index: number; start: number; end: number; text: string }[] {
+  const out: { index: number; start: number; end: number; text: string }[] = [];
+  const re = /\S+/g;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ index: idx, start: m.index, end: m.index + m[0].length, text: m[0] });
+    idx++;
+  }
+  return out;
+}
+
+/** Sort anchors for left-to-right display: bound chords by wordIndex, floating by chordCol. */
+function sortAnchors(chords: ChordAnchor[]): ChordAnchor[] {
+  return [...chords].sort((a, b) => {
+    const aw = a.wordIndex ?? Number.POSITIVE_INFINITY;
+    const bw = b.wordIndex ?? Number.POSITIVE_INFINITY;
+    if (aw !== bw) return aw - bw;
+    const ac = a.chordCol ?? a.offset ?? 0;
+    const bc = b.chordCol ?? b.offset ?? 0;
+    return ac - bc;
+  });
+}
+
+/**
+ * Snap each chord in a line to a unique word slot, in the chord's existing
+ * left-to-right order. Leftover chords stay floating (wordIndex undefined).
+ */
+function snapLineToWords(line: LyricLine): LyricLine {
+  const words = getWords(line.text);
+  if (!words.length) {
+    const cleared = sortAnchors(line.chords).map((c, i) => ({
+      ...c,
+      wordIndex: undefined as number | undefined,
+      chordCol: i * 4,
+      offset: i * 4,
+    }));
+    return { ...line, chords: cleared };
+  }
+  const ordered = sortAnchors(line.chords);
+  const used = new Set<number>();
+  const result: ChordAnchor[] = [];
+  for (const c of ordered) {
+    let target: number | undefined;
+    const desired = c.wordIndex;
+    if (desired != null && desired >= 0 && desired < words.length && !used.has(desired)) {
+      target = desired;
+    } else {
+      const probe = desired != null ? desired : result.length;
+      let best: number | undefined;
+      let bestDist = Infinity;
+      for (let i = 0; i < words.length; i++) {
+        if (used.has(i)) continue;
+        const d = Math.abs(i - probe);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      target = best;
+    }
+    if (target == null) {
+      result.push({ ...c, wordIndex: undefined });
+    } else {
+      used.add(target);
+      result.push({ ...c, wordIndex: target, chordCol: words[target].start, offset: words[target].start });
+    }
+  }
+  return { ...line, chords: result };
 }
 
 // ---------- Sync helpers ----------
@@ -1114,6 +1201,201 @@ export const useSongStore = create<SongState>((set, get) => ({
       };
     }),
   })); },
+
+  // -------- Word-anchored chord placement --------
+  upsertChordAtWord: (sectionId, lineId, nearWordIndex, chord, anchorId) => {
+    pushHistory(get);
+    set((s) => {
+      let createdAnchorId: string | null = null;
+      let updatedAnchorId: string | null = null;
+      let prevMirrorId: string | undefined;
+
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const words = getWords(l.text);
+            // If editing an existing anchor, just swap the chord (keep its wordIndex).
+            if (anchorId) {
+              const chords = l.chords.map((c) => {
+                if (c.id !== anchorId) return c;
+                prevMirrorId = c.mirrorId;
+                updatedAnchorId = c.id;
+                return { ...c, chord };
+              });
+              return { ...l, chords };
+            }
+            // Find target word: nearest unused word at or after nearWordIndex; if all
+            // are taken to the right, scan left; if no words at all, append floating.
+            const occupied = new Set<number>();
+            l.chords.forEach((c) => { if (c.wordIndex != null) occupied.add(c.wordIndex); });
+            let target: number | undefined;
+            if (words.length) {
+              const clamped = Math.max(0, Math.min(words.length - 1, nearWordIndex));
+              for (let i = clamped; i < words.length; i++) {
+                if (!occupied.has(i)) { target = i; break; }
+              }
+              if (target == null) {
+                for (let i = clamped - 1; i >= 0; i--) {
+                  if (!occupied.has(i)) { target = i; break; }
+                }
+              }
+            }
+            const newId = nanoid();
+            createdAnchorId = newId;
+            const wordIndex = target;
+            const col = wordIndex != null ? words[wordIndex].start : (l.chords.length * 4);
+            const newAnchor: ChordAnchor = {
+              id: newId,
+              offset: col,
+              chordCol: col,
+              wordIndex,
+              chord,
+            };
+            const chords = sortAnchors([...l.chords, newAnchor]);
+            return { ...l, chords };
+          }),
+        };
+      });
+
+      // Mirror to pattern (same logic as upsertChordAt for created anchors).
+      let progression = s.progression;
+      let finalSections = sections;
+      if (createdAnchorId) {
+        const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
+        progression = placed.progression;
+        const pcId = placed.chordId;
+        if (pcId) {
+          finalSections = sections.map((sec) => {
+            if (sec.id !== sectionId) return sec;
+            return {
+              ...sec,
+              lines: sec.lines.map((l) => ({
+                ...l,
+                chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
+              })),
+            };
+          });
+        }
+        const updatedSection = finalSections.find((x) => x.id === sectionId);
+        if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
+      } else if (updatedAnchorId && prevMirrorId) {
+        progression = s.progression.map((p) =>
+          p.sectionId !== sectionId
+            ? p
+            : { ...p, chords: p.chords.map((c) => (c.id === prevMirrorId ? { ...c, chord } : c)) },
+        );
+      }
+
+      return { sections: finalSections, progression };
+    });
+  },
+
+  appendChordToLine: (sectionId, lineId, chord, anchorId) => {
+    // Convenience: append to end of a line with no words → floating, ordered last.
+    const state = get();
+    const sec = state.sections.find((s) => s.id === sectionId);
+    const line = sec?.lines.find((l) => l.id === lineId);
+    if (!line) return;
+    state.upsertChordAtWord(sectionId, lineId, getWords(line.text).length, chord, anchorId);
+  },
+
+  formatChordsInLine: (sectionId, lineId) => {
+    pushHistory(get);
+    set((s) => {
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => (l.id === lineId ? snapLineToWords(l) : l)),
+        };
+      });
+      return { sections };
+    });
+  },
+
+  formatChordsInSong: () => {
+    pushHistory(get);
+    set((s) => ({
+      sections: s.sections.map((sec) => ({
+        ...sec,
+        lines: sec.lines.map((l) => snapLineToWords(l)),
+      })),
+    }));
+  },
+
+  moveChordWordSlot: (sectionId, lineId, anchorId, direction) => {
+    pushHistory(get);
+    set((s) => {
+      const sections = s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          lines: sec.lines.map((l) => {
+            if (l.id !== lineId) return l;
+            const words = getWords(l.text);
+            const ordered = sortAnchors(l.chords);
+            const idx = ordered.findIndex((c) => c.id === anchorId);
+            if (idx < 0) return l;
+            const cur = ordered[idx];
+            // Find the neighbor in the visual order (next/prev sibling chord).
+            const neighbor = direction === 1 ? ordered[idx + 1] : ordered[idx - 1];
+            // Swap their wordIndex (covers occupied case + floating reorder).
+            if (neighbor) {
+              const swapped = l.chords.map((c) => {
+                if (c.id === cur.id) {
+                  const wi = neighbor.wordIndex;
+                  return {
+                    ...c,
+                    wordIndex: wi,
+                    chordCol: wi != null && words[wi] ? words[wi].start : (c.chordCol ?? 0),
+                    offset: wi != null && words[wi] ? words[wi].start : (c.offset ?? 0),
+                  };
+                }
+                if (c.id === neighbor.id) {
+                  const wi = cur.wordIndex;
+                  return {
+                    ...c,
+                    wordIndex: wi,
+                    chordCol: wi != null && words[wi] ? words[wi].start : (c.chordCol ?? 0),
+                    offset: wi != null && words[wi] ? words[wi].start : (c.offset ?? 0),
+                  };
+                }
+                return c;
+              });
+              return { ...l, chords: sortAnchors(swapped) };
+            }
+            // No neighbor in that direction: shift to next/prev free word slot.
+            const curWord = cur.wordIndex ?? -1;
+            const occupied = new Set<number>();
+            l.chords.forEach((c) => { if (c.wordIndex != null && c.id !== cur.id) occupied.add(c.wordIndex); });
+            let target: number | undefined;
+            if (direction === 1) {
+              for (let i = (curWord < 0 ? 0 : curWord + 1); i < words.length; i++) {
+                if (!occupied.has(i)) { target = i; break; }
+              }
+            } else {
+              for (let i = (curWord < 0 ? words.length - 1 : curWord - 1); i >= 0; i--) {
+                if (!occupied.has(i)) { target = i; break; }
+              }
+            }
+            if (target == null) return l;
+            const updated = l.chords.map((c) =>
+              c.id === cur.id
+                ? { ...c, wordIndex: target, chordCol: words[target!].start, offset: words[target!].start }
+                : c,
+            );
+            return { ...l, chords: sortAnchors(updated) };
+          }),
+        };
+      });
+      const sec = sections.find((x) => x.id === sectionId);
+      const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
+      return { sections, progression };
+    });
+  },
 
   addToBasket: (chords) => set((s) => ({
     basket: [...s.basket, ...chords.map((chord) => ({ id: nanoid(), chord }))],
