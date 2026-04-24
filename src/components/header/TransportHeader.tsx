@@ -339,8 +339,8 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
               <Redo2 className="h-4 w-4" />
             </Button>
             {!isPlaying ? (
-              <Button size="sm" onClick={handlePlay}>
-                <Play className="h-4 w-4 shadow-lg shadow-primary/50" /> Play
+              <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play">
+                <Play className="h-4 w-4" /> Play
               </Button>
             ) : (
               <Button size="sm" variant="secondary" onClick={handleStop}>
