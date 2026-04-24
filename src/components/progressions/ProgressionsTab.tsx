@@ -115,7 +115,7 @@ function PatternBlock({
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      if (pdragRef.current) return; // suppress while dragging
+      
       if (blockRef.current && blockRef.current.contains(t)) return;
       if (t.closest("[data-radix-dialog-content]")) return;
       if (t.closest("[data-progression-ctx]")) return;
