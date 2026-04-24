@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
-import {
-  ChordSymbol,
-  Quality,
-  nashvilleLadder,
-  parseChord,
-  isMinorMode,
-} from "@/lib/music/chords";
+import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,13 +9,27 @@ import { Plus, Music, X, Filter } from "lucide-react";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
-  "maj", "min", "dim", "aug", "sus2", "sus4",
-  "maj7", "min7", "7", "dim7", "m7b5", "minMaj7",
-  "maj9", "min9", "9", "add9", "6", "min6",
+  "maj",
+  "min",
+  "dim",
+  "aug",
+  "sus2",
+  "sus4",
+  "maj7",
+  "min7",
+  "7",
+  "dim7",
+  "m7b5",
+  "minMaj7",
+  "maj9",
+  "min9",
+  "9",
+  "add9",
+  "6",
+  "min6",
 ];
 
-const qualitySuffix = (q: Quality): string =>
-  q === "maj" ? "" : q === "min" ? "m" : q;
+const qualitySuffix = (q: Quality): string => (q === "maj" ? "" : q === "min" ? "m" : q);
 
 export function ChordsTab() {
   const { meta, addToBasket } = useSongStore();
@@ -64,7 +72,8 @@ export function ChordsTab() {
   const toggleNumeral = (numeral: string) => {
     setNumeralFilter((prev) => {
       const next = new Set(prev);
-      if (next.has(numeral)) next.delete(numeral); else next.add(numeral);
+      if (next.has(numeral)) next.delete(numeral);
+      else next.add(numeral);
       return next;
     });
   };
@@ -91,9 +100,8 @@ export function ChordsTab() {
   }, [selected]);
 
   const selectedCount = Object.keys(selected).length;
-  const keySuffix = isMinorMode(meta.keyMode) && meta.keyMode !== "blues" && meta.keyMode !== "pentatonic-min"
-    ? "m"
-    : "";
+  const keySuffix =
+    isMinorMode(meta.keyMode) && meta.keyMode !== "blues" && meta.keyMode !== "pentatonic-min" ? "m" : "";
 
   return (
     <div className="space-y-5">
@@ -102,17 +110,17 @@ export function ChordsTab() {
         <div className="flex items-center gap-2 mb-3">
           <Music className="h-4 w-4 ink-chord" />
           <h2 className="font-display text-lg flex-1 min-w-0 truncate">
-            Diatonic ladder · <span className="font-mono-chord">{meta.keyRoot}{keySuffix}</span>
+            <span className="font-mono-chord">
+              {meta.keyRoot}
+              {keySuffix}
+            </span>{" "}
+            · Filter Chord Root
           </h2>
           {numeralFilter.size > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setNumeralFilter(new Set())}>
+            <Button size="sm" variant="secondary" onClick={() => setNumeralFilter(new Set())}>
               Clear filter
             </Button>
           )}
-        </div>
-        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-          <Filter className="h-3 w-3" />
-          <span>Tap a numeral to filter the rows below</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {ladder.map((d) => {
@@ -123,7 +131,7 @@ export function ChordsTab() {
                 type="button"
                 onClick={() => toggleNumeral(d.numeral)}
                 className={cn(
-                  "rounded-md border p-2 text-center transition-colors",
+                  "rounded-md p-2 text-center transition-colors",
                   active
                     ? "border-primary bg-accent ring-1 ring-primary"
                     : "border-border bg-muted/50 hover:bg-accent/60",
