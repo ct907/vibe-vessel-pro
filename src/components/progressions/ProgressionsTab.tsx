@@ -70,7 +70,23 @@ function PatternBlock({
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
   const lastTapRef = useRef<{ id: string; t: number } | null>(null);
+  const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+
+  // Pointer-based multi-chord drag (move selection to another pattern block).
+  const [pdrag, setPdrag] = useState<null | {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    active: boolean;
+    ids: string[];
+    displays: string[];
+    targetPatternId?: string;
+  }>(null);
+  const pdragRef = useRef<typeof pdrag>(null);
+  pdragRef.current = pdrag;
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
@@ -80,6 +96,27 @@ function PatternBlock({
   const canDeleteThisBlock = blocksInSection > 1;
 
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+
+  // (#8) Auto-close context menu when nothing is selected.
+  useEffect(() => {
+    if (selectMode && selected.size === 0) setSelectMode(false);
+  }, [selectMode, selected]);
+
+  // Outside-tap closes the select-mode context menu.
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (pdragRef.current) return; // suppress while dragging
+      if (blockRef.current && blockRef.current.contains(t)) return;
+      if (t.closest("[data-radix-dialog-content]")) return;
+      if (t.closest("[data-progression-ctx]")) return;
+      exitSelect();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [selectMode]);
 
   useEffect(() => {
     if (!activeChord) return;
@@ -95,10 +132,26 @@ function PatternBlock({
   }, [activeChord]);
 
   useEffect(() => {
-    if (!activeChord) return;
+    if (!activeChord && !selectMode) return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // (#6) Delete / Backspace removes active chord or all selected chords.
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectMode && selectedIds.length > 0) {
+          e.preventDefault();
+          removePatternChordsBatch(pattern.id, selectedIds);
+          exitSelect();
+          return;
+        }
+        if (activeChord) {
+          e.preventDefault();
+          removePatternChordsBatch(pattern.id, [activeChord]);
+          setActiveChord(null);
+          return;
+        }
+      }
+      if (!activeChord) return;
       const c = sortedChords.find((x) => x.id === activeChord);
       if (!c) return;
       const otherSum = sortedChords.reduce((s, x) => s + (x.id === c.id ? 0 : x.lengthBeats), 0);
@@ -119,7 +172,41 @@ function PatternBlock({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeChord, sortedChords, totalBeats, pattern.id, setPatternChordLength]);
+  }, [activeChord, selectMode, selectedIds, sortedChords, totalBeats, pattern.id, setPatternChordLength, removePatternChordsBatch]);
+
+  // Pointer drag lifecycle for multi-selected chords (#4).
+  useEffect(() => {
+    if (!pdrag) return;
+    const DRAG_THRESHOLD = 6;
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pdrag.pointerId) return;
+      const dx = ev.clientX - pdrag.startX;
+      const dy = ev.clientY - pdrag.startY;
+      const moved = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const blk = hit?.closest("[data-pattern-block]") as HTMLElement | null;
+      const targetPatternId = blk?.getAttribute("data-pattern-block") ?? undefined;
+      setPdrag((prev) => prev ? { ...prev, x: ev.clientX, y: ev.clientY, active: prev.active || moved, targetPatternId } : prev);
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pdrag.pointerId) return;
+      const cur = pdragRef.current;
+      setPdrag(null);
+      if (!cur || !cur.active) return;
+      if (!cur.targetPatternId || cur.targetPatternId === pattern.id) return;
+      movePatternChordsTo(pattern.id, cur.targetPatternId, cur.ids);
+      exitSelect();
+    };
+    const onCancel = () => setPdrag(null);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+  }, [pdrag?.pointerId, pattern.id, movePatternChordsTo]);
 
   const startPress = (chordId: string) => {
     longFiredRef.current = false;
@@ -130,29 +217,45 @@ function PatternBlock({
         setSelected(new Set([chordId]));
         setActiveChord(null);
       } else if (!selected.has(chordId)) {
-        // Long-press on an unselected chord adds it.
         setSelected((prev) => {
           const next = new Set(prev);
           next.add(chordId);
           return next;
         });
       }
-      // Long-press on an already-selected chord is a no-op (becomes the
-      // drag-init gesture; HTML5 dragstart fires off the same pointerdown).
+      lastSelectedRef.current = chordId;
     }, 450);
   };
   const cancelPress = () => {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   };
-  const handleChordTap = (chordId: string) => {
+  const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
     if (longFiredRef.current) return;
     setFocusedPattern(pattern.id);
+    // Shift-click: range/multi select.
+    if (e && e.shiftKey) {
+      const ids = sortedChords.map((c) => c.id);
+      const i2 = ids.indexOf(chordId);
+      const anchor = lastSelectedRef.current;
+      const i1 = anchor ? ids.indexOf(anchor) : i2;
+      const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
+      const range = ids.slice(from, to + 1);
+      setSelectMode(true);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        range.forEach((id) => next.add(id));
+        return next;
+      });
+      lastSelectedRef.current = chordId;
+      return;
+    }
     if (selectMode) {
       setSelected((prev) => {
         const next = new Set(prev);
         if (next.has(chordId)) next.delete(chordId); else next.add(chordId);
         return next;
       });
+      lastSelectedRef.current = chordId;
       return;
     }
     const now = Date.now();
@@ -165,6 +268,9 @@ function PatternBlock({
     }
     lastTapRef.current = { id: chordId, t: now };
     setActiveChord(activeChord === chordId ? null : chordId);
+    // (#5) Tap to focus a chord also auditions it.
+    const c = sortedChords.find((x) => x.id === chordId);
+    if (c) void playChord(c.chord);
   };
 
   const active = activeChord ? sortedChords.find((c) => c.id === activeChord) ?? null : null;
