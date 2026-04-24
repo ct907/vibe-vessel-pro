@@ -38,6 +38,8 @@ export function ChordsTab() {
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
   // Numeral filter: when non-empty, only rows whose numeral is selected are shown.
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
+  // Audition octave applied to every chord chip in this tab.
+  const [octave, setOctave] = useState<number>(4);
 
   // Build rows with all qualities. Dedupe variants WITHIN each row by their
   // canonical (parsed) display so e.g. "Dm" never appears twice.
