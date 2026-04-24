@@ -1150,8 +1150,14 @@ function LineRow({
               variant="ghost"
               className="h-7 w-7"
               disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, -1)}
-              aria-label="Move chord left (by order)"
+              onClick={() => {
+                // Move each selected chord one word slot left (left-to-right order).
+                const ordered = [...line.chords]
+                  .filter((c) => selectedIds.includes(c.id))
+                  .sort((a, b) => (a.wordIndex ?? colOf(a)) - (b.wordIndex ?? colOf(b)));
+                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, -1));
+              }}
+              aria-label="Move chord left (by word slot)"
             >
               <ArrowUp className="h-3.5 w-3.5 -rotate-90" />
             </Button>
@@ -1160,8 +1166,13 @@ function LineRow({
               variant="ghost"
               className="h-7 w-7"
               disabled={!selectedIds.length}
-              onClick={() => moveSelectedChordsByOrder(sectionId, line.id, selectedIds, 1)}
-              aria-label="Move chord right (by order)"
+              onClick={() => {
+                const ordered = [...line.chords]
+                  .filter((c) => selectedIds.includes(c.id))
+                  .sort((a, b) => (b.wordIndex ?? colOf(b)) - (a.wordIndex ?? colOf(a)));
+                ordered.forEach((c) => moveChordWordSlot(sectionId, line.id, c.id, 1));
+              }}
+              aria-label="Move chord right (by word slot)"
             >
               <ArrowDown className="h-3.5 w-3.5 -rotate-90" />
             </Button>
