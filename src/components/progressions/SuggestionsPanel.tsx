@@ -74,7 +74,7 @@ export function SuggestionsPanel({ pattern }: Props) {
         setOpen(v);
         if (!v) stopPreview();
       }}
-      className="mt-3 pt-2"
+      className="mt-1 pt-2"
     >
       <CollapsibleTrigger asChild>
         <button
