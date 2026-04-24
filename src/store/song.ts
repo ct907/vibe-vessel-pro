@@ -2328,7 +2328,12 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
 
     if (parsed.version !== 2) return;
-    const sectionsLoaded: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
+    const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
+    // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
+    const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
+      ...sec,
+      lines: sec.lines.map((l) => ensureSlotsForLine(l)),
+    }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
     const migratedProgression = progressionLoaded.map((p) => ({
