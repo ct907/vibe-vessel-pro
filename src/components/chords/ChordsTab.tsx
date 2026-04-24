@@ -196,14 +196,14 @@ export function ChordsTab() {
         <div className="sticky bottom-10 flex justify-end gap-2">
           <Button
             onClick={sendSelected}
-            size="md"
+            size="default"
             className="h-12 bg-indigo-300 text-chord-chip-foreground shadow-lg shadow-indigo-300 text-base px-6 py-6"
           >
             <Plus className="h-5 w-5" /> Add {selectedCount} to basket
           </Button>
           <Button
             onClick={clearSelection}
-            size="md"
+            size="default"
             variant="outline"
             className="h-12 shadow-lg text-base px-6 py-6"
             aria-label="Cancel selection"
