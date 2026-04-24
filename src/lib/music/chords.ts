@@ -16,25 +16,27 @@ export interface ChordSymbol {
   display: string;       // pretty form, e.g. "Fmaj7"
 }
 
+// Order matters: longer/more-specific patterns must come before shorter ones.
+// Each alternative is independently anchored to the start of `rest`.
 const QUALITY_MAP: Array<[RegExp, Quality]> = [
-  [/^maj9|M9/i, "maj9"],
-  [/^maj7|M7|Δ7?/i, "maj7"],
-  [/^min9|m9/i, "min9"],
-  [/^min7|m7/i, "min7"],
-  [/^min6|m6/i, "min6"],
-  [/^minMaj7|mMaj7|mM7/i, "minMaj7"],
-  [/^min|m(?!aj)/i, "min"],
-  [/^dim7|°7/i, "dim7"],
-  [/^m7b5|ø/i, "m7b5"],
-  [/^dim|°/i, "dim"],
-  [/^aug|\+/i, "aug"],
+  [/^(?:dim7|°7)/i, "dim7"],
+  [/^(?:m7b5|ø)/, "m7b5"],
+  [/^(?:dim|°)/i, "dim"],
+  [/^(?:minMaj7|mMaj7|mM7)/, "minMaj7"],
+  [/^(?:maj9|M9)/, "maj9"],
+  [/^(?:maj7|M7|Δ7?)/, "maj7"],
+  [/^(?:min9|m9)/, "min9"],
+  [/^(?:min7|m7)/, "min7"],
+  [/^(?:min6|m6)/, "min6"],
+  [/^(?:min|m(?!aj))/, "min"],
+  [/^(?:aug|\+)/i, "aug"],
   [/^sus2/i, "sus2"],
-  [/^sus4|sus/i, "sus4"],
+  [/^(?:sus4|sus)/i, "sus4"],
   [/^add9/i, "add9"],
-  [/^9/i, "9"],
-  [/^7/i, "7"],
-  [/^6/i, "6"],
-  [/^maj|M(?!7|9)/i, "maj"],
+  [/^9/, "9"],
+  [/^7/, "7"],
+  [/^6/, "6"],
+  [/^(?:maj|M(?!7|9))/, "maj"],
 ];
 
 const QUALITY_INTERVALS: Record<Quality, number[]> = {
