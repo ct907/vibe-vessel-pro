@@ -15,7 +15,12 @@ const Index = () => {
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
   const updateSection = useSongStore((s) => s.updateSection);
+  const formatChordsInSong = useSongStore((s) => s.formatChordsInSong);
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
+  // Format Chords is enabled iff the song has both at least one word and at least one chord anchor.
+  const canFormat = sections.some(
+    (s) => s.lines.some((l) => /\S/.test(l.text)) && s.lines.some((l) => l.chords.length > 0),
+  );
 
   // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
   // states so we can restore them when exiting sort mode.
