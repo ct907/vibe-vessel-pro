@@ -1121,7 +1121,7 @@ function LineRow({
             }
           }}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 break-words"
+          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
         />
       </div>
     </div>
@@ -1254,7 +1254,7 @@ function SectionCard({
       ref={cardRef}
       data-section-id={section.id}
       style={sectionTintStyle(section.color)}
-      className={cn("paper-card rounded-xl px-5 py-3 transition-shadow")}
+      className={cn("paper-card rounded-xl px-2 py-2 transition-shadow")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
@@ -1275,7 +1275,8 @@ function SectionCard({
           }}
           disabled={sortMode}
         >
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize">
+          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6
+          ">
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
