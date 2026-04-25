@@ -2448,7 +2448,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       chords: repackChords(p.chords, p.bars * p.beatsPerBar),
     }));
     set({
-      meta: parsed.meta ?? get().meta,
+      meta: { beatsPerBar: 4, beatUnit: 4, ...(parsed.meta ?? get().meta) },
       sections: sectionsLoaded,
       progression: migratedProgression,
       basket: [],
