@@ -362,7 +362,7 @@ function LineRow({
               {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
                 <span
                   key={i}
-                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/50"
+                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/25"
                   style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
                 />
               ))}
