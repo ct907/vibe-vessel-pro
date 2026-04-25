@@ -926,13 +926,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     const toUsed = toPattern.chords.reduce((s, c) => s + c.lengthBeats, 0);
     const toFree = Math.max(0, toCap - toUsed);
 
-    // Basket → pattern block at slot.
+    // Basket → pattern block: COPY chord at the target slot. Original chip
+    // stays in the basket so the user can drop the same chord multiple times.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
       const item = state.basket.find((b) => b.id === basketItemId);
       if (!item) return;
       state.addChordToPatternSlot(toId, item.chord, toSlot);
-      removeFromBasket(basketItemId);
       return;
     }
 
@@ -998,53 +998,54 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
         </Button>
       </div>
 
-      <DragDropContext onDragEnd={onDragEnd}>
-        {groupedSections.map(({ section, blocks }, i) => (
-          <SectionGroup
-            key={section.id}
-            sectionId={section.id}
-            displayName={getSectionDisplayName(sections, section.id)}
-            blocks={blocks}
-            totalSections={sections.length}
-            index={i}
-            allPatterns={progression}
-            onPickerOpen={openPicker}
-            onRequestDeleteSection={requestDeleteSection}
-            onRequestDeleteBlock={requestDeleteBlock}
-            sortMode={sortMode}
-            onMoveSection={(id, direction) => moveSection(id, direction)}
-          />
-        ))}
+      {/* Register tab-level drag-end handler with the global DnD store.
+          The single <DragDropContext> in Index.tsx routes drops here based
+          on droppableId prefix. */}
+      <ProgressionsDndRegistrar onDragEnd={onDragEnd} />
 
-        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
-          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
-              <Button
-                key={t}
-                size="sm"
-                variant="outline"
-                onClick={() => addSection(t)}
-                className="capitalize border border-muted-foreground/40"
-              >
-                <Plus className="h-3.5 w-3.5" /> {t}
-              </Button>
-            ))}
+      {groupedSections.map(({ section, blocks }, i) => (
+        <SectionGroup
+          key={section.id}
+          sectionId={section.id}
+          displayName={getSectionDisplayName(sections, section.id)}
+          blocks={blocks}
+          totalSections={sections.length}
+          index={i}
+          allPatterns={progression}
+          onPickerOpen={openPicker}
+          onRequestDeleteSection={requestDeleteSection}
+          onRequestDeleteBlock={requestDeleteBlock}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
+        />
+      ))}
+
+      <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+        <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
             <Button
+              key={t}
               size="sm"
               variant="outline"
-              onClick={() => addSection("custom")}
-              className="border border-muted-foreground/40"
+              onClick={() => addSection(t)}
+              className="capitalize border border-muted-foreground/40"
             >
-              <Plus className="h-3.5 w-3.5" /> Custom…
+              <Plus className="h-3.5 w-3.5" /> {t}
             </Button>
-          </div>
+          ))}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => addSection("custom")}
+            className="border border-muted-foreground/40"
+          >
+            <Plus className="h-3.5 w-3.5" /> Custom…
+          </Button>
         </div>
+      </div>
 
-        <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
-
-        <BasketBar draggable onSendToLyrics={() => onSwitchTab?.("lyrics")} />
-      </DragDropContext>
+      <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteSection}
