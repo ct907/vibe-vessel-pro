@@ -253,6 +253,7 @@ function PatternBlock({
   };
   const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
     if (longFiredRef.current) return;
+    if (Date.now() - justDraggedAtRef.current < 350) return;
     setFocusedPattern(pattern.id);
     // Shift-click: range/multi select.
     if (e && e.shiftKey) {
