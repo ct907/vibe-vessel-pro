@@ -2122,7 +2122,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
   },
 
-
+  removePatternChord: (patternId, chordId) => set((s) => {
     let mirrorAnchorId: string | undefined;
     const progression = s.progression.map((p) => {
       if (p.id !== patternId) return p;
