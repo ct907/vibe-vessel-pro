@@ -262,8 +262,8 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       )}
 
       <BasketBar
-        onSendToLyrics={() => _onSwitchTab?.("lyrics")}
-        onSendToProgressions={() => _onSwitchTab?.("progressions")}
+        onSendToLyrics={() => onSwitchTab?.("lyrics")}
+        onSendToProgressions={() => onSwitchTab?.("progressions")}
       />
     </div>
   );

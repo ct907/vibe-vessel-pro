@@ -820,7 +820,7 @@ function SectionGroup({
             blocksInSection={blocks.length}
             otherPatterns={blocks
               .filter((q) => q.id !== p.id)
-              .map((q, qi) => ({
+              .map((q) => ({
                 id: q.id,
                 label: `${displayName}: Block ${blocks.findIndex((b) => b.id === q.id) + 1}`,
               }))}
