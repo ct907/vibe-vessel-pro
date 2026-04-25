@@ -942,12 +942,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     const toSlot = Number(dst[2]);
     if (!toId || Number.isNaN(toSlot)) return;
 
+    const state = useSongStore.getState();
+    const toPattern = state.progression.find((p) => p.id === toId);
+    if (!toPattern) return;
+    const toCap = toPattern.bars * toPattern.beatsPerBar;
+    const toUsed = toPattern.chords.reduce((s, c) => s + c.lengthBeats, 0);
+    const toFree = Math.max(0, toCap - toUsed);
+
     // Basket → pattern block at slot.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
-      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      const item = state.basket.find((b) => b.id === basketItemId);
       if (!item) return;
-      useSongStore.getState().addChordToPatternSlot(toId, item.chord, toSlot);
+      state.addChordToPatternSlot(toId, item.chord, toSlot);
       removeFromBasket(basketItemId);
       return;
     }
@@ -957,11 +964,29 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     const fromId = src[1];
     if (!fromId) return;
     if (fromId === toId) {
-      useSongStore.getState().movePatternChordToSlot(toId, draggableId, toSlot);
-    } else {
-      // Cross-block: append into target near slot. Use existing action.
-      movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
+      state.movePatternChordToSlot(toId, draggableId, toSlot);
+      return;
     }
+
+    // Cross-block: validate capacity for the chord(s) being moved.
+    const fromPattern = state.progression.find((p) => p.id === fromId);
+    if (!fromPattern) return;
+    const movingIds = [draggableId];
+    const movingLen = fromPattern.chords
+      .filter((c) => movingIds.includes(c.id))
+      .reduce((s, c) => s + c.lengthBeats, 0);
+    if (movingLen > toFree + 1e-9) {
+      toast({
+        title: movingIds.length > 1 ? "Not enough space" : "Chord doesn't fit",
+        description:
+          movingIds.length > 1
+            ? "The selected chords don't fit in the target pattern block."
+            : "This chord is too long for the target pattern block's free space.",
+        variant: "destructive",
+      });
+      return;
+    }
+    movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {
