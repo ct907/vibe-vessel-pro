@@ -362,19 +362,25 @@ function PatternBlock({
                 const isSel = selected.has(c.id);
                 return (
                   <Draggable key={c.id} draggableId={c.id} index={idx}>
-                    {(dragProvided, dragSnapshot) => (
+                    {(dragProvided, dragSnapshot) => {
+                      if (dragSnapshot.isDragging) cancelPress();
+                      return (
                       <button
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
                         {...dragProvided.dragHandleProps}
-                        onMouseDown={() => {
+                        onMouseDown={(e) => {
+                          dragProvided.dragHandleProps?.onMouseDown?.(e);
                           startPress(c.id);
                         }}
                         onMouseUp={cancelPress}
+                        onMouseMove={cancelPress}
                         onMouseLeave={cancelPress}
-                        onTouchStart={() => {
+                        onTouchStart={(e) => {
+                          dragProvided.dragHandleProps?.onTouchStart?.(e);
                           startPress(c.id);
                         }}
+                        onTouchMove={cancelPress}
                         onTouchEnd={cancelPress}
                         onContextMenu={(e) => e.preventDefault()}
                         onClick={(e) => {
@@ -407,7 +413,8 @@ function PatternBlock({
                           {formatBeats(c.lengthBeats)} beats
                         </span>
                       </button>
-                    )}
+                      );
+                    }}
                   </Draggable>
                 );
               })}
