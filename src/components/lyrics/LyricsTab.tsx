@@ -294,7 +294,29 @@ function LineRow({
     }
   };
 
-  const slots = chordsBySlot(line);
+  // Close (clear) selection on Escape or click outside this row.
+  useEffect(() => {
+    if (selection.size === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // Only clear if at least one chord on this row is selected.
+        if (line.chords.some((c) => selection.has(c.id))) selection.clear();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      const root = rowRef.current;
+      if (!root) return;
+      if (root.contains(e.target as Node)) return;
+      if (line.chords.some((c) => selection.has(c.id))) selection.clear();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointer, true);
+    };
+  }, [selection, line.chords]);
+
 
   return (
     <div
