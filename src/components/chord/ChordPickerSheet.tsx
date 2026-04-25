@@ -43,6 +43,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
     }
   }, [open, initialChord, queryProp]);
 
+  // When the user taps another slot in the chord row while the picker is
+  // already open, the active line/anchor changes — refocus the input so the
+  // user can keep typing without manually tapping back into the field.
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, [open, activeLineId, initialChord?.display]);
+
   useEffect(() => {
     if (!open || typeof window === "undefined") return;
     const vv = window.visualViewport;
