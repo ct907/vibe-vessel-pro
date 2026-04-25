@@ -160,6 +160,19 @@ function LineRow({
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
+  // Strict mode separation: Composition (default) vs Edit. Edit Mode disables
+  // all picker triggers and scroll-to-focus; clicks toggle chord selection only.
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Auto-exit Edit Mode if this row loses "active" focus (user moved elsewhere).
+  useEffect(() => {
+    if (!active && isEditMode) {
+      setIsEditMode(false);
+      selection.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
   // Auto-resize lyric textarea.
   useLayoutEffect(() => {
     const ta = lyricInputRef.current;
@@ -168,15 +181,20 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll active row into view (handles mobile keyboard appearing).
+  // Scroll active row into view (handles mobile keyboard appearing). Skipped
+  // entirely in Edit Mode — selecting chips shouldn't move the page.
   useEffect(() => {
-    if (!active || !rowRef.current) return;
+    if (!active || isEditMode || !rowRef.current) return;
     const el = rowRef.current;
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
     const scrollIntoView = () => {
       if (!el.isConnected) return;
+      // Dynamically grab the sticky header's actual height so the row never
+      // overshoots and hides under the header.
+      const header = document.getElementById("main-header");
+      const headerHeight = header ? header.getBoundingClientRect().height : 60;
+      const targetTop = (vv?.offsetTop ?? 0) + headerHeight + 16;
       const rect = el.getBoundingClientRect();
-      const targetTop = (vv?.offsetTop ?? 0) + 140;
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 2) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
@@ -194,7 +212,7 @@ function LineRow({
         vv.removeEventListener("scroll", scrollIntoView);
       }
     };
-  }, [active]);
+  }, [active, isEditMode]);
 
   // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
