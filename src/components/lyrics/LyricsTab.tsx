@@ -1065,6 +1065,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // Selection lives at the tab level so cross-row drags can read it.
   const selection = useDndSelection<string>();
+  const isMobile = useIsMobile();
 
   // Track the in-flight pangea drag (which ids ride along, are we dragging at all).
   const [draggingIds, setDraggingIds] = useState<Set<string>>(new Set());
