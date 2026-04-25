@@ -201,6 +201,31 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </button>
           </div>
 
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              onClick={() => undo()}
+              disabled={!canUndo()}
+              aria-label="Undo"
+              title="Undo (⌘/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              onClick={() => redo()}
+              disabled={!canRedo()}
+              aria-label="Redo"
+              title="Redo (⌘/Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open menu">
