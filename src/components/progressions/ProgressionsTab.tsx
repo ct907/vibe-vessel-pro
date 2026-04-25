@@ -126,6 +126,7 @@ function PatternBlock({
   const lastTapRef = useRef<{ id: string; t: number } | null>(null);
   const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+  const justDraggedAtRef = useRef<number>(0);
 
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
