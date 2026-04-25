@@ -19,12 +19,14 @@ interface Props {
   onPick: (chord: ChordSymbol) => void;
   /** Active chord row's line id — used so ArrowUp/Down can refocus it. */
   activeLineId?: string;
+  /** Active slot index — changes trigger input refocus to keep typing fast. */
+  activeSlotIndex?: number;
   /** Optional controlled query (kept in sync with the active chord row). */
   query?: string;
   onQueryChange?: (q: string) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, query: queryProp, onQueryChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -42,6 +44,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord, queryProp]);
+
+  // When the user taps another slot in the chord row while the picker is
+  // already open, the active line/anchor changes — refocus the input so the
+  // user can keep typing without manually tapping back into the field.
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, [open, activeLineId, activeSlotIndex, initialChord?.display]);
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return;

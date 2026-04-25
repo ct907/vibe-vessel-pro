@@ -181,8 +181,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
   return (
-    <header className="border-b border-border bg-paper/85 sticky top-0 z-40">
-      <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
+    <header className="sticky top-2 z-40 mx-2 sm:mx-4 mt-2 rounded-xl bg-card/95 backdrop-blur border border-border/60 shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.45),0_2px_8px_-2px_hsl(var(--primary)/0.25)]">
+      <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
         {/* Row 1: Bookmark icon + Gallery placeholder + Menu */}
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 ink-chord shrink-0" />

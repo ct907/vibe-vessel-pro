@@ -172,7 +172,7 @@ function LineRow({
     const scrollIntoView = () => {
       if (!el.isConnected) return;
       const rect = el.getBoundingClientRect();
-      const targetTop = (vv?.offsetTop ?? 0) + 80;
+      const targetTop = (vv?.offsetTop ?? 0) + 140;
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 2) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
@@ -458,7 +458,9 @@ function LineRow({
           })}
         </div>
 
-        {/* Edit pencil — opens chord picker for this row */}
+        {/* Edit pencil — opens chord picker AND selects all chords on this row
+            so the chord context toolbar appears. User can then tap chips to
+            adjust the selection (single or multi). */}
         <Button
           type="button"
           size="icon"
@@ -467,6 +469,10 @@ function LineRow({
           onClick={(e) => {
             e.stopPropagation();
             onChordFocus(line.id);
+            // Pre-select existing chords so the selection toolbar opens.
+            if (line.chords.length > 0) {
+              selection.set(line.chords.map((c) => c.id));
+            }
             onPickerOpen(line.id, 0);
           }}
           aria-label="Edit chords for this line"
@@ -711,7 +717,7 @@ function SectionCard({
     <div
       data-section-id={section.id}
       style={sectionTintStyle(section.color)}
-      className={cn("paper-card rounded-xl px-2 py-2 transition-shadow")}
+      className={cn("rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
@@ -1183,6 +1189,7 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
           initialChord={initialChord}
           onPick={handlePick}
           activeLineId={picker?.lineId}
+          activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
           onQueryChange={setPickerQuery}
         />
