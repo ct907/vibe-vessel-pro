@@ -550,7 +550,7 @@ function LineRow({
               size="icon"
               variant="ghost"
               className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={() => selection.clear()}
+              onClick={() => { selection.clear(); setIsEditMode(false); }}
               aria-label="Close selection"
               title="Close (Esc)"
             >
@@ -621,7 +621,7 @@ function LineRow({
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => selection.clear()}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => { selection.clear(); setIsEditMode(false); }}>
               Done
             </Button>
           </div>
