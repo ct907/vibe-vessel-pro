@@ -118,6 +118,8 @@ interface LineRowProps {
   onAddLineAfter: () => string | void;
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
+  /** Force-close the chord picker (used when entering Edit Mode). */
+  onPickerClose: () => void;
   /** Selection state lives in the section card so cross-row drags work. */
   selection: ReturnType<typeof useDndSelection<string>>;
   /** Notify parent which row is "active" for picker purposes. */
@@ -135,6 +137,7 @@ function LineRow({
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
+  onPickerClose,
   selection,
   onChordFocus,
   draggingIds,
@@ -157,6 +160,19 @@ function LineRow({
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
+  // Strict mode separation: Composition (default) vs Edit. Edit Mode disables
+  // all picker triggers and scroll-to-focus; clicks toggle chord selection only.
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Auto-exit Edit Mode if this row loses "active" focus (user moved elsewhere).
+  useEffect(() => {
+    if (!active && isEditMode) {
+      setIsEditMode(false);
+      selection.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
   // Auto-resize lyric textarea.
   useLayoutEffect(() => {
     const ta = lyricInputRef.current;
@@ -165,15 +181,20 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll active row into view (handles mobile keyboard appearing).
+  // Scroll active row into view (handles mobile keyboard appearing). Skipped
+  // entirely in Edit Mode — selecting chips shouldn't move the page.
   useEffect(() => {
-    if (!active || !rowRef.current) return;
+    if (!active || isEditMode || !rowRef.current) return;
     const el = rowRef.current;
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
     const scrollIntoView = () => {
       if (!el.isConnected) return;
+      // Dynamically grab the sticky header's actual height so the row never
+      // overshoots and hides under the header.
+      const header = document.getElementById("main-header");
+      const headerHeight = header ? header.getBoundingClientRect().height : 60;
+      const targetTop = (vv?.offsetTop ?? 0) + headerHeight + 16;
       const rect = el.getBoundingClientRect();
-      const targetTop = (vv?.offsetTop ?? 0) + 140;
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 2) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
@@ -191,7 +212,7 @@ function LineRow({
         vv.removeEventListener("scroll", scrollIntoView);
       }
     };
-  }, [active]);
+  }, [active, isEditMode]);
 
   // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
@@ -324,7 +345,7 @@ function LineRow({
     <div
       ref={rowRef}
       className={cn(
-        "group py-1 transition-colors",
+        "group py-1 transition-colors scroll-mt-24",
         active ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg" : "relative",
       )}
       data-line-id={line.id}
@@ -342,6 +363,8 @@ function LineRow({
             const t = e.target as HTMLElement;
             if (t.closest("[data-chip-anchor]")) return;
             if (t.closest("[data-slot-index]")) return;
+            // Edit Mode: empty-area taps do nothing (never open picker).
+            if (isEditMode) return;
             setFocusedPattern(null);
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
@@ -395,6 +418,8 @@ function LineRow({
                     onClick={(e) => {
                       if (occupied) return;
                       e.stopPropagation();
+                      // Edit Mode: never open picker on empty-slot tap.
+                      if (isEditMode) return;
                       onChordFocus(line.id);
                       onPickerOpen(line.id, slotIdx);
                     }}
@@ -418,6 +443,7 @@ function LineRow({
                               style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Modifier-key shortcuts always work as multi-select.
                                 if (e.shiftKey) {
                                   selectRangeTo(anchor!.id, true);
                                   return;
@@ -427,11 +453,14 @@ function LineRow({
                                   lastSelectedRef.current = anchor!.id;
                                   return;
                                 }
-                                if (selection.size > 0) {
+                                // Edit Mode: tap toggles selection only —
+                                // never opens the picker, never auditions.
+                                if (isEditMode) {
                                   selection.toggle(anchor!.id);
                                   lastSelectedRef.current = anchor!.id;
                                   return;
                                 }
+                                // Composition Mode: audition + open picker.
                                 void playChord(anchor!.chord);
                                 onChordFocus(line.id);
                                 onPickerOpen(line.id, slotIdx, anchor!.id);
@@ -473,25 +502,39 @@ function LineRow({
           })}
         </div>
 
-        {/* Edit pencil — opens chord picker AND selects all chords on this row
-            so the chord context toolbar appears. User can then tap chips to
-            adjust the selection (single or multi). */}
+        {/* Edit pencil — toggles Edit Mode. Entering Edit Mode closes the
+            picker, blurs inputs, and pre-selects all chords so the context
+            toolbar appears. Exiting clears the selection. */}
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground"
+          className={cn(
+            "h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground",
+            isEditMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
+          )}
           onClick={(e) => {
             e.stopPropagation();
             onChordFocus(line.id);
-            // Pre-select existing chords so the selection toolbar opens.
-            if (line.chords.length > 0) {
-              selection.set(line.chords.map((c) => c.id));
-            }
-            onPickerOpen(line.id, 0);
+            setIsEditMode((prev) => {
+              const next = !prev;
+              if (next) {
+                // Entering Edit Mode: close picker + blur active input.
+                onPickerClose();
+                (document.activeElement as HTMLElement | null)?.blur?.();
+                if (line.chords.length > 0) {
+                  selection.set(line.chords.map((c) => c.id));
+                }
+              } else {
+                // Exiting Edit Mode: clear selection.
+                selection.clear();
+              }
+              return next;
+            });
           }}
-          aria-label="Edit chords for this line"
-          title="Edit chords"
+          aria-label={isEditMode ? "Exit edit mode" : "Edit chords for this line"}
+          aria-pressed={isEditMode}
+          title={isEditMode ? "Exit edit mode" : "Edit chords"}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -507,7 +550,7 @@ function LineRow({
               size="icon"
               variant="ghost"
               className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={() => selection.clear()}
+              onClick={() => { selection.clear(); setIsEditMode(false); }}
               aria-label="Close selection"
               title="Close (Esc)"
             >
@@ -578,7 +621,7 @@ function LineRow({
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => selection.clear()}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => { selection.clear(); setIsEditMode(false); }}>
               Done
             </Button>
           </div>
@@ -633,6 +676,7 @@ interface SectionCardProps {
   displayName: string;
   activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => void;
+  onPickerClose: () => void;
   /** True while ANY pangea drag is in flight (passed down from LyricsTab). */
   isAnyDragging: boolean;
   /** Currently-dragging anchor ids (multi-select aware). */
@@ -650,6 +694,7 @@ function SectionCard({
   displayName,
   activeLineId,
   onPickerOpen,
+  onPickerClose,
   isAnyDragging,
   draggingIds,
   selection,
@@ -902,6 +947,7 @@ function SectionCard({
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onMergeUp={(kind) => handleMergeUp(line.id, kind)}
                 onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
+                onPickerClose={onPickerClose}
                 selection={selection}
                 onChordFocus={() => {
                   /* parent handles via picker */
@@ -1204,6 +1250,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             displayName={getSectionDisplayName(sections, sec.id)}
             activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
             onPickerOpen={openPicker}
+            onPickerClose={() => setPicker(null)}
             isAnyDragging={isAnyDragging}
             draggingIds={draggingIds}
             selection={selection}
