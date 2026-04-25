@@ -458,7 +458,9 @@ function LineRow({
           })}
         </div>
 
-        {/* Edit pencil — opens chord picker for this row */}
+        {/* Edit pencil — opens chord picker AND selects all chords on this row
+            so the chord context toolbar appears. User can then tap chips to
+            adjust the selection (single or multi). */}
         <Button
           type="button"
           size="icon"
@@ -467,6 +469,10 @@ function LineRow({
           onClick={(e) => {
             e.stopPropagation();
             onChordFocus(line.id);
+            // Pre-select existing chords so the selection toolbar opens.
+            if (line.chords.length > 0) {
+              selection.set(line.chords.map((c) => c.id));
+            }
             onPickerOpen(line.id, 0);
           }}
           aria-label="Edit chords for this line"
