@@ -417,7 +417,7 @@ function PatternBlock({
                         {occupied && c && (
                           <Draggable draggableId={c.id} index={0}>
                             {(dragProvided, dragSnapshot) => {
-                              if (dragSnapshot.isDragging) cancelPress();
+                              if (dragSnapshot.isDragging) { cancelPress(); justDraggedAtRef.current = Date.now(); }
                               return (
                                 <button
                                   type="button"
