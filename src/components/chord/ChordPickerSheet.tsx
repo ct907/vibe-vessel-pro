@@ -51,7 +51,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   useEffect(() => {
     if (!open) return;
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, [open, activeLineId, initialChord?.display]);
+  }, [open, activeLineId, activeSlotIndex, initialChord?.display]);
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return;
