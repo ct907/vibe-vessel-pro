@@ -499,28 +499,71 @@ function LineRow({
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow max-w-[400px]">
-          <span className="text-muted-foreground">{selection.size} selected</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            onClick={() => selection.clear()}
-            aria-label="Close selection"
-            title="Close (Esc)"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-          <div className="ml-auto flex items-center gap-1">
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
-              <Copy className="h-3.5 w-3.5" /> Copy
+        <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
+          {/* Row 1: counter + close + copy/cut/paste + move arrows */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-muted-foreground">{selection.size} selected</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={() => selection.clear()}
+              aria-label="Close selection"
+              title="Close (Esc)"
+            >
+              <X className="h-3.5 w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
-              <Scissors className="h-3.5 w-3.5" /> Cut
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
-              <ClipboardPaste className="h-3.5 w-3.5" /> Paste
-            </Button>
+            <div className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
+                <Copy className="h-3.5 w-3.5" /> Copy
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
+                <Scissors className="h-3.5 w-3.5" /> Cut
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
+                <ClipboardPaste className="h-3.5 w-3.5" /> Paste
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => {
+                  const ids = Array.from(selection.selected)
+                    .map((id) => line.chords.find((c) => c.id === id))
+                    .filter((c): c is ChordAnchor => !!c)
+                    .sort((a, b) => slotOf(a) - slotOf(b));
+                  ids.forEach((c) => {
+                    const next = (c.slotIndex ?? 0) - 1;
+                    if (next >= 0) moveChordToSlot(sectionId, line.id, c.id, next);
+                  });
+                }}
+                aria-label="Move selection left"
+              >
+                <ArrowUp className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => {
+                  const ids = Array.from(selection.selected)
+                    .map((id) => line.chords.find((c) => c.id === id))
+                    .filter((c): c is ChordAnchor => !!c)
+                    .sort((a, b) => slotOf(b) - slotOf(a));
+                  ids.forEach((c) => {
+                    const next = (c.slotIndex ?? 0) + 1;
+                    if (next < CHORD_ROW_SLOTS) moveChordToSlot(sectionId, line.id, c.id, next);
+                  });
+                }}
+                aria-label="Move selection right"
+              >
+                <ArrowDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Row 2: delete + done */}
+          <div className="flex items-center gap-1">
             <Button
               size="sm"
               variant="ghost"
@@ -535,44 +578,7 @@ function LineRow({
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={() => {
-                // Move selection ←: each selected chord steps to slotIndex-1.
-                const ids = Array.from(selection.selected)
-                  .map((id) => line.chords.find((c) => c.id === id))
-                  .filter((c): c is ChordAnchor => !!c)
-                  .sort((a, b) => slotOf(a) - slotOf(b));
-                ids.forEach((c) => {
-                  const next = (c.slotIndex ?? 0) - 1;
-                  if (next >= 0) moveChordToSlot(sectionId, line.id, c.id, next);
-                });
-              }}
-              aria-label="Move selection left"
-            >
-              <ArrowUp className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={() => {
-                const ids = Array.from(selection.selected)
-                  .map((id) => line.chords.find((c) => c.id === id))
-                  .filter((c): c is ChordAnchor => !!c)
-                  .sort((a, b) => slotOf(b) - slotOf(a));
-                ids.forEach((c) => {
-                  const next = (c.slotIndex ?? 0) + 1;
-                  if (next < CHORD_ROW_SLOTS) moveChordToSlot(sectionId, line.id, c.id, next);
-                });
-              }}
-              aria-label="Move selection right"
-            >
-              <ArrowDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => selection.clear()}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => selection.clear()}>
               Done
             </Button>
           </div>
