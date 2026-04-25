@@ -68,6 +68,8 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 import { useDndSelection } from "@/hooks/use-dnd-selection";
 import { BasketBar } from "@/components/basket/BasketBar";
+import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
 // shape as before so OS-clipboard chord parsing still works the same way.
@@ -1063,6 +1065,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // Selection lives at the tab level so cross-row drags can read it.
   const selection = useDndSelection<string>();
+  const isMobile = useIsMobile();
 
   // Track the in-flight pangea drag (which ids ride along, are we dragging at all).
   const [draggingIds, setDraggingIds] = useState<Set<string>>(new Set());
@@ -1266,18 +1269,31 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
         </div>
       </div>
 
-      <ChordPickerSheet
-        open={!!picker}
-        onOpenChange={(o) => {
-          if (!o) setPicker(null);
-        }}
-        initialChord={initialChord}
-        onPick={handlePick}
-        activeLineId={picker?.lineId}
-        activeSlotIndex={picker?.slotIndex}
-        query={pickerQuery}
-        onQueryChange={setPickerQuery}
-      />
+      {/* On mobile, the inline bottom-sheet picker fights the on-screen
+          keyboard and sticky headers — render a full-screen overlay instead.
+          Desktop continues to use the bottom sheet for fast inline editing. */}
+      {isMobile && picker ? (
+        <FocusedChordEditor
+          sectionId={picker.sectionId}
+          lineId={picker.lineId}
+          initialSlot={picker.slotIndex}
+          initialAnchorId={picker.anchorId}
+          onClose={() => setPicker(null)}
+        />
+      ) : (
+        <ChordPickerSheet
+          open={!!picker}
+          onOpenChange={(o) => {
+            if (!o) setPicker(null);
+          }}
+          initialChord={initialChord}
+          onPick={handlePick}
+          activeLineId={picker?.lineId}
+          activeSlotIndex={picker?.slotIndex}
+          query={pickerQuery}
+          onQueryChange={setPickerQuery}
+        />
+      )}
     </div>
   );
 }
