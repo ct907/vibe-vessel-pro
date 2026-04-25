@@ -407,14 +407,14 @@ function PatternBlock({
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
                                   onMouseDown={(e) => {
-                                    (dragProvided.dragHandleProps as any)?.onMouseDown?.(e);
+                                    (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onMouseDown?.(e);
                                     startPress(c!.id);
                                   }}
                                   onMouseUp={cancelPress}
                                   onMouseMove={cancelPress}
                                   onMouseLeave={cancelPress}
                                   onTouchStart={(e) => {
-                                    (dragProvided.dragHandleProps as any)?.onTouchStart?.(e);
+                                    (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onTouchStart?.(e);
                                     startPress(c!.id);
                                   }}
                                   onTouchMove={cancelPress}
