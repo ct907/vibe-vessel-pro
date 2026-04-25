@@ -346,7 +346,7 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-muted-foreground/12 outline-none"
+          className="relative flex items-stretch flex-1 min-w-0 overflow-hidden rounded-sm bg-muted-foreground/12 outline-none"
           style={{ minHeight: 36 }}
         >
           {line.chords.length === 0 && !isAnyDragging && (
@@ -355,7 +355,7 @@ function LineRow({
             </span>
           )}
 
-          {/* Slot dividers — 19 vertical lines between the 20 slots. Hidden
+          {/* Slot dividers — vertical lines between fixed-width slots. Hidden
               while a drag is in flight so the dashed slot outlines show. */}
           {!isAnyDragging && (
             <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
@@ -363,7 +363,7 @@ function LineRow({
                 <span
                   key={i}
                   className="absolute top-1 bottom-1 w-px bg-muted-foreground/12"
-                  style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
+                  style={{ left: `${(i + 1) * 16}px` }}
                 />
               ))}
             </div>
@@ -386,7 +386,7 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative flex-1 min-w-0 h-9 flex items-center justify-center",
+                      "relative w-4 shrink-0 h-9 flex items-center justify-center",
                       isAnyDragging &&
                         !occupied &&
                         "border border-dashed border-muted-foreground/30 rounded-sm",
@@ -412,7 +412,7 @@ function LineRow({
                               {...dragProvided.dragHandleProps}
                               data-chip-anchor={anchor!.id}
                               className={cn(
-                                "w-full h-full flex items-center justify-center px-0.5",
+                                "h-full flex items-center justify-center",
                                 hideForMulti && "opacity-30",
                               )}
                               style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
