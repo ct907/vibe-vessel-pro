@@ -418,6 +418,8 @@ function LineRow({
                     onClick={(e) => {
                       if (occupied) return;
                       e.stopPropagation();
+                      // Edit Mode: never open picker on empty-slot tap.
+                      if (isEditMode) return;
                       onChordFocus(line.id);
                       onPickerOpen(line.id, slotIdx);
                     }}
