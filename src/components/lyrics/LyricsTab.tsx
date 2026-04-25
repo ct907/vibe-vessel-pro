@@ -346,7 +346,7 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-accent/20 outline-none"
+          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-muted-foreground/25 outline-none"
           style={{ minHeight: 36 }}
         >
           {line.chords.length === 0 && !isAnyDragging && (
@@ -362,7 +362,7 @@ function LineRow({
               {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
                 <span
                   key={i}
-                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/50"
+                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/25"
                   style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
                 />
               ))}
@@ -1205,9 +1205,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           />
         ))}
 
-        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
               <Button
                 key={t}

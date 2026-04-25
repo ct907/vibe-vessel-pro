@@ -362,19 +362,26 @@ function PatternBlock({
                 const isSel = selected.has(c.id);
                 return (
                   <Draggable key={c.id} draggableId={c.id} index={idx}>
-                    {(dragProvided, dragSnapshot) => (
+                    {(dragProvided, dragSnapshot) => {
+                      if (dragSnapshot.isDragging) cancelPress();
+                      const handleProps = (dragProvided.dragHandleProps ?? {}) as React.HTMLAttributes<HTMLButtonElement>;
+                      return (
                       <button
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
-                        {...dragProvided.dragHandleProps}
-                        onMouseDown={() => {
+                        {...handleProps}
+                        onMouseDown={(e) => {
+                          handleProps.onMouseDown?.(e);
                           startPress(c.id);
                         }}
                         onMouseUp={cancelPress}
+                        onMouseMove={cancelPress}
                         onMouseLeave={cancelPress}
-                        onTouchStart={() => {
+                        onTouchStart={(e) => {
+                          handleProps.onTouchStart?.(e);
                           startPress(c.id);
                         }}
+                        onTouchMove={cancelPress}
                         onTouchEnd={cancelPress}
                         onContextMenu={(e) => e.preventDefault()}
                         onClick={(e) => {
@@ -407,7 +414,8 @@ function PatternBlock({
                           {formatBeats(c.lengthBeats)} beats
                         </span>
                       </button>
-                    )}
+                      );
+                    }}
                   </Draggable>
                 );
               })}
@@ -475,9 +483,10 @@ function PatternBlock({
         return (
           <div
             data-progression-ctx
-            className="mb-2 mt-2 flex flex-col gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
+            className="mb-2 mt-2 flex flex-col gap-3 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
             onPointerDown={(e) => e.stopPropagation()}
           >
+           {/* Row 1: label + Play from here + Move-to (multi) */}
            <div className="flex items-center gap-2 flex-wrap">
             {showMulti ? (
               <span className="font-medium">{selectedIds.length} selected</span>
@@ -485,7 +494,6 @@ function PatternBlock({
               <span className="font-medium font-mono-chord">{c?.chord.display}</span>
             )}
 
-            {/* Play from here — uses the active chord, or first selected chord. */}
             <Button
               size="sm"
               variant="default"
@@ -505,7 +513,31 @@ function PatternBlock({
               <Play className="h-3.5 w-3.5" /> Play from here
             </Button>
 
-            <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+            {showMulti && otherPatterns.length > 0 && (
+              <Select
+                value=""
+                onValueChange={(toId) => {
+                  movePatternChordsTo(pattern.id, toId, selectedIds);
+                  exitSelect();
+                }}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectValue placeholder="Move to…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherPatterns.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+           </div>
+
+           {/* Row 2: Length controls + Delete */}
+           <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">Length</span>
             <Button
               size="icon"
               variant="outline"
@@ -549,7 +581,7 @@ function PatternBlock({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-destructive"
+              className="h-7 w-7 text-destructive ml-auto"
               onClick={() => {
                 if (showSingle && c) {
                   removePatternChordsBatch(pattern.id, [c.id]);
@@ -564,27 +596,6 @@ function PatternBlock({
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
-
-            {showMulti && otherPatterns.length > 0 && (
-              <Select
-                value=""
-                onValueChange={(toId) => {
-                  movePatternChordsTo(pattern.id, toId, selectedIds);
-                  exitSelect();
-                }}
-              >
-                <SelectTrigger className="h-7 w-[140px] text-xs">
-                  <SelectValue placeholder="Move to…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {otherPatterns.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
            </div>
 
            {/* Row 2: move arrows + Done */}
@@ -956,9 +967,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
           />
         ))}
 
-        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
               <Button
                 key={t}
