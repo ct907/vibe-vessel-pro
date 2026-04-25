@@ -121,13 +121,9 @@ function PatternBlock({
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longFiredRef = useRef(false);
-  const lastTapRef = useRef<{ id: string; t: number } | null>(null);
   const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
   const justDraggedAtRef = useRef<number>(0);
-
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
