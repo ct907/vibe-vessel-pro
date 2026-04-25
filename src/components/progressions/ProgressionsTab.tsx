@@ -35,7 +35,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
-import { BasketBar } from "@/components/basket/BasketBar";
 import { toast } from "@/hooks/use-toast";
 
 const LENGTH_STEP = 0.5;
@@ -860,16 +859,26 @@ interface ProgressionsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsTabProps) {
+/** Tiny helper that registers the progressions onDragEnd handler with the
+ *  global DnD store. Lives inside ProgressionsTab so it has the right closure. */
+function ProgressionsDndRegistrar({ onDragEnd }: { onDragEnd: (r: DropResult) => void }) {
+  const ref = useRef(onDragEnd);
+  ref.current = onDragEnd;
+  const setProgressionsHandlers = useDndStore((s) => s.setProgressionsHandlers);
+  useEffect(() => {
+    setProgressionsHandlers((r) => ref.current(r));
+    return () => setProgressionsHandlers(null);
+  }, [setProgressionsHandlers]);
+  return null;
+}
+
+export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }: ProgressionsTabProps) {
   const {
     progression,
     sections,
     addSection,
-    addChordToPattern,
     updatePatternChord,
     basket,
-    removeFromBasket,
-    reorderPatternChord,
     movePatternChordToPatternAt,
     moveSection,
     removeSection,
