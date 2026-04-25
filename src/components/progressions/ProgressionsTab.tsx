@@ -483,9 +483,10 @@ function PatternBlock({
         return (
           <div
             data-progression-ctx
-            className="mb-2 mt-2 flex flex-col gap-2 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
+            className="mb-2 mt-2 flex flex-col gap-3 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
             onPointerDown={(e) => e.stopPropagation()}
           >
+           {/* Row 1: label + Play from here + Move-to (multi) */}
            <div className="flex items-center gap-2 flex-wrap">
             {showMulti ? (
               <span className="font-medium">{selectedIds.length} selected</span>
@@ -493,7 +494,6 @@ function PatternBlock({
               <span className="font-medium font-mono-chord">{c?.chord.display}</span>
             )}
 
-            {/* Play from here — uses the active chord, or first selected chord. */}
             <Button
               size="sm"
               variant="default"
@@ -513,7 +513,31 @@ function PatternBlock({
               <Play className="h-3.5 w-3.5" /> Play from here
             </Button>
 
-            <span className="text-[10px] text-muted-foreground ml-1">Length</span>
+            {showMulti && otherPatterns.length > 0 && (
+              <Select
+                value=""
+                onValueChange={(toId) => {
+                  movePatternChordsTo(pattern.id, toId, selectedIds);
+                  exitSelect();
+                }}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectValue placeholder="Move to…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherPatterns.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+           </div>
+
+           {/* Row 2: Length controls + Delete */}
+           <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">Length</span>
             <Button
               size="icon"
               variant="outline"
@@ -557,7 +581,7 @@ function PatternBlock({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-destructive"
+              className="h-7 w-7 text-destructive ml-auto"
               onClick={() => {
                 if (showSingle && c) {
                   removePatternChordsBatch(pattern.id, [c.id]);
@@ -572,27 +596,6 @@ function PatternBlock({
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
-
-            {showMulti && otherPatterns.length > 0 && (
-              <Select
-                value=""
-                onValueChange={(toId) => {
-                  movePatternChordsTo(pattern.id, toId, selectedIds);
-                  exitSelect();
-                }}
-              >
-                <SelectTrigger className="h-7 w-[140px] text-xs">
-                  <SelectValue placeholder="Move to…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {otherPatterns.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
            </div>
 
            {/* Row 2: move arrows + Done */}
