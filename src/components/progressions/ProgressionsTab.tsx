@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { useDndStore } from "@/store/dnd";
 import { useSongStore, getSectionDisplayName, type PatternBlock as PatternBlockType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -380,7 +381,7 @@ function PatternBlock({
                     key={`pslot-${slotIdx}`}
                     droppableId={`pattern:${pattern.id}:${slotIdx}`}
                     direction="horizontal"
-                    type="pattern-chord"
+                    type="chord"
                   >
                     {(dropProvided, dropSnapshot) => (
                       <div
