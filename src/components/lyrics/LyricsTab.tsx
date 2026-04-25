@@ -1210,6 +1210,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             displayName={getSectionDisplayName(sections, sec.id)}
             activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
             onPickerOpen={openPicker}
+            onPickerClose={() => setPicker(null)}
             isAnyDragging={isAnyDragging}
             draggingIds={draggingIds}
             selection={selection}
