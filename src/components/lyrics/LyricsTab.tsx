@@ -1,10 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Droppable,
   Draggable,
   type DropResult,
-  type DraggableProvided,
-  type DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import {
@@ -181,38 +179,9 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll active row into view (handles mobile keyboard appearing). Skipped
-  // entirely in Edit Mode — selecting chips shouldn't move the page.
-  useEffect(() => {
-    if (!active || isEditMode || !rowRef.current) return;
-    const el = rowRef.current;
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    const scrollIntoView = () => {
-      if (!el.isConnected) return;
-      // Dynamically grab the sticky header's actual height so the row never
-      // overshoots and hides under the header.
-      const header = document.getElementById("main-header");
-      const headerHeight = header ? header.getBoundingClientRect().height : 60;
-      const targetTop = (vv?.offsetTop ?? 0) + headerHeight + 16;
-      const rect = el.getBoundingClientRect();
-      const delta = rect.top - targetTop;
-      if (Math.abs(delta) < 2) return;
-      window.scrollBy({ top: delta, behavior: "smooth" });
-    };
-    scrollIntoView();
-    const settle = window.setTimeout(scrollIntoView, 200);
-    if (vv) {
-      vv.addEventListener("resize", scrollIntoView);
-      vv.addEventListener("scroll", scrollIntoView);
-    }
-    return () => {
-      window.clearTimeout(settle);
-      if (vv) {
-        vv.removeEventListener("resize", scrollIntoView);
-        vv.removeEventListener("scroll", scrollIntoView);
-      }
-    };
-  }, [active, isEditMode]);
+  // Note: visualViewport scroll-into-view effect was removed. Mobile keyboard
+  // overlap is now handled by the FocusedChordEditor overlay (mobile only)
+  // and CSS `scroll-mt-24` on the row container above.
 
   // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
