@@ -201,6 +201,31 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </button>
           </div>
 
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              onClick={() => undo()}
+              disabled={!canUndo()}
+              aria-label="Undo"
+              title="Undo (⌘/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              onClick={() => redo()}
+              disabled={!canRedo()}
+              aria-label="Redo"
+              title="Redo (⌘/Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open menu">
@@ -385,8 +410,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           </Sheet>
         </div>
 
-        {/* Row 2: Play + Tabs + Undo/Redo */}
-        <div className="flex items-center gap-1">
+        {/* Row 2: Play + Tabs */}
+        <div className="flex items-center gap-2">
           {!isPlaying ? (
             <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play shrink-0">
               <Play className="h-4 w-4" />
@@ -400,37 +425,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           )}
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 flex justify-center">
-            <TabsList className="bg-paper-shade/70">
-              <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
-              <TabsTrigger value="chords">Chords</TabsTrigger>
-              <TabsTrigger value="progressions">Progressions</TabsTrigger>
+            <TabsList className="bg-paper-shade/70 gap-1.5 p-1.5">
+              <TabsTrigger value="lyrics" className="px-3 sm:px-4">Lyrics</TabsTrigger>
+              <TabsTrigger value="chords" className="px-3 sm:px-4">Chords</TabsTrigger>
+              <TabsTrigger value="progressions" className="px-3 sm:px-4">Progressions</TabsTrigger>
             </TabsList>
           </Tabs>
-
-          <div className="flex items-center gap-0.5 shrink-0">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={() => undo()}
-              disabled={!canUndo()}
-              aria-label="Undo"
-              title="Undo (⌘/Ctrl+Z)"
-            >
-              <Undo2 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={() => redo()}
-              disabled={!canRedo()}
-              aria-label="Redo"
-              title="Redo (⌘/Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
       <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />

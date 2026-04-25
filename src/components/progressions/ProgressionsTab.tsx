@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { BasketBar } from "@/components/basket/BasketBar";
+import { toast } from "@/hooks/use-toast";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -125,6 +126,7 @@ function PatternBlock({
   const lastTapRef = useRef<{ id: string; t: number } | null>(null);
   const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+  const justDraggedAtRef = useRef<number>(0);
 
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
@@ -251,6 +253,7 @@ function PatternBlock({
   };
   const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
     if (longFiredRef.current) return;
+    if (Date.now() - justDraggedAtRef.current < 350) return;
     setFocusedPattern(pattern.id);
     // Shift-click: range/multi select.
     if (e && e.shiftKey) {
@@ -345,14 +348,26 @@ function PatternBlock({
       <div className="relative">
         {(() => {
           const slotCount = Math.max(1, pattern.bars * 2);
-          // Left-packed: orderedChords[i] -> slot i.
-          const slotChords: (typeof sortedChords[number] | undefined)[] = Array.from({ length: slotCount });
-          sortedChords.forEach((c, i) => {
-            if (i < slotCount) slotChords[i] = c;
-          });
+          const beatsPerSlot = pattern.beatsPerBar / 2;
+          // Walk left-to-right. Each chord claims ceil(length/beatsPerSlot) slots.
+          // Build per-slot info: either { kind: "start", chord, span }, { kind: "tail" }, or { kind: "empty" }.
+          type Cell =
+            | { kind: "start"; chord: typeof sortedChords[number]; span: number; slotIdx: number }
+            | { kind: "tail" }
+            | { kind: "empty" };
+          const cells: Cell[] = Array.from({ length: slotCount }, () => ({ kind: "empty" }));
+          let cursor = 0;
+          for (const c of sortedChords) {
+            if (cursor >= slotCount) break;
+            const span = Math.max(1, Math.ceil(c.lengthBeats / beatsPerSlot));
+            const fitSpan = Math.min(span, slotCount - cursor);
+            cells[cursor] = { kind: "start", chord: c, span: fitSpan, slotIdx: cursor };
+            for (let k = 1; k < fitSpan; k++) cells[cursor + k] = { kind: "tail" };
+            cursor += fitSpan;
+          }
           return (
             <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
-              {/* Bar separators every 2 slots */}
+              {/* Bar separators */}
               {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
                 <div
                   key={`bar-${i}`}
@@ -360,7 +375,7 @@ function PatternBlock({
                   style={{ left: `${(i / pattern.bars) * 100}%` }}
                 />
               ))}
-              {/* Half-bar slot dividers (between bar lines) */}
+              {/* Half-bar slot dividers */}
               {Array.from({ length: pattern.bars }).map((_, i) => (
                 <div
                   key={`half-${i}`}
@@ -369,8 +384,11 @@ function PatternBlock({
                 />
               ))}
 
-              {slotChords.map((c, slotIdx) => {
-                const occupied = !!c;
+              {cells.map((cell, slotIdx) => {
+                if (cell.kind === "tail") return null;
+                const occupied = cell.kind === "start";
+                const c = occupied ? cell.chord : undefined;
+                const span = occupied ? cell.span : 1;
                 const isSel = c ? selected.has(c.id) : false;
                 return (
                   <Droppable
@@ -384,22 +402,22 @@ function PatternBlock({
                         ref={dropProvided.innerRef}
                         {...dropProvided.droppableProps}
                         className={cn(
-                          "relative flex-1 min-w-0 flex items-stretch justify-center z-10",
+                          "relative min-w-0 flex items-stretch justify-center z-10",
                           !occupied && "border border-dashed border-transparent",
                           dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
+                        style={{ flex: `${span} ${span} 0%` }}
                         onClick={(e) => {
                           if (occupied) return;
                           e.stopPropagation();
-                          // Tap empty slot: open picker; new chord will be inserted at this slot.
                           onPickerOpen(pattern.id, slotIdx);
                         }}
                         data-pattern-slot={slotIdx}
                       >
-                        {occupied && (
-                          <Draggable draggableId={c!.id} index={0}>
+                        {occupied && c && (
+                          <Draggable draggableId={c.id} index={0}>
                             {(dragProvided, dragSnapshot) => {
-                              if (dragSnapshot.isDragging) cancelPress();
+                              if (dragSnapshot.isDragging) { cancelPress(); justDraggedAtRef.current = Date.now(); }
                               return (
                                 <button
                                   type="button"
@@ -408,29 +426,29 @@ function PatternBlock({
                                   {...dragProvided.dragHandleProps}
                                   onMouseDown={(e) => {
                                     (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onMouseDown?.(e);
-                                    startPress(c!.id);
+                                    startPress(c.id);
                                   }}
                                   onMouseUp={cancelPress}
                                   onMouseMove={cancelPress}
                                   onMouseLeave={cancelPress}
                                   onTouchStart={(e) => {
                                     (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onTouchStart?.(e);
-                                    startPress(c!.id);
+                                    startPress(c.id);
                                   }}
                                   onTouchMove={cancelPress}
                                   onTouchEnd={cancelPress}
                                   onContextMenu={(e) => e.preventDefault()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleChordTap(c!.id, e);
+                                    handleChordTap(c.id, e);
                                   }}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    onPickerOpen(pattern.id, slotIdx, c!.id);
+                                    onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
                                     "relative my-1 mx-0.5 w-full rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                                    !selectMode && activeChord === c!.id && "ring-2 ring-primary",
+                                    !selectMode && activeChord === c.id && "ring-2 ring-primary",
                                     selectMode && isSel && "ring-2 ring-primary",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
@@ -440,10 +458,10 @@ function PatternBlock({
                                   }}
                                 >
                                   <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                                    {c!.chord.display}
+                                    {c.chord.display}
                                   </span>
                                   <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
-                                    {formatBeats(c!.lengthBeats)}b
+                                    {formatBeats(c.lengthBeats)}b
                                   </span>
                                 </button>
                               );
@@ -926,12 +944,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     const toSlot = Number(dst[2]);
     if (!toId || Number.isNaN(toSlot)) return;
 
+    const state = useSongStore.getState();
+    const toPattern = state.progression.find((p) => p.id === toId);
+    if (!toPattern) return;
+    const toCap = toPattern.bars * toPattern.beatsPerBar;
+    const toUsed = toPattern.chords.reduce((s, c) => s + c.lengthBeats, 0);
+    const toFree = Math.max(0, toCap - toUsed);
+
     // Basket → pattern block at slot.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
-      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      const item = state.basket.find((b) => b.id === basketItemId);
       if (!item) return;
-      useSongStore.getState().addChordToPatternSlot(toId, item.chord, toSlot);
+      state.addChordToPatternSlot(toId, item.chord, toSlot);
       removeFromBasket(basketItemId);
       return;
     }
@@ -941,11 +966,29 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     const fromId = src[1];
     if (!fromId) return;
     if (fromId === toId) {
-      useSongStore.getState().movePatternChordToSlot(toId, draggableId, toSlot);
-    } else {
-      // Cross-block: append into target near slot. Use existing action.
-      movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
+      state.movePatternChordToSlot(toId, draggableId, toSlot);
+      return;
     }
+
+    // Cross-block: validate capacity for the chord(s) being moved.
+    const fromPattern = state.progression.find((p) => p.id === fromId);
+    if (!fromPattern) return;
+    const movingIds = [draggableId];
+    const movingLen = fromPattern.chords
+      .filter((c) => movingIds.includes(c.id))
+      .reduce((s, c) => s + c.lengthBeats, 0);
+    if (movingLen > toFree + 1e-9) {
+      toast({
+        title: movingIds.length > 1 ? "Not enough space" : "Chord doesn't fit",
+        description:
+          movingIds.length > 1
+            ? "The selected chords don't fit in the target pattern block."
+            : "This chord is too long for the target pattern block's free space.",
+        variant: "destructive",
+      });
+      return;
+    }
+    movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {
