@@ -1086,9 +1086,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   // Track the in-flight pangea drag (which ids ride along, are we dragging at all).
   const [draggingIds, setDraggingIds] = useState<Set<string>>(new Set());
   const isAnyDragging = draggingIds.size > 0;
+  // Suppress the picker-open click that fires after dropping a chord.
+  const justDraggedAtRef = useRef<number>(0);
 
   const openPicker = (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => {
     if (basket.length > 0) return;
+    if (Date.now() - justDraggedAtRef.current < 350) return;
     setPicker({ sectionId, lineId, slotIndex, anchorId });
   };
 
