@@ -96,12 +96,15 @@ function PatternBlock({
     updatePattern,
     basket,
     addChordToPattern,
+    addChordToPatternSlot,
     setPatternChordLength,
     movePatternChord,
     removePatternChordsBatch,
     shiftPatternChords,
     movePatternChordsTo,
     resizePatternChordsWithOverflow,
+    movePatternChordToSlot,
+    movePatternChordsToSlot,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
