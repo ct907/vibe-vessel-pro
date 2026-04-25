@@ -346,7 +346,7 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-muted-foreground/25 outline-none"
+          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-muted-foreground/12 outline-none"
           style={{ minHeight: 36 }}
         >
           {line.chords.length === 0 && !isAnyDragging && (
@@ -362,7 +362,7 @@ function LineRow({
               {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
                 <span
                   key={i}
-                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/25"
+                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/12"
                   style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
                 />
               ))}
