@@ -786,7 +786,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     redoStack.length = 0;
     const fresh = makeSection("verse");
     set((s) => ({
-      meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
+      meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
       sections: [fresh.section],
       progression: [fresh.pattern],
       basket: [],
