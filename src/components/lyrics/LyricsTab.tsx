@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  DragDropContext,
   Droppable,
   Draggable,
   type DropResult,
   type DraggableProvided,
   type DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
+import { useDndStore } from "@/store/dnd";
 import {
   useSongStore,
   getSectionDisplayName,
