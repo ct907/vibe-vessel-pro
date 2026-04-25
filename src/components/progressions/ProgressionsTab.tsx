@@ -956,9 +956,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
           />
         ))}
 
-        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
               <Button
                 key={t}
