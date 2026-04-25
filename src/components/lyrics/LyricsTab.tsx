@@ -355,6 +355,20 @@ function LineRow({
             </span>
           )}
 
+          {/* Slot dividers — 19 vertical lines between the 20 slots. Hidden
+              while a drag is in flight so the dashed slot outlines show. */}
+          {!isAnyDragging && (
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+              {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/50"
+                  style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
+                />
+              ))}
+            </div>
+          )}
+
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
             const playing = !!anchor && playingAnchorId === anchor.id;
