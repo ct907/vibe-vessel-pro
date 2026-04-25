@@ -2105,20 +2105,45 @@ export const useSongStore = create<SongState>((set, get) => ({
   }),
 
   addChordToPatternSlot: (patternId, chord, slotIndex) => {
-    // Add to end then reorder to slot.
     const state = get();
-    const before = state.progression.find((p) => p.id === patternId);
-    if (!before) return;
-    state.addChordToPattern(patternId, chord, (before.bars * before.beatsPerBar), undefined);
+    const target = state.progression.find((p) => p.id === patternId);
+    if (!target) return;
+    const defaultLen = getDefaults().defaultChordLengthBeats;
+    const totalBeats = target.bars * target.beatsPerBar;
+    const usedBeats = target.chords.reduce((sum, c) => sum + c.lengthBeats, 0);
+    const freeBeats = totalBeats - usedBeats;
+    // If no room in this block, walk to subsequent blocks in the same section.
+    if (freeBeats + 1e-9 < defaultLen) {
+      const sectionId = target.sectionId;
+      const sectionPatterns = state.progression.filter((p) => p.sectionId === sectionId);
+      const idx = sectionPatterns.findIndex((p) => p.id === patternId);
+      // Find next block in section with room.
+      for (let i = idx + 1; i < sectionPatterns.length; i++) {
+        const blk = sectionPatterns[i];
+        const free = blk.bars * blk.beatsPerBar - blk.chords.reduce((s, c) => s + c.lengthBeats, 0);
+        if (free + 1e-9 >= defaultLen) {
+          // Append at end of that block.
+          const sortedThere = [...blk.chords].sort((a, b) => a.startBeat - b.startBeat);
+          state.addChordToPattern(blk.id, chord, blk.bars * blk.beatsPerBar, undefined);
+          // The new chord is appended at end already; nothing more.
+          return;
+        }
+      }
+      // No existing block has room — create a fresh one and add there.
+      const newId = state.addPatternToSection(sectionId ?? patternId);
+      state.addChordToPattern(newId, chord, 0, undefined);
+      return;
+    }
+    // Add to end then reorder to slot.
+    state.addChordToPattern(patternId, chord, totalBeats, undefined);
     const after = get().progression.find((p) => p.id === patternId);
     if (!after) return;
-    // Identify the newly added chord (last by startBeat).
-    const sorted = [...after.chords].sort((a, b) => a.startBeat - b.startBeat);
-    const last = sorted[sorted.length - 1];
+    const sortedAfter = [...after.chords].sort((a, b) => a.startBeat - b.startBeat);
+    const last = sortedAfter[sortedAfter.length - 1];
     if (!last) return;
-    const target = Math.max(0, Math.min(sorted.length - 1, slotIndex));
-    if (target !== sorted.length - 1) {
-      get().reorderPatternChord(patternId, last.id, target);
+    const targetIdx = Math.max(0, Math.min(sortedAfter.length - 1, slotIndex));
+    if (targetIdx !== sortedAfter.length - 1) {
+      get().reorderPatternChord(patternId, last.id, targetIdx);
     }
   },
 
