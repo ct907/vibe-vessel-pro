@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,19 @@ interface Props {
   draggable?: boolean;
 }
 
-export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = false }: Props) {
+/**
+ * IMPORTANT: BasketBar must be a forwardRef component. @hello-pangea/dnd's
+ * <DragDropContext> attaches a ref to its direct children to manage drag
+ * lifecycle. A plain function child triggers React's "Function components
+ * cannot be given refs" warning AND silently breaks drags out of this
+ * fixed-position container.
+ */
+export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
+  { onSendToLyrics, onSendToProgressions, draggable = false },
+  ref,
+) {
   const { basket, clearBasket } = useSongStore();
-  if (basket.length === 0) return null;
+  if (basket.length === 0) return <div ref={ref} hidden />;
 
   const renderChips = () =>
     basket.map((b, i) => {
@@ -39,7 +50,10 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
     });
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade/95 backdrop-blur shadow-[0_-8px_24px_-12px_hsl(var(--foreground)/0.2)]">
+    <div
+      ref={ref}
+      className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade/95 backdrop-blur shadow-[0_-8px_24px_-12px_hsl(var(--foreground)/0.2)]"
+    >
       <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
         <span className="text-xs uppercase tracking-wide text-muted-foreground shrink-0">
           Basket · {basket.length}
@@ -109,4 +123,4 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
       </div>
     </div>
   );
-}
+});
