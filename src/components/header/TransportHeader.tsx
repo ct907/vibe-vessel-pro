@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Play,
   Square,
@@ -18,8 +19,8 @@ import {
   Undo2,
   Redo2,
   FileText,
-  Settings,
   FilePlus,
+  Image as ImageIcon,
 } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
@@ -38,19 +39,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Link } from "react-router-dom";
 import { Music2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   isPlaying: boolean;
   setIsPlaying: (b: boolean) => void;
+  tab: "lyrics" | "chords" | "progressions";
+  setTab: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
+export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props) {
   const {
     meta,
-    setTitle,
     setKey,
     setBpm,
     transposeSong,
@@ -74,20 +75,31 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const [confirmNewSong, setConfirmNewSong] = useState(false);
   const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
-  // Track total semitones the user has shifted from the original key in this session.
   const [transposeOffset, setTransposeOffset] = useState(0);
+
+  // Keep BPM input in sync if the store value changes externally (load, reset).
+  useEffect(() => {
+    setBpmDraft(String(meta.bpm));
+  }, [meta.bpm]);
+
+  const commitBpm = () => {
+    const n = parseInt(bpmDraft, 10);
+    if (Number.isNaN(n)) {
+      setBpmDraft(String(meta.bpm));
+      return;
+    }
+    const clamped = Math.max(40, Math.min(220, n));
+    setBpm(clamped);
+    setBpmDraft(String(clamped));
+  };
 
   const handlePlay = async () => {
     await ensureAudio();
-    // Build a global, looping event list. If a pattern is focused,
-    // start sequence at that pattern (loop continues from its position).
     const startIdx = focusedPatternId
-      ? Math.max(
-          0,
-          progression.findIndex((p) => p.id === focusedPatternId),
-        )
+      ? Math.max(0, progression.findIndex((p) => p.id === focusedPatternId))
       : 0;
-    const ordered = startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
+    const ordered =
+      startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
 
     let cursorBeat = 0;
     const events: ScheduledChord[] = [];
@@ -97,11 +109,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       [...p.chords]
         .sort((a, b) => a.startBeat - b.startBeat)
         .forEach((c) => {
-          events.push({
-            chord: c.chord,
-            startBeat: cursorBeat + c.startBeat,
-            lengthBeats: c.lengthBeats,
-          });
+          events.push({ chord: c.chord, startBeat: cursorBeat + c.startBeat, lengthBeats: c.lengthBeats });
           meta2.push({ patternId: p.id, patternChordId: c.id, mirrorId: c.mirrorId });
         });
       cursorBeat += totalBeats;
@@ -111,8 +119,6 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
       return;
     }
 
-    // If the user invoked "Play from here" on a specific chord, rotate
-    // events so that chord plays first while the loop length is preserved.
     const startFromChordId = usePlaybackStore.getState().startFromChordId;
     let playEvents = events;
     let playMeta = meta2;
@@ -146,7 +152,6 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
     setCurrent(null);
   };
 
-  // Allow other components (e.g. ProgressionsTab "Play from here") to trigger playback.
   useEffect(() => {
     const onReq = () => {
       handlePlay();
@@ -176,34 +181,129 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
   const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
   return (
-    <header className="border-b border-border bg-paper/85">
-      <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3">
-        {/* Row 1: Logo + Title + Nav menu */}
-        <div className="flex items-center gap-2 justify-between">
-          <BookOpen className="h-5 w-5 ink-chord" />
-          <Input
-            value={meta.title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter song title..."
-            className="text-center !text-2xl flex-1 min-w-0 max-w-xs font-display bg-transparent border-0 border-b border-transparent rounded-none px-1 focus-visible:border-primary focus-visible:ring-0"
-          />
-          {/* Nav menu (top right of first row) */}
+    <header className="border-b border-border bg-paper/85 sticky top-0 z-40">
+      <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
+        {/* Row 1: Bookmark icon + Gallery placeholder + Menu */}
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 ink-chord shrink-0" />
+
+          {/* Gallery placeholder (deferred) */}
+          <div className="flex-1 flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled
+              aria-label="Add inspiration image (coming soon)"
+              title="Add up to 3 inspiration images — coming soon"
+              className="inline-flex items-center gap-1.5 h-8 px-2 rounded-md border border-dashed border-border text-xs text-muted-foreground/70 hover:bg-accent/40 disabled:opacity-60"
+            >
+              <ImageIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Add inspiration</span>
+            </button>
+          </div>
+
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10
-                "
-                aria-label="Open menu"
-              >
+              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72">
+            <SheetContent side="right" className="w-80 overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
+
+              {/* Song Settings */}
+              <div className="mt-6">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Song Settings
+                </h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Key</span>
+                    <div className="flex items-center gap-1">
+                      <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
+                        <SelectTrigger className="h-9 w-auto min-w-0 px-2 gap-1 font-mono-chord">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ALL_ROOTS.map((r) => (
+                            <SelectItem key={r} value={r} className="font-mono-chord">
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
+                        <SelectTrigger className="h-9 w-[130px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {MODE_LABEL[m]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">BPM</span>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={bpmDraft}
+                      onChange={(e) => setBpmDraft(e.target.value.replace(/[^\d]/g, ""))}
+                      onBlur={commitBpm}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitBpm();
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      className="h-9 w-20 px-2 text-center font-mono-chord"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Transpose
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => stepTranspose(-1)}
+                        aria-label="Transpose down semitone"
+                      >
+                        <span aria-hidden className="text-base leading-none">
+                          −
+                        </span>
+                      </Button>
+                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center">
+                        {fmtOffset(transposeOffset)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => stepTranspose(1)}
+                        aria-label="Transpose up semitone"
+                      >
+                        <span aria-hidden className="text-base leading-none">
+                          +
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Other actions */}
               <div className="mt-6 flex flex-col gap-2">
                 <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
                   <div className="flex items-center gap-2 text-sm font-medium">
@@ -285,41 +385,33 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
           </Sheet>
         </div>
 
-        {/* Row 2 (was row 3): Transpose + Play + Undo/Redo */}
+        {/* Row 2: Play + Tabs + Undo/Redo */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-10"
-              onClick={() => stepTranspose(-1)}
-              aria-label="Transpose down semitone"
-            >
-              <span aria-hidden className="text-base leading-none">
-                −
-              </span>
+          {!isPlaying ? (
+            <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play shrink-0">
+              <Play className="h-4 w-4" />
+              {!isMobile && "Play"}
             </Button>
-            <span className="font-mono-chord text-xs px-1.5 pt-1 text-center tabular-nums whitespace-nowrap">
-              {isMobile ? "Transp" : "Transpose"} {fmtOffset(transposeOffset)}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-10"
-              onClick={() => stepTranspose(1)}
-              aria-label="Transpose up semitone"
-            >
-              <span aria-hidden className="text-base leading-none">
-                +
-              </span>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={handleStop} className="shrink-0">
+              <Square className="h-4 w-4" />
+              {!isMobile && "Stop"}
             </Button>
-          </div>
+          )}
 
-          <div className="flex items-center gap-1 ml-auto">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 flex justify-center">
+            <TabsList className="bg-paper-shade/70">
+              <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
+              <TabsTrigger value="chords">Chords</TabsTrigger>
+              <TabsTrigger value="progressions">Progressions</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="flex items-center gap-1 shrink-0">
             <Button
               size="icon"
               variant="outline"
-              className="h-10 w-10"
+              className="h-9 w-9"
               onClick={() => undo()}
               disabled={!canUndo()}
               aria-label="Undo"
@@ -330,7 +422,7 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             <Button
               size="icon"
               variant="outline"
-              className="h-10 w-10"
+              className="h-9 w-9"
               onClick={() => redo()}
               disabled={!canRedo()}
               aria-label="Redo"
@@ -338,58 +430,6 @@ export function TransportHeader({ isPlaying, setIsPlaying }: Props) {
             >
               <Redo2 className="h-4 w-4" />
             </Button>
-            {!isPlaying ? (
-              <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play">
-                <Play className="h-4 w-4" /> Play
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={handleStop}>
-                <Square className="h-4 w-4" /> Stop
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Row 3 (was row 2): Key + BPM */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Key</span>
-            <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
-              <SelectTrigger className="h-10 w-auto min-w-0 px-2 gap-1 font-mono-chord">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ALL_ROOTS.map((r) => (
-                  <SelectItem key={r} value={r} className="font-mono-chord">
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
-              <SelectTrigger className="h-10 w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {MODE_LABEL[m]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">BPM</span>
-            <Input
-              type="number"
-              min={40}
-              max={220}
-              value={meta.bpm}
-              onChange={(e) => setBpm(Number(e.target.value))}
-              className="h-10 w-14 px-1 text-center font-mono-chord [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
           </div>
         </div>
       </div>
