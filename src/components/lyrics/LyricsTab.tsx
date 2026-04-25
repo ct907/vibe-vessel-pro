@@ -443,6 +443,7 @@ function LineRow({
                               style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Modifier-key shortcuts always work as multi-select.
                                 if (e.shiftKey) {
                                   selectRangeTo(anchor!.id, true);
                                   return;
@@ -452,11 +453,14 @@ function LineRow({
                                   lastSelectedRef.current = anchor!.id;
                                   return;
                                 }
-                                if (selection.size > 0) {
+                                // Edit Mode: tap toggles selection only —
+                                // never opens the picker, never auditions.
+                                if (isEditMode) {
                                   selection.toggle(anchor!.id);
                                   lastSelectedRef.current = anchor!.id;
                                   return;
                                 }
+                                // Composition Mode: audition + open picker.
                                 void playChord(anchor!.chord);
                                 onChordFocus(line.id);
                                 onPickerOpen(line.id, slotIdx, anchor!.id);
