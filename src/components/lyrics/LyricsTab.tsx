@@ -636,6 +636,7 @@ interface SectionCardProps {
   displayName: string;
   activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => void;
+  onPickerClose: () => void;
   /** True while ANY pangea drag is in flight (passed down from LyricsTab). */
   isAnyDragging: boolean;
   /** Currently-dragging anchor ids (multi-select aware). */
@@ -653,6 +654,7 @@ function SectionCard({
   displayName,
   activeLineId,
   onPickerOpen,
+  onPickerClose,
   isAnyDragging,
   draggingIds,
   selection,
