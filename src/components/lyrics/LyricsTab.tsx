@@ -1175,13 +1175,13 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     const toSlot = Number(dstParts[3]);
     if (Number.isNaN(toSlot)) return;
 
-    // Basket → row: place chord into target slot, then remove from basket.
+    // Basket → row: COPY chord into target slot. Original chip stays in basket
+    // so the user can keep dragging the same chord into multiple destinations.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
       const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
       if (!item) return;
       placeChordInSlot(toSectionId, toLineId, toSlot, item.chord);
-      removeFromBasket(basketItemId);
       return;
     }
 
