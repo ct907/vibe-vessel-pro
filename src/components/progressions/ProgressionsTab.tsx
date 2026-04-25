@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -823,9 +824,10 @@ function SectionGroup({
 
 interface ProgressionsTabProps {
   sortMode?: boolean;
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
+export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsTabProps) {
   const {
     progression,
     sections,
@@ -833,6 +835,7 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
     addChordToPattern,
     updatePatternChord,
     basket,
+    removeFromBasket,
     reorderPatternChord,
     movePatternChordToPatternAt,
     moveSection,
@@ -876,11 +879,25 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
-    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
     const toId = destination.droppableId.startsWith("pattern:")
       ? destination.droppableId.slice("pattern:".length)
       : null;
-    if (!fromId || !toId) return;
+    if (!toId) return;
+
+    // Basket → pattern block: append at end (same length default as basket-tap), then remove from basket.
+    if (draggableId.startsWith("basket:")) {
+      const basketItemId = draggableId.slice("basket:".length);
+      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      const target = useSongStore.getState().progression.find((p) => p.id === toId);
+      if (!item || !target) return;
+      const used = target.chords.reduce((s, c) => s + c.lengthBeats, 0);
+      addChordToPattern(toId, item.chord, used, 2);
+      removeFromBasket(basketItemId);
+      return;
+    }
+
+    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
+    if (!fromId) return;
     if (fromId === toId) {
       if (source.index === destination.index) return;
       reorderPatternChord(toId, draggableId, destination.index);
@@ -938,13 +955,36 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
             onMoveSection={(id, direction) => moveSection(id, direction)}
           />
         ))}
+
+        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant="outline"
+                onClick={() => addSection(t)}
+                className="capitalize border border-muted-foreground/40"
+              >
+                <Plus className="h-3.5 w-3.5" /> {t}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => addSection("custom")}
+              className="border border-muted-foreground/40"
+            >
+              <Plus className="h-3.5 w-3.5" /> Custom…
+            </Button>
+          </div>
+        </div>
+
+        <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
+
+        <BasketBar draggable onSendToLyrics={() => onSwitchTab?.("lyrics")} />
       </DragDropContext>
-
-      <Button variant="outline" onClick={() => addSection("custom")}>
-        <Plus className="h-4 w-4" /> Add new section
-      </Button>
-
-      <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteSection}

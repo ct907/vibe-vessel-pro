@@ -386,7 +386,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         </div>
 
         {/* Row 2: Play + Tabs + Undo/Redo */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {!isPlaying ? (
             <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play shrink-0">
               <Play className="h-4 w-4" />
@@ -407,10 +407,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </TabsList>
           </Tabs>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               className="h-9 w-9"
               onClick={() => undo()}
               disabled={!canUndo()}
@@ -421,7 +421,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </Button>
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               className="h-9 w-9"
               onClick={() => redo()}
               disabled={!canRedo()}

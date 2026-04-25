@@ -32,14 +32,27 @@ const ALL_QUALITIES: Quality[] = [
 
 const qualitySuffix = (q: Quality): string => (q === "maj" ? "" : q === "min" ? "m" : q);
 
-export function ChordsTab() {
-  const { meta, addToBasket } = useSongStore();
+interface ChordsTabProps {
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
+}
+
+export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
+  const { meta, addToBasket, basket, removeFromBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
   // Numeral filter: when non-empty, only rows whose numeral is selected are shown.
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
   // Audition octave applied to every chord chip in this tab.
   const [octave, setOctave] = useState<number>(4);
+  const basketActive = basket.length > 0;
+  // Map chord display → basket item id for fast lookup.
+  const basketByDisplay = useMemo(() => {
+    const m = new Map<string, string>();
+    basket.forEach((b) => {
+      if (!m.has(b.chord.display)) m.set(b.chord.display, b.id);
+    });
+    return m;
+  }, [basket]);
 
   // Build rows with all qualities. Dedupe variants WITHIN each row by their
   // canonical (parsed) display so e.g. "Dm" never appears twice.
@@ -187,7 +200,23 @@ export function ChordsTab() {
             </div>
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => {
-                const isSel = !!selected[c.display];
+                // When basket is active, the checkbox reflects basket membership and
+                // toggling adds/removes from the basket directly. Otherwise it drives
+                // the local "Send to basket" selection workflow.
+                const inBasket = basketByDisplay.has(c.display);
+                const isSel = basketActive ? inBasket : !!selected[c.display];
+                const onCheckedChange = () => {
+                  if (basketActive) {
+                    if (inBasket) {
+                      const id = basketByDisplay.get(c.display);
+                      if (id) removeFromBasket(id);
+                    } else {
+                      addToBasket([c]);
+                    }
+                  } else {
+                    toggleSelect(c);
+                  }
+                };
                 return (
                   <div
                     key={c.display}
@@ -198,7 +227,7 @@ export function ChordsTab() {
                   >
                     <Checkbox
                       checked={isSel}
-                      onCheckedChange={() => toggleSelect(c)}
+                      onCheckedChange={onCheckedChange}
                       aria-label={`Select ${c.display}`}
                     />
                     <ChordChip chord={c} variant="ink" octave={octave} />
@@ -210,7 +239,7 @@ export function ChordsTab() {
         ))}
       </div>
 
-      {selectedCount > 0 && (
+      {!basketActive && selectedCount > 0 && (
         <div className="sticky bottom-10 flex justify-end gap-2">
           <Button
             onClick={sendSelected}

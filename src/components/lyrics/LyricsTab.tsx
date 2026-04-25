@@ -69,6 +69,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 import { useDndSelection } from "@/hooks/use-dnd-selection";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
 // shape as before so OS-clipboard chord parsing still works the same way.
@@ -354,6 +355,20 @@ function LineRow({
             </span>
           )}
 
+          {/* Slot dividers — 19 vertical lines between the 20 slots. Hidden
+              while a drag is in flight so the dashed slot outlines show. */}
+          {!isAnyDragging && (
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+              {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/50"
+                  style={{ left: `${((i + 1) / CHORD_ROW_SLOTS) * 100}%` }}
+                />
+              ))}
+            </div>
+          )}
+
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
             const playing = !!anchor && playingAnchorId === anchor.id;
@@ -484,28 +499,71 @@ function LineRow({
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow max-w-[400px]">
-          <span className="text-muted-foreground">{selection.size} selected</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            onClick={() => selection.clear()}
-            aria-label="Close selection"
-            title="Close (Esc)"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-          <div className="ml-auto flex items-center gap-1">
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
-              <Copy className="h-3.5 w-3.5" /> Copy
+        <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
+          {/* Row 1: counter + close + copy/cut/paste + move arrows */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-muted-foreground">{selection.size} selected</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={() => selection.clear()}
+              aria-label="Close selection"
+              title="Close (Esc)"
+            >
+              <X className="h-3.5 w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
-              <Scissors className="h-3.5 w-3.5" /> Cut
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
-              <ClipboardPaste className="h-3.5 w-3.5" /> Paste
-            </Button>
+            <div className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
+                <Copy className="h-3.5 w-3.5" /> Copy
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
+                <Scissors className="h-3.5 w-3.5" /> Cut
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
+                <ClipboardPaste className="h-3.5 w-3.5" /> Paste
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => {
+                  const ids = Array.from(selection.selected)
+                    .map((id) => line.chords.find((c) => c.id === id))
+                    .filter((c): c is ChordAnchor => !!c)
+                    .sort((a, b) => slotOf(a) - slotOf(b));
+                  ids.forEach((c) => {
+                    const next = (c.slotIndex ?? 0) - 1;
+                    if (next >= 0) moveChordToSlot(sectionId, line.id, c.id, next);
+                  });
+                }}
+                aria-label="Move selection left"
+              >
+                <ArrowUp className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => {
+                  const ids = Array.from(selection.selected)
+                    .map((id) => line.chords.find((c) => c.id === id))
+                    .filter((c): c is ChordAnchor => !!c)
+                    .sort((a, b) => slotOf(b) - slotOf(a));
+                  ids.forEach((c) => {
+                    const next = (c.slotIndex ?? 0) + 1;
+                    if (next < CHORD_ROW_SLOTS) moveChordToSlot(sectionId, line.id, c.id, next);
+                  });
+                }}
+                aria-label="Move selection right"
+              >
+                <ArrowDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Row 2: delete + done */}
+          <div className="flex items-center gap-1">
             <Button
               size="sm"
               variant="ghost"
@@ -520,44 +578,7 @@ function LineRow({
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={() => {
-                // Move selection ←: each selected chord steps to slotIndex-1.
-                const ids = Array.from(selection.selected)
-                  .map((id) => line.chords.find((c) => c.id === id))
-                  .filter((c): c is ChordAnchor => !!c)
-                  .sort((a, b) => slotOf(a) - slotOf(b));
-                ids.forEach((c) => {
-                  const next = (c.slotIndex ?? 0) - 1;
-                  if (next >= 0) moveChordToSlot(sectionId, line.id, c.id, next);
-                });
-              }}
-              aria-label="Move selection left"
-            >
-              <ArrowUp className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={() => {
-                const ids = Array.from(selection.selected)
-                  .map((id) => line.chords.find((c) => c.id === id))
-                  .filter((c): c is ChordAnchor => !!c)
-                  .sort((a, b) => slotOf(b) - slotOf(a));
-                ids.forEach((c) => {
-                  const next = (c.slotIndex ?? 0) + 1;
-                  if (next < CHORD_ROW_SLOTS) moveChordToSlot(sectionId, line.id, c.id, next);
-                });
-              }}
-              aria-label="Move selection right"
-            >
-              <ArrowDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => selection.clear()}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => selection.clear()}>
               Done
             </Button>
           </div>
@@ -1033,15 +1054,17 @@ function SectionCard({
 
 interface LyricsTabProps {
   sortMode?: boolean;
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function LyricsTab({ sortMode = false }: LyricsTabProps) {
+export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const {
     sections,
     upsertChordAt,
     addSection,
     moveSection,
     basket,
+    removeFromBasket,
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
@@ -1110,8 +1133,10 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
-    // If the dragged chip is part of the current selection, drag the whole set.
-    // Otherwise clear selection and drag just that chip.
+    if (start.draggableId.startsWith("basket:")) {
+      setDraggingIds(new Set([start.draggableId]));
+      return;
+    }
     if (selection.has(start.draggableId)) {
       setDraggingIds(new Set(selection.selected));
     } else {
@@ -1125,16 +1150,27 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
     setDraggingIds(new Set());
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    // Parse droppableId: slot:<sectionId>:<lineId>:<slotIdx>
-    const srcParts = source.droppableId.split(":");
     const dstParts = destination.droppableId.split(":");
-    if (srcParts[0] !== "slot" || dstParts[0] !== "slot") return;
-    const fromSectionId = srcParts[1];
-    const fromLineId = srcParts[2];
+    if (dstParts[0] !== "slot") return;
     const toSectionId = dstParts[1];
     const toLineId = dstParts[2];
     const toSlot = Number(dstParts[3]);
     if (Number.isNaN(toSlot)) return;
+
+    // Basket → row: place chord into target slot, then remove from basket.
+    if (draggableId.startsWith("basket:")) {
+      const basketItemId = draggableId.slice("basket:".length);
+      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      if (!item) return;
+      placeChordInSlot(toSectionId, toLineId, toSlot, item.chord);
+      removeFromBasket(basketItemId);
+      return;
+    }
+
+    const srcParts = source.droppableId.split(":");
+    if (srcParts[0] !== "slot") return;
+    const fromSectionId = srcParts[1];
+    const fromLineId = srcParts[2];
 
     if (ids.length > 1) {
       moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);
@@ -1169,16 +1205,29 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
           />
         ))}
 
-        <div className={cn("flex flex-wrap items-center gap-2")}>
-          <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
-          {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-            <Button key={t} size="sm" variant="outline" onClick={() => addSection(t)} className="capitalize">
-              <Plus className="h-3.5 w-3.5" /> {t}
+        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant="outline"
+                onClick={() => addSection(t)}
+                className="capitalize border border-muted-foreground/40"
+              >
+                <Plus className="h-3.5 w-3.5" /> {t}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => addSection("custom")}
+              className="border border-muted-foreground/40"
+            >
+              <Plus className="h-3.5 w-3.5" /> Custom…
             </Button>
-          ))}
-          <Button size="sm" variant="ghost" onClick={() => addSection("custom")}>
-            <Plus className="h-3.5 w-3.5" /> Custom…
-          </Button>
+          </div>
         </div>
 
         <ChordPickerSheet
@@ -1192,6 +1241,11 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
           activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
           onQueryChange={setPickerQuery}
+        />
+
+        <BasketBar
+          draggable
+          onSendToProgressions={() => onSwitchTab?.("progressions")}
         />
       </div>
     </DragDropContext>
