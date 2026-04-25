@@ -37,7 +37,7 @@ interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
+export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const { meta, addToBasket, basket, removeFromBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
