@@ -818,7 +818,12 @@ function SectionGroup({
             pattern={p}
             blockIndex={i}
             blocksInSection={blocks.length}
-            otherPatterns={allPatterns.filter((q) => q.id !== p.id).map((q) => ({ id: q.id, label: q.label }))}
+            otherPatterns={blocks
+              .filter((q) => q.id !== p.id)
+              .map((q) => ({
+                id: q.id,
+                label: `${displayName}: Block ${blocks.findIndex((b) => b.id === q.id) + 1}`,
+              }))}
             onPickerOpen={onPickerOpen}
             onRequestDeleteBlock={onRequestDeleteBlock}
           />

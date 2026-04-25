@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Plus, Music, X } from "lucide-react";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
@@ -36,7 +37,7 @@ interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
+export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const { meta, addToBasket, basket, removeFromBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
@@ -259,6 +260,11 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
           </Button>
         </div>
       )}
+
+      <BasketBar
+        onSendToLyrics={() => onSwitchTab?.("lyrics")}
+        onSendToProgressions={() => onSwitchTab?.("progressions")}
+      />
     </div>
   );
 }
