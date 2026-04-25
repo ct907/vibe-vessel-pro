@@ -480,6 +480,16 @@ function LineRow({
       {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
         <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow max-w-[400px]">
           <span className="text-muted-foreground">{selection.size} selected</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => selection.clear()}
+            aria-label="Close selection"
+            title="Close (Esc)"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
           <div className="ml-auto flex items-center gap-1">
             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
               <Copy className="h-3.5 w-3.5" /> Copy
