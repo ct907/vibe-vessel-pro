@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -954,13 +955,36 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
             onMoveSection={(id, direction) => moveSection(id, direction)}
           />
         ))}
+
+        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant="outline"
+                onClick={() => addSection(t)}
+                className="capitalize border border-muted-foreground/40"
+              >
+                <Plus className="h-3.5 w-3.5" /> {t}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => addSection("custom")}
+              className="border border-muted-foreground/40"
+            >
+              <Plus className="h-3.5 w-3.5" /> Custom…
+            </Button>
+          </div>
+        </div>
+
+        <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
+
+        <BasketBar draggable onSendToLyrics={() => onSwitchTab?.("lyrics")} />
       </DragDropContext>
-
-      <Button variant="outline" onClick={() => addSection("custom")}>
-        <Plus className="h-4 w-4" /> Add new section
-      </Button>
-
-      <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteSection}
