@@ -178,6 +178,11 @@ export interface SongState {
   resizePatternChordsWithOverflow: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
+  /** Slot-based: reorder a chord (or group of chords preserving relative order) to a target slot index in the same pattern. */
+  movePatternChordToSlot: (patternId: string, chordId: string, slotIndex: number) => void;
+  movePatternChordsToSlot: (patternId: string, chordIds: string[], slotIndex: number) => void;
+  /** Slot-based: insert a brand-new chord into a specific slot (left-packed). */
+  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
   addPatternToSection: (sectionId: string) => string;
   /** Remove a single pattern block. No-op if it's the only block in its section. */
@@ -2070,6 +2075,52 @@ export const useSongStore = create<SongState>((set, get) => ({
 
     return { progression, sections };
   }),
+
+  movePatternChordToSlot: (patternId, chordId, slotIndex) => {
+    get().reorderPatternChord(patternId, chordId, Math.max(0, slotIndex));
+  },
+
+  movePatternChordsToSlot: (patternId, chordIds, slotIndex) => set((s) => {
+    pushHistory(get);
+    const idSet = new Set(chordIds);
+    const progression = s.progression.map((p) => {
+      if (p.id !== patternId) return p;
+      const totalBeats = p.bars * p.beatsPerBar;
+      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+      const moving = sorted.filter((c) => idSet.has(c.id));
+      const others = sorted.filter((c) => !idSet.has(c.id));
+      const target = Math.max(0, Math.min(others.length, slotIndex));
+      const next = [...others.slice(0, target), ...moving, ...others.slice(target)];
+      let cursor = 0;
+      const reseq = next.map((c) => {
+        const out = { ...c, startBeat: cursor };
+        cursor += c.lengthBeats;
+        return out;
+      });
+      return { ...p, chords: repackChords(reseq, totalBeats) };
+    });
+    const updated = progression.find((p) => p.id === patternId);
+    const sections = updated ? syncAnchorsFromPattern(s.sections, updated) : s.sections;
+    return { progression, sections };
+  }),
+
+  addChordToPatternSlot: (patternId, chord, slotIndex) => {
+    // Add to end then reorder to slot.
+    const state = get();
+    const before = state.progression.find((p) => p.id === patternId);
+    if (!before) return;
+    state.addChordToPattern(patternId, chord, (before.bars * before.beatsPerBar), undefined);
+    const after = get().progression.find((p) => p.id === patternId);
+    if (!after) return;
+    // Identify the newly added chord (last by startBeat).
+    const sorted = [...after.chords].sort((a, b) => a.startBeat - b.startBeat);
+    const last = sorted[sorted.length - 1];
+    if (!last) return;
+    const target = Math.max(0, Math.min(sorted.length - 1, slotIndex));
+    if (target !== sorted.length - 1) {
+      get().reorderPatternChord(patternId, last.id, target);
+    }
+  },
 
   removePatternChord: (patternId, chordId) => set((s) => {
     let mirrorAnchorId: string | undefined;
