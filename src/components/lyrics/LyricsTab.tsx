@@ -502,25 +502,39 @@ function LineRow({
           })}
         </div>
 
-        {/* Edit pencil — opens chord picker AND selects all chords on this row
-            so the chord context toolbar appears. User can then tap chips to
-            adjust the selection (single or multi). */}
+        {/* Edit pencil — toggles Edit Mode. Entering Edit Mode closes the
+            picker, blurs inputs, and pre-selects all chords so the context
+            toolbar appears. Exiting clears the selection. */}
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground"
+          className={cn(
+            "h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground",
+            isEditMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
+          )}
           onClick={(e) => {
             e.stopPropagation();
             onChordFocus(line.id);
-            // Pre-select existing chords so the selection toolbar opens.
-            if (line.chords.length > 0) {
-              selection.set(line.chords.map((c) => c.id));
-            }
-            onPickerOpen(line.id, 0);
+            setIsEditMode((prev) => {
+              const next = !prev;
+              if (next) {
+                // Entering Edit Mode: close picker + blur active input.
+                onPickerClose();
+                (document.activeElement as HTMLElement | null)?.blur?.();
+                if (line.chords.length > 0) {
+                  selection.set(line.chords.map((c) => c.id));
+                }
+              } else {
+                // Exiting Edit Mode: clear selection.
+                selection.clear();
+              }
+              return next;
+            });
           }}
-          aria-label="Edit chords for this line"
-          title="Edit chords"
+          aria-label={isEditMode ? "Exit edit mode" : "Edit chords for this line"}
+          aria-pressed={isEditMode}
+          title={isEditMode ? "Exit edit mode" : "Edit chords"}
         >
           <Pencil className="h-4 w-4" />
         </Button>
