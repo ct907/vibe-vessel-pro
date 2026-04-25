@@ -345,7 +345,7 @@ function LineRow({
     <div
       ref={rowRef}
       className={cn(
-        "group py-1 transition-colors",
+        "group py-1 transition-colors scroll-mt-24",
         active ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg" : "relative",
       )}
       data-line-id={line.id}
@@ -363,6 +363,8 @@ function LineRow({
             const t = e.target as HTMLElement;
             if (t.closest("[data-chip-anchor]")) return;
             if (t.closest("[data-slot-index]")) return;
+            // Edit Mode: empty-area taps do nothing (never open picker).
+            if (isEditMode) return;
             setFocusedPattern(null);
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
