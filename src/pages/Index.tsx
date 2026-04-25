@@ -5,7 +5,6 @@ import { SongTitleHeader } from "@/components/song/SongTitleHeader";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
-import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 
 const Index = () => {
@@ -67,18 +66,16 @@ const Index = () => {
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full mt-4">
           <TabsContent value="lyrics" className="mt-0">
-            <LyricsTab sortMode={sortMode === "lyrics"} />
+            <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} />
           </TabsContent>
           <TabsContent value="chords" className="mt-0">
-            <ChordsTab />
+            <ChordsTab onSwitchTab={setTab} />
           </TabsContent>
           <TabsContent value="progressions" className="mt-0">
-            <ProgressionsTab sortMode={sortMode === "progressions"} />
+            <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} />
           </TabsContent>
         </Tabs>
       </main>
-
-      <BasketBar onSendToLyrics={() => setTab("lyrics")} onSendToProgressions={() => setTab("progressions")} />
     </div>
   );
 };
