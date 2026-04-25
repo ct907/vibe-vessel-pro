@@ -118,6 +118,8 @@ interface LineRowProps {
   onAddLineAfter: () => string | void;
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
+  /** Force-close the chord picker (used when entering Edit Mode). */
+  onPickerClose: () => void;
   /** Selection state lives in the section card so cross-row drags work. */
   selection: ReturnType<typeof useDndSelection<string>>;
   /** Notify parent which row is "active" for picker purposes. */
@@ -135,6 +137,7 @@ function LineRow({
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
+  onPickerClose,
   selection,
   onChordFocus,
   draggingIds,
