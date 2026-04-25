@@ -345,14 +345,26 @@ function PatternBlock({
       <div className="relative">
         {(() => {
           const slotCount = Math.max(1, pattern.bars * 2);
-          // Left-packed: orderedChords[i] -> slot i.
-          const slotChords: (typeof sortedChords[number] | undefined)[] = Array.from({ length: slotCount });
-          sortedChords.forEach((c, i) => {
-            if (i < slotCount) slotChords[i] = c;
-          });
+          const beatsPerSlot = pattern.beatsPerBar / 2;
+          // Walk left-to-right. Each chord claims ceil(length/beatsPerSlot) slots.
+          // Build per-slot info: either { kind: "start", chord, span }, { kind: "tail" }, or { kind: "empty" }.
+          type Cell =
+            | { kind: "start"; chord: typeof sortedChords[number]; span: number; slotIdx: number }
+            | { kind: "tail" }
+            | { kind: "empty" };
+          const cells: Cell[] = Array.from({ length: slotCount }, () => ({ kind: "empty" }));
+          let cursor = 0;
+          for (const c of sortedChords) {
+            if (cursor >= slotCount) break;
+            const span = Math.max(1, Math.ceil(c.lengthBeats / beatsPerSlot));
+            const fitSpan = Math.min(span, slotCount - cursor);
+            cells[cursor] = { kind: "start", chord: c, span: fitSpan, slotIdx: cursor };
+            for (let k = 1; k < fitSpan; k++) cells[cursor + k] = { kind: "tail" };
+            cursor += fitSpan;
+          }
           return (
             <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
-              {/* Bar separators every 2 slots */}
+              {/* Bar separators */}
               {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
                 <div
                   key={`bar-${i}`}
@@ -360,7 +372,7 @@ function PatternBlock({
                   style={{ left: `${(i / pattern.bars) * 100}%` }}
                 />
               ))}
-              {/* Half-bar slot dividers (between bar lines) */}
+              {/* Half-bar slot dividers */}
               {Array.from({ length: pattern.bars }).map((_, i) => (
                 <div
                   key={`half-${i}`}
@@ -369,8 +381,11 @@ function PatternBlock({
                 />
               ))}
 
-              {slotChords.map((c, slotIdx) => {
-                const occupied = !!c;
+              {cells.map((cell, slotIdx) => {
+                if (cell.kind === "tail") return null;
+                const occupied = cell.kind === "start";
+                const c = occupied ? cell.chord : undefined;
+                const span = occupied ? cell.span : 1;
                 const isSel = c ? selected.has(c.id) : false;
                 return (
                   <Droppable
@@ -384,20 +399,20 @@ function PatternBlock({
                         ref={dropProvided.innerRef}
                         {...dropProvided.droppableProps}
                         className={cn(
-                          "relative flex-1 min-w-0 flex items-stretch justify-center z-10",
+                          "relative min-w-0 flex items-stretch justify-center z-10",
                           !occupied && "border border-dashed border-transparent",
                           dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
+                        style={{ flex: `${span} ${span} 0%` }}
                         onClick={(e) => {
                           if (occupied) return;
                           e.stopPropagation();
-                          // Tap empty slot: open picker; new chord will be inserted at this slot.
                           onPickerOpen(pattern.id, slotIdx);
                         }}
                         data-pattern-slot={slotIdx}
                       >
-                        {occupied && (
-                          <Draggable draggableId={c!.id} index={0}>
+                        {occupied && c && (
+                          <Draggable draggableId={c.id} index={0}>
                             {(dragProvided, dragSnapshot) => {
                               if (dragSnapshot.isDragging) cancelPress();
                               return (
@@ -408,29 +423,29 @@ function PatternBlock({
                                   {...dragProvided.dragHandleProps}
                                   onMouseDown={(e) => {
                                     (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onMouseDown?.(e);
-                                    startPress(c!.id);
+                                    startPress(c.id);
                                   }}
                                   onMouseUp={cancelPress}
                                   onMouseMove={cancelPress}
                                   onMouseLeave={cancelPress}
                                   onTouchStart={(e) => {
                                     (dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined)?.onTouchStart?.(e);
-                                    startPress(c!.id);
+                                    startPress(c.id);
                                   }}
                                   onTouchMove={cancelPress}
                                   onTouchEnd={cancelPress}
                                   onContextMenu={(e) => e.preventDefault()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleChordTap(c!.id, e);
+                                    handleChordTap(c.id, e);
                                   }}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    onPickerOpen(pattern.id, slotIdx, c!.id);
+                                    onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
                                     "relative my-1 mx-0.5 w-full rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                                    !selectMode && activeChord === c!.id && "ring-2 ring-primary",
+                                    !selectMode && activeChord === c.id && "ring-2 ring-primary",
                                     selectMode && isSel && "ring-2 ring-primary",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
@@ -440,10 +455,10 @@ function PatternBlock({
                                   }}
                                 >
                                   <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                                    {c!.chord.display}
+                                    {c.chord.display}
                                   </span>
                                   <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
-                                    {formatBeats(c!.lengthBeats)}b
+                                    {formatBeats(c.lengthBeats)}b
                                   </span>
                                 </button>
                               );
