@@ -1189,6 +1189,7 @@ export function LyricsTab({ sortMode = false }: LyricsTabProps) {
           initialChord={initialChord}
           onPick={handlePick}
           activeLineId={picker?.lineId}
+          activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
           onQueryChange={setPickerQuery}
         />
