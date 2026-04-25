@@ -364,24 +364,59 @@ function PatternBlock({
                   <Draggable key={c.id} draggableId={c.id} index={idx}>
                     {(dragProvided, dragSnapshot) => {
                       if (dragSnapshot.isDragging) cancelPress();
+                      const handleProps = (dragProvided.dragHandleProps ?? {}) as React.HTMLAttributes<HTMLButtonElement>;
                       return (
                       <button
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
-                        {...dragProvided.dragHandleProps}
+                        {...handleProps}
                         onMouseDown={(e) => {
-                          dragProvided.dragHandleProps?.onMouseDown?.(e);
+                          handleProps.onMouseDown?.(e);
                           startPress(c.id);
                         }}
                         onMouseUp={cancelPress}
                         onMouseMove={cancelPress}
                         onMouseLeave={cancelPress}
                         onTouchStart={(e) => {
-                          dragProvided.dragHandleProps?.onTouchStart?.(e);
+                          handleProps.onTouchStart?.(e);
                           startPress(c.id);
                         }}
                         onTouchMove={cancelPress}
                         onTouchEnd={cancelPress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleChordTap(c.id, e);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          onPickerOpen(pattern.id, c.startBeat, c.id);
+                        }}
+                        className={cn(
+                          "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors z-10",
+                          !selectMode && activeChord === c.id && "ring-2 ring-primary",
+                          selectMode && isSel && "ring-2 ring-primary",
+                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
+                        )}
+                        style={{
+                          flexGrow: c.lengthBeats,
+                          flexShrink: c.lengthBeats,
+                          flexBasis: 0,
+                          minWidth: 32,
+                          touchAction: "none",
+                          ...dragProvided.draggableProps.style,
+                        }}
+                      >
+                        <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
+                          {c.chord.display}
+                        </span>
+                        <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
+                          {formatBeats(c.lengthBeats)} beats
+                        </span>
+                      </button>
+                      );
+                    }}
+                  </Draggable>
                         onContextMenu={(e) => e.preventDefault()}
                         onClick={(e) => {
                           e.stopPropagation();
