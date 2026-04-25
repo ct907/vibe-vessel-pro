@@ -917,32 +917,33 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
   };
 
   const onDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId } = result;
+    const { destination, source, draggableId } = result;
     if (!destination) return;
-    const toId = destination.droppableId.startsWith("pattern:")
-      ? destination.droppableId.slice("pattern:".length)
-      : null;
-    if (!toId) return;
+    const dst = destination.droppableId.split(":");
+    if (dst[0] !== "pattern") return;
+    const toId = dst[1];
+    const toSlot = Number(dst[2]);
+    if (!toId || Number.isNaN(toSlot)) return;
 
-    // Basket → pattern block: append at end (same length default as basket-tap), then remove from basket.
+    // Basket → pattern block at slot.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
       const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
-      const target = useSongStore.getState().progression.find((p) => p.id === toId);
-      if (!item || !target) return;
-      const used = target.chords.reduce((s, c) => s + c.lengthBeats, 0);
-      addChordToPattern(toId, item.chord, used, 2);
+      if (!item) return;
+      useSongStore.getState().addChordToPatternSlot(toId, item.chord, toSlot);
       removeFromBasket(basketItemId);
       return;
     }
 
-    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
+    const src = source.droppableId.split(":");
+    if (src[0] !== "pattern") return;
+    const fromId = src[1];
     if (!fromId) return;
     if (fromId === toId) {
-      if (source.index === destination.index) return;
-      reorderPatternChord(toId, draggableId, destination.index);
+      useSongStore.getState().movePatternChordToSlot(toId, draggableId, toSlot);
     } else {
-      movePatternChordToPatternAt(fromId, toId, draggableId, destination.index);
+      // Cross-block: append into target near slot. Use existing action.
+      movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
     }
   };
 
