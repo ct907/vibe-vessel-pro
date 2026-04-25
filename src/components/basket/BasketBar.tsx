@@ -19,7 +19,7 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
   const renderChips = () =>
     basket.map((b, i) => {
       if (!draggable) {
-        return <ChordChip key={b.id} chord={b.chord} variant="ink" size="sm" />;
+        return <ChordChip key={b.id} chord={b.chord} variant="ink" size="md" />;
       }
       return (
         <Draggable key={b.id} draggableId={`basket:${b.id}`} index={i}>
@@ -31,7 +31,7 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
               style={{ touchAction: "none", ...prov.draggableProps.style }}
               className={cn(snap.isDragging && "opacity-90")}
             >
-              <ChordChip chord={b.chord} variant="ink" size="sm" audition={false} />
+              <ChordChip chord={b.chord} variant="ink" size="md" audition={false} />
             </div>
           )}
         </Draggable>
@@ -45,14 +45,14 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
           Basket · {basket.length}
         </span>
 
-        <div className="flex-1 min-w-0 sm:overflow-x-auto">
+        <div className="flex-1 min-w-0">
           {draggable ? (
             <Droppable droppableId="basket-source" direction="horizontal" type="chord" isDropDisabled>
               {(prov) => (
                 <div
                   ref={prov.innerRef}
                   {...prov.droppableProps}
-                  className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-1"
+                  className="flex flex-wrap items-center gap-2 py-1"
                 >
                   {renderChips()}
                   {prov.placeholder}
@@ -60,7 +60,7 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
               )}
             </Droppable>
           ) : (
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-1">{renderChips()}</div>
+            <div className="flex flex-wrap items-center gap-2 py-1">{renderChips()}</div>
           )}
         </div>
 

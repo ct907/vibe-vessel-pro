@@ -54,6 +54,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     meta,
     setKey,
     setBpm,
+    setTimeSignature,
     transposeSong,
     progression,
     suppressCrossTabDeleteWarning,
@@ -291,6 +292,30 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       }}
                       className="h-9 w-20 px-2 text-center font-mono-chord"
                     />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Time Signature
+                    </span>
+                    <Select
+                      value={`${meta.beatsPerBar}/${meta.beatUnit}`}
+                      onValueChange={(v) => {
+                        const [n, d] = v.split("/").map((x) => parseInt(x, 10));
+                        if (Number.isFinite(n) && Number.isFinite(d)) setTimeSignature(n, d);
+                      }}
+                    >
+                      <SelectTrigger className="h-9 w-[110px] font-mono-chord">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["2/4", "3/4", "4/4", "5/4", "6/4", "6/8", "7/8", "9/8", "12/8"].map((ts) => (
+                          <SelectItem key={ts} value={ts} className="font-mono-chord">
+                            {ts}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">

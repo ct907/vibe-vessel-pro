@@ -912,39 +912,7 @@ function SectionCard({
             ))}
           </div>
 
-          {basket.length > 0 && (
-            <div className="mt-4 border-t border-border pt-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                Drop basket chords into this section
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {basket.map((b) => (
-                  <ChordChip
-                    key={b.id}
-                    chord={b.chord}
-                    size="sm"
-                    onClick={() => {
-                      const last = section.lines[section.lines.length - 1];
-                      if (last) {
-                        // Append into the next free slot of the last line.
-                        const used = new Set(
-                          last.chords.map((c) => c.slotIndex).filter((s): s is number => s != null),
-                        );
-                        let target = 0;
-                        for (let i = 0; i < CHORD_ROW_SLOTS; i++) {
-                          if (!used.has(i)) {
-                            target = i;
-                            break;
-                          }
-                        }
-                        useSongStore.getState().placeChordInSlot(section.id, last.id, target, b.chord);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Basket chords are now drag-and-dropped directly into chord-row slots. */}
 
           {/* Comment accordion */}
           <div className="mt-4 flex flex-col items-end">
