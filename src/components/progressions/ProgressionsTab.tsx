@@ -823,9 +823,10 @@ function SectionGroup({
 
 interface ProgressionsTabProps {
   sortMode?: boolean;
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
+export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsTabProps) {
   const {
     progression,
     sections,
@@ -833,6 +834,7 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
     addChordToPattern,
     updatePatternChord,
     basket,
+    removeFromBasket,
     reorderPatternChord,
     movePatternChordToPatternAt,
     moveSection,
@@ -876,11 +878,25 @@ export function ProgressionsTab({ sortMode = false }: ProgressionsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
-    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
     const toId = destination.droppableId.startsWith("pattern:")
       ? destination.droppableId.slice("pattern:".length)
       : null;
-    if (!fromId || !toId) return;
+    if (!toId) return;
+
+    // Basket → pattern block: append at end (same length default as basket-tap), then remove from basket.
+    if (draggableId.startsWith("basket:")) {
+      const basketItemId = draggableId.slice("basket:".length);
+      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      const target = useSongStore.getState().progression.find((p) => p.id === toId);
+      if (!item || !target) return;
+      const used = target.chords.reduce((s, c) => s + c.lengthBeats, 0);
+      addChordToPattern(toId, item.chord, used, 2);
+      removeFromBasket(basketItemId);
+      return;
+    }
+
+    const fromId = source.droppableId.startsWith("pattern:") ? source.droppableId.slice("pattern:".length) : null;
+    if (!fromId) return;
     if (fromId === toId) {
       if (source.index === destination.index) return;
       reorderPatternChord(toId, draggableId, destination.index);
