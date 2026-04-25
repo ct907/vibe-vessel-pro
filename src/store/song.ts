@@ -7,7 +7,7 @@ import { getDefaults } from "@/store/defaults";
 // ---------- Types ----------
 
 /** Number of fixed equal-width slots in a chord row. */
-export const CHORD_ROW_SLOTS = 20;
+export const CHORD_ROW_SLOTS = 80;
 
 export interface ChordAnchor {
   id: string;
