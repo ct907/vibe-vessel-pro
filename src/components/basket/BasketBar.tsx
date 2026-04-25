@@ -47,7 +47,29 @@ export function BasketBar({ onSendToLyrics, onSendToProgressions, draggable = fa
 
         <div className="flex-1 min-w-0">
           {draggable ? (
-            <Droppable droppableId="basket-source" direction="horizontal" type="chord" isDropDisabled>
+            <Droppable
+              droppableId="basket-source"
+              direction="horizontal"
+              type="chord"
+              isDropDisabled
+              renderClone={(prov, _snap, rubric) => {
+                // While a basket chip is being dragged, render a free-floating
+                // clone that follows the finger. The original chip stays
+                // mounted in the basket so drops act as COPIES, not moves.
+                const item = basket[rubric.source.index];
+                if (!item) return <div ref={prov.innerRef} {...prov.draggableProps} />;
+                return (
+                  <div
+                    ref={prov.innerRef}
+                    {...prov.draggableProps}
+                    {...prov.dragHandleProps}
+                    style={{ touchAction: "none", ...prov.draggableProps.style }}
+                  >
+                    <ChordChip chord={item.chord} variant="ink" size="md" audition={false} />
+                  </div>
+                );
+              }}
+            >
               {(prov) => (
                 <div
                   ref={prov.innerRef}
