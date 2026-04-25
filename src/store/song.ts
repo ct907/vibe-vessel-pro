@@ -2425,7 +2425,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         return { sec, pat };
       });
       set({
-        meta: parsed.meta ?? get().meta,
+        meta: { beatsPerBar: 4, beatUnit: 4, ...(parsed.meta ?? get().meta) },
         sections: [section, ...extras.map((e) => e.sec)],
         progression: [firstPattern, ...extras.map((e) => e.pat)],
         basket: [],
