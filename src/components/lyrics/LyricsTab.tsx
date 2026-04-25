@@ -317,6 +317,7 @@ function LineRow({
     };
   }, [selection, line.chords]);
 
+  const slots = chordsBySlot(line);
 
   return (
     <div
