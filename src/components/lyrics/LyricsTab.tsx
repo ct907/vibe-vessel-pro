@@ -1,12 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  DragDropContext,
   Droppable,
   Draggable,
   type DropResult,
-  type DraggableProvided,
-  type DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
+import { useDndStore } from "@/store/dnd";
 import {
   useSongStore,
   getSectionDisplayName,
@@ -181,38 +179,9 @@ function LineRow({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [line.text]);
 
-  // Scroll active row into view (handles mobile keyboard appearing). Skipped
-  // entirely in Edit Mode — selecting chips shouldn't move the page.
-  useEffect(() => {
-    if (!active || isEditMode || !rowRef.current) return;
-    const el = rowRef.current;
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    const scrollIntoView = () => {
-      if (!el.isConnected) return;
-      // Dynamically grab the sticky header's actual height so the row never
-      // overshoots and hides under the header.
-      const header = document.getElementById("main-header");
-      const headerHeight = header ? header.getBoundingClientRect().height : 60;
-      const targetTop = (vv?.offsetTop ?? 0) + headerHeight + 16;
-      const rect = el.getBoundingClientRect();
-      const delta = rect.top - targetTop;
-      if (Math.abs(delta) < 2) return;
-      window.scrollBy({ top: delta, behavior: "smooth" });
-    };
-    scrollIntoView();
-    const settle = window.setTimeout(scrollIntoView, 200);
-    if (vv) {
-      vv.addEventListener("resize", scrollIntoView);
-      vv.addEventListener("scroll", scrollIntoView);
-    }
-    return () => {
-      window.clearTimeout(settle);
-      if (vv) {
-        vv.removeEventListener("resize", scrollIntoView);
-        vv.removeEventListener("scroll", scrollIntoView);
-      }
-    };
-  }, [active, isEditMode]);
+  // Note: visualViewport scroll-into-view effect was removed. Mobile keyboard
+  // overlap is now handled by the FocusedChordEditor overlay (mobile only)
+  // and CSS `scroll-mt-24` on the row container above.
 
   // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
@@ -1078,11 +1047,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     addSection,
     moveSection,
     basket,
-    removeFromBasket,
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
-    appendChordToLine,
   } = useSongStore();
 
   const [picker, setPicker] = useState<{
@@ -1175,13 +1142,13 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     const toSlot = Number(dstParts[3]);
     if (Number.isNaN(toSlot)) return;
 
-    // Basket → row: place chord into target slot, then remove from basket.
+    // Basket → row: COPY chord into target slot. Original chip stays in basket
+    // so the user can keep dragging the same chord into multiple destinations.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
       const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
       if (!item) return;
       placeChordInSlot(toSectionId, toLineId, toSlot, item.chord);
-      removeFromBasket(basketItemId);
       return;
     }
 
@@ -1238,70 +1205,79 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
   };
 
-  return (
-    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="space-y-4">
-        {sections.map((sec, i) => (
-          <SectionCard
-            key={sec.id}
-            section={sec}
-            index={i}
-            total={sections.length}
-            displayName={getSectionDisplayName(sections, sec.id)}
-            activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
-            onPickerOpen={openPicker}
-            onPickerClose={() => setPicker(null)}
-            isAnyDragging={isAnyDragging}
-            draggingIds={draggingIds}
-            selection={selection}
-            sortMode={sortMode}
-            onMoveSection={(id, direction) => moveSection(id, direction)}
-          />
-        ))}
+  // Register tab-level handlers with the global DnD store. We use refs so the
+  // single <DragDropContext> in Index.tsx always invokes the freshest closure
+  // without forcing re-registration on every render.
+  const onDragStartRef = useRef(onDragStart);
+  const onDragEndRef = useRef(onDragEnd);
+  onDragStartRef.current = onDragStart;
+  onDragEndRef.current = onDragEnd;
+  const setLyricsHandlers = useDndStore((s) => s.setLyricsHandlers);
+  useEffect(() => {
+    setLyricsHandlers(
+      (s) => onDragStartRef.current(s),
+      (r) => onDragEndRef.current(r),
+    );
+    return () => setLyricsHandlers(null, null);
+  }, [setLyricsHandlers]);
 
-        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
-          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-              <Button
-                key={t}
-                size="sm"
-                variant="outline"
-                onClick={() => addSection(t)}
-                className="capitalize border border-muted-foreground/40"
-              >
-                <Plus className="h-3.5 w-3.5" /> {t}
-              </Button>
-            ))}
+  return (
+    <div className="space-y-4">
+      {sections.map((sec, i) => (
+        <SectionCard
+          key={sec.id}
+          section={sec}
+          index={i}
+          total={sections.length}
+          displayName={getSectionDisplayName(sections, sec.id)}
+          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
+          onPickerOpen={openPicker}
+          onPickerClose={() => setPicker(null)}
+          isAnyDragging={isAnyDragging}
+          draggingIds={draggingIds}
+          selection={selection}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
+        />
+      ))}
+
+      <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+        <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
             <Button
+              key={t}
               size="sm"
               variant="outline"
-              onClick={() => addSection("custom")}
-              className="border border-muted-foreground/40"
+              onClick={() => addSection(t)}
+              className="capitalize border border-muted-foreground/40"
             >
-              <Plus className="h-3.5 w-3.5" /> Custom…
+              <Plus className="h-3.5 w-3.5" /> {t}
             </Button>
-          </div>
+          ))}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => addSection("custom")}
+            className="border border-muted-foreground/40"
+          >
+            <Plus className="h-3.5 w-3.5" /> Custom…
+          </Button>
         </div>
-
-        <ChordPickerSheet
-          open={!!picker}
-          onOpenChange={(o) => {
-            if (!o) setPicker(null);
-          }}
-          initialChord={initialChord}
-          onPick={handlePick}
-          activeLineId={picker?.lineId}
-          activeSlotIndex={picker?.slotIndex}
-          query={pickerQuery}
-          onQueryChange={setPickerQuery}
-        />
-
-        <BasketBar
-          draggable
-          onSendToProgressions={() => onSwitchTab?.("progressions")}
-        />
       </div>
-    </DragDropContext>
+
+      <ChordPickerSheet
+        open={!!picker}
+        onOpenChange={(o) => {
+          if (!o) setPicker(null);
+        }}
+        initialChord={initialChord}
+        onPick={handlePick}
+        activeLineId={picker?.lineId}
+        activeSlotIndex={picker?.slotIndex}
+        query={pickerQuery}
+        onQueryChange={setPickerQuery}
+      />
+    </div>
   );
 }
