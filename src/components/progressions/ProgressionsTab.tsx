@@ -912,7 +912,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab }: ProgressionsT
     if (picker.replaceChordId) {
       updatePatternChord(picker.patternId, picker.replaceChordId, { chord });
     } else {
-      addChordToPattern(picker.patternId, chord, picker.atBeat, 2);
+      // picker.atBeat is reused as a slot index by the new slot grid.
+      useSongStore.getState().addChordToPatternSlot(picker.patternId, chord, picker.atBeat);
     }
   };
 
