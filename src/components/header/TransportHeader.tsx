@@ -54,6 +54,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     meta,
     setKey,
     setBpm,
+    setTimeSignature,
     transposeSong,
     progression,
     suppressCrossTabDeleteWarning,
