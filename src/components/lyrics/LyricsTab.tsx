@@ -907,6 +907,7 @@ function SectionCard({
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onMergeUp={(kind) => handleMergeUp(line.id, kind)}
                 onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
+                onPickerClose={onPickerClose}
                 selection={selection}
                 onChordFocus={() => {
                   /* parent handles via picker */
