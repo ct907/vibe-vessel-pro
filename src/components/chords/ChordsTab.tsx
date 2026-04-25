@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Plus, Music, X } from "lucide-react";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 // All qualities shown together, in display order.
 const ALL_QUALITIES: Quality[] = [
@@ -259,6 +260,11 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
           </Button>
         </div>
       )}
+
+      <BasketBar
+        onSendToLyrics={() => _onSwitchTab?.("lyrics")}
+        onSendToProgressions={() => _onSwitchTab?.("progressions")}
+      />
     </div>
   );
 }
