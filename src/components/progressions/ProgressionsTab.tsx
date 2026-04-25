@@ -343,16 +343,16 @@ function PatternBlock({
       {/* Toolbar moved below the pattern grid (#7). */}
 
       <div className="relative">
-        <Droppable droppableId={`pattern:${pattern.id}`} direction="horizontal" type="pattern-chord">
-          {(dropProvided, dropSnapshot) => (
-            <div
-              ref={dropProvided.innerRef}
-              {...dropProvided.droppableProps}
-              className={cn(
-                "relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full",
-                dropSnapshot.isDraggingOver && "ring-2 ring-primary/40",
-              )}
-            >
+        {(() => {
+          const slotCount = Math.max(1, pattern.bars * 2);
+          // Left-packed: orderedChords[i] -> slot i.
+          const slotChords: (typeof sortedChords[number] | undefined)[] = Array.from({ length: slotCount });
+          sortedChords.forEach((c, i) => {
+            if (i < slotCount) slotChords[i] = c;
+          });
+          return (
+            <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
+              {/* Bar separators every 2 slots */}
               {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
                 <div
                   key={`bar-${i}`}
@@ -360,84 +360,105 @@ function PatternBlock({
                   style={{ left: `${(i / pattern.bars) * 100}%` }}
                 />
               ))}
+              {/* Half-bar slot dividers (between bar lines) */}
+              {Array.from({ length: pattern.bars }).map((_, i) => (
+                <div
+                  key={`half-${i}`}
+                  className="absolute top-2 bottom-2 border-l border-muted-foreground/20 pointer-events-none z-0"
+                  style={{ left: `${((i + 0.5) / pattern.bars) * 100}%` }}
+                />
+              ))}
 
-              {sortedChords.map((c, idx) => {
-                const isSel = selected.has(c.id);
+              {slotChords.map((c, slotIdx) => {
+                const occupied = !!c;
+                const isSel = c ? selected.has(c.id) : false;
                 return (
-                  <Draggable key={c.id} draggableId={c.id} index={idx}>
-                    {(dragProvided, dragSnapshot) => {
-                      if (dragSnapshot.isDragging) cancelPress();
-                      const handleProps = (dragProvided.dragHandleProps ?? {}) as React.HTMLAttributes<HTMLButtonElement>;
-                      return (
-                      <button
-                        ref={dragProvided.innerRef}
-                        {...dragProvided.draggableProps}
-                        {...handleProps}
-                        onMouseDown={(e) => {
-                          handleProps.onMouseDown?.(e);
-                          startPress(c.id);
-                        }}
-                        onMouseUp={cancelPress}
-                        onMouseMove={cancelPress}
-                        onMouseLeave={cancelPress}
-                        onTouchStart={(e) => {
-                          handleProps.onTouchStart?.(e);
-                          startPress(c.id);
-                        }}
-                        onTouchMove={cancelPress}
-                        onTouchEnd={cancelPress}
-                        onContextMenu={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleChordTap(c.id, e);
-                        }}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          onPickerOpen(pattern.id, c.startBeat, c.id);
-                        }}
+                  <Droppable
+                    key={`pslot-${slotIdx}`}
+                    droppableId={`pattern:${pattern.id}:${slotIdx}`}
+                    direction="horizontal"
+                    type="pattern-chord"
+                  >
+                    {(dropProvided, dropSnapshot) => (
+                      <div
+                        ref={dropProvided.innerRef}
+                        {...dropProvided.droppableProps}
                         className={cn(
-                          "relative my-1 mx-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors z-10",
-                          !selectMode && activeChord === c.id && "ring-2 ring-primary",
-                          selectMode && isSel && "ring-2 ring-primary",
-                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
+                          "relative flex-1 min-w-0 flex items-stretch justify-center z-10",
+                          !occupied && "border border-dashed border-transparent",
+                          dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
-                        style={{
-                          flexGrow: c.lengthBeats,
-                          flexShrink: c.lengthBeats,
-                          flexBasis: 0,
-                          minWidth: 32,
-                          touchAction: "none",
-                          ...dragProvided.draggableProps.style,
+                        onClick={(e) => {
+                          if (occupied) return;
+                          e.stopPropagation();
+                          // Tap empty slot: open picker; new chord will be inserted at this slot.
+                          onPickerOpen(pattern.id, slotIdx);
                         }}
+                        data-pattern-slot={slotIdx}
                       >
-                        <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                          {c.chord.display}
-                        </span>
-                        <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
-                          {formatBeats(c.lengthBeats)} beats
-                        </span>
-                      </button>
-                      );
-                    }}
-                  </Draggable>
+                        {occupied && (
+                          <Draggable draggableId={c!.id} index={0}>
+                            {(dragProvided, dragSnapshot) => {
+                              if (dragSnapshot.isDragging) cancelPress();
+                              return (
+                                <button
+                                  type="button"
+                                  ref={dragProvided.innerRef}
+                                  {...dragProvided.draggableProps}
+                                  {...dragProvided.dragHandleProps}
+                                  onMouseDown={(e) => {
+                                    (dragProvided.dragHandleProps as any)?.onMouseDown?.(e);
+                                    startPress(c!.id);
+                                  }}
+                                  onMouseUp={cancelPress}
+                                  onMouseMove={cancelPress}
+                                  onMouseLeave={cancelPress}
+                                  onTouchStart={(e) => {
+                                    (dragProvided.dragHandleProps as any)?.onTouchStart?.(e);
+                                    startPress(c!.id);
+                                  }}
+                                  onTouchMove={cancelPress}
+                                  onTouchEnd={cancelPress}
+                                  onContextMenu={(e) => e.preventDefault()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleChordTap(c!.id, e);
+                                  }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    onPickerOpen(pattern.id, slotIdx, c!.id);
+                                  }}
+                                  className={cn(
+                                    "relative my-1 mx-0.5 w-full rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
+                                    !selectMode && activeChord === c!.id && "ring-2 ring-primary",
+                                    selectMode && isSel && "ring-2 ring-primary",
+                                    dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
+                                  )}
+                                  style={{
+                                    touchAction: "none",
+                                    ...dragProvided.draggableProps.style,
+                                  }}
+                                >
+                                  <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
+                                    {c!.chord.display}
+                                  </span>
+                                  <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
+                                    {formatBeats(c!.lengthBeats)}b
+                                  </span>
+                                </button>
+                              );
+                            }}
+                          </Draggable>
+                        )}
+                        {dropProvided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 );
               })}
-              {dropProvided.placeholder}
-
-              {freeBeats > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onPickerOpen(pattern.id, usedBeats)}
-                  className="my-1 mx-0.5 rounded-md border border-dashed border-border/70 text-[11px] text-muted-foreground hover:bg-accent/40 transition-colors z-10"
-                  style={{ flexGrow: freeBeats, flexShrink: freeBeats, flexBasis: 0, minWidth: 32 }}
-                  aria-label="Add chord at end"
-                >
-                  {sortedChords.length === 0 ? "Click to add a chord" : `+ ${formatBeats(freeBeats)}b`}
-                </button>
-              )}
             </div>
-          )}
-        </Droppable>
+          );
+        })()}
 
         {playingChordId &&
           (() => {
