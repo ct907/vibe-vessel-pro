@@ -346,7 +346,7 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-accent/20 outline-none"
+          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-muted-foreground/25 outline-none"
           style={{ minHeight: 36 }}
         >
           {line.chords.length === 0 && !isAnyDragging && (
