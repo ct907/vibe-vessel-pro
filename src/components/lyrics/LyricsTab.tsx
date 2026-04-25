@@ -1151,6 +1151,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const ids = Array.from(draggingIds);
     setDraggingIds(new Set());
+    justDraggedAtRef.current = Date.now();
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
     const dstParts = destination.droppableId.split(":");
@@ -1175,8 +1176,43 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     const fromSectionId = srcParts[1];
     const fromLineId = srcParts[2];
 
+    // Multi-drag: preserve relative spacing between selected chords.
     if (ids.length > 1) {
-      moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);
+      const fromSec = sections.find((s) => s.id === fromSectionId);
+      const fromLine = fromSec?.lines.find((l) => l.id === fromLineId);
+      if (!fromLine) {
+        selection.clear();
+        return;
+      }
+      // Anchor = the chord the user actually grabbed.
+      const draggedAnchor = fromLine.chords.find((c) => c.id === draggableId);
+      const draggedSlot = draggedAnchor?.slotIndex ?? 0;
+      // Build (id, originalSlot) pairs for selection, sorted by slot.
+      const pairs = ids
+        .map((id) => {
+          const a = fromLine.chords.find((c) => c.id === id);
+          return a ? { id, slot: a.slotIndex ?? 0 } : null;
+        })
+        .filter((x): x is { id: string; slot: number } => !!x)
+        .sort((a, b) => a.slot - b.slot);
+
+      // Compute targets preserving offset to the dragged anchor.
+      const targets = pairs.map((p) => ({
+        id: p.id,
+        target: Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, toSlot + (p.slot - draggedSlot))),
+      }));
+
+      // Process in the direction of motion so swaps don't trample siblings.
+      const delta = toSlot - draggedSlot;
+      const order = delta >= 0 ? [...targets].reverse() : targets;
+
+      if (fromSectionId === toSectionId && fromLineId === toLineId) {
+        order.forEach((t) => moveChordToSlot(fromSectionId, fromLineId, t.id, t.target));
+      } else {
+        order.forEach((t) => {
+          moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, [t.id], t.target);
+        });
+      }
       selection.clear();
       return;
     }
