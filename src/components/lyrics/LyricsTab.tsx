@@ -1047,11 +1047,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     addSection,
     moveSection,
     basket,
-    removeFromBasket,
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
-    appendChordToLine,
   } = useSongStore();
 
   const [picker, setPicker] = useState<{
@@ -1207,15 +1205,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
   };
 
-  // Register tab-level handlers with the global DnD store. The single
-  // <DragDropContext> in Index.tsx routes onDragStart/onDragEnd here based on
-  // the source/destination droppableId prefix.
+  // Register tab-level handlers with the global DnD store. We use refs so the
+  // single <DragDropContext> in Index.tsx always invokes the freshest closure
+  // without forcing re-registration on every render.
+  const onDragStartRef = useRef(onDragStart);
+  const onDragEndRef = useRef(onDragEnd);
+  onDragStartRef.current = onDragStart;
+  onDragEndRef.current = onDragEnd;
   const setLyricsHandlers = useDndStore((s) => s.setLyricsHandlers);
   useEffect(() => {
-    setLyricsHandlers(onDragStart, onDragEnd);
+    setLyricsHandlers(
+      (s) => onDragStartRef.current(s),
+      (r) => onDragEndRef.current(r),
+    );
     return () => setLyricsHandlers(null, null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, basket]);
+  }, [setLyricsHandlers]);
 
   return (
     <div className="space-y-4">
