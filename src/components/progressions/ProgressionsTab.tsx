@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { BasketBar } from "@/components/basket/BasketBar";
+import { toast } from "@/hooks/use-toast";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
