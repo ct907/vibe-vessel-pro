@@ -1033,15 +1033,17 @@ function SectionCard({
 
 interface LyricsTabProps {
   sortMode?: boolean;
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function LyricsTab({ sortMode = false }: LyricsTabProps) {
+export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const {
     sections,
     upsertChordAt,
     addSection,
     moveSection,
     basket,
+    removeFromBasket,
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
