@@ -223,32 +223,7 @@ function PatternBlock({
     removePatternChordsBatch,
   ]);
 
-  const startPress = (chordId: string) => {
-    longFiredRef.current = false;
-    pressTimer.current = setTimeout(() => {
-      longFiredRef.current = true;
-      if (!selectMode) {
-        setSelectMode(true);
-        setSelected(new Set([chordId]));
-        setActiveChord(null);
-      } else if (!selected.has(chordId)) {
-        setSelected((prev) => {
-          const next = new Set(prev);
-          next.add(chordId);
-          return next;
-        });
-      }
-      lastSelectedRef.current = chordId;
-    }, 450);
-  };
-  const cancelPress = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
   const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
-    if (longFiredRef.current) return;
     if (Date.now() - justDraggedAtRef.current < 350) return;
     setFocusedPattern(pattern.id);
     // Shift-click: range/multi select.
@@ -268,6 +243,18 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
+    // Ctrl/Cmd-click toggles selection (enters select-mode).
+    if (e && (e.metaKey || e.ctrlKey)) {
+      setSelectMode(true);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(chordId)) next.delete(chordId);
+        else next.add(chordId);
+        return next;
+      });
+      lastSelectedRef.current = chordId;
+      return;
+    }
     if (selectMode) {
       setSelected((prev) => {
         const next = new Set(prev);
@@ -278,17 +265,8 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
-    const now = Date.now();
-    const last = lastTapRef.current;
-    if (last && last.id === chordId && now - last.t < 350) {
-      lastTapRef.current = null;
-      const c = sortedChords.find((x) => x.id === chordId);
-      if (c) onPickerOpen(pattern.id, c.startBeat, c.id);
-      return;
-    }
-    lastTapRef.current = { id: chordId, t: now };
     setActiveChord(activeChord === chordId ? null : chordId);
-    // (#5) Tap to focus a chord also auditions it.
+    // Single tap auditions the chord.
     const c = sortedChords.find((x) => x.id === chordId);
     if (c) void playChord(c.chord);
   };
