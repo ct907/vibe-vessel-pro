@@ -239,7 +239,7 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
         ))}
       </div>
 
-      {selectedCount > 0 && (
+      {!basketActive && selectedCount > 0 && (
         <div className="sticky bottom-10 flex justify-end gap-2">
           <Button
             onClick={sendSelected}
