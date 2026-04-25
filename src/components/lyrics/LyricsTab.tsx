@@ -328,133 +328,152 @@ function LineRow({
       )}
       data-line-id={line.id}
     >
-      {/* CHORD ROW: 20 equal-width slots. Each slot is its own Droppable so
-          pangea's contiguous-index requirement is naturally satisfied (each
-          slot holds at most one Draggable at index 0). */}
-      <div
-        data-chord-row={line.id}
-        tabIndex={0}
-        onFocus={() => onChordFocus(line.id)}
-        onKeyDown={onRowKeyDown}
-        onClick={(e) => {
-          const t = e.target as HTMLElement;
-          if (t.closest("[data-chip-anchor]")) return;
-          if (t.closest("[data-slot-index]")) return;
-          setFocusedPattern(null);
-          onChordFocus(line.id);
-          onPickerOpen(line.id, 0);
-        }}
-        className="relative flex items-stretch w-full rounded-sm bg-accent/20 outline-none"
-        style={{ minHeight: 36 }}
-      >
-        {line.chords.length === 0 && !isAnyDragging && (
-          <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
-            add your chords here
-          </span>
-        )}
+      {/* CHORD ROW + edit pencil. Each slot is its own Droppable so pangea's
+          contiguous-index requirement is naturally satisfied (each slot holds
+          at most one Draggable at index 0). */}
+      <div className="flex items-stretch gap-1">
+        <div
+          data-chord-row={line.id}
+          tabIndex={0}
+          onFocus={() => onChordFocus(line.id)}
+          onKeyDown={onRowKeyDown}
+          onClick={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.closest("[data-chip-anchor]")) return;
+            if (t.closest("[data-slot-index]")) return;
+            setFocusedPattern(null);
+            onChordFocus(line.id);
+            onPickerOpen(line.id, 0);
+          }}
+          className="relative flex items-stretch flex-1 min-w-0 rounded-sm bg-accent/20 outline-none"
+          style={{ minHeight: 36 }}
+        >
+          {line.chords.length === 0 && !isAnyDragging && (
+            <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
+              add your chords here
+            </span>
+          )}
 
-        {slots.map((anchor, slotIdx) => {
-          const occupied = !!anchor;
-          const playing = !!anchor && playingAnchorId === anchor.id;
-          return (
-            <Droppable
-              key={`slot-${slotIdx}`}
-              droppableId={`slot:${sectionId}:${line.id}:${slotIdx}`}
-              direction="horizontal"
-              type="chord"
-              isDropDisabled={false}
-            >
-              {(dropProvided, dropSnapshot) => (
-                <div
-                  ref={dropProvided.innerRef}
-                  {...dropProvided.droppableProps}
-                  data-slot-index={slotIdx}
-                  className={cn(
-                    "relative flex-1 min-w-0 h-9 flex items-center justify-center",
-                    isAnyDragging &&
-                      !occupied &&
-                      "border border-dashed border-muted-foreground/30 rounded-sm",
-                    dropSnapshot.isDraggingOver && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
-                  )}
-                  onClick={(e) => {
-                    if (occupied) return;
-                    e.stopPropagation();
-                    onChordFocus(line.id);
-                    onPickerOpen(line.id, slotIdx);
-                  }}
-                >
-                  {occupied && (
-                    <Draggable draggableId={anchor!.id} index={0}>
-                      {(dragProvided, dragSnapshot) => {
-                        const beingDragged = draggingIds.has(anchor!.id);
-                        const isPrimary = dragSnapshot.isDragging;
-                        const hideForMulti = beingDragged && !isPrimary;
-                        return (
-                          <div
-                            ref={dragProvided.innerRef}
-                            {...dragProvided.draggableProps}
-                            {...dragProvided.dragHandleProps}
-                            data-chip-anchor={anchor!.id}
-                            className={cn(
-                              "w-full h-full flex items-center justify-center px-0.5",
-                              hideForMulti && "opacity-30",
-                            )}
-                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (e.shiftKey) {
-                                selectRangeTo(anchor!.id, true);
-                                return;
-                              }
-                              if (e.metaKey || e.ctrlKey) {
-                                selection.toggle(anchor!.id);
-                                lastSelectedRef.current = anchor!.id;
-                                return;
-                              }
-                              if (selection.size > 0) {
-                                selection.toggle(anchor!.id);
-                                lastSelectedRef.current = anchor!.id;
-                                return;
-                              }
-                              void playChord(anchor!.chord);
-                              onChordFocus(line.id);
-                              onPickerOpen(line.id, slotIdx, anchor!.id);
-                            }}
-                          >
-                            <div className="relative pointer-events-none">
-                              <ChordChip
-                                chord={anchor!.chord}
-                                variant="ink"
-                                size="sm"
-                                selected={selection.has(anchor!.id)}
-                                audition={false}
-                              />
-                              {isPrimary && draggingIds.size > 1 && (
-                                <span
-                                  className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
-                                  aria-label={`${draggingIds.size} chords selected`}
-                                >
-                                  +{draggingIds.size - 1}
-                                </span>
+          {slots.map((anchor, slotIdx) => {
+            const occupied = !!anchor;
+            const playing = !!anchor && playingAnchorId === anchor.id;
+            return (
+              <Droppable
+                key={`slot-${slotIdx}`}
+                droppableId={`slot:${sectionId}:${line.id}:${slotIdx}`}
+                direction="horizontal"
+                type="chord"
+                isDropDisabled={false}
+              >
+                {(dropProvided, dropSnapshot) => (
+                  <div
+                    ref={dropProvided.innerRef}
+                    {...dropProvided.droppableProps}
+                    data-slot-index={slotIdx}
+                    className={cn(
+                      "relative flex-1 min-w-0 h-9 flex items-center justify-center",
+                      isAnyDragging &&
+                        !occupied &&
+                        "border border-dashed border-muted-foreground/30 rounded-sm",
+                      dropSnapshot.isDraggingOver && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
+                    )}
+                    onClick={(e) => {
+                      if (occupied) return;
+                      e.stopPropagation();
+                      onChordFocus(line.id);
+                      onPickerOpen(line.id, slotIdx);
+                    }}
+                  >
+                    {occupied && (
+                      <Draggable draggableId={anchor!.id} index={0}>
+                        {(dragProvided, dragSnapshot) => {
+                          const beingDragged = draggingIds.has(anchor!.id);
+                          const isPrimary = dragSnapshot.isDragging;
+                          const hideForMulti = beingDragged && !isPrimary;
+                          return (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              {...dragProvided.dragHandleProps}
+                              data-chip-anchor={anchor!.id}
+                              className={cn(
+                                "w-full h-full flex items-center justify-center px-0.5",
+                                hideForMulti && "opacity-30",
                               )}
-                              {playing && (
-                                <span
-                                  aria-hidden
-                                  className="absolute inset-0 rounded-md ring-2 ring-[hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                              style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (e.shiftKey) {
+                                  selectRangeTo(anchor!.id, true);
+                                  return;
+                                }
+                                if (e.metaKey || e.ctrlKey) {
+                                  selection.toggle(anchor!.id);
+                                  lastSelectedRef.current = anchor!.id;
+                                  return;
+                                }
+                                if (selection.size > 0) {
+                                  selection.toggle(anchor!.id);
+                                  lastSelectedRef.current = anchor!.id;
+                                  return;
+                                }
+                                void playChord(anchor!.chord);
+                                onChordFocus(line.id);
+                                onPickerOpen(line.id, slotIdx, anchor!.id);
+                              }}
+                            >
+                              <div className="relative pointer-events-none">
+                                <ChordChip
+                                  chord={anchor!.chord}
+                                  variant="ink"
+                                  size="sm"
+                                  selected={selection.has(anchor!.id)}
+                                  audition={false}
                                 />
-                              )}
+                                {isPrimary && draggingIds.size > 1 && (
+                                  <span
+                                    className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
+                                    aria-label={`${draggingIds.size} chords selected`}
+                                  >
+                                    +{draggingIds.size - 1}
+                                  </span>
+                                )}
+                                {playing && (
+                                  <span
+                                    aria-hidden
+                                    className="absolute inset-0 rounded-md ring-2 ring-[hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                                  />
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }}
-                    </Draggable>
-                  )}
-                  {dropProvided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          );
-        })}
+                          );
+                        }}
+                      </Draggable>
+                    )}
+                    {dropProvided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            );
+          })}
+        </div>
+
+        {/* Edit pencil — opens chord picker for this row */}
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChordFocus(line.id);
+            onPickerOpen(line.id, 0);
+          }}
+          aria-label="Edit chords for this line"
+          title="Edit chords"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
