@@ -78,6 +78,10 @@ export interface SongState {
     keyRoot: string;
     keyMode: Mode;
     bpm: number;
+    /** Time signature numerator (beats per bar). Default 4. */
+    beatsPerBar: number;
+    /** Time signature denominator (beat unit). Default 4. */
+    beatUnit: number;
   };
   sections: Section[];
   basket: BasketItem[];
@@ -90,6 +94,7 @@ export interface SongState {
   setTitle: (t: string) => void;
   setKey: (root: string, mode: Mode) => void;
   setBpm: (bpm: number) => void;
+  setTimeSignature: (beatsPerBar: number, beatUnit: number) => void;
   transposeSong: (semitones: number) => void;
 
   // ---- sections ----
@@ -584,7 +589,7 @@ function pushHistory(get: () => SongState) {
 }
 
 export const useSongStore = create<SongState>((set, get) => ({
-  meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92 },
+  meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
   sections: [seed.section],
   basket: [],
   progression: [seed.pattern],
@@ -594,6 +599,31 @@ export const useSongStore = create<SongState>((set, get) => ({
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
   setKey: (keyRoot, keyMode) => set((s) => ({ meta: { ...s.meta, keyRoot, keyMode } })),
   setBpm: (bpm) => set((s) => ({ meta: { ...s.meta, bpm: Math.max(40, Math.min(220, bpm)) } })),
+
+  setTimeSignature: (beatsPerBar, beatUnit) => set((s) => {
+    const bpb = Math.max(1, Math.min(16, Math.round(beatsPerBar)));
+    const bu = [2, 4, 8, 16].includes(beatUnit) ? beatUnit : 4;
+    // Propagate beatsPerBar to every pattern block; clamp/repack chords to fit new capacity.
+    const progression = s.progression.map((p) => {
+      const newTotal = p.bars * bpb;
+      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+      const fit: PatternChord[] = [];
+      let cursor = 0;
+      for (const c of sorted) {
+        const len = Math.max(0.5, c.lengthBeats);
+        if (cursor + len <= newTotal + 1e-9) {
+          fit.push({ ...c, startBeat: cursor, lengthBeats: len });
+          cursor += len;
+        } else if (cursor < newTotal) {
+          // Truncate the last chord to fit; drop the rest (rare).
+          fit.push({ ...c, startBeat: cursor, lengthBeats: newTotal - cursor });
+          cursor = newTotal;
+        }
+      }
+      return { ...p, beatsPerBar: bpb, chords: repackChords(fit, newTotal) };
+    });
+    return { meta: { ...s.meta, beatsPerBar: bpb, beatUnit: bu }, progression };
+  }),
 
   transposeSong: (semitones) => set((s) => ({
     meta: { ...s.meta, keyRoot: transposeKey(s.meta.keyRoot, semitones) },
