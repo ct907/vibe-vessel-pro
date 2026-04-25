@@ -32,9 +32,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
   }, [meta.title]);
 
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
-  const canFormat = sections.some(
-    (s) => s.lines.some((l) => /\S/.test(l.text)) && s.lines.some((l) => l.chords.length > 0),
-  );
+  const canFormat = sections.some((s) => s.lines.some((l) => l.chords.length > 0));
   const showSort = activeTab === "lyrics" || activeTab === "progressions";
 
   return (

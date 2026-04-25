@@ -172,7 +172,7 @@ function LineRow({
     const scrollIntoView = () => {
       if (!el.isConnected) return;
       const rect = el.getBoundingClientRect();
-      const targetTop = (vv?.offsetTop ?? 0) + 80;
+      const targetTop = (vv?.offsetTop ?? 0) + 140;
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 2) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
