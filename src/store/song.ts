@@ -178,6 +178,11 @@ export interface SongState {
   resizePatternChordsWithOverflow: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
+  /** Slot-based: reorder a chord (or group of chords preserving relative order) to a target slot index in the same pattern. */
+  movePatternChordToSlot: (patternId: string, chordId: string, slotIndex: number) => void;
+  movePatternChordsToSlot: (patternId: string, chordIds: string[], slotIndex: number) => void;
+  /** Slot-based: insert a brand-new chord into a specific slot (left-packed). */
+  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
   addPatternToSection: (sectionId: string) => string;
   /** Remove a single pattern block. No-op if it's the only block in its section. */
