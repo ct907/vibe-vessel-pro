@@ -1238,70 +1238,73 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
   };
 
-  return (
-    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="space-y-4">
-        {sections.map((sec, i) => (
-          <SectionCard
-            key={sec.id}
-            section={sec}
-            index={i}
-            total={sections.length}
-            displayName={getSectionDisplayName(sections, sec.id)}
-            activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
-            onPickerOpen={openPicker}
-            onPickerClose={() => setPicker(null)}
-            isAnyDragging={isAnyDragging}
-            draggingIds={draggingIds}
-            selection={selection}
-            sortMode={sortMode}
-            onMoveSection={(id, direction) => moveSection(id, direction)}
-          />
-        ))}
+  // Register tab-level handlers with the global DnD store. The single
+  // <DragDropContext> in Index.tsx routes onDragStart/onDragEnd here based on
+  // the source/destination droppableId prefix.
+  const setLyricsHandlers = useDndStore((s) => s.setLyricsHandlers);
+  useEffect(() => {
+    setLyricsHandlers(onDragStart, onDragEnd);
+    return () => setLyricsHandlers(null, null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, basket]);
 
-        <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
-          <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-              <Button
-                key={t}
-                size="sm"
-                variant="outline"
-                onClick={() => addSection(t)}
-                className="capitalize border border-muted-foreground/40"
-              >
-                <Plus className="h-3.5 w-3.5" /> {t}
-              </Button>
-            ))}
+  return (
+    <div className="space-y-4">
+      {sections.map((sec, i) => (
+        <SectionCard
+          key={sec.id}
+          section={sec}
+          index={i}
+          total={sections.length}
+          displayName={getSectionDisplayName(sections, sec.id)}
+          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
+          onPickerOpen={openPicker}
+          onPickerClose={() => setPicker(null)}
+          isAnyDragging={isAnyDragging}
+          draggingIds={draggingIds}
+          selection={selection}
+          sortMode={sortMode}
+          onMoveSection={(id, direction) => moveSection(id, direction)}
+        />
+      ))}
+
+      <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
+        <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
             <Button
+              key={t}
               size="sm"
               variant="outline"
-              onClick={() => addSection("custom")}
-              className="border border-muted-foreground/40"
+              onClick={() => addSection(t)}
+              className="capitalize border border-muted-foreground/40"
             >
-              <Plus className="h-3.5 w-3.5" /> Custom…
+              <Plus className="h-3.5 w-3.5" /> {t}
             </Button>
-          </div>
+          ))}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => addSection("custom")}
+            className="border border-muted-foreground/40"
+          >
+            <Plus className="h-3.5 w-3.5" /> Custom…
+          </Button>
         </div>
-
-        <ChordPickerSheet
-          open={!!picker}
-          onOpenChange={(o) => {
-            if (!o) setPicker(null);
-          }}
-          initialChord={initialChord}
-          onPick={handlePick}
-          activeLineId={picker?.lineId}
-          activeSlotIndex={picker?.slotIndex}
-          query={pickerQuery}
-          onQueryChange={setPickerQuery}
-        />
-
-        <BasketBar
-          draggable
-          onSendToProgressions={() => onSwitchTab?.("progressions")}
-        />
       </div>
-    </DragDropContext>
+
+      <ChordPickerSheet
+        open={!!picker}
+        onOpenChange={(o) => {
+          if (!o) setPicker(null);
+        }}
+        initialChord={initialChord}
+        onPick={handlePick}
+        activeLineId={picker?.lineId}
+        activeSlotIndex={picker?.slotIndex}
+        query={pickerQuery}
+        onQueryChange={setPickerQuery}
+      />
+    </div>
   );
 }
