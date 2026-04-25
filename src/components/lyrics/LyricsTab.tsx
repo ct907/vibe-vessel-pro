@@ -69,6 +69,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 import { useDndSelection } from "@/hooks/use-dnd-selection";
+import { BasketBar } from "@/components/basket/BasketBar";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
 // shape as before so OS-clipboard chord parsing still works the same way.
