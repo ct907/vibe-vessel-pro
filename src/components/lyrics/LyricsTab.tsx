@@ -1112,8 +1112,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
-    // If the dragged chip is part of the current selection, drag the whole set.
-    // Otherwise clear selection and drag just that chip.
+    if (start.draggableId.startsWith("basket:")) {
+      setDraggingIds(new Set([start.draggableId]));
+      return;
+    }
     if (selection.has(start.draggableId)) {
       setDraggingIds(new Set(selection.selected));
     } else {
@@ -1127,16 +1129,27 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     setDraggingIds(new Set());
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    // Parse droppableId: slot:<sectionId>:<lineId>:<slotIdx>
-    const srcParts = source.droppableId.split(":");
     const dstParts = destination.droppableId.split(":");
-    if (srcParts[0] !== "slot" || dstParts[0] !== "slot") return;
-    const fromSectionId = srcParts[1];
-    const fromLineId = srcParts[2];
+    if (dstParts[0] !== "slot") return;
     const toSectionId = dstParts[1];
     const toLineId = dstParts[2];
     const toSlot = Number(dstParts[3]);
     if (Number.isNaN(toSlot)) return;
+
+    // Basket → row: place chord into target slot, then remove from basket.
+    if (draggableId.startsWith("basket:")) {
+      const basketItemId = draggableId.slice("basket:".length);
+      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
+      if (!item) return;
+      placeChordInSlot(toSectionId, toLineId, toSlot, item.chord);
+      removeFromBasket(basketItemId);
+      return;
+    }
+
+    const srcParts = source.droppableId.split(":");
+    if (srcParts[0] !== "slot") return;
+    const fromSectionId = srcParts[1];
+    const fromLineId = srcParts[2];
 
     if (ids.length > 1) {
       moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, ids, toSlot);
@@ -1171,16 +1184,29 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           />
         ))}
 
-        <div className={cn("flex flex-wrap items-center gap-2")}>
-          <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Add section</span>
-          {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-            <Button key={t} size="sm" variant="outline" onClick={() => addSection(t)} className="capitalize">
-              <Plus className="h-3.5 w-3.5" /> {t}
+        <div className="flex flex-col gap-2 rounded-md border border-muted-foreground/40 p-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Add section</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant="outline"
+                onClick={() => addSection(t)}
+                className="capitalize border border-muted-foreground/40"
+              >
+                <Plus className="h-3.5 w-3.5" /> {t}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => addSection("custom")}
+              className="border border-muted-foreground/40"
+            >
+              <Plus className="h-3.5 w-3.5" /> Custom…
             </Button>
-          ))}
-          <Button size="sm" variant="ghost" onClick={() => addSection("custom")}>
-            <Plus className="h-3.5 w-3.5" /> Custom…
-          </Button>
+          </div>
         </div>
 
         <ChordPickerSheet
@@ -1194,6 +1220,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
           onQueryChange={setPickerQuery}
+        />
+
+        <BasketBar
+          draggable
+          onSendToProgressions={() => onSwitchTab?.("progressions")}
         />
       </div>
     </DragDropContext>
