@@ -6,6 +6,7 @@ import { playChord } from "@/lib/music/audio";
 import {
   useSongStore,
   getSectionDisplayName,
+  getLineChordsViaSSOT,
   CHORD_ROW_SLOTS,
   type LyricLine,
 } from "@/store/song";
@@ -50,7 +51,8 @@ export function FocusedChordEditor({
   // Keep slot/anchor in sync with the underlying store (e.g. if a chord is
   // placed, advance to the next slot for fast successive entry).
   useEffect(() => {
-    const initialChord = line?.chords.find((c) => c.id === initialAnchorId)?.chord;
+    const lineChords = section ? getLineChordsViaSSOT(section, lineId) : [];
+    const initialChord = lineChords.find((c) => c.id === initialAnchorId)?.chord;
     setQuery(initialChord?.display ?? "");
     setTimeout(() => inputRef.current?.focus(), 60);
     // Only on mount.
