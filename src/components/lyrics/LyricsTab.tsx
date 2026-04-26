@@ -360,7 +360,7 @@ function LineRow({
                 <span
                   key={i}
                   className="absolute top-1 bottom-1 w-px bg-muted-foreground/12"
-                  style={{ left: `${(i + 1) * 16}px` }}
+                  style={{ left: `${(i + 1) * 28}px` }}
                 />
               ))}
             </div>
@@ -390,7 +390,7 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative w-4 shrink-0 h-9 flex items-center justify-start",
+                      "relative w-7 shrink-0 h-9 flex items-center justify-start",
                       isAnyDragging &&
                         !occupied &&
                         !isInvalidDrop &&
