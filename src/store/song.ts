@@ -1954,23 +1954,59 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      // Spacing rule: pick a slot whose neighbors are also free.
-      const occupied = new Set<number>();
-      for (const sc of sec.chords) {
-        if (sc.lyricsPlacement?.lineId === lineId) occupied.add(sc.lyricsPlacement.slotIndex);
+      // Auto-reflow placement: target the requested slot. If it collides with
+      // an existing chord OR violates the 1-slot spacing rule with its
+      // immediate neighbors, shift every chord at-or-after the desired slot
+      // by +2 to open a properly-spaced gap, then place at `target`.
+      const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
+      const lineChords = sec.chords
+        .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
+        .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
+      const occupied = new Set<number>(lineChords.map((sc) => sc.lyricsPlacement!.slotIndex));
+      const collision =
+        occupied.has(target) || occupied.has(target - 1) || occupied.has(target + 1);
+
+      let nextSectionsBase = s.sections;
+      let placeSlot = target;
+      if (collision) {
+        // Shift everything at-or-after target by +2 (clamped). If the tail
+        // would overflow CHORD_ROW_SLOTS we silently drop — row genuinely full.
+        const shifted = lineChords
+          .filter((sc) => sc.lyricsPlacement!.slotIndex >= target)
+          .map((sc) => ({ id: sc.id, to: sc.lyricsPlacement!.slotIndex + 2 }));
+        if (shifted.some((x) => x.to >= CHORD_ROW_SLOTS)) {
+          // Fallback: try a non-shifting spaced slot rather than losing chord.
+          const fallback = nearestSpacedFreeSlot(occupied, target);
+          if (fallback < 0) return {};
+          placeSlot = fallback;
+        } else {
+          const shiftMap = new Map(shifted.map((x) => [x.id, x.to]));
+          nextSectionsBase = s.sections.map((x) =>
+            x.id !== sectionId
+              ? x
+              : {
+                  ...x,
+                  chords: x.chords.map((sc) =>
+                    shiftMap.has(sc.id) && sc.lyricsPlacement
+                      ? { ...sc, lyricsPlacement: { ...sc.lyricsPlacement, slotIndex: shiftMap.get(sc.id)! } }
+                      : sc,
+                  ),
+                },
+          );
+        }
       }
-      const slot = nearestSpacedFreeSlot(occupied, slotIndex);
-      if (slot < 0) return {}; // row full — silently drop
+
       const newId = nanoid();
+      const secForPlacement = nextSectionsBase.find((x) => x.id === sectionId)!;
       const placement = placeSectionChordInProgression(
         s.progression,
         sectionId,
-        sec.chords,
+        secForPlacement.chords,
         chord,
         newId,
-        { lineId, slotIndex: slot },
+        { lineId, slotIndex: placeSlot },
       );
-      const nextSections = s.sections.map((x) =>
+      const nextSections = nextSectionsBase.map((x) =>
         x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
       );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
