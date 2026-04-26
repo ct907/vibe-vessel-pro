@@ -34,12 +34,53 @@ export interface LyricLine {
 
 export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
 
+/**
+ * Per-view placement metadata for a {@link SectionChord}. Free-form: NO
+ * spacing rule is enforced. `slotIndex` is just an integer ordering hint
+ * within a chord row in the lyrics view (any value, can be sparse).
+ */
+export interface LyricsPlacement {
+  lineId: string;
+  slotIndex: number;
+}
+
+/** Per-view placement metadata for a {@link SectionChord} in the progression view. */
+export interface ProgressionPlacement {
+  patternId: string;
+  startBeat: number;
+  lengthBeats: number;
+}
+
+/**
+ * SSOT chord record for a section. The section's `chords` array is the
+ * canonical list — chord **type** (`chord`) and **relative order** within
+ * this array are what's synchronized across the lyrics and progression
+ * views. Per-view position metadata (`lyricsPlacement`, `progressionPlacement`)
+ * is independent and free-form.
+ *
+ * Phase 1: this is a DERIVED projection rebuilt from the existing
+ * `line.chords` / `pattern.chords` mirrors after every mutation. Later
+ * phases invert the flow.
+ */
+export interface SectionChord {
+  id: string;
+  chord: ChordSymbol;
+  lyricsPlacement?: LyricsPlacement;
+  progressionPlacement?: ProgressionPlacement;
+}
+
 export interface Section {
   id: string;
   label: string;
   type: SectionType;
   collapsed: boolean;
   lines: LyricLine[];
+  /**
+   * SSOT chord projection for this section. Phase 1: derived from mirrors
+   * after every mutation. Do NOT mutate directly yet — write to
+   * `line.chords` / `pattern.chords` and the projection will refresh.
+   */
+  chords: SectionChord[];
   /** Optional notes/comment for this section. */
   comment?: string;
   /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
