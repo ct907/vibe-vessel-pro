@@ -2163,24 +2163,18 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // SSOT-first: chordId === SectionChord.id. Mutate that chord's
   // progressionPlacement.lengthBeats; mirror derivation re-packs startBeats.
   setPatternChordLength: (patternId, chordId, lengthBeats) => set((s) => {
-    const pattern = s.progression.find((p) => p.id === patternId);
-    if (!pattern) return {};
-    const totalBeats = pattern.bars * pattern.beatsPerBar;
+    // SSOT-first: just update the SectionChord's lengthBeats. Overflow into
+    // subsequent blocks (and continuation-block spawning) is handled by the
+    // derive step in syncMirrorsFromAllSectionChords.
+    const newLen = Math.max(0.5, lengthBeats);
     const sections = s.sections.map((sec) => {
       if (!sec.chords.some((sc) => sc.id === chordId && sc.progressionPlacement?.patternId === patternId)) return sec;
-      const othersSum = sec.chords.reduce((sum, sc) => {
-        if (sc.id === chordId) return sum;
-        const pp = sc.progressionPlacement;
-        return pp && pp.patternId === patternId ? sum + pp.lengthBeats : sum;
-      }, 0);
-      const maxForThis = Math.max(0.5, totalBeats - othersSum);
-      const clamped = Math.max(0.5, Math.min(lengthBeats, maxForThis));
       return {
         ...sec,
         chords: sec.chords.map((sc) =>
           sc.id !== chordId || !sc.progressionPlacement
             ? sc
-            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: clamped } },
+            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: newLen } },
         ),
       };
     });
