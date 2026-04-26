@@ -457,15 +457,7 @@ function LineRow({
                                 onPickerOpen(line.id, slotIdx, anchor!.id);
                               }}
                             >
-                              {/* No `pointer-events-none` here: pangea's touch
-                                  sensor needs to hit-test the visible child to
-                                  position the drag clone correctly under the
-                                  finger. The inner ChordChip is a <button> but
-                                  we route taps via the wrapper's onClick (with
-                                  audition disabled), and the parent
-                                  Draggable's dragHandleProps still owns the
-                                  press-and-hold gesture. */}
-                              <div className="relative">
+                              <div className="relative pointer-events-none">
                                 <ChordChip
                                   chord={anchor!.chord}
                                   variant="ink"
