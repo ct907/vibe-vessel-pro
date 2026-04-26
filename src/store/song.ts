@@ -732,7 +732,28 @@ function pushHistory(get: () => SongState) {
   redoStack.length = 0;
 }
 
-export const useSongStore = create<SongState>((set, get) => ({
+export const useSongStore = create<SongState>((rawSet, get) => {
+  /**
+   * Wrapped setter: after any update that touches `sections` or `progression`,
+   * refresh the SSOT projection (`section.chords`). Phase 1 keeps the legacy
+   * mirrors authoritative; the projection is a read-only view used by tests
+   * and (in later phases) by the UI itself.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const set = ((updater: any, replace?: any) => {
+    return rawSet((prev: SongState) => {
+      const partial = typeof updater === "function" ? updater(prev) : updater;
+      if (!partial) return partial;
+      const touchesSections = Object.prototype.hasOwnProperty.call(partial, "sections");
+      const touchesProgression = Object.prototype.hasOwnProperty.call(partial, "progression");
+      if (!touchesSections && !touchesProgression) return partial;
+      const sections = touchesSections ? partial.sections : prev.sections;
+      const progression = touchesProgression ? partial.progression : prev.progression;
+      return { ...partial, sections: refreshAllSectionChords(sections, progression) };
+    }, replace);
+  }) as typeof rawSet;
+
+  return {
   meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
   sections: [seed.section],
   basket: [],
