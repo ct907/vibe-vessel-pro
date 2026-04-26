@@ -2224,54 +2224,68 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return { progression };
   }),
 
-  // Add chord into pattern; mirror it back as an anchor at end of last lyric line of bound section.
+  // Add chord into pattern (SSOT-first). Creates a SectionChord targeting the
+  // specific pattern; mirrors derive `line.chords` + `pattern.chords`.
   addChordToPattern: (patternId, chord, atBeat, lengthBeats) => set((s) => {
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const sec = s.sections.find((x) => x.id === sectionId);
+    if (!sec) return {};
+    const totalBeats = pattern.bars * pattern.beatsPerBar;
     const effectiveLen = lengthBeats ?? getDefaults().defaultChordLengthBeats;
-    const newPcId = nanoid();
-    let createdAnchorId: string | null = null;
 
-    // 1) Create the anchor in the bound section's last line
-    const sections = s.sections.map((sec) => {
-      if (sec.id !== patternId) return sec;
-      const lines = [...sec.lines];
-      if (!lines.length) lines.push(initialLine());
-      const lastIdx = lines.length - 1;
-      const last = lines[lastIdx];
-      const newAnchorId = nanoid();
-      createdAnchorId = newAnchorId;
-      const nextCol = (last.chordRowLen ?? 0) > 0
-        ? (last.chordRowLen ?? 0) + 1
-        : 0;
-      lines[lastIdx] = {
-        ...last,
-        chords: [...last.chords, { id: newAnchorId, offset: nextCol, chordCol: nextCol, chord, mirrorId: newPcId }]
-          .sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0)),
-        chordRowLen: nextCol + 1,
-      };
-      return { ...sec, lines };
-    });
+    // SSOT used in this pattern (sum of lengths) — drives append point.
+    const usedInPattern = sec.chords
+      .filter((c) => c.progressionPlacement?.patternId === patternId)
+      .reduce((acc, c) => acc + (c.progressionPlacement!.lengthBeats || 0), 0);
+    const free = totalBeats - usedInPattern;
 
-    // 2) Add the pattern chord with the back-link, then re-pack left-aligned.
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      const start = Math.max(0, Math.min(totalBeats - 1, atBeat));
-      const pc: PatternChord = {
-        id: newPcId,
+    const newId = nanoid();
+    let nextProgression = s.progression;
+    let sectionChord: SectionChord;
+    if (free + 1e-9 >= 0.5) {
+      // Append into target pattern at the natural end.
+      const placedLen = Math.max(0.5, Math.min(effectiveLen, free));
+      sectionChord = {
+        id: newId,
         chord,
-        startBeat: start,
-        lengthBeats: Math.max(0.5, Math.min(effectiveLen, totalBeats)),
-        mirrorId: createdAnchorId ?? undefined,
+        progressionPlacement: { patternId, startBeat: usedInPattern, lengthBeats: placedLen },
       };
-      // Append at end so it packs after existing chords.
-      const lastEnd = p.chords.length
-        ? Math.max(...p.chords.map((c) => c.startBeat + c.lengthBeats))
-        : 0;
-      const merged = [...p.chords, { ...pc, startBeat: lastEnd }];
-      return { ...p, chords: repackChords(merged, totalBeats) };
+    } else {
+      // Pattern full — fall back to generic placement (continuation block etc.).
+      const placement = placeSectionChordInProgression(
+        s.progression,
+        sectionId,
+        sec.chords,
+        chord,
+        newId,
+      );
+      nextProgression = placement.progression;
+      sectionChord = placement.sectionChord;
+    }
+
+    // Insert SectionChord at the end of this pattern's group within section.chords.
+    const nextSections = s.sections.map((x) => {
+      if (x.id !== sectionId) return x;
+      // Find last index of any SectionChord placed in same pattern; insert after it.
+      let insertAt = x.chords.length;
+      for (let i = x.chords.length - 1; i >= 0; i--) {
+        if (x.chords[i].progressionPlacement?.patternId === patternId) {
+          insertAt = i + 1;
+          break;
+        }
+      }
+      const next = [...x.chords];
+      next.splice(insertAt, 0, sectionChord);
+      return { ...x, chords: next };
     });
 
-    return { sections, progression };
+    // Suppress unused warning on atBeat (free-form per-view metadata, not respected for SSOT placement).
+    void atBeat;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, progression: nextProgression, [SSOT_MODE]: true } as any);
   }),
 
   updatePatternChord: (patternId, chordId, patch) => set((s) => {
