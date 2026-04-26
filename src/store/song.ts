@@ -248,7 +248,8 @@ export interface SongState {
 }
 
 export interface SerializedSong {
-  version: 2;
+  /** v2 = legacy mirror-only. v3 = SectionChord projection persisted alongside mirrors. */
+  version: 2 | 3;
   meta: SongState["meta"];
   sections: Section[];
   progression: PatternBlock[];
