@@ -194,7 +194,7 @@ function LineRow({
 
   // ---- Clipboard helpers (kept compatible with the rest of the app) ----
   const collectClip = (ids: string[]): ChordClip[] => {
-    const sel = line.chords.filter((c) => ids.includes(c.id));
+    const sel = lineChords.filter((c) => ids.includes(c.id));
     if (!sel.length) return [];
     const minSlot = Math.min(...sel.map(slotOf));
     return sel.map((c) => ({
@@ -216,12 +216,12 @@ function LineRow({
     }
   };
   const doCopy = () => {
-    const ids = Array.from(selection.selected).filter((id) => line.chords.some((c) => c.id === id));
+    const ids = Array.from(selection.selected).filter((id) => lineChords.some((c) => c.id === id));
     chordClipboard = collectClip(ids);
     writeOSClipboard(chordClipboard);
   };
   const doCut = () => {
-    const ids = Array.from(selection.selected).filter((id) => line.chords.some((c) => c.id === id));
+    const ids = Array.from(selection.selected).filter((id) => lineChords.some((c) => c.id === id));
     chordClipboard = collectClip(ids);
     writeOSClipboard(chordClipboard);
     if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
@@ -242,7 +242,7 @@ function LineRow({
   };
 
   // ---- Selection helpers (range-select via shift) ----
-  const sortedChords = [...line.chords].sort((a, b) => slotOf(a) - slotOf(b));
+  const sortedChords = [...lineChords].sort((a, b) => slotOf(a) - slotOf(b));
   const lastSelectedRef = useRef<string | null>(null);
   const selectRangeTo = (anchorId: string, additive: boolean) => {
     const anchor = lastSelectedRef.current;
@@ -274,7 +274,7 @@ function LineRow({
     }
     if (mod && (k === "a" || k === "A")) {
       e.preventDefault();
-      selection.set(line.chords.map((c) => c.id));
+      selection.set(lineChords.map((c) => c.id));
       return;
     }
     if (mod && (k === "c" || k === "C") && selection.size > 0) {
@@ -300,7 +300,7 @@ function LineRow({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         // Only clear if at least one chord on this row is selected.
-        if (line.chords.some((c) => selection.has(c.id))) selection.clear();
+        if (lineChords.some((c) => selection.has(c.id))) selection.clear();
       }
     };
     const onPointer = (e: PointerEvent) => {
@@ -310,7 +310,7 @@ function LineRow({
       // Don't interfere with basket drag-and-drop initiation.
       if (t && t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
       if (root.contains(e.target as Node)) return;
-      if (line.chords.some((c) => selection.has(c.id))) selection.clear();
+      if (lineChords.some((c) => selection.has(c.id))) selection.clear();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("pointerdown", onPointer, true);
@@ -318,7 +318,7 @@ function LineRow({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointer, true);
     };
-  }, [selection, line.chords]);
+  }, [selection, lineChords]);
 
   const slots = chordsBySlot(line);
 
@@ -353,7 +353,7 @@ function LineRow({
           className="relative flex items-stretch flex-1 min-w-0 overflow-hidden rounded-sm bg-muted-foreground/12 outline-none"
           style={{ minHeight: 36 }}
         >
-          {line.chords.length === 0 && !isAnyDragging && (
+          {lineChords.length === 0 && !isAnyDragging && (
             <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
               add your chords here
             </span>
@@ -515,8 +515,8 @@ function LineRow({
                 // Entering Edit Mode: close picker + blur active input.
                 onPickerClose();
                 (document.activeElement as HTMLElement | null)?.blur?.();
-                if (line.chords.length > 0) {
-                  selection.set(line.chords.map((c) => c.id));
+                if (lineChords.length > 0) {
+                  selection.set(lineChords.map((c) => c.id));
                 }
               } else {
                 // Exiting Edit Mode: clear selection.
@@ -534,7 +534,7 @@ function LineRow({
       </div>
 
       {/* SELECTION TOOLBAR (only when something is selected on this row) */}
-      {selection.size > 0 && line.chords.some((c) => selection.has(c.id)) && (
+      {selection.size > 0 && lineChords.some((c) => selection.has(c.id)) && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
           {/* Row 1: counter + close + copy/cut/paste + move arrows */}
           <div className="flex items-center gap-1 flex-wrap">
@@ -565,7 +565,7 @@ function LineRow({
                 className="h-7 px-2"
                 onClick={() => {
                   const ids = Array.from(selection.selected)
-                    .map((id) => line.chords.find((c) => c.id === id))
+                    .map((id) => lineChords.find((c) => c.id === id))
                     .filter((c): c is ChordAnchor => !!c)
                     .sort((a, b) => slotOf(a) - slotOf(b));
                   ids.forEach((c) => {
@@ -583,7 +583,7 @@ function LineRow({
                 className="h-7 px-2"
                 onClick={() => {
                   const ids = Array.from(selection.selected)
-                    .map((id) => line.chords.find((c) => c.id === id))
+                    .map((id) => lineChords.find((c) => c.id === id))
                     .filter((c): c is ChordAnchor => !!c)
                     .sort((a, b) => slotOf(b) - slotOf(a));
                   ids.forEach((c) => {
@@ -606,7 +606,7 @@ function LineRow({
               className="h-7 px-2 text-destructive"
               onClick={() => {
                 const ids = Array.from(selection.selected).filter((id) =>
-                  line.chords.some((c) => c.id === id),
+                  lineChords.some((c) => c.id === id),
                 );
                 if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
                 selection.clear();
