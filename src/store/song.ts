@@ -2674,50 +2674,40 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   },
 
   removePatternChord: (patternId, chordId) => set((s) => {
-    let mirrorAnchorId: string | undefined;
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const found = p.chords.find((c) => c.id === chordId);
-      mirrorAnchorId = found?.mirrorId;
-      const totalBeats = p.bars * p.beatsPerBar;
-      return { ...p, chords: repackChords(p.chords.filter((c) => c.id !== chordId), totalBeats) };
-    });
-    const sections = mirrorAnchorId
-      ? s.sections.map((sec) => {
-          if (sec.id !== patternId) return sec;
-          return {
-            ...sec,
-            lines: sec.lines.map((l) => ({
-              ...l,
-              chords: l.chords.filter((a) => a.id !== mirrorAnchorId),
-            })),
-          };
-        })
-      : s.sections;
-    return { progression, sections };
+    // SSOT-first: chordId === SectionChord.id. Drop the SectionChord; mirrors derive.
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const nextSections = s.sections.map((sec) =>
+      sec.id !== sectionId ? sec : { ...sec, chords: sec.chords.filter((c) => c.id !== chordId) },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
   movePatternChord: (patternId, chordId, direction) => set((s) => {
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-      const idx = sorted.findIndex((c) => c.id === chordId);
-      const swapWith = idx + direction;
-      if (idx < 0 || swapWith < 0 || swapWith >= sorted.length) return p;
-      [sorted[idx], sorted[swapWith]] = [sorted[swapWith], sorted[idx]];
-      // Reassign startBeats so repack (which sorts by startBeat) preserves the swap.
-      let cursor = 0;
-      const reseq = sorted.map((c) => {
-        const next = { ...c, startBeat: cursor };
-        cursor += c.lengthBeats;
-        return next;
-      });
-      return { ...p, chords: repackChords(reseq, totalBeats) };
+    // SSOT-first: reorder within the SectionChord array (only those bound to
+    // this pattern), then derive mirrors. Identity is preserved (id stable).
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const sec = s.sections.find((x) => x.id === sectionId);
+    if (!sec) return {};
+    const inPattern = sec.chords.filter((c) => c.progressionPlacement?.patternId === patternId);
+    const idx = inPattern.findIndex((c) => c.id === chordId);
+    const swapWith = idx + direction;
+    if (idx < 0 || swapWith < 0 || swapWith >= inPattern.length) return {};
+    // Swap order WITHIN section.chords, preserving relative positions of chords from other patterns.
+    const a = inPattern[idx];
+    const b = inPattern[swapWith];
+    const nextSections = s.sections.map((x) => {
+      if (x.id !== sectionId) return x;
+      // Build new list: walk original; when we hit one of the two swapped, emit the other.
+      const next = x.chords.map((c) => (c.id === a.id ? b : c.id === b.id ? a : c));
+      return { ...x, chords: next };
     });
-    const updatedPattern = progression.find((p) => p.id === patternId);
-    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
-    return { progression, sections };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
