@@ -1449,46 +1449,24 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return { sections: finalSections, progression };
   }); },
 
-  removeChordAnchor: (sectionId, lineId, anchorId) => { pushHistory(get); return set((s) => {
-    let mirrorId: string | undefined;
-    const sections = s.sections.map((sec) => {
-      if (sec.id !== sectionId) return sec;
-      return {
-        ...sec,
-        lines: sec.lines.map((l) => {
-          if (l.id !== lineId) return l;
-          const removed = l.chords.find((c) => c.id === anchorId);
-          mirrorId = removed?.mirrorId;
-          return { ...l, chords: l.chords.filter((c) => c.id !== anchorId) };
-        }),
-      };
-    });
-    const progression = mirrorId
-      ? s.progression.map((p) =>
-          p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => c.id !== mirrorId) },
-        )
-      : s.progression;
-    return { sections, progression };
+  // SSOT-first: anchorId === SectionChord.id (deriveMirrorsFromSectionChords
+  // copies sc.id into ChordAnchor.id). Drop that SectionChord and let
+  // mirror derivation remove both the lyric anchor and the pattern chord.
+  removeChordAnchor: (sectionId, _lineId, anchorId) => { pushHistory(get); return set((s) => {
+    const sections = s.sections.map((sec) =>
+      sec.id !== sectionId ? sec : { ...sec, chords: sec.chords.filter((sc) => sc.id !== anchorId) },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }); },
 
-  removeChordAnchorsBatch: (sectionId, lineId, anchorIds) => { pushHistory(get); return set((s) => {
+  removeChordAnchorsBatch: (sectionId, _lineId, anchorIds) => { pushHistory(get); return set((s) => {
     const idSet = new Set(anchorIds);
-    const mirrorIds = new Set<string>();
-    const sections = s.sections.map((sec) => {
-      if (sec.id !== sectionId) return sec;
-      return {
-        ...sec,
-        lines: sec.lines.map((l) => {
-          if (l.id !== lineId) return l;
-          l.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorIds.add(c.mirrorId); });
-          return { ...l, chords: l.chords.filter((c) => !idSet.has(c.id)) };
-        }),
-      };
-    });
-    const progression = mirrorIds.size
-      ? s.progression.map((p) => p.id !== sectionId ? p : { ...p, chords: p.chords.filter((c) => !mirrorIds.has(c.id)) })
-      : s.progression;
-    return { sections, progression };
+    const sections = s.sections.map((sec) =>
+      sec.id !== sectionId ? sec : { ...sec, chords: sec.chords.filter((sc) => !idSet.has(sc.id)) },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }); },
 
   shiftChordAnchors: (sectionId, lineId, anchorIds, deltaCols) => { pushHistory(get); return set((s) => {
