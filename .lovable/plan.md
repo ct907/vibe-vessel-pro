@@ -46,37 +46,34 @@ Scope:
 - `playback.ts` left untouched: its `mirrorId` field already equals the anchor id (== SectionChord id from the projection), so highlight selectors in LyricsTab/ProgressionsTab continue to work unchanged.
 - Mirrors (`line.chords`, `pattern.chords`, `mirrorId`) remain authoritative writers — store actions are unchanged.
 
-## Phase 4b — Invert flow + delete legacy types (sliced over 4 turns)
+## Phase 4b — Invert flow + delete legacy types (action-by-action)
 
-Strategy: section.chords becomes the authoritative writer. After each batch of actions is migrated, `line.chords` / `pattern.chords` are *derived* from `section.chords` by a new helper `deriveMirrorsFromSectionChords(section)`. Mirrors stay on the type until the very end so unmigrated actions keep working.
+Strategy: section.chords becomes the authoritative writer. After each batch of actions is migrated, `line.chords` / `pattern.chords` are *derived* from `section.chords` by `deriveMirrorsFromSectionChords(section)`. Mirrors stay on the type until the very end so unmigrated actions keep working alongside SSOT-first ones.
 
-### 4b.1 — Foundation (PARTIAL — foundation landed, action migration deferred)
-- ✅ Added `deriveMirrorsFromSectionChords(section, sectionPatterns)` in `store/song.ts` that rebuilds `line.chords` + each pattern's `chords` from `section.chords`.
-- ✅ Added `syncMirrorsFromAllSectionChords(sections, progression)` to apply across the whole song.
-- ✅ Added `SSOT_MODE` marker on partial state updates. Wrapped `set` checks for it: when present, treats `section.chords` as authoritative and rebuilds mirrors; when absent, defaults to refreshing `section.chords` from mirrors (legacy mirror-first flow).
-- ⏸ DEFERRED: rewriting individual chord-mutating actions to be SSOT-first.
+### 4b.1 — Foundation (DONE)
+- ✅ `deriveMirrorsFromSectionChords` rebuilds `line.chords` + pattern chords from `section.chords`.
+- ✅ `syncMirrorsFromAllSectionChords` applies it across the whole song.
+- ✅ `placeSectionChordInProgression` ports the legacy `placeMirroredChord` continuation-block-spawning logic into the SSOT-first flow. Used by SSOT-first actions to assign a `progressionPlacement` to a brand-new SectionChord, spawning a continuation block when no existing pattern in the section has room.
+- ✅ `SSOT_MODE` marker on partial state updates.
 
-#### Why action migration was deferred
-Two real behavioral semantics live in the existing mirror-first actions that the naive `deriveMirrorsFromSectionChords` does NOT replicate:
-1. **Continuation-block spawning**: `placeMirroredChord` creates a brand-new pattern block in a section if no existing block has room. My derive helper just clamps/drops chords that don't fit. Migrating `placeChordInSlot` (and friends) to SSOT-first without porting this logic would silently lose chords on full patterns.
-2. **Overflow cascade across pattern blocks**: `resizePatternChordsWithOverflow` pushes chords into the next pattern block when a resize exceeds capacity. SSOT-first would have to encode this cascade in the action itself before calling set.
+### 4b.2 — Migrate actions (IN PROGRESS, 1/25)
+- ✅ `placeChordInSlot` — fully SSOT-first. Writes a new SectionChord; uses `placeSectionChordInProgression` for room/continuation; mirrors derived via SSOT_MODE.
+- ⏸ All others (24 remaining) still mirror-first.
 
-Both are solvable but each adds 30–60 lines of careful logic per migrated action. Doing all 8 simple actions correctly is a full focused turn on its own; doing all 30+ actions across all 4 batches is multiple focused sessions with manual smoke between each.
+**Smoke-test before continuing**: drag a chord from the basket onto an empty lyric row slot. Verify:
+- Chord appears in the lyrics row at the chosen slot.
+- Same chord appears in the progression block.
+- Adding chords until a block is full spawns a continuation block automatically.
+- Undo/redo works.
+- No console errors.
 
-#### Current state assessment
-The infrastructure for SSOT-first mutations is in place. Future SSOT-first writes can use the `SSOT_MODE` marker. The existing UI continues to work via the mirror-first path. **Phase 4b can be resumed action-by-action incrementally as the need arises** (e.g., when adding a new chord-touching feature, write that action SSOT-first instead of mirror-first).
+If green, the next batch (per turn): `removeChordAnchor`, `removeChordAnchorsBatch`, `replacePatternChords`, `addChordToPatternSlot`, `setPatternChordLength`. Each turn ends with a stop-and-smoke checkpoint.
 
-### 4b.2 — Medium actions
-- Migrate: `upsertChordAt`, `upsertChordAtWord`, `moveChordToSlot`, `moveChordWordSlot`, `shiftChordAnchors`, `moveSelectedChordsByOrder`, `moveChordAnchor`, `moveSelectedChordsTo`, `addChordToPattern`, `updatePatternChord`, `movePatternChord`, `setPatternChordLength`, `shiftPatternChords`, `reorderPatternChord`, `movePatternChordToSlot`, `movePatternChordsToSlot`.
-- Verify: build + chord row tap-to-add, slot reorder in both views, length change in progression.
+### 4b.3 — Complex actions (TODO)
+- `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow` (overflow cascade), `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
 
-### 4b.3 — Complex actions
-- Migrate: `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow`, `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
-- Verify: build + Format Chords button, paste chord text, resize chord that overflows next pattern, drag chord between lines/patterns.
-
-### 4b.4 — Type cleanup + final
-- Delete `mirrorId` field from `ChordAnchor` and `PatternChord` (no longer needed — pairing is implicit via SectionChord.id).
-- OR fully delete `ChordAnchor` / `PatternChord` if mirrors are no longer needed at runtime (they may still be useful as the rendering shape — decide at this point).
-- Update `playback.ts` to use `sectionChordId` instead of `mirrorId`.
-- Bump `SerializedSong.version` to 4 (section.chords is now authoritative; mirrors omitted from JSON or kept as cache).
-- Final type prune + smoke pass across all chord interactions.
+### 4b.4 — Type cleanup (FINAL)
+- Delete `mirrorId` from `ChordAnchor` / `PatternChord` (pairing implicit via SectionChord.id).
+- Drop legacy `offset`, `chordCol`, `wordIndex`, `chordRowLen` once consumers stop reading them.
+- Update `playback.ts` mirrorId comment to reference SectionChord id.
+- Bump `SerializedSong.version` to 4.
