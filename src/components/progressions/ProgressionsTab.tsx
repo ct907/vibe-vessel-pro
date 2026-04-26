@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import { useBasketSelectionStore } from "@/store/basket-selection";
-import { useSongStore, getSectionDisplayName, type PatternBlock as PatternBlockType } from "@/store/song";
+import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
@@ -127,7 +127,13 @@ function PatternBlock({
   const justDraggedAtRef = useRef<number>(0);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
-  const sortedChords = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
+  const ownerSection = useSongStore((s) =>
+    s.sections.find((sec) => sec.id === (pattern.sectionId ?? pattern.id)),
+  );
+  const sortedChords = ownerSection
+    ? getPatternChordsViaSSOT(ownerSection, pattern)
+    : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
   const selectedIds = Array.from(selected);
