@@ -46,8 +46,28 @@ Scope:
 - `playback.ts` left untouched: its `mirrorId` field already equals the anchor id (== SectionChord id from the projection), so highlight selectors in LyricsTab/ProgressionsTab continue to work unchanged.
 - Mirrors (`line.chords`, `pattern.chords`, `mirrorId`) remain authoritative writers — store actions are unchanged.
 
-## Phase 4b (FUTURE) — Invert flow + delete legacy types
-- Rewrite all chord-mutating actions in `store/song.ts` to mutate `section.chords` first, then derive `line.chords` / `pattern.chords` from it.
-- Delete `ChordAnchor`, `PatternChord`, `mirrorId`, mirror-rederive helpers (`recomputeSectionChordsFromMirrors` becomes `deriveMirrorsFromSectionChords`).
-- Update `playback.ts` to drop the `mirrorId` field (use `chordId` directly).
-- Final type pruning + type check + manual smoke.
+## Phase 4b — Invert flow + delete legacy types (sliced over 4 turns)
+
+Strategy: section.chords becomes the authoritative writer. After each batch of actions is migrated, `line.chords` / `pattern.chords` are *derived* from `section.chords` by a new helper `deriveMirrorsFromSectionChords(section)`. Mirrors stay on the type until the very end so unmigrated actions keep working.
+
+### 4b.1 — Foundation + simple actions
+- Add `deriveMirrorsFromSectionChords(section)`: reads `section.chords` and rebuilds `line.chords` (using `lyricsPlacement.lineId/slotIndex`) + the section's pattern chords (using `progressionPlacement`).
+- Add SectionChord-first write helpers: `addSectionChord`, `removeSectionChord`, `updateSectionChordType`, `setSectionChordLyricsPlacement`, `setSectionChordProgressionPlacement`.
+- Wrap `set` so that any action calling these helpers re-runs `deriveMirrorsFromSectionChords` after `refreshAllSectionChords`. Both directions remain consistent during the transition.
+- Migrate SIMPLE actions: `placeChordInSlot`, `removeChordAnchor`, `removeChordAnchorsBatch`, `addChordToPatternSlot`, `removePatternChord`, `removePatternChordsBatch`, `replacePatternChords`, `appendChordToLine`. Each rewritten to mutate `section.chords` first.
+- Verify: build + addToBasket → drag to lyric slot, drag to pattern slot, delete chord, replace pattern.
+
+### 4b.2 — Medium actions
+- Migrate: `upsertChordAt`, `upsertChordAtWord`, `moveChordToSlot`, `moveChordWordSlot`, `shiftChordAnchors`, `moveSelectedChordsByOrder`, `moveChordAnchor`, `moveSelectedChordsTo`, `addChordToPattern`, `updatePatternChord`, `movePatternChord`, `setPatternChordLength`, `shiftPatternChords`, `reorderPatternChord`, `movePatternChordToSlot`, `movePatternChordsToSlot`.
+- Verify: build + chord row tap-to-add, slot reorder in both views, length change in progression.
+
+### 4b.3 — Complex actions
+- Migrate: `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow`, `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
+- Verify: build + Format Chords button, paste chord text, resize chord that overflows next pattern, drag chord between lines/patterns.
+
+### 4b.4 — Type cleanup + final
+- Delete `mirrorId` field from `ChordAnchor` and `PatternChord` (no longer needed — pairing is implicit via SectionChord.id).
+- OR fully delete `ChordAnchor` / `PatternChord` if mirrors are no longer needed at runtime (they may still be useful as the rendering shape — decide at this point).
+- Update `playback.ts` to use `sectionChordId` instead of `mirrorId`.
+- Bump `SerializedSong.version` to 4 (section.chords is now authoritative; mirrors omitted from JSON or kept as cache).
+- Final type prune + smoke pass across all chord interactions.
