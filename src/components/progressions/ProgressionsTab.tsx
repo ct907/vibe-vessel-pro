@@ -120,7 +120,6 @@ function PatternBlock({
   const isFocused = focusedPatternId === pattern.id;
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
 
-  const [activeChord, setActiveChord] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -133,23 +132,25 @@ function PatternBlock({
   const ownerSection = useSongStore((s) =>
     s.sections.find((sec) => sec.id === (pattern.sectionId ?? pattern.id)),
   );
+  // Total pattern blocks across the entire song — used to decide whether
+  // *any* pattern block is allowed to be deleted (we only forbid deleting
+  // the very last remaining block in the whole song).
+  const totalBlocksInSong = useSongStore((s) =>
+    s.sections.reduce((n, sec) => n + sec.progression.length, 0),
+  );
   const sortedChords = ownerSection
     ? getPatternChordsViaSSOT(ownerSection, pattern)
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
   const selectedIds = Array.from(selected);
-  const canDeleteThisBlock = blocksInSection > 1;
+  const canDeleteThisBlock = totalBlocksInSong > 1;
 
   const exitSelect = () => {
     setSelectMode(false);
     setSelected(new Set());
+    lastSelectedRef.current = null;
   };
-
-  // (#8) Auto-close context menu when nothing is selected.
-  useEffect(() => {
-    if (selectMode && selected.size === 0) setSelectMode(false);
-  }, [selectMode, selected]);
 
   // Outside-tap closes the select-mode context menu.
   useEffect(() => {
@@ -167,63 +168,44 @@ function PatternBlock({
     return () => document.removeEventListener("pointerdown", onDown, true);
   }, [selectMode]);
 
+  // Keyboard shortcuts while in select mode.
   useEffect(() => {
-    if (!activeChord) return;
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
-      if (blockRef.current && blockRef.current.contains(t)) return;
-      if (t.closest("[data-radix-dialog-content]")) return;
-      setActiveChord(null);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [activeChord]);
-
-  useEffect(() => {
-    if (!activeChord && !selectMode) return;
+    if (!selectMode) return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      // (#6) Delete / Backspace removes active chord or all selected chords.
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectMode && selectedIds.length > 0) {
+        if (selectedIds.length > 0) {
           e.preventDefault();
           removePatternChordsBatch(pattern.id, selectedIds);
-          exitSelect();
-          return;
-        }
-        if (activeChord) {
-          e.preventDefault();
-          removePatternChordsBatch(pattern.id, [activeChord]);
-          setActiveChord(null);
+          setSelected(new Set());
           return;
         }
       }
-      if (!activeChord) return;
-      const c = sortedChords.find((x) => x.id === activeChord);
-      if (!c) return;
-      const otherSum = sortedChords.reduce((s, x) => s + (x.id === c.id ? 0 : x.lengthBeats), 0);
-      const maxLen = totalBeats - otherSum;
-      if (e.key === "+" || e.key === "=") {
-        e.preventDefault();
-        if (c.lengthBeats + LENGTH_STEP <= maxLen + 1e-9) {
-          setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+      if (selectedIds.length === 1) {
+        const c = sortedChords.find((x) => x.id === selectedIds[0]);
+        if (!c) return;
+        const otherSum = sortedChords.reduce((s, x) => s + (x.id === c.id ? 0 : x.lengthBeats), 0);
+        const maxLen = totalBeats - otherSum;
+        if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          if (c.lengthBeats + LENGTH_STEP <= maxLen + 1e-9) {
+            setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
+          }
+        } else if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          if (c.lengthBeats > MIN_LEN) {
+            setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
+          }
         }
-      } else if (e.key === "-" || e.key === "_") {
-        e.preventDefault();
-        if (c.lengthBeats > MIN_LEN) {
-          setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
-        }
-      } else if (e.key === "Escape") {
-        setActiveChord(null);
+      }
+      if (e.key === "Escape") {
+        exitSelect();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    activeChord,
     selectMode,
     selectedIds,
     sortedChords,
