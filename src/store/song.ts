@@ -741,6 +741,33 @@ export function getLineChordsViaSSOT(section: Section, lineId: string): ChordAnc
   return out;
 }
 
+/**
+ * SSOT-aware read for the progression view. Returns this pattern's
+ * {@link PatternChord} list ordered to match the section's SSOT
+ * (`section.chords`). Pattern chords not represented in the SSOT (transient
+ * mismatches) are appended at the end in their native order.
+ */
+export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock): PatternChord[] {
+  if (!section.chords || section.chords.length === 0) {
+    return [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  }
+  const byId = new Map(pattern.chords.map((pc) => [pc.id, pc] as const));
+  const out: PatternChord[] = [];
+  const seen = new Set<string>();
+  for (const sc of section.chords) {
+    if (sc.progressionPlacement?.patternId !== pattern.id) continue;
+    const pc = byId.get(sc.id);
+    if (pc) {
+      out.push(pc);
+      seen.add(pc.id);
+    }
+  }
+  for (const pc of [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat)) {
+    if (!seen.has(pc.id)) out.push(pc);
+  }
+  return out;
+}
+
 // ---------- Store ----------
 
 const seed = makeSection("verse");
