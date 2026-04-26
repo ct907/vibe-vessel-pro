@@ -135,9 +135,7 @@ function PatternBlock({
   // Total pattern blocks across the entire song — used to decide whether
   // *any* pattern block is allowed to be deleted (we only forbid deleting
   // the very last remaining block in the whole song).
-  const totalBlocksInSong = useSongStore((s) =>
-    s.sections.reduce((n, sec) => n + sec.progression.length, 0),
-  );
+  const totalBlocksInSong = useSongStore((s) => s.progression.length);
   const sortedChords = ownerSection
     ? getPatternChordsViaSSOT(ownerSection, pattern)
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
