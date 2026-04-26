@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
+import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useSongStore, getSectionDisplayName, type PatternBlock as PatternBlockType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -936,13 +937,20 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     const toUsed = toPattern.chords.reduce((s, c) => s + c.lengthBeats, 0);
     const toFree = Math.max(0, toCap - toUsed);
 
-    // Basket → pattern block: COPY chord at the target slot. Original chip
-    // stays in the basket so the user can drop the same chord multiple times.
+    // Basket → pattern block: COPY chord(s) at the target slot. Original
+    // chips stay in basket so the user can drop the same chord multiple
+    // times. If the dragged chip is part of a multi-selection, every
+    // selected chord is appended sequentially starting at the drop slot.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
-      const item = state.basket.find((b) => b.id === basketItemId);
-      if (!item) return;
-      state.addChordToPatternSlot(toId, item.chord, toSlot);
+      const { resolveDragIds, clear: clearBasketSelection } =
+        useBasketSelectionStore.getState();
+      const ids = resolveDragIds(basketItemId);
+      const ordered = state.basket.filter((b) => ids.includes(b.id));
+      ordered.forEach((b, i) =>
+        state.addChordToPatternSlot(toId, b.chord, toSlot + i),
+      );
+      clearBasketSelection();
       return;
     }
 
