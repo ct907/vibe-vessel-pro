@@ -29,9 +29,9 @@ function StaticChordChip({
   return (
     <span
       className={cn(
-        "relative inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none transition-all",
+        "relative inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none transition-colors",
         "px-2.5 py-1 text-sm bg-chord-chip/50 text-chord-chip-foreground",
-        selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade bg-primary/15 scale-105",
+        selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade bg-primary/15",
         dragging && "shadow-lg ring-2 ring-primary",
       )}
       style={{ pointerEvents: "none" }}
