@@ -389,7 +389,13 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative w-7 shrink-0 h-9 flex items-center justify-start",
+                      "relative shrink-0 h-9 flex items-center justify-start",
+                      // Width: 28px floor for empty slots, fit-content with a
+                      // 48px cap for occupied slots so long chord names fit.
+                      occupied ? "min-w-[28px] max-w-[48px] w-fit" : "w-7",
+                      // Per-slot left border acts as the vertical divider
+                      // between adjacent slots (skip the first one).
+                      slotIdx > 0 && !isAnyDragging && "border-l border-muted-foreground/12",
                       isAnyDragging &&
                         !occupied &&
                         !isInvalidDrop &&
