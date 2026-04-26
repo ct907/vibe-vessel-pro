@@ -2353,38 +2353,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }),
 
   updatePatternChord: (patternId, chordId, patch) => set((s) => {
-    let mirrorAnchorId: string | undefined;
-    let newChord: ChordSymbol | undefined;
-
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      const chords = p.chords.map((c) => {
-        if (c.id !== chordId) return c;
-        mirrorAnchorId = c.mirrorId;
-        const next = { ...c, ...patch };
-        next.lengthBeats = Math.max(0.5, next.lengthBeats);
-        if (patch.chord) newChord = patch.chord;
-        return next;
-      });
-      return { ...p, chords: repackChords(chords, totalBeats) };
+    // SSOT-first: chordId === SectionChord.id. Apply patch to the
+    // SectionChord; mirror derivation refreshes line.chords + pattern.chords.
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const totalBeats = pattern.bars * pattern.beatsPerBar;
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      if (!sec.chords.some((sc) => sc.id === chordId)) return sec;
+      const othersSum = sec.chords.reduce((sum, sc) => {
+        if (sc.id === chordId) return sum;
+        const pp = sc.progressionPlacement;
+        return pp && pp.patternId === patternId ? sum + pp.lengthBeats : sum;
+      }, 0);
+      const maxForThis = Math.max(0.5, totalBeats - othersSum);
+      return {
+        ...sec,
+        chords: sec.chords.map((sc) => {
+          if (sc.id !== chordId) return sc;
+          const next: SectionChord = { ...sc };
+          if (patch.chord) next.chord = patch.chord;
+          if (patch.lengthBeats != null && next.progressionPlacement) {
+            const clamped = Math.max(0.5, Math.min(patch.lengthBeats, maxForThis));
+            next.progressionPlacement = { ...next.progressionPlacement, lengthBeats: clamped };
+          }
+          return next;
+        }),
+      };
     });
-
-    // Mirror chord-quality changes to the anchor (length/position are pattern-only)
-    const sections = (mirrorAnchorId && newChord)
-      ? s.sections.map((sec) => {
-          if (sec.id !== patternId) return sec;
-          return {
-            ...sec,
-            lines: sec.lines.map((l) => ({
-              ...l,
-              chords: l.chords.map((a) => (a.id === mirrorAnchorId ? { ...a, chord: newChord! } : a)),
-            })),
-          };
-        })
-      : s.sections;
-
-    return { progression, sections };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }),
 
   // SSOT-first: chordId === SectionChord.id. Mutate that chord's
