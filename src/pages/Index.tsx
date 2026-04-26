@@ -68,8 +68,21 @@ const Index = () => {
   const onDragEnd = (result: DropResult) => {
     const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
     const dstPrefix = result.destination?.droppableId.split(":")[0];
-    if (dstPrefix === "slot") return lyricsOnDragEnd?.(result);
-    if (dstPrefix === "pattern") return progressionsOnDragEnd?.(result);
+    // eslint-disable-next-line no-console
+    console.log("[DnD] onDragEnd", {
+      result,
+      destination: result.destination?.droppableId,
+      source: result.source?.droppableId,
+      dstPrefix,
+    });
+    if (dstPrefix === "slot") {
+      console.log("[DnD] -> lyrics handler");
+      return lyricsOnDragEnd?.(result);
+    }
+    if (dstPrefix === "pattern") {
+      console.log("[DnD] -> progressions handler");
+      return progressionsOnDragEnd?.(result);
+    }
     // No destination (drop cancelled) — still notify lyrics so its draggingIds
     // state clears (its handler returns early when destination is null).
     lyricsOnDragEnd?.(result);
