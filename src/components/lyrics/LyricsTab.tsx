@@ -67,7 +67,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 import { useDndSelection } from "@/hooks/use-dnd-selection";
-import { BasketBar } from "@/components/basket/BasketBar";
+import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -1160,13 +1160,22 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     const toSlot = Number(dstParts[3]);
     if (Number.isNaN(toSlot)) return;
 
-    // Basket → row: COPY chord into target slot. Original chip stays in basket
-    // so the user can keep dragging the same chord into multiple destinations.
+    // Basket → row: COPY chord(s) into target slot(s). Original chips stay
+    // in basket so the user can keep dragging the same chord into multiple
+    // destinations. If the dragged chip is part of a multi-selection, every
+    // selected chord is placed starting at the drop slot, walking right.
     if (draggableId.startsWith("basket:")) {
       const basketItemId = draggableId.slice("basket:".length);
-      const item = useSongStore.getState().basket.find((b) => b.id === basketItemId);
-      if (!item) return;
-      placeChordInSlot(toSectionId, toLineId, toSlot, item.chord);
+      const basket = useSongStore.getState().basket;
+      const { resolveDragIds, clear: clearBasketSelection } =
+        useBasketSelectionStore.getState();
+      const ids = resolveDragIds(basketItemId);
+      // Preserve basket order for multi-drops so the user gets a predictable layout.
+      const ordered = basket.filter((b) => ids.includes(b.id));
+      ordered.forEach((b, i) =>
+        placeChordInSlot(toSectionId, toLineId, toSlot + i, b.chord),
+      );
+      clearBasketSelection();
       return;
     }
 
