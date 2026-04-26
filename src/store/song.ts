@@ -1963,12 +1963,19 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
         .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
       const occupied = new Set<number>(lineChords.map((sc) => sc.lyricsPlacement!.slotIndex));
-      const collision =
-        occupied.has(target) || occupied.has(target - 1) || occupied.has(target + 1);
+      // Reflow rules:
+      //  - Rule 1: every chord must have an empty slot to its right.
+      //  - Rule 2: otherwise, chords can be placed freely on any empty slot.
+      //  - Rule 3: auto-reflow (shift later chords by +2) ONLY when dropped
+      //    on the spacing slot directly BETWEEN two existing chords, OR when
+      //    the target slot itself is already occupied.
+      const occupiedHere = occupied.has(target);
+      const sandwiched = occupied.has(target - 1) && occupied.has(target + 1);
+      const needsReflow = occupiedHere || sandwiched;
 
       let nextSectionsBase = s.sections;
       let placeSlot = target;
-      if (collision) {
+      if (needsReflow) {
         // Shift everything at-or-after target by +2 (clamped). If the tail
         // would overflow CHORD_ROW_SLOTS we silently drop — row genuinely full.
         const shifted = lineChords
