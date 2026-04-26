@@ -2486,6 +2486,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         label: "Verse",
         collapsed: false,
         lines: parsed.lyrics.length ? parsed.lyrics : [initialLine()],
+        chords: [],
       };
       // Take first v1 pattern (if any) and bind its id to the new section.
       const firstPattern: PatternBlock = v1Progression?.[0]
@@ -2494,7 +2495,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       // any extra v1 patterns become their own bare sections
       const extras = (v1Progression?.slice(1) ?? []).map((p, i) => {
         const sid = nanoid();
-        const sec: Section = { id: sid, type: "custom", label: p.label || `Section ${i + 2}`, collapsed: false, lines: [initialLine()] };
+        const sec: Section = { id: sid, type: "custom", label: p.label || `Section ${i + 2}`, collapsed: false, lines: [initialLine()], chords: [] };
         const pat: PatternBlock = { ...p, id: sid };
         return { sec, pat };
       });
