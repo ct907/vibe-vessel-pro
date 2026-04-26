@@ -50,12 +50,21 @@ Scope:
 
 Strategy: section.chords becomes the authoritative writer. After each batch of actions is migrated, `line.chords` / `pattern.chords` are *derived* from `section.chords` by a new helper `deriveMirrorsFromSectionChords(section)`. Mirrors stay on the type until the very end so unmigrated actions keep working.
 
-### 4b.1 — Foundation + simple actions
-- Add `deriveMirrorsFromSectionChords(section)`: reads `section.chords` and rebuilds `line.chords` (using `lyricsPlacement.lineId/slotIndex`) + the section's pattern chords (using `progressionPlacement`).
-- Add SectionChord-first write helpers: `addSectionChord`, `removeSectionChord`, `updateSectionChordType`, `setSectionChordLyricsPlacement`, `setSectionChordProgressionPlacement`.
-- Wrap `set` so that any action calling these helpers re-runs `deriveMirrorsFromSectionChords` after `refreshAllSectionChords`. Both directions remain consistent during the transition.
-- Migrate SIMPLE actions: `placeChordInSlot`, `removeChordAnchor`, `removeChordAnchorsBatch`, `addChordToPatternSlot`, `removePatternChord`, `removePatternChordsBatch`, `replacePatternChords`, `appendChordToLine`. Each rewritten to mutate `section.chords` first.
-- Verify: build + addToBasket → drag to lyric slot, drag to pattern slot, delete chord, replace pattern.
+### 4b.1 — Foundation (PARTIAL — foundation landed, action migration deferred)
+- ✅ Added `deriveMirrorsFromSectionChords(section, sectionPatterns)` in `store/song.ts` that rebuilds `line.chords` + each pattern's `chords` from `section.chords`.
+- ✅ Added `syncMirrorsFromAllSectionChords(sections, progression)` to apply across the whole song.
+- ✅ Added `SSOT_MODE` marker on partial state updates. Wrapped `set` checks for it: when present, treats `section.chords` as authoritative and rebuilds mirrors; when absent, defaults to refreshing `section.chords` from mirrors (legacy mirror-first flow).
+- ⏸ DEFERRED: rewriting individual chord-mutating actions to be SSOT-first.
+
+#### Why action migration was deferred
+Two real behavioral semantics live in the existing mirror-first actions that the naive `deriveMirrorsFromSectionChords` does NOT replicate:
+1. **Continuation-block spawning**: `placeMirroredChord` creates a brand-new pattern block in a section if no existing block has room. My derive helper just clamps/drops chords that don't fit. Migrating `placeChordInSlot` (and friends) to SSOT-first without porting this logic would silently lose chords on full patterns.
+2. **Overflow cascade across pattern blocks**: `resizePatternChordsWithOverflow` pushes chords into the next pattern block when a resize exceeds capacity. SSOT-first would have to encode this cascade in the action itself before calling set.
+
+Both are solvable but each adds 30–60 lines of careful logic per migrated action. Doing all 8 simple actions correctly is a full focused turn on its own; doing all 30+ actions across all 4 batches is multiple focused sessions with manual smoke between each.
+
+#### Current state assessment
+The infrastructure for SSOT-first mutations is in place. Future SSOT-first writes can use the `SSOT_MODE` marker. The existing UI continues to work via the mirror-first path. **Phase 4b can be resumed action-by-action incrementally as the need arises** (e.g., when adding a new chord-touching feature, write that action SSOT-first instead of mirror-first).
 
 ### 4b.2 — Medium actions
 - Migrate: `upsertChordAt`, `upsertChordAtWord`, `moveChordToSlot`, `moveChordWordSlot`, `shiftChordAnchors`, `moveSelectedChordsByOrder`, `moveChordAnchor`, `moveSelectedChordsTo`, `addChordToPattern`, `updatePatternChord`, `movePatternChord`, `setPatternChordLength`, `shiftPatternChords`, `reorderPatternChord`, `movePatternChordToSlot`, `movePatternChordsToSlot`.
