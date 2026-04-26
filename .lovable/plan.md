@@ -29,9 +29,11 @@ Scope:
 - Wrap the zustand `set` so that any state update that touches `sections` or `progression` re-runs the projection across all sections.
 - Bump `SerializedSong.version` to 3, persist `section.chords`. On load (v3) trust mirrors, recompute projection. On v2 load, recompute projection from existing mirrors. (No legacy data path needs to honor SectionChord directly yet.)
 
-## Phase 2 — LyricsTab reads section.chords
-- Replace `line.chords` reads with `useMemo(() => section.chords.filter(c => c.lyricsPlacement?.lineId === line.id).sort by slotIndex)`.
-- Update FocusedChordEditor.
+## Phase 2 (DONE) — LyricsTab reads section.chords
+- Added `getLineChordsViaSSOT(section, lineId)` selector in `store/song.ts` that returns ChordAnchor[] in SSOT order (using `section.chords` projection, falling back to raw line.chords if SSOT empty).
+- `LyricsTab.LineRow` now derives `lineChords` via the selector and uses it everywhere (`chordsBySlot`, selection, clipboard, drag, render). `line.chords` is no longer read by the renderer (the legacy field still exists as the authoritative mirror that the projection is rebuilt from).
+- `FocusedChordEditor` seeds initial query from the SSOT-derived list.
+- `SectionCard.handleMergeUp` still reads `line.chords.length` for an emptiness check — kept as-is since it's a structural mirror question, not a render decision.
 
 ## Phase 3 — ProgressionsTab reads section.chords
 - Replace `block.chords` reads with derived selector.
