@@ -34,12 +34,53 @@ export interface LyricLine {
 
 export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
 
+/**
+ * Per-view placement metadata for a {@link SectionChord}. Free-form: NO
+ * spacing rule is enforced. `slotIndex` is just an integer ordering hint
+ * within a chord row in the lyrics view (any value, can be sparse).
+ */
+export interface LyricsPlacement {
+  lineId: string;
+  slotIndex: number;
+}
+
+/** Per-view placement metadata for a {@link SectionChord} in the progression view. */
+export interface ProgressionPlacement {
+  patternId: string;
+  startBeat: number;
+  lengthBeats: number;
+}
+
+/**
+ * SSOT chord record for a section. The section's `chords` array is the
+ * canonical list — chord **type** (`chord`) and **relative order** within
+ * this array are what's synchronized across the lyrics and progression
+ * views. Per-view position metadata (`lyricsPlacement`, `progressionPlacement`)
+ * is independent and free-form.
+ *
+ * Phase 1: this is a DERIVED projection rebuilt from the existing
+ * `line.chords` / `pattern.chords` mirrors after every mutation. Later
+ * phases invert the flow.
+ */
+export interface SectionChord {
+  id: string;
+  chord: ChordSymbol;
+  lyricsPlacement?: LyricsPlacement;
+  progressionPlacement?: ProgressionPlacement;
+}
+
 export interface Section {
   id: string;
   label: string;
   type: SectionType;
   collapsed: boolean;
   lines: LyricLine[];
+  /**
+   * SSOT chord projection for this section. Phase 1: derived from mirrors
+   * after every mutation. Do NOT mutate directly yet — write to
+   * `line.chords` / `pattern.chords` and the projection will refresh.
+   */
+  chords: SectionChord[];
   /** Optional notes/comment for this section. */
   comment?: string;
   /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
@@ -207,7 +248,8 @@ export interface SongState {
 }
 
 export interface SerializedSong {
-  version: 2;
+  /** v2 = legacy mirror-only. v3 = SectionChord projection persisted alongside mirrors. */
+  version: 2 | 3;
   meta: SongState["meta"];
   sections: Section[];
   progression: PatternBlock[];
@@ -240,6 +282,7 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
       label: finalLabel,
       collapsed: false,
       lines: [initialLine()],
+      chords: [],
     },
     pattern: {
       id,
@@ -591,9 +634,83 @@ function placeMirroredChord(
   return { progression: next, chordId: pcId, patternId: newId };
 }
 
+// ---------- SSOT projection (Phase 1) ----------
+/**
+ * Rebuild a section's `chords: SectionChord[]` projection from the existing
+ * `line.chords` (anchors) and the section's pattern blocks. Pairing happens
+ * via `mirrorId`. Order is determined by visual order of anchors first
+ * (lines top-to-bottom, slots/cols left-to-right), with progression-only
+ * pattern chords (no anchor mirror) appended afterward in pattern order.
+ *
+ * The chord type and relative order in this list are the SSOT invariant.
+ * Per-view metadata (`lyricsPlacement`, `progressionPlacement`) is captured
+ * but treated as free-form (no spacing rule enforced).
+ */
+function recomputeSectionChordsFromMirrors(
+  section: Section,
+  sectionPatterns: PatternBlock[],
+): SectionChord[] {
+  const pcByMirror = new Map<string, { patternId: string; pc: PatternChord }>();
+  const pcAll: { patternId: string; pc: PatternChord }[] = [];
+  sectionPatterns.forEach((p) => {
+    const sortedPcs = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+    sortedPcs.forEach((pc) => {
+      pcAll.push({ patternId: p.id, pc });
+      if (pc.mirrorId) pcByMirror.set(pc.mirrorId, { patternId: p.id, pc });
+    });
+  });
+
+  const usedPcIds = new Set<string>();
+  const out: SectionChord[] = [];
+
+  section.lines.forEach((line) => {
+    const sorted = [...line.chords].sort((a, b) => {
+      const as = a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
+      const bs = b.slotIndex ?? b.wordIndex ?? b.chordCol ?? b.offset ?? 0;
+      return as - bs;
+    });
+    sorted.forEach((a) => {
+      const mirror = a.mirrorId ? pcByMirror.get(a.mirrorId) : undefined;
+      if (mirror) usedPcIds.add(mirror.pc.id);
+      out.push({
+        id: a.id,
+        chord: a.chord,
+        lyricsPlacement: { lineId: line.id, slotIndex: a.slotIndex ?? 0 },
+        progressionPlacement: mirror
+          ? { patternId: mirror.patternId, startBeat: mirror.pc.startBeat, lengthBeats: mirror.pc.lengthBeats }
+          : undefined,
+      });
+    });
+  });
+
+  pcAll.forEach(({ patternId, pc }) => {
+    if (usedPcIds.has(pc.id)) return;
+    out.push({
+      id: pc.id,
+      chord: pc.chord,
+      lyricsPlacement: undefined,
+      progressionPlacement: { patternId, startBeat: pc.startBeat, lengthBeats: pc.lengthBeats },
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Refresh `section.chords` for every section based on current mirrors.
+ * Wrapped `set` calls this after any update that touches sections/progression.
+ */
+function refreshAllSectionChords(sections: Section[], progression: PatternBlock[]): Section[] {
+  return sections.map((sec) => {
+    const sectionPatterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
+    return { ...sec, chords: recomputeSectionChordsFromMirrors(sec, sectionPatterns) };
+  });
+}
+
 // ---------- Store ----------
 
 const seed = makeSection("verse");
+seed.section.chords = recomputeSectionChordsFromMirrors(seed.section, [seed.pattern]);
 
 // History stacks live outside the reactive state so snapshots don't trigger re-renders.
 type HistorySnapshot = { sections: Section[]; progression: PatternBlock[] };
@@ -616,7 +733,28 @@ function pushHistory(get: () => SongState) {
   redoStack.length = 0;
 }
 
-export const useSongStore = create<SongState>((set, get) => ({
+export const useSongStore = create<SongState>((rawSet, get) => {
+  /**
+   * Wrapped setter: after any update that touches `sections` or `progression`,
+   * refresh the SSOT projection (`section.chords`). Phase 1 keeps the legacy
+   * mirrors authoritative; the projection is a read-only view used by tests
+   * and (in later phases) by the UI itself.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const set = ((updater: any, replace?: any) => {
+    return rawSet((prev: SongState) => {
+      const partial = typeof updater === "function" ? updater(prev) : updater;
+      if (!partial) return partial;
+      const touchesSections = Object.prototype.hasOwnProperty.call(partial, "sections");
+      const touchesProgression = Object.prototype.hasOwnProperty.call(partial, "progression");
+      if (!touchesSections && !touchesProgression) return partial;
+      const sections = touchesSections ? partial.sections : prev.sections;
+      const progression = touchesProgression ? partial.progression : prev.progression;
+      return { ...partial, sections: refreshAllSectionChords(sections, progression) };
+    }, replace);
+  }) as typeof rawSet;
+
+  return {
   meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
   sections: [seed.section],
   basket: [],
@@ -714,6 +852,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       label: `${src.label} copy`,
       collapsed: src.collapsed,
       lines: newLines,
+      chords: [],
     };
     const newPattern: PatternBlock = srcPattern
       ? {
@@ -2443,6 +2582,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         label: "Verse",
         collapsed: false,
         lines: parsed.lyrics.length ? parsed.lyrics : [initialLine()],
+        chords: [],
       };
       // Take first v1 pattern (if any) and bind its id to the new section.
       const firstPattern: PatternBlock = v1Progression?.[0]
@@ -2451,7 +2591,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       // any extra v1 patterns become their own bare sections
       const extras = (v1Progression?.slice(1) ?? []).map((p, i) => {
         const sid = nanoid();
-        const sec: Section = { id: sid, type: "custom", label: p.label || `Section ${i + 2}`, collapsed: false, lines: [initialLine()] };
+        const sec: Section = { id: sid, type: "custom", label: p.label || `Section ${i + 2}`, collapsed: false, lines: [initialLine()], chords: [] };
         const pat: PatternBlock = { ...p, id: sid };
         return { sec, pat };
       });
@@ -2464,12 +2604,14 @@ export const useSongStore = create<SongState>((set, get) => ({
       return;
     }
 
-    if (parsed.version !== 2) return;
+    if (parsed.version !== 2 && parsed.version !== 3) return;
     const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
     // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
+    // Also ensure `chords: []` exists (the wrapped set will recompute the SSOT projection).
     const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
       ...sec,
       lines: sec.lines.map((l) => ensureSlotsForLine(l)),
+      chords: sec.chords ?? [],
     }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
@@ -2491,7 +2633,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   toJSON: () => {
     const s = get();
     return {
-      version: 2,
+      version: 3,
       meta: s.meta,
       sections: s.sections,
       progression: s.progression,
@@ -2499,7 +2641,8 @@ export const useSongStore = create<SongState>((set, get) => ({
       sound: useSoundStore.getState().toJSON(),
     };
   },
-}));
+  };
+});
 
 // ---- localStorage autosave ----
 const STORAGE_KEY = "songwriters-notebook:v1";
