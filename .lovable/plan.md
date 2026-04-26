@@ -166,3 +166,15 @@ Recommend implementing in this batch order so each piece can be smoke-tested:
 3. **FocusedChordEditor restructure**: F1.
 
 After each batch, you can confirm console is clean before proceeding to the next.
+---
+
+## Implementation log (2026-04-26)
+
+- L1–L4 done: pencil no longer pre-selects; Select-all button in toolbar; toolbar persists while in Edit Mode (controlled by Done/pencil only); outside-click & delete no longer exit edit mode.
+- L5 + B2: removed `scale-105` from selected basket chip (was compounding with dnd transform); kept inner chip `pointer-events-none` for handle stability.
+- B1: basket chips are now `isDragDisabled={false}` for all chips — quick tap toggles selection, long-press/movement initiates drag immediately.
+- F1: underlying lyric row no longer gets `z-[60]/ring/shadow` on mobile when picker is open; FocusedChordEditor now renders a live read-only Preview (chord row + lyric text) above the input.
+- P1: pencil button added to pattern block header, toggles `selectMode` without pre-selecting.
+- P2: lyrics chord row slots are now `28–48px w-fit` for occupied slots; dividers moved from absolutely-positioned to per-slot `border-l`.
+- P3: per-block deletion now gated by `totalBlocksInSong > 1` (read from `s.progression.length`) instead of per-section.
+- P4: removed `activeChord` state entirely; unified context menu rendered whenever `selectMode` is on (single-tap selects exclusively + auditions, second tap clears); removed the "N beats" length text indicator; Select-all also added to the menu's row 1.
