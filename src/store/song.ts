@@ -1722,27 +1722,52 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
   },
 
-  pasteChordsAt: (sectionId, lineId, atCol, items) => { pushHistory(get); return set((s) => ({
-    sections: s.sections.map((sec) => {
-      if (sec.id !== sectionId) return sec;
-      return {
-        ...sec,
-        lines: sec.lines.map((l) => {
-          if (l.id !== lineId) return l;
-          const newAnchors: ChordAnchor[] = items.map((it) => {
-            const col = atCol + Math.max(0, it.relCol);
-            return { id: nanoid(), offset: col, chordCol: col, chord: it.chord };
-          });
-          // Replace any chord at the same column.
-          const occupied = new Set(newAnchors.map((a) => a.chordCol!));
-          const kept = l.chords.filter((c) => !occupied.has((c.chordCol ?? c.offset ?? 0)));
-          const chords = [...kept, ...newAnchors].sort((a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0));
-          const maxEnd = newAnchors.reduce((m, a) => Math.max(m, (a.chordCol ?? 0) + Math.max(1, a.chord.display.length) + 1), 0);
-          return { ...l, chords, chordRowLen: Math.max(l.chordRowLen ?? 0, maxEnd) };
-        }),
-      };
-    }),
-  })); },
+  pasteChordsAt: (sectionId, lineId, atCol, items) => {
+    pushHistory(get);
+    set((s) => {
+      const sec = s.sections.find((x) => x.id === sectionId);
+      if (!sec) return {};
+      // Compute target slots from atCol+relCol, clamped to row.
+      const targetByItem = items.map((it) => ({
+        chord: it.chord,
+        slot: Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, atCol + Math.max(0, it.relCol))),
+      }));
+      const replaceSlots = new Set(targetByItem.map((t) => t.slot));
+      // Drop any existing SectionChord on this line whose slot collides.
+      const trimmedSectionChords = sec.chords.filter(
+        (sc) => !(sc.lyricsPlacement?.lineId === lineId && replaceSlots.has(sc.lyricsPlacement.slotIndex)),
+      );
+      // Build new SectionChords + their progression placements one at a time
+      // (using placeSectionChordInProgression for continuation-block behavior).
+      let workingProgression = s.progression;
+      let workingChords = trimmedSectionChords;
+      const created: SectionChord[] = [];
+      for (const t of targetByItem) {
+        const newId = nanoid();
+        const placement = placeSectionChordInProgression(
+          workingProgression,
+          sectionId,
+          workingChords,
+          t.chord,
+          newId,
+          { lineId, slotIndex: t.slot },
+        );
+        workingProgression = placement.progression;
+        workingChords = [...workingChords, placement.sectionChord];
+        created.push(placement.sectionChord);
+      }
+      const nextSections = s.sections.map((x) =>
+        x.id !== sectionId ? x : { ...x, chords: workingChords },
+      );
+      void created;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({
+        sections: nextSections,
+        progression: workingProgression,
+        [SSOT_MODE]: true,
+      } as any);
+    });
+  },
 
   // -------- Word-anchored chord placement --------
   upsertChordAtWord: (sectionId, lineId, nearWordIndex, chord, anchorId) => {
