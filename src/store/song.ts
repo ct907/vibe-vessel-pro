@@ -845,6 +845,85 @@ function deriveMirrorsFromSectionChords(
 }
 
 /**
+ * Place a brand-new SectionChord into a section, choosing a target pattern
+ * with available room. If no existing pattern in the section has space,
+ * spawn a continuation block at the end of the section. This ports the
+ * legacy `placeMirroredChord` behavior into the SSOT-first flow.
+ *
+ * Returns the new SectionChord (with progressionPlacement filled), the
+ * (possibly extended) progression, and the chosen patternId.
+ */
+function placeSectionChordInProgression(
+  progression: PatternBlock[],
+  sectionId: string,
+  sectionChords: SectionChord[],
+  newChord: ChordSymbol,
+  newId: string,
+  lyricsPlacement?: LyricsPlacement,
+): { progression: PatternBlock[]; sectionChord: SectionChord } {
+  const len = getDefaults().defaultChordLengthBeats;
+  const sectionBlockIndices = progression
+    .map((p, i) => ((p.sectionId ?? p.id) === sectionId ? i : -1))
+    .filter((i) => i >= 0);
+  if (!sectionBlockIndices.length) {
+    return {
+      progression,
+      sectionChord: { id: newId, chord: newChord, lyricsPlacement },
+    };
+  }
+  // For each candidate pattern, sum the lengths of SectionChords already
+  // assigned to it (SSOT-driven, ignoring stale pattern.chords arrays).
+  const usedByPattern = new Map<string, number>();
+  for (const sc of sectionChords) {
+    const pp = sc.progressionPlacement;
+    if (!pp) continue;
+    usedByPattern.set(pp.patternId, (usedByPattern.get(pp.patternId) ?? 0) + (pp.lengthBeats || len));
+  }
+  for (const i of sectionBlockIndices) {
+    const target = progression[i];
+    const total = target.bars * target.beatsPerBar;
+    const used = usedByPattern.get(target.id) ?? 0;
+    const free = total - used;
+    if (free + 1e-9 >= 0.5) {
+      const placedLen = Math.min(len, free);
+      return {
+        progression,
+        sectionChord: {
+          id: newId,
+          chord: newChord,
+          lyricsPlacement,
+          progressionPlacement: { patternId: target.id, startBeat: used, lengthBeats: placedLen },
+        },
+      };
+    }
+  }
+  // No room — spawn continuation block after the last block of this section.
+  const lastIdx = sectionBlockIndices[sectionBlockIndices.length - 1];
+  const ref = progression[lastIdx];
+  const newPatternId = nanoid();
+  const newPattern: PatternBlock = {
+    id: newPatternId,
+    sectionId,
+    label: `${ref.label} (cont.)`,
+    bars: ref.bars,
+    beatsPerBar: ref.beatsPerBar,
+    chords: [],
+  };
+  const placedLen = Math.min(len, newPattern.bars * newPattern.beatsPerBar);
+  const nextProg = [...progression];
+  nextProg.splice(lastIdx + 1, 0, newPattern);
+  return {
+    progression: nextProg,
+    sectionChord: {
+      id: newId,
+      chord: newChord,
+      lyricsPlacement,
+      progressionPlacement: { patternId: newPatternId, startBeat: 0, lengthBeats: placedLen },
+    },
+  };
+}
+
+/**
  * Apply `deriveMirrorsFromSectionChords` across the whole song after a
  * SectionChord-first mutation. Keeps `section.chords` untouched and
  * rebuilds `line.chords` + `pattern.chords` from it.
@@ -1891,54 +1970,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
   },
 
-  // -------- Slot-based chord row (20 fixed slots) --------
+  // -------- Slot-based chord row (SSOT-first) --------
   placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
     pushHistory(get);
     set((s) => {
-      let createdAnchorId: string | null = null;
-      const sections = s.sections.map((sec) => {
-        if (sec.id !== sectionId) return sec;
-        return {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== lineId) return l;
-            const occupied = new Set<number>();
-            l.chords.forEach((c) => { if (c.slotIndex != null) occupied.add(c.slotIndex); });
-            // Spacing rule: prefer a slot whose immediate neighbors are also
-            // empty so chord chips never visually crowd each other. Falls back
-            // to the next free slot when the row is too dense for spacing.
-            const slot = nearestSpacedFreeSlot(occupied, slotIndex);
-            if (slot < 0) return l; // row full — silently drop
-            const id = nanoid();
-            createdAnchorId = id;
-            const newAnchor: ChordAnchor = { id, offset: 0, slotIndex: slot, chord };
-            return { ...l, chords: [...l.chords, newAnchor].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
-          }),
-        };
-      });
-      // Mirror to pattern.
-      let progression = s.progression;
-      let finalSections = sections;
-      if (createdAnchorId) {
-        const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
-        progression = placed.progression;
-        const pcId = placed.chordId;
-        if (pcId) {
-          finalSections = sections.map((sec) => {
-            if (sec.id !== sectionId) return sec;
-            return {
-              ...sec,
-              lines: sec.lines.map((l) => ({
-                ...l,
-                chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
-              })),
-            };
-          });
-        }
-        const updatedSection = finalSections.find((x) => x.id === sectionId);
-        if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
+      const sec = s.sections.find((x) => x.id === sectionId);
+      if (!sec) return {};
+      // Spacing rule: pick a slot whose neighbors are also free.
+      const occupied = new Set<number>();
+      for (const sc of sec.chords) {
+        if (sc.lyricsPlacement?.lineId === lineId) occupied.add(sc.lyricsPlacement.slotIndex);
       }
-      return { sections: finalSections, progression };
+      const slot = nearestSpacedFreeSlot(occupied, slotIndex);
+      if (slot < 0) return {}; // row full — silently drop
+      const newId = nanoid();
+      const placement = placeSectionChordInProgression(
+        s.progression,
+        sectionId,
+        sec.chords,
+        chord,
+        newId,
+        { lineId, slotIndex: slot },
+      );
+      const nextSections = s.sections.map((x) =>
+        x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({
+        sections: nextSections,
+        progression: placement.progression,
+        [SSOT_MODE]: true,
+      } as any);
     });
   },
 
