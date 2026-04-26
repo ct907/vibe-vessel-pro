@@ -2467,29 +2467,35 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }),
 
   reorderPatternChord: (patternId, chordId, toIndex) => set((s) => {
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-      const fromIdx = sorted.findIndex((c) => c.id === chordId);
-      if (fromIdx < 0) return p;
-      const [moved] = sorted.splice(fromIdx, 1);
-      let insertAt = Math.max(0, Math.min(sorted.length, toIndex));
-      // Removing from before the target shifts the target index left by one.
-      if (toIndex > fromIdx) insertAt = Math.max(0, insertAt - 1);
-      sorted.splice(insertAt, 0, moved);
-      // Reassign startBeats so repack (which sorts by startBeat) preserves new order.
-      let cursor = 0;
-      const reseq = sorted.map((c) => {
-        const next = { ...c, startBeat: cursor };
-        cursor += c.lengthBeats;
-        return next;
-      });
-      return { ...p, chords: repackChords(reseq, totalBeats) };
+    // SSOT-first: reorder SectionChord entries bound to this pattern; derive mirrors.
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const sec = s.sections.find((x) => x.id === sectionId);
+    if (!sec) return {};
+    const inPattern = sec.chords.filter((c) => c.progressionPlacement?.patternId === patternId);
+    const fromIdx = inPattern.findIndex((c) => c.id === chordId);
+    if (fromIdx < 0) return {};
+    let insertAt = Math.max(0, Math.min(inPattern.length, toIndex));
+    if (toIndex > fromIdx) insertAt = Math.max(0, insertAt - 1);
+    const reordered = [...inPattern];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(insertAt, 0, moved);
+    // Splice these back into section.chords positions originally occupied by `inPattern`.
+    const slotIndices: number[] = [];
+    sec.chords.forEach((c, i) => {
+      if (c.progressionPlacement?.patternId === patternId) slotIndices.push(i);
     });
-    const updatedPattern = progression.find((p) => p.id === patternId);
-    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
-    return { progression, sections };
+    const nextSections = s.sections.map((x) => {
+      if (x.id !== sectionId) return x;
+      const next = [...x.chords];
+      slotIndices.forEach((origIdx, k) => {
+        next[origIdx] = reordered[k];
+      });
+      return { ...x, chords: next };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
   movePatternChordToPatternAt: (fromPatternId, toPatternId, chordId, toIndex) => set((s) => {
