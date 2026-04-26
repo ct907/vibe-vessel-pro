@@ -320,7 +320,7 @@ function LineRow({
     };
   }, [selection, lineChords]);
 
-  const slots = chordsBySlot(line);
+  const slots = chordsBySlot(lineChords);
 
   return (
     <div
@@ -934,6 +934,7 @@ function SectionCard({
               <LineRow
                 key={line.id}
                 sectionId={section.id}
+                section={section}
                 line={line}
                 isFirst={i === 0}
                 active={activeLineId === line.id}
