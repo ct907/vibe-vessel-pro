@@ -1373,8 +1373,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
   // Add or replace a chord anchor; mirror to bound pattern block.
   upsertChordAt: (sectionId, lineId, col, chord, anchorId) => {
-    pushHistory(get);
     if (anchorId) {
+      pushHistory(get);
       // Edit existing SectionChord: swap chord (and update slotIndex if it
       // moved). Identity preserved.
       set((s) => {
