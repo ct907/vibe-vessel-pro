@@ -217,6 +217,10 @@ function PatternBlock({
     if (Date.now() - justDraggedAtRef.current < 350) return;
     setFocusedPattern(pattern.id);
     // Shift-click: range/multi select.
+  const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
+    if (Date.now() - justDraggedAtRef.current < 350) return;
+    setFocusedPattern(pattern.id);
+    // Shift-click: range select.
     if (e && e.shiftKey) {
       const ids = sortedChords.map((c) => c.id);
       const i2 = ids.indexOf(chordId);
@@ -233,7 +237,7 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
-    // Ctrl/Cmd-click toggles selection (enters select-mode).
+    // Ctrl/Cmd-click toggles selection.
     if (e && (e.metaKey || e.ctrlKey)) {
       setSelectMode(true);
       setSelected((prev) => {
@@ -245,23 +249,23 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
-    if (selectMode) {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(chordId)) next.delete(chordId);
-        else next.add(chordId);
-        return next;
-      });
-      lastSelectedRef.current = chordId;
-      return;
+    // Unified default: single tap selects this chord exclusively, opens the
+    // context menu, and auditions. Tapping the same chord again clears it.
+    const alreadyOnly = selected.size === 1 && selected.has(chordId);
+    setSelectMode(!alreadyOnly);
+    setSelected(alreadyOnly ? new Set() : new Set([chordId]));
+    lastSelectedRef.current = alreadyOnly ? null : chordId;
+    if (!alreadyOnly) {
+      const c = sortedChords.find((x) => x.id === chordId);
+      if (c) void playChord(c.chord);
     }
-    setActiveChord(activeChord === chordId ? null : chordId);
-    // Single tap auditions the chord.
-    const c = sortedChords.find((x) => x.id === chordId);
-    if (c) void playChord(c.chord);
   };
 
-  const active = activeChord ? (sortedChords.find((c) => c.id === activeChord) ?? null) : null;
+  // The "active" chord is the single-selection case. Multi-selection hides
+  // per-chord controls and uses batch operations instead.
+  const active = selectedIds.length === 1
+    ? (sortedChords.find((c) => c.id === selectedIds[0]) ?? null)
+    : null;
   const activeMaxLen = active ? totalBeats - (usedBeats - active.lengthBeats) : 0;
   const activeIdx = active ? sortedChords.findIndex((c) => c.id === active.id) : -1;
 
