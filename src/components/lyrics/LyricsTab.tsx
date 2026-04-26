@@ -155,6 +155,7 @@ function LineRow({
     undo,
     redo,
   } = useSongStore();
+  const isMobile = useIsMobile();
   // Phase 2 SSOT: read line chords through the section's SectionChord[]
   // projection. The legacy ChordAnchor shape is preserved (renderer still
   // depends on slotIndex/mirrorId/etc.) — only the order is now SSOT-driven.
@@ -294,12 +295,14 @@ function LineRow({
     }
   };
 
-  // Close (clear) selection on Escape or click outside this row.
+  // Close (clear) selection on Escape or click outside this row. While Edit
+  // Mode is on we don't auto-clear — the user controls dismissal via Done or
+  // the pencil button.
   useEffect(() => {
     if (selection.size === 0) return;
+    if (isEditMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Only clear if at least one chord on this row is selected.
         if (lineChords.some((c) => selection.has(c.id))) selection.clear();
       }
     };
@@ -318,7 +321,7 @@ function LineRow({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointer, true);
     };
-  }, [selection, lineChords]);
+  }, [selection, lineChords, isEditMode]);
 
   const slots = chordsBySlot(lineChords);
 
@@ -327,7 +330,13 @@ function LineRow({
       ref={rowRef}
       className={cn(
         "group py-1 transition-colors scroll-mt-24",
-        active ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg" : "relative",
+        // On mobile, the FocusedChordEditor renders a clone of this row,
+        // so the underlying row should NOT be visually elevated. On desktop
+        // we keep the focus highlight so the user can see which row the
+        // bottom-sheet picker is editing.
+        active && !isMobile
+          ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
+          : "relative",
       )}
       data-line-id={line.id}
     >
@@ -359,19 +368,9 @@ function LineRow({
             </span>
           )}
 
-          {/* Slot dividers — vertical lines between fixed-width slots. Hidden
-              while a drag is in flight so the dashed slot outlines show. */}
-          {!isAnyDragging && (
-            <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-              {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/12"
-                  style={{ left: `${(i + 1) * 28}px` }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Slot dividers are now rendered per-slot (border-l on each slot
+              past the first) so they stay aligned even when occupied slots
+              grow to fit long chord names (28–48px). */}
 
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
@@ -397,7 +396,13 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative w-7 shrink-0 h-9 flex items-center justify-start",
+                      "relative shrink-0 h-9 flex items-center justify-start",
+                      // Width: 28px floor for empty slots, fit-content with a
+                      // 48px cap for occupied slots so long chord names fit.
+                      occupied ? "min-w-[28px] max-w-[48px] w-fit" : "w-7",
+                      // Per-slot left border acts as the vertical divider
+                      // between adjacent slots (skip the first one).
+                      slotIdx > 0 && !isAnyDragging && "border-l border-muted-foreground/12",
                       isAnyDragging &&
                         !occupied &&
                         !isInvalidDrop &&
@@ -513,11 +518,10 @@ function LineRow({
               const next = !prev;
               if (next) {
                 // Entering Edit Mode: close picker + blur active input.
+                // Do NOT pre-select chords — user does the picking.
                 onPickerClose();
                 (document.activeElement as HTMLElement | null)?.blur?.();
-                if (lineChords.length > 0) {
-                  selection.set(lineChords.map((c) => c.id));
-                }
+                selection.clear();
               } else {
                 // Exiting Edit Mode: clear selection.
                 selection.clear();
@@ -533,27 +537,40 @@ function LineRow({
         </Button>
       </div>
 
-      {/* SELECTION TOOLBAR (only when something is selected on this row) */}
-      {selection.size > 0 && lineChords.some((c) => selection.has(c.id)) && (
+      {/* SELECTION TOOLBAR — visible whenever Edit Mode is on. Closing requires
+          either tapping Done or the pencil icon again. */}
+      {isEditMode && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
-          {/* Row 1: counter + close + copy/cut/paste + move arrows */}
+          {/* Row 1: counter + close + select-all + copy/cut/paste + move arrows */}
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-muted-foreground">{selection.size} selected</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => selection.set(lineChords.map((c) => c.id))}
+              disabled={lineChords.length === 0 || selection.size === lineChords.length}
+              aria-label="Select all chords"
+              title="Select all chords on this row"
+            >
+              Select all
+            </Button>
             <Button
               size="icon"
               variant="ghost"
               className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={() => { selection.clear(); setIsEditMode(false); }}
-              aria-label="Close selection"
-              title="Close (Esc)"
+              onClick={() => selection.clear()}
+              aria-label="Clear selection"
+              title="Clear selection"
+              disabled={selection.size === 0}
             >
               <X className="h-3.5 w-3.5" />
             </Button>
             <div className="ml-auto flex items-center gap-1">
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy} disabled={selection.size === 0}>
                 <Copy className="h-3.5 w-3.5" /> Copy
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut} disabled={selection.size === 0}>
                 <Scissors className="h-3.5 w-3.5" /> Cut
               </Button>
               <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
@@ -563,6 +580,7 @@ function LineRow({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2"
+                disabled={selection.size === 0}
                 onClick={() => {
                   const ids = Array.from(selection.selected)
                     .map((id) => lineChords.find((c) => c.id === id))
@@ -581,6 +599,7 @@ function LineRow({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2"
+                disabled={selection.size === 0}
                 onClick={() => {
                   const ids = Array.from(selection.selected)
                     .map((id) => lineChords.find((c) => c.id === id))
@@ -604,12 +623,14 @@ function LineRow({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-destructive"
+              disabled={selection.size === 0}
               onClick={() => {
                 const ids = Array.from(selection.selected).filter((id) =>
                   lineChords.some((c) => c.id === id),
                 );
                 if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
                 selection.clear();
+                // Stay in Edit Mode so the user can keep working.
               }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
