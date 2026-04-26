@@ -1,163 +1,39 @@
-# Chord Row: Strict Composition vs Edit Mode + Dynamic Scroll Offset
+# SSOT Chord Refactor — Phased Plan
 
-Refactor `LineRow` in `src/components/lyrics/LyricsTab.tsx` so that the Pencil button no longer creates conflicting UI (picker + selection toolbar simultaneously), and replace the hardcoded 140px scroll offset with a dynamic header-aware calculation.
+Final contract (locked in with user):
+- `Section.chords: SectionChord[]` is the single source of truth for a section.
+- Sync invariant = chord **type** (`ChordSymbol`) + **relative order** within `section.chords`. Slot index in lyrics and beat position/length in progression are per-view metadata, free-form, with NO spacing enforcement.
+- When a chord is added in the progression view, it also gets a `lyricsPlacement` next to its neighbor's slot (or `slotIndex = 1` if the section has no other chords).
+- Existing songs in localStorage will be wiped manually by the user. No migration code.
+- Reactivity via Zustand subscription + `useMemo` derivations in tabs.
 
-## 1. State separation (per-row in `LineRow`)
+## Phase 1 — Store SSOT, UI untouched (NEXT TURN)
+Goal: introduce `section.chords` as the source of truth in the store. Keep
+`line.chords` and `block.chords` as derived mirrors maintained by the store
+itself, so the existing UI compiles and runs unchanged.
 
-Add a new local state alongside the existing `selection` (which already tracks `selectedChords`):
+- Add `SectionChord` type with `lyricsPlacement?` and `progressionPlacement?`.
+- Add `chords: SectionChord[]` to every `Section`.
+- Helpers:
+  - `findSection(state, sectionId)`, `findSectionByLineId`, `findSectionByPatternId`
+  - `rederiveSectionMirrors(section, progression)` — rebuilds `line.chords` (as `ChordAnchor[]`) and `block.chords` (as `PatternChord[]`) from `section.chords` + their stored placements. Run at the end of every chord-mutating action.
+  - `insertSectionChordAt(section, index, sectionChord)` to keep relative-order insertion explicit.
+- Rewrite EVERY chord-mutating action so it:
+  1. Mutates `section.chords` (add / remove / reorder / patch placement / patch type).
+  2. Calls `rederiveSectionMirrors` to rebuild `line.chords` and `block.chords`.
+- Affected actions: placeChordInSlot, upsertChordAt, upsertChordAtWord, appendChordToLine, removeChordAnchor(+Batch), shiftChordAnchors, moveSelectedChordsByOrder, moveChordAnchor, moveSelectedChordsTo, pasteChordsAt, formatChordsInLine(+Song), moveChordWordSlot, moveChordToSlot, moveChordsAcrossLines, addChordToPattern, updatePatternChord, removePatternChord, movePatternChord, removePatternChordsBatch, shiftPatternChords, movePatternChordsTo, setPatternChordLength, resizePatternChordsWithOverflow, reorderPatternChord, movePatternChordToPatternAt, movePatternChordToSlot(+s), addChordToPatternSlot, replacePatternChords, addToBasket-then-place flows.
+- Persistence: bump `SerializedSong.version` and store `section.chords` instead of mirroring; on load build mirrors.
+- Verify: build passes, lyrics/progressions still display chords correctly, basket→drop still works.
 
-```tsx
-const [isEditMode, setIsEditMode] = useState(false);
-```
+## Phase 2 — LyricsTab reads section.chords directly
+- Replace `line.chords` reads with `useMemo(() => section.chords.filter(c => c.lyricsPlacement?.lineId === line.id).sort by slotIndex)`.
+- Update FocusedChordEditor.
 
-The existing `selection` (from `useDndSelection`) plays the role of `selectedChords`. The picker open state already lives in the parent (`picker` in `LyricsTab`) — the row signals it via `onPickerOpen`. We'll add a sibling `onPickerClose` callback (or have the parent close when `picker.lineId` changes) so the row can force-close the picker when entering Edit Mode.
+## Phase 3 — ProgressionsTab reads section.chords directly
+- Replace `block.chords` reads with derived selector.
+- Update SuggestionsPanel + drag-drop handlers.
 
-- Add an `onPickerClose: () => void` prop to `LineRowProps`.
-- In the parent `LyricsTab`, pass `() => setPicker(null)`.
-
-## 2. Pencil button → `toggleEditMode`
-
-Replace the current pencil `onClick` (which selects all chords AND opens the picker) with:
-
-```tsx
-onClick={(e) => {
-  e.stopPropagation();
-  onChordFocus(line.id);
-  setIsEditMode((prev) => {
-    const next = !prev;
-    if (next) {
-      // Entering Edit Mode: close picker + blur active input
-      onPickerClose();
-      (document.activeElement as HTMLElement | null)?.blur?.();
-      // Pre-select all chords on this row so the context toolbar appears
-      if (line.chords.length > 0) selection.set(line.chords.map((c) => c.id));
-    } else {
-      // Exiting Edit Mode: clear selection
-      selection.clear();
-    }
-    return next;
-  });
-}}
-```
-
-Add a visual-active style to the pencil button when `isEditMode` is true (e.g. `text-primary bg-primary/10`).
-
-## 3. Slot / chord click handlers — gated by `isEditMode`
-
-**Chord row container `onClick`** (empty-area tap that currently opens the picker at slot 0):
-```tsx
-onClick={(e) => {
-  const t = e.target as HTMLElement;
-  if (t.closest("[data-chip-anchor]")) return;
-  if (t.closest("[data-slot-index]")) return;
-  if (isEditMode) return; // never open picker in Edit Mode
-  setFocusedPattern(null);
-  onChordFocus(line.id);
-  onPickerOpen(line.id, 0);
-}}
-```
-
-**Empty slot `onClick`**:
-```tsx
-onClick={(e) => {
-  if (occupied) return;
-  e.stopPropagation();
-  if (isEditMode) return; // never open picker in Edit Mode
-  onChordFocus(line.id);
-  onPickerOpen(line.id, slotIdx);
-}}
-```
-
-**Existing chord chip `onClick`** — split behavior on `isEditMode`:
-```tsx
-onClick={(e) => {
-  e.stopPropagation();
-  // Modifier-key paths still always work as multi-select shortcuts
-  if (e.shiftKey) { selectRangeTo(anchor!.id, true); return; }
-  if (e.metaKey || e.ctrlKey) {
-    selection.toggle(anchor!.id);
-    lastSelectedRef.current = anchor!.id;
-    return;
-  }
-
-  if (isEditMode) {
-    // EDIT MODE: tap toggles selection only — never opens picker, never auditions
-    selection.toggle(anchor!.id);
-    lastSelectedRef.current = anchor!.id;
-    return;
-  }
-
-  // COMPOSITION MODE: audition + open picker for that chord
-  void playChord(anchor!.chord);
-  onChordFocus(line.id);
-  onPickerOpen(line.id, slotIdx, anchor!.id);
-}}
-```
-
-The selection toolbar (already rendered when `selection.size > 0`) becomes the "floating Context Menu" — no separate component needed. Add a "Done" button in the toolbar that calls `setIsEditMode(false)` + `selection.clear()` so the user can exit Edit Mode from the toolbar too.
-
-## 4. Dynamic scroll-to-focus
-
-**Add an ID to the sticky header** in `src/components/header/TransportHeader.tsx`:
-```tsx
-<header id="main-header" className="sticky top-2 z-40 ...">
-```
-
-**Add scroll-margin to the row container** in `LineRow`:
-```tsx
-<div ref={rowRef} className={cn("group py-1 transition-colors scroll-mt-24", ...)} ...>
-```
-
-**Replace the scroll effect** (lines ~168–194):
-```tsx
-useEffect(() => {
-  // Skip entirely in Edit Mode — selecting chips shouldn't move the page.
-  if (!active || isEditMode || !rowRef.current) return;
-  const el = rowRef.current;
-  const vv = typeof window !== "undefined" ? window.visualViewport : null;
-  const scrollIntoView = () => {
-    if (!el.isConnected) return;
-    const header = document.getElementById("main-header");
-    const headerHeight = header ? header.getBoundingClientRect().height : 60;
-    const targetTop = (vv?.offsetTop ?? 0) + headerHeight + 16;
-    const rect = el.getBoundingClientRect();
-    const delta = rect.top - targetTop;
-    if (Math.abs(delta) < 2) return;
-    window.scrollBy({ top: delta, behavior: "smooth" });
-  };
-  scrollIntoView();
-  const settle = window.setTimeout(scrollIntoView, 200);
-  if (vv) {
-    vv.addEventListener("resize", scrollIntoView);
-    vv.addEventListener("scroll", scrollIntoView);
-  }
-  return () => {
-    window.clearTimeout(settle);
-    if (vv) {
-      vv.removeEventListener("resize", scrollIntoView);
-      vv.removeEventListener("scroll", scrollIntoView);
-    }
-  };
-}, [active, isEditMode]);
-```
-
-## 5. Auto-exit Edit Mode
-
-To avoid stale state, clear `isEditMode` when the row loses `active` status (e.g. user taps another row):
-```tsx
-useEffect(() => {
-  if (!active && isEditMode) {
-    setIsEditMode(false);
-    selection.clear();
-  }
-}, [active]);
-```
-
-## Files to edit
-- `src/components/lyrics/LyricsTab.tsx` — `LineRow` state, pencil handler, slot/chip click gating, scroll effect, toolbar "Done" button, parent passes `onPickerClose`.
-- `src/components/header/TransportHeader.tsx` — add `id="main-header"` to the `<header>`.
-
-## Out of scope
-- No store changes.
-- No changes to drag-and-drop logic; DnD continues to work in both modes (chips remain Draggable).
-- ProgressionsTab is not touched.
+## Phase 4 — Cleanup
+- Delete `ChordAnchor`, `PatternChord`, `mirrorId`, mirror-rederive code.
+- Update `lib/lyrics/export.ts`, `store/playback.ts`.
+- Final type pruning + type check + manual smoke.
