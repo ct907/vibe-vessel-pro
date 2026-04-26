@@ -2,9 +2,32 @@ import { forwardRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Trash2 } from "lucide-react";
+import { ArrowRight, GripVertical, Trash2 } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
+import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
+
+/**
+ * Static, non-interactive chip used INSIDE basket Draggables. We can't reuse
+ * <ChordChip> here because it renders a <button> with its own touch handlers
+ * (audition + sustain-on-hold), which capture touchstart and prevent
+ * @hello-pangea/dnd from initiating a drag on touch devices.
+ */
+function StaticChordChip({ chord, dragging }: { chord: ChordSymbol; dragging?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none",
+        "px-2.5 py-1 text-sm bg-chord-chip/50 text-chord-chip-foreground",
+        dragging && "shadow-lg ring-2 ring-primary",
+      )}
+      style={{ pointerEvents: "none" }}
+    >
+      <GripVertical className="h-3 w-3 opacity-50" aria-hidden />
+      {chord.display}
+    </span>
+  );
+}
 
 interface Props {
   onSendToLyrics?: () => void;
@@ -40,10 +63,19 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               {...prov.draggableProps}
               {...prov.dragHandleProps}
               data-basket-chip="true"
-              style={{ touchAction: "none", ...prov.draggableProps.style }}
+              role="button"
+              aria-label={`Drag chord ${b.chord.display}`}
+              style={{
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+                cursor: snap.isDragging ? "grabbing" : "grab",
+                ...prov.draggableProps.style,
+              }}
               className={cn(snap.isDragging && "opacity-90")}
             >
-              <ChordChip chord={b.chord} variant="ink" size="md" audition={false} />
+              <StaticChordChip chord={b.chord} dragging={snap.isDragging} />
             </div>
           )}
         </Draggable>
@@ -79,9 +111,14 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                     {...prov.draggableProps}
                     {...prov.dragHandleProps}
                     data-basket-chip="true"
-                    style={{ touchAction: "none", ...prov.draggableProps.style }}
+                    style={{
+                      touchAction: "none",
+                      userSelect: "none",
+                      cursor: "grabbing",
+                      ...prov.draggableProps.style,
+                    }}
                   >
-                    <ChordChip chord={item.chord} variant="ink" size="md" audition={false} />
+                    <StaticChordChip chord={item.chord} dragging />
                   </div>
                 );
               }}
