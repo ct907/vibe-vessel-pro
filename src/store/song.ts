@@ -756,6 +756,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       label: `${src.label} copy`,
       collapsed: src.collapsed,
       lines: newLines,
+      chords: [],
     };
     const newPattern: PatternBlock = srcPattern
       ? {
