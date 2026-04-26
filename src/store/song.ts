@@ -2086,93 +2086,125 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     pushHistory(get);
     set((s) => {
       const fromSec = s.sections.find((x) => x.id === fromSectionId);
-      const fromLine = fromSec?.lines.find((l) => l.id === fromLineId);
-      if (!fromSec || !fromLine) return s;
-      // Same row → fall back to single-anchor moves.
-      if (fromSectionId === toSectionId && fromLineId === toLineId) {
-        // Lay out selection starting at dropSlot, push others right.
-        const moving = anchorIds
-          .map((id) => fromLine.chords.find((c) => c.id === id))
-          .filter((c): c is ChordAnchor => !!c)
-          .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
-        const others = fromLine.chords.filter((c) => !anchorIds.includes(c.id));
-        const used = new Set<number>();
-        const placedMoving: ChordAnchor[] = [];
-        let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+      if (!fromSec) return {};
+      const idSet = new Set(anchorIds);
+      // Pull the SectionChords being moved (anchorId === SectionChord.id under SSOT).
+      const moving = fromSec.chords
+        .filter((sc) => idSet.has(sc.id) && sc.lyricsPlacement?.lineId === fromLineId)
+        .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
+      if (!moving.length) return {};
+
+      const start = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
+
+      // Helper: lay out a list of SectionChords on a target line starting at
+      // `start`, walking right past any occupied or out-of-spacing slots.
+      const layout = (used: Set<number>): Map<string, number> => {
+        const out = new Map<string, number>();
+        let cursor = start;
         for (const m of moving) {
-          const slot = nearestFreeSlot(used, cursor);
-          if (slot < 0) break;
-          used.add(slot);
-          placedMoving.push({ ...m, slotIndex: slot });
-          cursor = slot + 1;
+          let s2 = cursor;
+          while (s2 < CHORD_ROW_SLOTS && used.has(s2)) s2++;
+          if (s2 >= CHORD_ROW_SLOTS) break;
+          out.set(m.id, s2);
+          used.add(s2);
+          cursor = s2 + 1;
         }
-        // Now place others in their original slot, walking right on collision.
-        const placedOthers: ChordAnchor[] = [];
-        for (const o of others.sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))) {
-          const slot = nearestFreeSlot(used, o.slotIndex ?? 0);
-          if (slot < 0) continue;
-          used.add(slot);
-          placedOthers.push({ ...o, slotIndex: slot });
-        }
-        const sections = s.sections.map((sec) =>
-          sec.id !== fromSectionId
-            ? sec
-            : {
-                ...sec,
-                lines: sec.lines.map((l) =>
-                  l.id !== fromLineId
-                    ? l
-                    : { ...l, chords: [...placedOthers, ...placedMoving].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) },
-                ),
-              },
-        );
-        const sec = sections.find((x) => x.id === fromSectionId);
-        const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
-        return { sections, progression };
-      }
-      // Cross-line: remove from source, insert into target.
-      const moving = anchorIds
-        .map((id) => fromLine.chords.find((c) => c.id === id))
-        .filter((c): c is ChordAnchor => !!c)
-        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
-      if (!moving.length) return s;
-      const sections = s.sections.map((sec) => {
-        if (sec.id === fromSectionId) {
+        return out;
+      };
+
+      if (fromSectionId === toSectionId && fromLineId === toLineId) {
+        // Same row: reslot only the moving chords; others stay put. Treat
+        // others' slots as occupied to avoid collisions.
+        const used = new Set<number>();
+        fromSec.chords.forEach((sc) => {
+          if (sc.lyricsPlacement?.lineId === fromLineId && !idSet.has(sc.id)) {
+            used.add(sc.lyricsPlacement.slotIndex);
+          }
+        });
+        const slotById = layout(used);
+        const nextSections = s.sections.map((sec) => {
+          if (sec.id !== fromSectionId) return sec;
           return {
             ...sec,
-            lines: sec.lines.map((l) =>
-              l.id !== fromLineId ? l : { ...l, chords: l.chords.filter((c) => !anchorIds.includes(c.id)) },
-            ),
+            chords: sec.chords.map((sc) => {
+              const ns = slotById.get(sc.id);
+              if (ns == null || !sc.lyricsPlacement) return sc;
+              return { ...sc, lyricsPlacement: { ...sc.lyricsPlacement, slotIndex: ns } };
+            }),
           };
-        }
-        return sec;
-      }).map((sec) => {
-        if (sec.id !== toSectionId) return sec;
-        return {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== toLineId) return l;
-            const used = new Set<number>();
-            l.chords.forEach((c) => { if (c.slotIndex != null) used.add(c.slotIndex); });
-            const placed: ChordAnchor[] = [];
-            let cursor = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, dropSlot));
-            for (const m of moving) {
-              const slot = nearestFreeSlot(used, cursor);
-              if (slot < 0) break;
-              used.add(slot);
-              placed.push({ ...m, slotIndex: slot });
-              cursor = slot + 1;
-            }
-            return { ...l, chords: [...l.chords, ...placed].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
-          }),
-        };
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return ({ sections: nextSections, [SSOT_MODE]: true } as any);
+      }
+
+      // Cross-line / cross-section move.
+      const toSec = s.sections.find((x) => x.id === toSectionId);
+      if (!toSec) return {};
+      const used = new Set<number>();
+      toSec.chords.forEach((sc) => {
+        if (sc.lyricsPlacement?.lineId === toLineId) used.add(sc.lyricsPlacement.slotIndex);
       });
-      let progression = s.progression;
-      const fromSecNew = sections.find((x) => x.id === fromSectionId);
-      if (fromSecNew) progression = syncPatternFromAnchors(progression, fromSecNew);
-      const toSecNew = sections.find((x) => x.id === toSectionId);
-      if (toSecNew) progression = syncPatternFromAnchors(progression, toSecNew);
-      return { sections, progression };
+      const slotById = layout(used);
+      // Anchors that found a slot get their lyricsPlacement updated; for
+      // cross-section, also re-place into the destination's progression.
+      const placedIds = new Set(slotById.keys());
+      // Build moved SectionChord objects with new lyricsPlacement.
+      const movedChords = moving
+        .filter((m) => placedIds.has(m.id))
+        .map((m) => ({
+          ...m,
+          lyricsPlacement: { lineId: toLineId, slotIndex: slotById.get(m.id)! },
+        }));
+
+      if (fromSectionId === toSectionId) {
+        // Same section, different line: just update lyricsPlacement in place.
+        const nextSections = s.sections.map((sec) => {
+          if (sec.id !== fromSectionId) return sec;
+          return {
+            ...sec,
+            chords: sec.chords.map((sc) => {
+              const ns = slotById.get(sc.id);
+              if (ns == null || !sc.lyricsPlacement) return sc;
+              return { ...sc, lyricsPlacement: { lineId: toLineId, slotIndex: ns } };
+            }),
+          };
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return ({ sections: nextSections, [SSOT_MODE]: true } as any);
+      }
+
+      // Cross-section: remove from source, add fresh SectionChords to target
+      // (re-running placeSectionChordInProgression so target section owns the
+      // progression placement). Drop from source's section.chords entirely.
+      let workingProgression = s.progression;
+      let nextSections = s.sections.map((sec) => {
+        if (sec.id !== fromSectionId) return sec;
+        return { ...sec, chords: sec.chords.filter((sc) => !placedIds.has(sc.id)) };
+      });
+      // For each moved chord, allocate a fresh SectionChord in the target section.
+      for (const mc of movedChords) {
+        const targetSec = nextSections.find((x) => x.id === toSectionId);
+        if (!targetSec) continue;
+        const newId = nanoid();
+        const placement = placeSectionChordInProgression(
+          workingProgression,
+          toSectionId,
+          targetSec.chords,
+          mc.chord,
+          newId,
+          mc.lyricsPlacement,
+        );
+        workingProgression = placement.progression;
+        nextSections = nextSections.map((sec) =>
+          sec.id !== toSectionId ? sec : { ...sec, chords: [...sec.chords, placement.sectionChord] },
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({
+        sections: nextSections,
+        progression: workingProgression,
+        [SSOT_MODE]: true,
+      } as any);
     });
   },
 
