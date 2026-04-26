@@ -117,7 +117,53 @@ export function FocusedChordEditor({
           </Button>
         </div>
 
-        {/* INPUT */}
+        {/* LIVE CLONE of the lyric row + chord row being edited. Read-only:
+            updates as chords are placed. Replaces the previous behavior of
+            visually elevating the underlying row. */}
+        <div className="px-3 py-2 border-b border-border shrink-0 bg-muted/30">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+            Preview
+          </p>
+          {(() => {
+            const liveChords = section ? getLineChordsViaSSOT(section, lineId) : [];
+            const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
+            liveChords.forEach((c) => {
+              const s = c.slotIndex;
+              if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
+            });
+            return (
+              <>
+                <div
+                  className="flex items-stretch rounded-sm bg-muted-foreground/10 overflow-x-auto"
+                  style={{ minHeight: 32 }}
+                >
+                  {slotMap.map((c, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "shrink-0 h-8 flex items-center justify-center px-0.5",
+                        c ? "min-w-[28px] max-w-[48px] w-fit" : "w-7",
+                        i > 0 && "border-l border-muted-foreground/15",
+                        i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
+                      )}
+                    >
+                      {c && (
+                        <span className="font-mono-chord text-xs font-semibold text-chord-chip-foreground truncate">
+                          {c.chord.display}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
+                  {line.text || (
+                    <span className="italic text-muted-foreground/70">(empty lyric line)</span>
+                  )}
+                </p>
+              </>
+            );
+          })()}
+        </div>
         <div className="px-3 py-3 border-b border-border shrink-0">
           <Input
             ref={inputRef}
