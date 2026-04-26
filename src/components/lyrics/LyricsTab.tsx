@@ -513,11 +513,10 @@ function LineRow({
               const next = !prev;
               if (next) {
                 // Entering Edit Mode: close picker + blur active input.
+                // Do NOT pre-select chords — user does the picking.
                 onPickerClose();
                 (document.activeElement as HTMLElement | null)?.blur?.();
-                if (lineChords.length > 0) {
-                  selection.set(lineChords.map((c) => c.id));
-                }
+                selection.clear();
               } else {
                 // Exiting Edit Mode: clear selection.
                 selection.clear();
