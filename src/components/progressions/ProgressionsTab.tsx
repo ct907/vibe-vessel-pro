@@ -148,7 +148,7 @@ function PatternBlock({
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      
+      if (t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
       if (blockRef.current && blockRef.current.contains(t)) return;
       if (t.closest("[data-radix-dialog-content]")) return;
       if (t.closest("[data-progression-ctx]")) return;
@@ -163,6 +163,7 @@ function PatternBlock({
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
+      if (t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
       if (blockRef.current && blockRef.current.contains(t)) return;
       if (t.closest("[data-radix-dialog-content]")) return;
       setActiveChord(null);

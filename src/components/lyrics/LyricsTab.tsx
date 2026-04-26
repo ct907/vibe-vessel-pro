@@ -299,6 +299,9 @@ function LineRow({
     const onPointer = (e: PointerEvent) => {
       const root = rowRef.current;
       if (!root) return;
+      const t = e.target as HTMLElement | null;
+      // Don't interfere with basket drag-and-drop initiation.
+      if (t && t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
       if (root.contains(e.target as Node)) return;
       if (line.chords.some((c) => selection.has(c.id))) selection.clear();
     };

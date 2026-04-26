@@ -39,6 +39,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               ref={prov.innerRef}
               {...prov.draggableProps}
               {...prov.dragHandleProps}
+              data-basket-chip="true"
               style={{ touchAction: "none", ...prov.draggableProps.style }}
               className={cn(snap.isDragging && "opacity-90")}
             >
