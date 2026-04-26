@@ -2860,50 +2860,78 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }),
 
   movePatternChordsTo: (fromPatternId, toPatternId, chordIds) => set((s) => {
-    if (fromPatternId === toPatternId) return s;
-    const idSet = new Set(chordIds);
+    if (fromPatternId === toPatternId) return {};
     const fromPattern = s.progression.find((p) => p.id === fromPatternId);
     const toPattern = s.progression.find((p) => p.id === toPatternId);
-    if (!fromPattern || !toPattern) return s;
-    const moving = fromPattern.chords.filter((c) => idSet.has(c.id));
-    if (!moving.length) return s;
-    const mirrorAnchorIds = new Set(moving.map((c) => c.mirrorId).filter(Boolean) as string[]);
+    if (!fromPattern || !toPattern) return {};
+    const fromSectionId = fromPattern.sectionId ?? fromPattern.id;
+    const toSectionId = toPattern.sectionId ?? toPattern.id;
+    const idSet = new Set(chordIds);
 
-    let target: PatternBlock = { ...toPattern, chords: [...toPattern.chords] };
-    let cursor = target.chords.length
-      ? Math.max(...target.chords.map((c) => c.startBeat + c.lengthBeats))
-      : 0;
-    for (const m of moving) {
-      let total = target.bars * target.beatsPerBar;
-      if (cursor + m.lengthBeats > total) {
-        const neededBars = Math.min(32, Math.ceil((cursor + m.lengthBeats) / target.beatsPerBar));
-        target = { ...target, bars: neededBars };
-        total = target.bars * target.beatsPerBar;
+    if (fromSectionId === toSectionId) {
+      // Same section: just reassign progressionPlacement.patternId, keep
+      // section.chords order (move SCs to end of target's group to mirror
+      // legacy "append at end" semantics).
+      const sec = s.sections.find((x) => x.id === fromSectionId);
+      if (!sec) return {};
+      const moving = sec.chords.filter((c) => idSet.has(c.id) && c.progressionPlacement);
+      if (!moving.length) return {};
+      const remapped = moving.map((c) => ({
+        ...c,
+        progressionPlacement: { ...c.progressionPlacement!, patternId: toPatternId, startBeat: 0 },
+      }));
+      const without = sec.chords.filter((c) => !idSet.has(c.id));
+      // Append remapped at the end of target pattern's group.
+      const nextChords: SectionChord[] = [];
+      let lastTargetIdx = -1;
+      without.forEach((c, i) => {
+        if (c.progressionPlacement?.patternId === toPatternId) lastTargetIdx = i;
+      });
+      if (lastTargetIdx < 0) {
+        nextChords.push(...without, ...remapped);
+      } else {
+        nextChords.push(...without.slice(0, lastTargetIdx + 1), ...remapped, ...without.slice(lastTargetIdx + 1));
       }
-      const start = Math.min(cursor, total - 1);
-      const len = Math.max(1, Math.min(m.lengthBeats, total - start));
-      target.chords.push({ id: m.id, chord: m.chord, startBeat: start, lengthBeats: len, mirrorId: undefined });
-      cursor = start + len;
+      const nextSections = s.sections.map((x) =>
+        x.id !== fromSectionId ? x : { ...x, chords: nextChords },
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     }
-    target.chords = repackChords(target.chords, target.bars * target.beatsPerBar);
 
-    const progression = s.progression.map((p) => {
-      if (p.id === fromPatternId) {
-        const totalBeats = p.bars * p.beatsPerBar;
-        return { ...p, chords: repackChords(p.chords.filter((c) => !idSet.has(c.id)), totalBeats) };
-      }
-      if (p.id === toPatternId) return target;
-      return p;
+    // Cross-section: remove from source section.chords (drops lyrics anchor
+    // too — matches legacy behavior of detaching the lyric mirror), then
+    // place fresh SectionChords into the target section using its
+    // progression-placement helper.
+    const fromSec = s.sections.find((x) => x.id === fromSectionId);
+    if (!fromSec) return {};
+    const moving = fromSec.chords.filter((c) => idSet.has(c.id));
+    if (!moving.length) return {};
+
+    let workingProgression = s.progression;
+    let nextSections = s.sections.map((sec) => {
+      if (sec.id !== fromSectionId) return sec;
+      return { ...sec, chords: sec.chords.filter((c) => !idSet.has(c.id)) };
     });
-
-    const sections = mirrorAnchorIds.size
-      ? s.sections.map((sec) => sec.id !== fromPatternId ? sec : {
-          ...sec,
-          lines: sec.lines.map((l) => ({ ...l, chords: l.chords.filter((a) => !mirrorAnchorIds.has(a.id)) })),
-        })
-      : s.sections;
-
-    return { progression, sections };
+    for (const m of moving) {
+      const toSec = nextSections.find((x) => x.id === toSectionId);
+      if (!toSec) continue;
+      // Create a fresh SectionChord in target (no lyricsPlacement — cross-section).
+      const newId = nanoid();
+      const placement = placeSectionChordInProgression(
+        workingProgression,
+        toSectionId,
+        toSec.chords,
+        m.chord,
+        newId,
+      );
+      workingProgression = placement.progression;
+      nextSections = nextSections.map((sec) =>
+        sec.id !== toSectionId ? sec : { ...sec, chords: [...sec.chords, placement.sectionChord] },
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, progression: workingProgression, [SSOT_MODE]: true } as any);
   }),
 
   addPatternToSection: (sectionId) => {
