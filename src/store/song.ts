@@ -765,8 +765,87 @@ function deriveMirrorsFromSectionChords(
       mirrorId: sc.progressionPlacement ? sc.id : undefined,
     });
   }
+
+  // 2) Rebuild each pattern's chords from SectionChords whose
+  //    progressionPlacement matches that pattern. Walk SectionChords in
+  //    array order (== SSOT order). Pack left-to-right within each block;
+  //    when a chord doesn't fit, cascade into the next block (preserving
+  //    relative order). If no remaining block has room, spawn continuation
+  //    blocks at the end of the section. Reassigns SectionChord patternIds
+  //    on overflow so SSOT stays in sync with mirrors.
+  const defaultLen = getDefaults().defaultChordLengthBeats;
+  // Mutable copy of blocks; may grow with continuation blocks on overflow.
+  const blocks: PatternBlock[] = sectionPatterns.map((p) => ({ ...p, chords: [] as PatternChord[] }));
+  const usage: number[] = blocks.map(() => 0);
+  const indexById = new Map<string, number>(blocks.map((b, i) => [b.id, i]));
+  // Track patternId reassignment for SCs that overflowed.
+  const remappedPlacement = new Map<string, { patternId: string; startBeat: number; lengthBeats: number }>();
+
+  for (const sc of section.chords) {
+    const pp = sc.progressionPlacement;
+    if (!pp) continue;
+    const origIdx = indexById.get(pp.patternId);
+    if (origIdx == null) continue; // placement points to a foreign block — ignore here
+    const want = pp.lengthBeats > 0 ? pp.lengthBeats : defaultLen;
+    const len = Math.max(0.5, want);
+    // Find first block at or after origIdx with room.
+    let placed = false;
+    for (let i = origIdx; i < blocks.length; i++) {
+      const cap = blocks[i].bars * blocks[i].beatsPerBar;
+      if (usage[i] + len <= cap + 1e-9) {
+        const start = usage[i];
+        blocks[i].chords.push({
+          id: sc.id,
+          chord: sc.chord,
+          startBeat: start,
+          lengthBeats: len,
+          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+        });
+        usage[i] = start + len;
+        if (blocks[i].id !== pp.patternId || start !== pp.startBeat) {
+          remappedPlacement.set(sc.id, { patternId: blocks[i].id, startBeat: start, lengthBeats: len });
+        }
+        placed = true;
+        break;
+      }
+    }
+    if (placed) continue;
+    // Spawn a new continuation block at the end of this section's blocks.
+    const ref = blocks[blocks.length - 1] ?? sectionPatterns[sectionPatterns.length - 1];
+    if (!ref) continue; // no template — section has no blocks; drop placement
+    const newId = nanoid();
+    const newBlock: PatternBlock = {
+      id: newId,
+      sectionId: section.id,
+      label: `${ref.label} (cont.)`,
+      bars: ref.bars,
+      beatsPerBar: ref.beatsPerBar,
+      chords: [],
+    };
+    const cap = newBlock.bars * newBlock.beatsPerBar;
+    const placedLen = Math.min(len, cap);
+    newBlock.chords.push({
+      id: sc.id,
+      chord: sc.chord,
+      startBeat: 0,
+      lengthBeats: placedLen,
+      mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+    });
+    blocks.push(newBlock);
+    usage.push(placedLen);
+    indexById.set(newId, blocks.length - 1);
+    remappedPlacement.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: placedLen });
+  }
+
+  // Build updated section with possibly-remapped SC placements.
+  const nextSectionChords = section.chords.map((sc) => {
+    const np = remappedPlacement.get(sc.id);
+    if (!np) return sc;
+    return { ...sc, progressionPlacement: np };
+  });
   const nextSection: Section = {
     ...section,
+    chords: nextSectionChords,
     lines: section.lines.map((l) => ({
       ...l,
       chords: (anchorsByLine.get(l.id) ?? []).sort(
@@ -775,34 +854,7 @@ function deriveMirrorsFromSectionChords(
     })),
   };
 
-  // 2) Rebuild each pattern's chords from SectionChords whose
-  //    progressionPlacement matches that pattern. Order by SectionChord
-  //    array order. Re-pack startBeat left-to-right.
-  const defaultLen = getDefaults().defaultChordLengthBeats;
-  const nextPatterns = sectionPatterns.map((p) => {
-    const total = p.bars * p.beatsPerBar;
-    const list: PatternChord[] = [];
-    let cursor = 0;
-    for (const sc of section.chords) {
-      const pp = sc.progressionPlacement;
-      if (!pp || pp.patternId !== p.id) continue;
-      const want = pp.lengthBeats > 0 ? pp.lengthBeats : defaultLen;
-      const remaining = total - cursor;
-      if (remaining < 0.5) break;
-      const len = Math.max(0.5, Math.min(want, remaining));
-      list.push({
-        id: sc.id,
-        chord: sc.chord,
-        startBeat: cursor,
-        lengthBeats: len,
-        mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-      });
-      cursor += len;
-    }
-    return { ...p, chords: list };
-  });
-
-  return { section: nextSection, patterns: nextPatterns };
+  return { section: nextSection, patterns: blocks };
 }
 
 /**
@@ -894,14 +946,38 @@ function syncMirrorsFromAllSectionChords(
   progression: PatternBlock[],
 ): { sections: Section[]; progression: PatternBlock[] } {
   const nextSections: Section[] = [];
-  const patternReplacements = new Map<string, PatternBlock>();
+  // Per section: ordered list of patterns (existing replacements + new continuation blocks).
+  const patternsBySection = new Map<string, PatternBlock[]>();
   for (const sec of sections) {
     const sectionPatterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
     const derived = deriveMirrorsFromSectionChords(sec, sectionPatterns);
     nextSections.push(derived.section);
-    derived.patterns.forEach((p) => patternReplacements.set(p.id, p));
+    patternsBySection.set(sec.id, derived.patterns);
   }
-  const nextProgression = progression.map((p) => patternReplacements.get(p.id) ?? p);
+  // Rebuild progression: walk original order, replacing each section's blocks
+  // (in their original first-appearance position) with the derived ordered list
+  // (which may include newly-spawned continuation blocks).
+  const placedSections = new Set<string>();
+  const nextProgression: PatternBlock[] = [];
+  const sectionOfBlock = new Map<string, string>();
+  for (const p of progression) sectionOfBlock.set(p.id, p.sectionId ?? p.id);
+  for (const p of progression) {
+    const sid = sectionOfBlock.get(p.id)!;
+    if (placedSections.has(sid)) continue;
+    const list = patternsBySection.get(sid);
+    if (list && list.length) {
+      nextProgression.push(...list);
+    } else {
+      nextProgression.push(p);
+    }
+    placedSections.add(sid);
+  }
+  // Append blocks from sections that exist only in patternsBySection but
+  // weren't represented in original progression order (defensive — shouldn't
+  // happen normally).
+  for (const [sid, list] of patternsBySection) {
+    if (!placedSections.has(sid)) nextProgression.push(...list);
+  }
   return { sections: nextSections, progression: nextProgression };
 }
 
@@ -2087,24 +2163,18 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // SSOT-first: chordId === SectionChord.id. Mutate that chord's
   // progressionPlacement.lengthBeats; mirror derivation re-packs startBeats.
   setPatternChordLength: (patternId, chordId, lengthBeats) => set((s) => {
-    const pattern = s.progression.find((p) => p.id === patternId);
-    if (!pattern) return {};
-    const totalBeats = pattern.bars * pattern.beatsPerBar;
+    // SSOT-first: just update the SectionChord's lengthBeats. Overflow into
+    // subsequent blocks (and continuation-block spawning) is handled by the
+    // derive step in syncMirrorsFromAllSectionChords.
+    const newLen = Math.max(0.5, lengthBeats);
     const sections = s.sections.map((sec) => {
       if (!sec.chords.some((sc) => sc.id === chordId && sc.progressionPlacement?.patternId === patternId)) return sec;
-      const othersSum = sec.chords.reduce((sum, sc) => {
-        if (sc.id === chordId) return sum;
-        const pp = sc.progressionPlacement;
-        return pp && pp.patternId === patternId ? sum + pp.lengthBeats : sum;
-      }, 0);
-      const maxForThis = Math.max(0.5, totalBeats - othersSum);
-      const clamped = Math.max(0.5, Math.min(lengthBeats, maxForThis));
       return {
         ...sec,
         chords: sec.chords.map((sc) =>
           sc.id !== chordId || !sc.progressionPlacement
             ? sc
-            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: clamped } },
+            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: newLen } },
         ),
       };
     });

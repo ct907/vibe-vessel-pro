@@ -92,3 +92,23 @@ All actively-used chord-mutating store actions are now SSOT-first:
 - Drop legacy `offset`, `chordCol`, `wordIndex`, `chordRowLen` once consumers stop reading them.
 - Update `playback.ts` mirrorId comment to reference SectionChord id.
 - Bump `SerializedSong.version` to 4.
+
+### Pattern overflow rules (DONE — moved into derive step)
+`deriveMirrorsFromSectionChords` now enforces all pattern-block layout rules
+in one place, so EVERY mutation gets them automatically:
+1. Chords are left-packed (no gaps between, gap only after last).
+2. Free placement allowed.
+3. When a chord doesn't fit in its assigned block, it cascades into the next
+   block of the same section (preserving SSOT order). On overflow it
+   reassigns `progressionPlacement.patternId` so SSOT stays in sync.
+4. Cascading pushes existing chords in following blocks further right
+   automatically (relative SSOT order is preserved).
+5. If no remaining block has room, a continuation block is spawned at the
+   end of the section. Multiple overflows ⇒ multiple continuation blocks.
+6. Overflow stays within the same section (never crosses sections).
+7. Cross-block drops still validate capacity in the UI handler (Rule 6 in
+   user spec) so users can't drop a 4-beat chord into 2 free beats.
+
+`setPatternChordLength` simplified to just patch `lengthBeats` — derive
+handles all overflow. `resizePatternChordsWithOverflow` retained for bulk
+multi-select resize but now also benefits from the unified derive cascade.

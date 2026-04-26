@@ -590,8 +590,7 @@ function PatternBlock({
               className="h-7 w-7"
               onClick={() => {
                 if (showSingle && c) {
-                  if (canIncrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
-                  else resizePatternChordsWithOverflow(pattern.id, [c.id], LENGTH_STEP);
+                  setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
                 } else {
                   resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP);
                 }
