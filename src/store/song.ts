@@ -633,9 +633,83 @@ function placeMirroredChord(
   return { progression: next, chordId: pcId, patternId: newId };
 }
 
+// ---------- SSOT projection (Phase 1) ----------
+/**
+ * Rebuild a section's `chords: SectionChord[]` projection from the existing
+ * `line.chords` (anchors) and the section's pattern blocks. Pairing happens
+ * via `mirrorId`. Order is determined by visual order of anchors first
+ * (lines top-to-bottom, slots/cols left-to-right), with progression-only
+ * pattern chords (no anchor mirror) appended afterward in pattern order.
+ *
+ * The chord type and relative order in this list are the SSOT invariant.
+ * Per-view metadata (`lyricsPlacement`, `progressionPlacement`) is captured
+ * but treated as free-form (no spacing rule enforced).
+ */
+function recomputeSectionChordsFromMirrors(
+  section: Section,
+  sectionPatterns: PatternBlock[],
+): SectionChord[] {
+  const pcByMirror = new Map<string, { patternId: string; pc: PatternChord }>();
+  const pcAll: { patternId: string; pc: PatternChord }[] = [];
+  sectionPatterns.forEach((p) => {
+    const sortedPcs = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
+    sortedPcs.forEach((pc) => {
+      pcAll.push({ patternId: p.id, pc });
+      if (pc.mirrorId) pcByMirror.set(pc.mirrorId, { patternId: p.id, pc });
+    });
+  });
+
+  const usedPcIds = new Set<string>();
+  const out: SectionChord[] = [];
+
+  section.lines.forEach((line) => {
+    const sorted = [...line.chords].sort((a, b) => {
+      const as = a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
+      const bs = b.slotIndex ?? b.wordIndex ?? b.chordCol ?? b.offset ?? 0;
+      return as - bs;
+    });
+    sorted.forEach((a) => {
+      const mirror = a.mirrorId ? pcByMirror.get(a.mirrorId) : undefined;
+      if (mirror) usedPcIds.add(mirror.pc.id);
+      out.push({
+        id: a.id,
+        chord: a.chord,
+        lyricsPlacement: { lineId: line.id, slotIndex: a.slotIndex ?? 0 },
+        progressionPlacement: mirror
+          ? { patternId: mirror.patternId, startBeat: mirror.pc.startBeat, lengthBeats: mirror.pc.lengthBeats }
+          : undefined,
+      });
+    });
+  });
+
+  pcAll.forEach(({ patternId, pc }) => {
+    if (usedPcIds.has(pc.id)) return;
+    out.push({
+      id: pc.id,
+      chord: pc.chord,
+      lyricsPlacement: undefined,
+      progressionPlacement: { patternId, startBeat: pc.startBeat, lengthBeats: pc.lengthBeats },
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Refresh `section.chords` for every section based on current mirrors.
+ * Wrapped `set` calls this after any update that touches sections/progression.
+ */
+function refreshAllSectionChords(sections: Section[], progression: PatternBlock[]): Section[] {
+  return sections.map((sec) => {
+    const sectionPatterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
+    return { ...sec, chords: recomputeSectionChordsFromMirrors(sec, sectionPatterns) };
+  });
+}
+
 // ---------- Store ----------
 
 const seed = makeSection("verse");
+seed.section.chords = recomputeSectionChordsFromMirrors(seed.section, [seed.pattern]);
 
 // History stacks live outside the reactive state so snapshots don't trigger re-renders.
 type HistorySnapshot = { sections: Section[]; progression: PatternBlock[] };
