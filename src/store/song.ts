@@ -2604,12 +2604,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       return;
     }
 
-    if (parsed.version !== 2) return;
+    if (parsed.version !== 2 && parsed.version !== 3) return;
     const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
     // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
+    // Also ensure `chords: []` exists (the wrapped set will recompute the SSOT projection).
     const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
       ...sec,
       lines: sec.lines.map((l) => ensureSlotsForLine(l)),
+      chords: sec.chords ?? [],
     }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
@@ -2631,7 +2633,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   toJSON: () => {
     const s = get();
     return {
-      version: 2,
+      version: 3,
       meta: s.meta,
       sections: s.sections,
       progression: s.progression,
