@@ -8,6 +8,7 @@ import { useDndStore } from "@/store/dnd";
 import {
   useSongStore,
   getSectionDisplayName,
+  getLineChordsViaSSOT,
   CHORD_ROW_SLOTS,
   type LyricLine,
   type Section,
