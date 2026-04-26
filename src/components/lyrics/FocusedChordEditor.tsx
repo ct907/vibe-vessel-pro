@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordSymbol, suggestChords, parseChord } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
 import {
   useSongStore,
   getSectionDisplayName,
   CHORD_ROW_SLOTS,
-  type ChordAnchor,
   type LyricLine,
 } from "@/store/song";
-import { cn } from "@/lib/utils";
-import { Play, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, X } from "lucide-react";
 
 interface Props {
   sectionId: string;
