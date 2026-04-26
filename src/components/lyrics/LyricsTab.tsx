@@ -294,12 +294,14 @@ function LineRow({
     }
   };
 
-  // Close (clear) selection on Escape or click outside this row.
+  // Close (clear) selection on Escape or click outside this row. While Edit
+  // Mode is on we don't auto-clear — the user controls dismissal via Done or
+  // the pencil button.
   useEffect(() => {
     if (selection.size === 0) return;
+    if (isEditMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Only clear if at least one chord on this row is selected.
         if (lineChords.some((c) => selection.has(c.id))) selection.clear();
       }
     };
@@ -318,7 +320,7 @@ function LineRow({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointer, true);
     };
-  }, [selection, lineChords]);
+  }, [selection, lineChords, isEditMode]);
 
   const slots = chordsBySlot(lineChords);
 
