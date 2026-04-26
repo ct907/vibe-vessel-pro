@@ -360,6 +360,34 @@ export function nearestFreeSlot(occupied: Set<number>, desired: number, total = 
   return -1;
 }
 
+/**
+ * Find nearest free slot with empty immediate neighbors (spacing rule).
+ * Prevents two chords from being placed in adjacent slots, which keeps the
+ * chord row visually readable. Falls back to {@link nearestFreeSlot} if no
+ * slot satisfies the spacing constraint (e.g. very dense rows).
+ */
+export function nearestSpacedFreeSlot(
+  occupied: Set<number>,
+  desired: number,
+  total = CHORD_ROW_SLOTS,
+): number {
+  const isSpaced = (i: number) =>
+    !occupied.has(i) &&
+    !occupied.has(i - 1) &&
+    !occupied.has(i + 1);
+  const start = Math.max(0, Math.min(total - 1, desired));
+  if (isSpaced(start)) return start;
+  for (let off = 1; off < total; off++) {
+    const r = start + off;
+    if (r < total && isSpaced(r)) return r;
+    const l = start - off;
+    if (l >= 0 && isSpaced(l)) return l;
+  }
+  // No spaced slot available — fall back so the user doesn't silently lose
+  // the chord on dense rows.
+  return nearestFreeSlot(occupied, desired, total);
+}
+
 /** Derive a slotIndex for a legacy anchor (uses wordIndex if present, else order). */
 function deriveSlotIndex(anchor: ChordAnchor, fallbackOrder: number): number {
   if (anchor.wordIndex != null) return Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, anchor.wordIndex));
@@ -1561,7 +1589,10 @@ export const useSongStore = create<SongState>((set, get) => ({
             if (l.id !== lineId) return l;
             const occupied = new Set<number>();
             l.chords.forEach((c) => { if (c.slotIndex != null) occupied.add(c.slotIndex); });
-            const slot = nearestFreeSlot(occupied, slotIndex);
+            // Spacing rule: prefer a slot whose immediate neighbors are also
+            // empty so chord chips never visually crowd each other. Falls back
+            // to the next free slot when the row is too dense for spacing.
+            const slot = nearestSpacedFreeSlot(occupied, slotIndex);
             if (slot < 0) return l; // row full — silently drop
             const id = nanoid();
             createdAnchorId = id;
