@@ -155,6 +155,7 @@ function LineRow({
     undo,
     redo,
   } = useSongStore();
+  const isMobile = useIsMobile();
   // Phase 2 SSOT: read line chords through the section's SectionChord[]
   // projection. The legacy ChordAnchor shape is preserved (renderer still
   // depends on slotIndex/mirrorId/etc.) — only the order is now SSOT-driven.
