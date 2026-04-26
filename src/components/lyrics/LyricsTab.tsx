@@ -97,10 +97,10 @@ const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "out
 const slotOf = (a: ChordAnchor): number =>
   a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
 
-/** Build a slot → chord map for one line. Slots without a chord map to undefined. */
-function chordsBySlot(line: LyricLine): (ChordAnchor | undefined)[] {
+/** Build a slot → chord map from a chord list. Slots without a chord map to undefined. */
+function chordsBySlot(chords: ChordAnchor[]): (ChordAnchor | undefined)[] {
   const out: (ChordAnchor | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-  line.chords.forEach((c) => {
+  chords.forEach((c) => {
     const s = c.slotIndex;
     if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) out[s] = c;
   });
