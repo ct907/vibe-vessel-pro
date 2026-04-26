@@ -41,8 +41,13 @@ Scope:
 - `SuggestionsPanel.sortedChords` left as-is (beat sort is used for suggestion math, not display ordering of existing chords).
 - Cross-pattern move helpers still read raw `pattern.chords` for beat capacity math — that's a structural mirror question, not a render decision.
 
-## Phase 4 — Invert flow + cleanup
-- Rewrite chord-mutating actions to mutate `section.chords` first, then rederive `line.chords` / `block.chords`.
-- Delete `ChordAnchor`, `PatternChord`, `mirrorId`, mirror-rederive helpers.
-- Update `lib/lyrics/export.ts`, `store/playback.ts`.
+## Phase 4a (DONE) — Read-side cleanup using SSOT
+- `lib/lyrics/export.ts` rewritten to render chord rows directly from `section.chords` (SSOT) using `lyricsPlacement.slotIndex`. No more dependency on legacy `chordCol`/`offset`/`chordRowLen` per-anchor fields for export.
+- `playback.ts` left untouched: its `mirrorId` field already equals the anchor id (== SectionChord id from the projection), so highlight selectors in LyricsTab/ProgressionsTab continue to work unchanged.
+- Mirrors (`line.chords`, `pattern.chords`, `mirrorId`) remain authoritative writers — store actions are unchanged.
+
+## Phase 4b (FUTURE) — Invert flow + delete legacy types
+- Rewrite all chord-mutating actions in `store/song.ts` to mutate `section.chords` first, then derive `line.chords` / `pattern.chords` from it.
+- Delete `ChordAnchor`, `PatternChord`, `mirrorId`, mirror-rederive helpers (`recomputeSectionChordsFromMirrors` becomes `deriveMirrorsFromSectionChords`).
+- Update `playback.ts` to drop the `mirrorId` field (use `chordId` directly).
 - Final type pruning + type check + manual smoke.
