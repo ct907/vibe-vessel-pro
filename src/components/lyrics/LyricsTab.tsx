@@ -152,10 +152,13 @@ function LineRow({
     removeChordAnchorsBatch,
     pasteChordsAt,
     moveChordToSlot,
-    placeChordInSlot,
     undo,
     redo,
   } = useSongStore();
+  // Phase 2 SSOT: read line chords through the section's SectionChord[]
+  // projection. The legacy ChordAnchor shape is preserved (renderer still
+  // depends on slotIndex/mirrorId/etc.) — only the order is now SSOT-driven.
+  const lineChords: ChordAnchor[] = getLineChordsViaSSOT(section, line.id);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
