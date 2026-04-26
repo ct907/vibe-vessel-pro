@@ -768,6 +768,110 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
   return out;
 }
 
+// ---------- SSOT inversion (Phase 4b) ----------
+/**
+ * Inverse of `recomputeSectionChordsFromMirrors`: given an updated
+ * `section.chords` (SSOT), rebuild `line.chords` and the section's pattern
+ * blocks' chords so the legacy mirrors stay in sync.
+ *
+ * Each SectionChord becomes:
+ *  - an anchor on the line referenced by `lyricsPlacement.lineId` (if any),
+ *    using the SectionChord's id so playback `mirrorId` keeps pointing at
+ *    the same anchor.
+ *  - a pattern chord on the pattern referenced by
+ *    `progressionPlacement.patternId` (if any), with `mirrorId` set to the
+ *    SectionChord id so the legacy pairing keeps working.
+ *
+ * Pattern chord `startBeat` is recomputed left-to-right (no spacing rule).
+ */
+function deriveMirrorsFromSectionChords(
+  section: Section,
+  sectionPatterns: PatternBlock[],
+): { section: Section; patterns: PatternBlock[] } {
+  // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
+  const anchorsByLine = new Map<string, ChordAnchor[]>();
+  section.lines.forEach((l) => anchorsByLine.set(l.id, []));
+  for (const sc of section.chords) {
+    const lp = sc.lyricsPlacement;
+    if (!lp) continue;
+    const bucket = anchorsByLine.get(lp.lineId);
+    if (!bucket) continue;
+    bucket.push({
+      id: sc.id,
+      offset: lp.slotIndex,
+      slotIndex: lp.slotIndex,
+      chord: sc.chord,
+      mirrorId: sc.progressionPlacement ? sc.id : undefined,
+    });
+  }
+  const nextSection: Section = {
+    ...section,
+    lines: section.lines.map((l) => ({
+      ...l,
+      chords: (anchorsByLine.get(l.id) ?? []).sort(
+        (a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0),
+      ),
+    })),
+  };
+
+  // 2) Rebuild each pattern's chords from SectionChords whose
+  //    progressionPlacement matches that pattern. Order by SectionChord
+  //    array order. Re-pack startBeat left-to-right.
+  const defaultLen = getDefaults().defaultChordLengthBeats;
+  const nextPatterns = sectionPatterns.map((p) => {
+    const total = p.bars * p.beatsPerBar;
+    const list: PatternChord[] = [];
+    let cursor = 0;
+    for (const sc of section.chords) {
+      const pp = sc.progressionPlacement;
+      if (!pp || pp.patternId !== p.id) continue;
+      const want = pp.lengthBeats > 0 ? pp.lengthBeats : defaultLen;
+      const remaining = total - cursor;
+      if (remaining < 0.5) break;
+      const len = Math.max(0.5, Math.min(want, remaining));
+      list.push({
+        id: sc.id,
+        chord: sc.chord,
+        startBeat: cursor,
+        lengthBeats: len,
+        mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+      });
+      cursor += len;
+    }
+    return { ...p, chords: list };
+  });
+
+  return { section: nextSection, patterns: nextPatterns };
+}
+
+/**
+ * Apply `deriveMirrorsFromSectionChords` across the whole song after a
+ * SectionChord-first mutation. Keeps `section.chords` untouched and
+ * rebuilds `line.chords` + `pattern.chords` from it.
+ */
+function syncMirrorsFromAllSectionChords(
+  sections: Section[],
+  progression: PatternBlock[],
+): { sections: Section[]; progression: PatternBlock[] } {
+  const nextSections: Section[] = [];
+  const patternReplacements = new Map<string, PatternBlock>();
+  for (const sec of sections) {
+    const sectionPatterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
+    const derived = deriveMirrorsFromSectionChords(sec, sectionPatterns);
+    nextSections.push(derived.section);
+    derived.patterns.forEach((p) => patternReplacements.set(p.id, p));
+  }
+  const nextProgression = progression.map((p) => patternReplacements.get(p.id) ?? p);
+  return { sections: nextSections, progression: nextProgression };
+}
+
+/**
+ * Marker on a partial state update: when present, the wrapped `set` treats
+ * `section.chords` as authoritative and rebuilds mirrors from it. Stripped
+ * before being merged into state.
+ */
+const SSOT_MODE = "__ssotMode__" as const;
+
 // ---------- Store ----------
 
 const seed = makeSection("verse");
