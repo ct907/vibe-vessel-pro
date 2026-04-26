@@ -56,18 +56,24 @@ Strategy: section.chords becomes the authoritative writer. After each batch of a
 - ✅ `placeSectionChordInProgression` ports the legacy `placeMirroredChord` continuation-block-spawning logic into the SSOT-first flow. Used by SSOT-first actions to assign a `progressionPlacement` to a brand-new SectionChord, spawning a continuation block when no existing pattern in the section has room.
 - ✅ `SSOT_MODE` marker on partial state updates.
 
-### 4b.2 — Migrate actions (IN PROGRESS, 1/25)
-- ✅ `placeChordInSlot` — fully SSOT-first. Writes a new SectionChord; uses `placeSectionChordInProgression` for room/continuation; mirrors derived via SSOT_MODE.
-- ⏸ All others (24 remaining) still mirror-first.
+### 4b.2 — Migrate actions (IN PROGRESS, 6/25)
+- ✅ `placeChordInSlot` — fully SSOT-first.
+- ✅ `removeChordAnchor` — drops SectionChord by id; mirrors derived.
+- ✅ `removeChordAnchorsBatch` — same, batch.
+- ✅ `setPatternChordLength` — mutates `progressionPlacement.lengthBeats` with same-pattern clamp.
+- ✅ `addChordToPatternSlot` — appends SectionChord to target pattern (or sibling/continuation if full), inserted at slotIndex within same-pattern order.
+- ✅ `replacePatternChords` — swaps `chord` on SectionChords mapped to that pattern, in SSOT order. Lyric mirror updates too (correct under SSOT — unified identity).
+- ⏸ 19 remaining still mirror-first.
 
-**Smoke-test before continuing**: drag a chord from the basket onto an empty lyric row slot. Verify:
-- Chord appears in the lyrics row at the chosen slot.
-- Same chord appears in the progression block.
-- Adding chords until a block is full spawns a continuation block automatically.
-- Undo/redo works.
-- No console errors.
+**Smoke-test checkpoints**:
+1. Delete a chord from a lyric row → also gone from progression.
+2. Multi-select delete in a lyric row → both views clear.
+3. Resize a pattern chord → length updates, siblings re-pack.
+4. Drop a chord in the middle of a progression block → inserts at correct position; lyric mirror appears.
+5. Replace chords in a pattern (if UI exposed) → identities swap.
+6. Undo/redo across all of the above.
 
-If green, the next batch (per turn): `removeChordAnchor`, `removeChordAnchorsBatch`, `replacePatternChords`, `addChordToPatternSlot`, `setPatternChordLength`. Each turn ends with a stop-and-smoke checkpoint.
+Next batch (after smoke): `removePatternChord`, `addChordToPattern`, `moveChordToSlot`, `movePatternChord`, `reorderPatternChord`.
 
 ### 4b.3 — Complex actions (TODO)
 - `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow` (overflow cascade), `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
