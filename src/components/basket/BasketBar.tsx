@@ -78,6 +78,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                     ref={prov.innerRef}
                     {...prov.draggableProps}
                     {...prov.dragHandleProps}
+                    data-basket-chip="true"
                     style={{ touchAction: "none", ...prov.draggableProps.style }}
                   >
                     <ChordChip chord={item.chord} variant="ink" size="md" audition={false} />
@@ -89,6 +90,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 <div
                   ref={prov.innerRef}
                   {...prov.droppableProps}
+                  data-droppable-id="basket-source"
                   className="flex flex-wrap items-center gap-2 py-1"
                 >
                   {renderChips()}
