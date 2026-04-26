@@ -157,8 +157,6 @@ export interface SongState {
   removeLine: (sectionId: string, id: string) => void;
   setLineText: (sectionId: string, id: string, text: string) => void;
   setChordRowLen: (sectionId: string, id: string, len: number) => void;
-  insertChordSpaceAt: (sectionId: string, lineId: string, col: number) => void;
-  removeChordCellAt: (sectionId: string, lineId: string, col: number) => boolean;
   upsertChordAt: (sectionId: string, lineId: string, col: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
