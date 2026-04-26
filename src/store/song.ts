@@ -2271,22 +2271,32 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return { progression, sections };
   }),
 
+  // SSOT-first: chordId === SectionChord.id. Mutate that chord's
+  // progressionPlacement.lengthBeats; mirror derivation re-packs startBeats.
   setPatternChordLength: (patternId, chordId, lengthBeats) => set((s) => {
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      // Compute the maximum length this chord can have without bumping siblings off the grid:
-      // total - (sum of other chords' lengths).
-      const othersSum = p.chords.reduce((sum, c) => sum + (c.id === chordId ? 0 : c.lengthBeats), 0);
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const totalBeats = pattern.bars * pattern.beatsPerBar;
+    const sections = s.sections.map((sec) => {
+      if (!sec.chords.some((sc) => sc.id === chordId && sc.progressionPlacement?.patternId === patternId)) return sec;
+      const othersSum = sec.chords.reduce((sum, sc) => {
+        if (sc.id === chordId) return sum;
+        const pp = sc.progressionPlacement;
+        return pp && pp.patternId === patternId ? sum + pp.lengthBeats : sum;
+      }, 0);
       const maxForThis = Math.max(0.5, totalBeats - othersSum);
-      const next = p.chords.map((c) =>
-        c.id === chordId
-          ? { ...c, lengthBeats: Math.max(0.5, Math.min(lengthBeats, maxForThis)) }
-          : c,
-      );
-      return { ...p, chords: repackChords(next, totalBeats) };
+      const clamped = Math.max(0.5, Math.min(lengthBeats, maxForThis));
+      return {
+        ...sec,
+        chords: sec.chords.map((sc) =>
+          sc.id !== chordId || !sc.progressionPlacement
+            ? sc
+            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: clamped } },
+        ),
+      };
     });
-    return { progression };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }),
 
   resizePatternChordsWithOverflow: (patternId, chordIds, deltaBeats) => set((s) => {
