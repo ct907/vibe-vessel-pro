@@ -11,6 +11,7 @@ import {
   type LyricLine,
 } from "@/store/song";
 import { Play, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   sectionId: string;
