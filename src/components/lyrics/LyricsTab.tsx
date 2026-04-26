@@ -369,6 +369,13 @@ function LineRow({
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
             const playing = !!anchor && playingAnchorId === anchor.id;
+            // Spacing rule preview: while dragging, an empty slot whose
+            // immediate neighbor already holds a chord is an invalid drop
+            // target (the store will auto-shift to the next spaced slot).
+            // Mark it visually so the user understands why a slot won't accept.
+            const leftOccupied = slotIdx > 0 && !!slots[slotIdx - 1];
+            const rightOccupied = slotIdx < CHORD_ROW_SLOTS - 1 && !!slots[slotIdx + 1];
+            const isInvalidDrop = !occupied && (leftOccupied || rightOccupied);
             return (
               <Droppable
                 key={`slot-${slotIdx}`}
@@ -383,11 +390,16 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative w-4 shrink-0 h-9 flex items-center justify-center",
+                      "relative w-4 shrink-0 h-9 flex items-center justify-start",
                       isAnyDragging &&
                         !occupied &&
+                        !isInvalidDrop &&
                         "border border-dashed border-muted-foreground/30 rounded-sm",
-                      dropSnapshot.isDraggingOver && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
+                      isAnyDragging &&
+                        isInvalidDrop &&
+                        "border border-dashed border-destructive/40 rounded-sm",
+                      dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
+                      dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
                     onClick={(e) => {
                       if (occupied) return;
