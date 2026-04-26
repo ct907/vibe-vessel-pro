@@ -330,7 +330,13 @@ function LineRow({
       ref={rowRef}
       className={cn(
         "group py-1 transition-colors scroll-mt-24",
-        active ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg" : "relative",
+        // On mobile, the FocusedChordEditor renders a clone of this row,
+        // so the underlying row should NOT be visually elevated. On desktop
+        // we keep the focus highlight so the user can see which row the
+        // bottom-sheet picker is editing.
+        active && !isMobile
+          ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
+          : "relative",
       )}
       data-line-id={line.id}
     >
