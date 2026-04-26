@@ -20,6 +20,8 @@ import {
   ArrowUp,
   ArrowDown,
   Play,
+  Pencil,
+  X,
   ChevronsDownUp,
   ChevronsUpDown,
   ChevronDown,
