@@ -1,21 +1,28 @@
-import { getSectionDisplayName, type Section } from "@/store/song";
+import { getSectionDisplayName, type Section, type SectionChord } from "@/store/song";
 
 /**
- * Render a chord row by placing each chord's display string at its column
- * position, padding with spaces. Returns null if the line has no chord content.
+ * Render a chord row from the SSOT (`section.chords`) for a given line.
+ * Each chord is placed at column = `slotIndex * SLOT_WIDTH`. Returns null
+ * if there are no chords on this line.
+ *
+ * Phase 4a: this replaces the legacy renderer that walked `line.chords`
+ * and used per-anchor `chordCol`/`offset` fields. Output spacing is now
+ * driven purely by `lyricsPlacement.slotIndex` from the SectionChord
+ * projection, matching what the user sees in the lyrics tab.
  */
-function renderChordRow(line: Section["lines"][number]): string | null {
-  if (line.chords.length === 0 && (line.chordRowLen ?? 0) === 0) return null;
-  const sorted = [...line.chords].sort(
-    (a, b) => (a.chordCol ?? a.offset ?? 0) - (b.chordCol ?? b.offset ?? 0),
-  );
+const SLOT_WIDTH = 4;
+
+function renderChordRow(sectionChords: SectionChord[], lineId: string): string | null {
+  const lineChords = sectionChords
+    .filter((c) => c.lyricsPlacement?.lineId === lineId)
+    .sort((a, b) => (a.lyricsPlacement?.slotIndex ?? 0) - (b.lyricsPlacement?.slotIndex ?? 0));
+  if (lineChords.length === 0) return null;
   let out = "";
-  for (const a of sorted) {
-    const col = a.chordCol ?? a.offset ?? 0;
+  for (const c of lineChords) {
+    const col = (c.lyricsPlacement?.slotIndex ?? 0) * SLOT_WIDTH;
     if (col > out.length) out += " ".repeat(col - out.length);
-    // If the previous chord overlaps this column, ensure at least one space.
-    if (out.length > col) out += " ";
-    out += a.chord.display;
+    if (out.length > col) out += " "; // overlap fallback
+    out += c.chord.display;
   }
   return out.length ? out : null;
 }
@@ -26,7 +33,7 @@ export function exportLyricsAsText(sections: Section[]): string {
     const title = `[${getSectionDisplayName(sections, section.id)}]`;
     const lines: string[] = [title];
     for (const line of section.lines) {
-      const chordRow = renderChordRow(line);
+      const chordRow = renderChordRow(section.chords ?? [], line.id);
       if (chordRow !== null) lines.push(chordRow);
       lines.push(line.text);
     }
