@@ -100,13 +100,13 @@ const Index = () => {
           <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full mt-4">
-            <TabsContent value="lyrics" className="mt-0">
+            <TabsContent value="lyrics" forceMount className="mt-0 data-[state=inactive]:hidden">
               <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} />
             </TabsContent>
-            <TabsContent value="chords" className="mt-0">
+            <TabsContent value="chords" forceMount className="mt-0 data-[state=inactive]:hidden">
               <ChordsTab onSwitchTab={setTab} />
             </TabsContent>
-            <TabsContent value="progressions" className="mt-0">
+            <TabsContent value="progressions" forceMount className="mt-0 data-[state=inactive]:hidden">
               <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} />
             </TabsContent>
           </Tabs>
