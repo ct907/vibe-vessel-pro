@@ -411,8 +411,7 @@ function PatternBlock({
                                   }}
                                   className={cn(
                                     "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                                    !selectMode && activeChord === c.id && "ring-2 ring-primary",
-                                    selectMode && isSel && "ring-2 ring-primary",
+                                    isSel && "ring-2 ring-primary",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
                                   style={{
