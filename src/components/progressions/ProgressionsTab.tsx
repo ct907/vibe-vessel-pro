@@ -295,13 +295,35 @@ function PatternBlock({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
+          className={cn(
+            "h-8 w-8 ml-auto text-muted-foreground hover:text-foreground",
+            selectMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (selectMode) {
+              exitSelect();
+            } else {
+              setSelectMode(true);
+              setSelected(new Set());
+            }
+          }}
+          aria-label={selectMode ? "Exit edit mode" : "Edit chords in this block"}
+          aria-pressed={selectMode}
+          title={selectMode ? "Exit edit mode" : "Edit chords"}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
           onClick={(e) => {
             e.stopPropagation();
             onRequestDeleteBlock(pattern.id);
           }}
           disabled={!canDeleteThisBlock}
-          title={canDeleteThisBlock ? "Delete pattern block" : "Cannot delete the only block in this section"}
+          title={canDeleteThisBlock ? "Delete pattern block" : "Cannot delete the last remaining block in the song"}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
