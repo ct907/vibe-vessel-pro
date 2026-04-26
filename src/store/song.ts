@@ -946,14 +946,38 @@ function syncMirrorsFromAllSectionChords(
   progression: PatternBlock[],
 ): { sections: Section[]; progression: PatternBlock[] } {
   const nextSections: Section[] = [];
-  const patternReplacements = new Map<string, PatternBlock>();
+  // Per section: ordered list of patterns (existing replacements + new continuation blocks).
+  const patternsBySection = new Map<string, PatternBlock[]>();
   for (const sec of sections) {
     const sectionPatterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
     const derived = deriveMirrorsFromSectionChords(sec, sectionPatterns);
     nextSections.push(derived.section);
-    derived.patterns.forEach((p) => patternReplacements.set(p.id, p));
+    patternsBySection.set(sec.id, derived.patterns);
   }
-  const nextProgression = progression.map((p) => patternReplacements.get(p.id) ?? p);
+  // Rebuild progression: walk original order, replacing each section's blocks
+  // (in their original first-appearance position) with the derived ordered list
+  // (which may include newly-spawned continuation blocks).
+  const placedSections = new Set<string>();
+  const nextProgression: PatternBlock[] = [];
+  const sectionOfBlock = new Map<string, string>();
+  for (const p of progression) sectionOfBlock.set(p.id, p.sectionId ?? p.id);
+  for (const p of progression) {
+    const sid = sectionOfBlock.get(p.id)!;
+    if (placedSections.has(sid)) continue;
+    const list = patternsBySection.get(sid);
+    if (list && list.length) {
+      nextProgression.push(...list);
+    } else {
+      nextProgression.push(p);
+    }
+    placedSections.add(sid);
+  }
+  // Append blocks from sections that exist only in patternsBySection but
+  // weren't represented in original progression order (defensive — shouldn't
+  // happen normally).
+  for (const [sid, list] of patternsBySection) {
+    if (!placedSections.has(sid)) nextProgression.push(...list);
+  }
   return { sections: nextSections, progression: nextProgression };
 }
 
