@@ -2021,30 +2021,32 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   moveChordToSlot: (sectionId, lineId, anchorId, slotIndex) => {
     pushHistory(get);
     set((s) => {
-      const sections = s.sections.map((sec) => {
-        if (sec.id !== sectionId) return sec;
-        return {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== lineId) return l;
-            const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
-            const me = l.chords.find((c) => c.id === anchorId);
-            if (!me) return l;
-            if (me.slotIndex === target) return l;
-            const occupant = l.chords.find((c) => c.id !== anchorId && c.slotIndex === target);
-            const myPrev = me.slotIndex;
-            const chords = l.chords.map((c) => {
-              if (c.id === anchorId) return { ...c, slotIndex: target };
-              if (occupant && c.id === occupant.id) return { ...c, slotIndex: myPrev };
-              return c;
-            });
-            return { ...l, chords: chords.sort((a, b) => (a.slotIndex ?? 99) - (b.slotIndex ?? 99)) };
-          }),
-        };
-      });
-      const sec = sections.find((x) => x.id === sectionId);
-      const progression = sec ? syncPatternFromAnchors(s.progression, sec) : s.progression;
-      return { sections, progression };
+      const sec = s.sections.find((x) => x.id === sectionId);
+      if (!sec) return {};
+      const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
+      const me = sec.chords.find((c) => c.id === anchorId && c.lyricsPlacement?.lineId === lineId);
+      if (!me || !me.lyricsPlacement) return {};
+      if (me.lyricsPlacement.slotIndex === target) return {};
+      const occupant = sec.chords.find(
+        (c) => c.id !== anchorId && c.lyricsPlacement?.lineId === lineId && c.lyricsPlacement.slotIndex === target,
+      );
+      const myPrev = me.lyricsPlacement.slotIndex;
+      const nextSections = s.sections.map((x) =>
+        x.id !== sectionId
+          ? x
+          : {
+              ...x,
+              chords: x.chords.map((c) => {
+                if (c.id === anchorId && c.lyricsPlacement)
+                  return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: target } };
+                if (occupant && c.id === occupant.id && c.lyricsPlacement)
+                  return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: myPrev } };
+                return c;
+              }),
+            },
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
   },
 
