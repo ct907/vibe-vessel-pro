@@ -105,27 +105,26 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
         return <ChordChip key={b.id} chord={b.chord} variant="ink" size="md" />;
       }
       const sel = isSelected(b.id);
-      // Only selected chips are draggable. Unselected chips still render as
-      // a Draggable (pangea requires contiguous indices) but we omit
-      // dragHandleProps so the gesture is ignored — long-press on an
-      // unselected chip does nothing, per spec.
+      // All chips are draggable. Quick taps still toggle selection (the tap
+      // detector below); long-press / movement defaults to a drag because
+      // pangea owns the gesture once it crosses its threshold.
       return (
         <Draggable
           key={b.id}
           draggableId={`basket:${b.id}`}
           index={i}
-          isDragDisabled={!sel}
+          isDragDisabled={false}
         >
           {(prov, snap) => (
             <div
               ref={prov.innerRef}
               {...prov.draggableProps}
-              {...(sel ? prov.dragHandleProps : {})}
+              {...prov.dragHandleProps}
               data-basket-chip="true"
               data-basket-id={b.id}
               role="button"
               aria-pressed={sel}
-              aria-label={sel ? `Selected chord ${b.chord.display}. Long-press to drag.` : `Tap to select chord ${b.chord.display}`}
+              aria-label={sel ? `Selected chord ${b.chord.display}. Long-press to drag.` : `Chord ${b.chord.display}. Tap to select, long-press to drag.`}
               onPointerDown={(e) => onChipPointerDown(b.id, e)}
               onPointerUp={(e) => onChipPointerUp(b.id, e)}
               onPointerCancel={() => (tapInfo.current = null)}
@@ -134,7 +133,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 userSelect: "none",
                 WebkitUserSelect: "none",
                 WebkitTouchCallout: "none",
-                cursor: sel ? (snap.isDragging ? "grabbing" : "grab") : "pointer",
+                cursor: snap.isDragging ? "grabbing" : "grab",
                 ...prov.draggableProps.style,
               }}
               className={cn(snap.isDragging && "opacity-90")}
