@@ -845,6 +845,85 @@ function deriveMirrorsFromSectionChords(
 }
 
 /**
+ * Place a brand-new SectionChord into a section, choosing a target pattern
+ * with available room. If no existing pattern in the section has space,
+ * spawn a continuation block at the end of the section. This ports the
+ * legacy `placeMirroredChord` behavior into the SSOT-first flow.
+ *
+ * Returns the new SectionChord (with progressionPlacement filled), the
+ * (possibly extended) progression, and the chosen patternId.
+ */
+function placeSectionChordInProgression(
+  progression: PatternBlock[],
+  sectionId: string,
+  sectionChords: SectionChord[],
+  newChord: ChordSymbol,
+  newId: string,
+  lyricsPlacement?: LyricsPlacement,
+): { progression: PatternBlock[]; sectionChord: SectionChord } {
+  const len = getDefaults().defaultChordLengthBeats;
+  const sectionBlockIndices = progression
+    .map((p, i) => ((p.sectionId ?? p.id) === sectionId ? i : -1))
+    .filter((i) => i >= 0);
+  if (!sectionBlockIndices.length) {
+    return {
+      progression,
+      sectionChord: { id: newId, chord: newChord, lyricsPlacement },
+    };
+  }
+  // For each candidate pattern, sum the lengths of SectionChords already
+  // assigned to it (SSOT-driven, ignoring stale pattern.chords arrays).
+  const usedByPattern = new Map<string, number>();
+  for (const sc of sectionChords) {
+    const pp = sc.progressionPlacement;
+    if (!pp) continue;
+    usedByPattern.set(pp.patternId, (usedByPattern.get(pp.patternId) ?? 0) + (pp.lengthBeats || len));
+  }
+  for (const i of sectionBlockIndices) {
+    const target = progression[i];
+    const total = target.bars * target.beatsPerBar;
+    const used = usedByPattern.get(target.id) ?? 0;
+    const free = total - used;
+    if (free + 1e-9 >= 0.5) {
+      const placedLen = Math.min(len, free);
+      return {
+        progression,
+        sectionChord: {
+          id: newId,
+          chord: newChord,
+          lyricsPlacement,
+          progressionPlacement: { patternId: target.id, startBeat: used, lengthBeats: placedLen },
+        },
+      };
+    }
+  }
+  // No room — spawn continuation block after the last block of this section.
+  const lastIdx = sectionBlockIndices[sectionBlockIndices.length - 1];
+  const ref = progression[lastIdx];
+  const newPatternId = nanoid();
+  const newPattern: PatternBlock = {
+    id: newPatternId,
+    sectionId,
+    label: `${ref.label} (cont.)`,
+    bars: ref.bars,
+    beatsPerBar: ref.beatsPerBar,
+    chords: [],
+  };
+  const placedLen = Math.min(len, newPattern.bars * newPattern.beatsPerBar);
+  const nextProg = [...progression];
+  nextProg.splice(lastIdx + 1, 0, newPattern);
+  return {
+    progression: nextProg,
+    sectionChord: {
+      id: newId,
+      chord: newChord,
+      lyricsPlacement,
+      progressionPlacement: { patternId: newPatternId, startBeat: 0, lengthBeats: placedLen },
+    },
+  };
+}
+
+/**
  * Apply `deriveMirrorsFromSectionChords` across the whole song after a
  * SectionChord-first mutation. Keeps `section.chords` untouched and
  * rebuilds `line.chords` + `pattern.chords` from it.
