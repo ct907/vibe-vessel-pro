@@ -123,7 +123,7 @@ export function FocusedChordEditor({
           )}
         </p>
         <div className="relative h-9 rounded-sm bg-muted-foreground/12 overflow-x-auto">
-          <div className="relative flex items-stretch h-full" style={{ minWidth: CHORD_ROW_SLOTS * 16 }}>
+          <div className="relative flex items-stretch h-full" style={{ minWidth: CHORD_ROW_SLOTS * 28 }}>
             {slotMap.map((anchor, i) => {
               const isCurrent = i === slot;
               return (
@@ -137,7 +137,7 @@ export function FocusedChordEditor({
                     setTimeout(() => inputRef.current?.focus(), 30);
                   }}
                   className={cn(
-                    "relative w-4 shrink-0 h-full flex items-center justify-center border-r border-muted-foreground/10",
+                    "relative w-7 shrink-0 h-full flex items-center justify-start border-r border-muted-foreground/10",
                     isCurrent && "bg-primary/20 ring-1 ring-primary",
                   )}
                   aria-label={`Slot ${i + 1}${anchor ? ` — ${anchor.chord.display}` : ""}`}
