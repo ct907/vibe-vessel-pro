@@ -175,18 +175,10 @@ export interface SongState {
     sectionId: string, lineId: string, atCol: number,
     chords: { chord: ChordSymbol; relCol: number; widthCh: number }[],
   ) => void;
-  /** Word-anchored: insert a chord bound to the word nearest `nearWordIndex` (skipping occupied words to the right). */
-  upsertChordAtWord: (
-    sectionId: string, lineId: string, nearWordIndex: number, chord: ChordSymbol, anchorId?: string,
-  ) => void;
-  /** Append a chord to the end of a line (used when the line has no words yet). */
-  appendChordToLine: (sectionId: string, lineId: string, chord: ChordSymbol, anchorId?: string) => void;
   /** Snap each chord in a line to the closest unused word, preserving overall order. */
   formatChordsInLine: (sectionId: string, lineId: string) => void;
   /** Run formatChordsInLine on every line of every section. */
   formatChordsInSong: () => void;
-  /** Re-bind a chord's word slot by ±1, swapping with the chord at the target slot if any. */
-  moveChordWordSlot: (sectionId: string, lineId: string, anchorId: string, direction: -1 | 1) => void;
   /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
   placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
