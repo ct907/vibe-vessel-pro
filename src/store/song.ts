@@ -2638,7 +2638,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sound: useSoundStore.getState().toJSON(),
     };
   },
-}));
+  };
+});
 
 // ---- localStorage autosave ----
 const STORAGE_KEY = "songwriters-notebook:v1";
