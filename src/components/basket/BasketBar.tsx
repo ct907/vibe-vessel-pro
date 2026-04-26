@@ -71,7 +71,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 // clone that follows the finger. The original chip stays
                 // mounted in the basket so drops act as COPIES, not moves.
                 const item = basket[rubric.source.index];
-                if (!item) return <div ref={prov.innerRef} {...prov.draggableProps} />;
+                if (!item) return null;
                 return (
                   <div
                     ref={prov.innerRef}
