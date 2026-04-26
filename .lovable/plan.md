@@ -35,9 +35,11 @@ Scope:
 - `FocusedChordEditor` seeds initial query from the SSOT-derived list.
 - `SectionCard.handleMergeUp` still reads `line.chords.length` for an emptiness check — kept as-is since it's a structural mirror question, not a render decision.
 
-## Phase 3 — ProgressionsTab reads section.chords
-- Replace `block.chords` reads with derived selector.
-- Update SuggestionsPanel + drag-drop handlers.
+## Phase 3 (DONE) — ProgressionsTab reads section.chords
+- Added `getPatternChordsViaSSOT(section, pattern)` selector in `store/song.ts` that returns PatternChord[] in SSOT order (using `section.chords` projection, falling back to beat-sorted pattern.chords).
+- `ProgressionsTab.PatternBlock` now derives `sortedChords` via the selector (looking up the owner section from store via `pattern.sectionId ?? pattern.id`). The renderer + selection + drag-drop all flow from this SSOT-ordered list.
+- `SuggestionsPanel.sortedChords` left as-is (beat sort is used for suggestion math, not display ordering of existing chords).
+- Cross-pattern move helpers still read raw `pattern.chords` for beat capacity math — that's a structural mirror question, not a render decision.
 
 ## Phase 4 — Invert flow + cleanup
 - Rewrite chord-mutating actions to mutate `section.chords` first, then rederive `line.chords` / `block.chords`.
