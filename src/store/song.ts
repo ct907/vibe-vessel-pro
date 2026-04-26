@@ -533,37 +533,8 @@ function syncPatternFromAnchors(progression: PatternBlock[], section: Section): 
   });
 }
 
-/**
- * Given a single updated pattern, rotate the bound section's mirrored anchor
- * contents (only those mirroring chords in this pattern) so the chords
- * displayed at each anchor slot follow the pattern's new order.
- */
-function syncAnchorsFromPattern(sections: Section[], pattern: PatternBlock): Section[] {
-  const section = sections.find((s) => s.id === pattern.sectionId);
-  if (!section) return sections;
-  const visual = anchorsInVisualOrder(section);
-  const sortedPcs = [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
-  const mirroredSlots = visual.filter((v) => v.anchor.mirrorId && sortedPcs.some((c) => c.id === v.anchor.mirrorId));
-  const mirroredPcs = sortedPcs.filter((c) => mirroredSlots.some((s) => s.anchor.mirrorId === c.id));
-  if (mirroredSlots.length !== mirroredPcs.length) return sections;
-  const replace = new Map<string, { chord: ChordSymbol; mirrorId: string }>();
-  for (let i = 0; i < mirroredSlots.length; i++) {
-    replace.set(mirroredSlots[i].anchor.id, { chord: mirroredPcs[i].chord, mirrorId: mirroredPcs[i].id });
-  }
-  return sections.map((sec) => {
-    if (sec.id !== section.id) return sec;
-    return {
-      ...sec,
-      lines: sec.lines.map((l) => ({
-        ...l,
-        chords: l.chords.map((a) => {
-          const r = replace.get(a.id);
-          return r ? { ...a, chord: r.chord, mirrorId: r.mirrorId } : a;
-        }),
-      })),
-    };
-  });
-}
+// (syncAnchorsFromPattern removed — replaced by deriveMirrorsFromSectionChords)
+
 
 /**
  * Place a new chord into a section's pattern blocks. Tries each block in the
