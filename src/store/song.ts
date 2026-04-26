@@ -1963,12 +1963,19 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
         .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
       const occupied = new Set<number>(lineChords.map((sc) => sc.lyricsPlacement!.slotIndex));
-      const collision =
-        occupied.has(target) || occupied.has(target - 1) || occupied.has(target + 1);
+      // Reflow rules:
+      //  - Rule 1: every chord must have an empty slot to its right.
+      //  - Rule 2: otherwise, chords can be placed freely on any empty slot.
+      //  - Rule 3: auto-reflow (shift later chords by +2) ONLY when dropped
+      //    on the spacing slot directly BETWEEN two existing chords, OR when
+      //    the target slot itself is already occupied.
+      const occupiedHere = occupied.has(target);
+      const sandwiched = occupied.has(target - 1) && occupied.has(target + 1);
+      const needsReflow = occupiedHere || sandwiched;
 
       let nextSectionsBase = s.sections;
       let placeSlot = target;
-      if (collision) {
+      if (needsReflow) {
         // Shift everything at-or-after target by +2 (clamped). If the tail
         // would overflow CHORD_ROW_SLOTS we silently drop — row genuinely full.
         const shifted = lineChords
@@ -2735,28 +2742,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }),
 
   shiftPatternChords: (patternId, chordIds, deltaBeats) => set((s) => {
+    // SSOT-first: reorder the entries in section.chords that belong to
+    // `patternId` by the requested direction. Pattern.chords is derived.
     const idSet = new Set(chordIds);
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-      const dir = deltaBeats > 0 ? 1 : -1;
-      const indices = sorted
-        .map((c, i) => idSet.has(c.id) ? i : -1)
-        .filter((i) => i >= 0);
-      const order = dir > 0 ? indices.slice().reverse() : indices.slice();
-      const arr = [...sorted];
-      for (const i of order) {
-        const j = i + dir;
-        if (j < 0 || j >= arr.length) continue;
-        if (idSet.has(arr[j].id)) continue;
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return { ...p, chords: repackChords(arr, totalBeats) };
+    const dir = deltaBeats > 0 ? 1 : -1;
+    const ownerSec = s.sections.find((sec) =>
+      sec.chords.some((sc) => sc.progressionPlacement?.patternId === patternId),
+    );
+    if (!ownerSec) return {};
+    const groupIdx: number[] = [];
+    ownerSec.chords.forEach((sc, i) => {
+      if (sc.progressionPlacement?.patternId === patternId) groupIdx.push(i);
     });
-    const updatedPattern = progression.find((p) => p.id === patternId);
-    const sections = updatedPattern ? syncAnchorsFromPattern(s.sections, updatedPattern) : s.sections;
-    return { progression, sections };
+    if (groupIdx.length < 2) return {};
+    const selectedPos = groupIdx
+      .map((idx, pos) => (idSet.has(ownerSec.chords[idx].id) ? pos : -1))
+      .filter((p) => p >= 0);
+    if (!selectedPos.length) return {};
+    const order = dir > 0 ? selectedPos.slice().reverse() : selectedPos.slice();
+    const newChords = [...ownerSec.chords];
+    const isSelectedAtPos = (pos: number) => idSet.has(newChords[groupIdx[pos]].id);
+    for (const pos of order) {
+      const otherPos = pos + dir;
+      if (otherPos < 0 || otherPos >= groupIdx.length) continue;
+      if (isSelectedAtPos(otherPos)) continue;
+      const a = groupIdx[pos];
+      const b = groupIdx[otherPos];
+      [newChords[a], newChords[b]] = [newChords[b], newChords[a]];
+    }
+    const sections = s.sections.map((sec) => sec.id !== ownerSec.id ? sec : { ...sec, chords: newChords });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }),
 
   movePatternChordsTo: (fromPatternId, toPatternId, chordIds) => set((s) => {

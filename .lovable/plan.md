@@ -56,28 +56,24 @@ Strategy: section.chords becomes the authoritative writer. After each batch of a
 - ✅ `placeSectionChordInProgression` ports the legacy `placeMirroredChord` continuation-block-spawning logic into the SSOT-first flow. Used by SSOT-first actions to assign a `progressionPlacement` to a brand-new SectionChord, spawning a continuation block when no existing pattern in the section has room.
 - ✅ `SSOT_MODE` marker on partial state updates.
 
-### 4b.2 — Migrate actions (IN PROGRESS, 11/25)
-- ✅ `placeChordInSlot` — fully SSOT-first, with **auto-reflow on collision** (insert at target, shift later chords by +2 to maintain spacing). Falls back to `nearestSpacedFreeSlot` only if shift would overflow `CHORD_ROW_SLOTS`.
-- ✅ `removeChordAnchor` / `removeChordAnchorsBatch` — drop SectionChord by id; mirrors derived.
-- ✅ `setPatternChordLength` — mutates `progressionPlacement.lengthBeats` with same-pattern clamp.
-- ✅ `addChordToPatternSlot` — appends SectionChord to target pattern (or sibling/continuation if full).
-- ✅ `replacePatternChords` — swaps `chord` on SectionChords mapped to that pattern, in SSOT order.
-- ✅ `moveChordToSlot` — mutates `lyricsPlacement.slotIndex` with occupant swap.
-- ✅ `addChordToPattern` — appends SectionChord into target pattern; falls back to continuation if full.
-- ✅ `removePatternChord` — drops SectionChord by id (chordId === SectionChord.id under SSOT).
-- ✅ `movePatternChord` — swaps two SectionChord entries within the pattern's group inside `section.chords`.
-- ✅ `reorderPatternChord` — moves SectionChord within the pattern's group via splice in `section.chords`.
-- ⏸ 14 remaining still mirror-first.
+### 4b.2 — Migrate actions (IN PROGRESS, 12/25)
+- ✅ `placeChordInSlot` — SSOT-first with refined auto-reflow rules:
+  * Rule 1: every chord has empty slot to its right.
+  * Rule 2: chords can be placed freely on any empty slot (no spacing search).
+  * Rule 3: reflow (+2 shift on later chords) ONLY when target is occupied OR sandwiched (chord at target-1 AND target+1).
+- ✅ `removeChordAnchor` / `removeChordAnchorsBatch`
+- ✅ `setPatternChordLength`
+- ✅ `addChordToPatternSlot`
+- ✅ `replacePatternChords`
+- ✅ `moveChordToSlot`
+- ✅ `addChordToPattern`
+- ✅ `removePatternChord`
+- ✅ `movePatternChord`
+- ✅ `reorderPatternChord`
+- ✅ `shiftPatternChords` — multi-select left/right reorder. Now permutes entries in `section.chords` for the pattern's group; pattern.chords derived. Fixes "no response" bug where mutating `pattern.chords` directly was shadowed by SSOT ordering.
+- ⏸ 13 remaining still mirror-first (formatChordsInLine/Song are mirror-safe via the set wrapper recompute, no migration required).
 
-**Smoke-test checkpoints (current batch)**:
-1. **Auto-reflow**: drop chord on slot 1 between [slot 0] and [slot 2] → result: [0, 2, 4]. ✅ FIX
-2. Move a lyric chord to a slot → swaps with occupant.
-3. Add a chord to a specific pattern → appears there + in last lyric line.
-4. Remove a chord from progression → also gone from lyrics.
-5. Reorder chords in a pattern via drag → identity preserved, lyric order updates.
-6. Undo/redo across all of the above.
-
-Next batch (after smoke): `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow`, `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
+Next batch: `pasteChordsAt`, `resizePatternChordsWithOverflow`, `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `movePatternChordsToSlot`, `insertChordSpaceAt`, `removeChordCellAt`.
 
 ### 4b.3 — Complex actions (TODO)
 - `formatChordsInLine`, `formatChordsInSong`, `pasteChordsAt`, `resizePatternChordsWithOverflow` (overflow cascade), `moveChordsAcrossLines`, `movePatternChordsTo`, `movePatternChordToPatternAt`, `insertChordSpaceAt`, `removeChordCellAt`.
