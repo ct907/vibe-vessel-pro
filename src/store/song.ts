@@ -2802,19 +2802,28 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       : s.sections;
     return { sections, progression: s.progression.filter((p) => p.id !== patternId) };
   }),
+  // SSOT-first: swap `chord` on SectionChords assigned to this pattern, in
+  // section.chords order (which is the SSOT order). Lengths/placements are
+  // preserved. Note: under SSOT the lyric mirror updates too — that's
+  // correct since the SectionChord is the unified identity.
   replacePatternChords: (patternId, chords) => set((s) => {
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      // Preserve length structure, swap chord identities. Detach mirror links.
-      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-      const next = sorted.map((c, i) => ({
-        ...c,
-        chord: chords[i] ?? c.chord,
-        mirrorId: undefined,
-      }));
-      return { ...p, chords: repackChords(next, p.bars * p.beatsPerBar) };
+    const target = s.progression.find((p) => p.id === patternId);
+    if (!target) return {};
+    const sectionId = target.sectionId ?? target.id;
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      let i = 0;
+      return {
+        ...sec,
+        chords: sec.chords.map((sc) => {
+          if (sc.progressionPlacement?.patternId !== patternId) return sc;
+          const swap = chords[i++];
+          return swap ? { ...sc, chord: swap } : sc;
+        }),
+      };
     });
-    return { progression };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
   }),
 
   // ---- chord-row undo/redo ----
