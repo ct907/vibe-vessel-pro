@@ -900,10 +900,14 @@ function pushHistory(get: () => SongState) {
 
 export const useSongStore = create<SongState>((rawSet, get) => {
   /**
-   * Wrapped setter: after any update that touches `sections` or `progression`,
-   * refresh the SSOT projection (`section.chords`). Phase 1 keeps the legacy
-   * mirrors authoritative; the projection is a read-only view used by tests
-   * and (in later phases) by the UI itself.
+   * Wrapped setter. Two flow modes:
+   *   - Default (mirror-first, legacy): after any update touching sections/
+   *     progression, refresh `section.chords` from the mirrors via
+   *     `refreshAllSectionChords`.
+   *   - SSOT-first (Phase 4b actions): if the partial carries the
+   *     `[SSOT_MODE]: true` marker, treat the new `section.chords` as
+   *     authoritative and rebuild `line.chords` + `pattern.chords` from it
+   *     via `syncMirrorsFromAllSectionChords`. The marker is stripped.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const set = ((updater: any, replace?: any) => {
@@ -913,8 +917,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const touchesSections = Object.prototype.hasOwnProperty.call(partial, "sections");
       const touchesProgression = Object.prototype.hasOwnProperty.call(partial, "progression");
       if (!touchesSections && !touchesProgression) return partial;
+      const ssotMode = partial[SSOT_MODE] === true;
       const sections = touchesSections ? partial.sections : prev.sections;
       const progression = touchesProgression ? partial.progression : prev.progression;
+      if (ssotMode) {
+        const synced = syncMirrorsFromAllSectionChords(sections, progression);
+        const out = { ...partial, sections: synced.sections, progression: synced.progression };
+        delete out[SSOT_MODE];
+        return out;
+      }
       return { ...partial, sections: refreshAllSectionChords(sections, progression) };
     }, replace);
   }) as typeof rawSet;
