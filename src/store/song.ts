@@ -2812,21 +2812,17 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }),
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
+    // SSOT-first: drop the listed SectionChords (id === SectionChord.id) from
+    // their owning section. Mirrors derive automatically.
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
     const idSet = new Set(chordIds);
-    const mirrorAnchorIds = new Set<string>();
-    const progression = s.progression.map((p) => {
-      if (p.id !== patternId) return p;
-      const totalBeats = p.bars * p.beatsPerBar;
-      p.chords.forEach((c) => { if (idSet.has(c.id) && c.mirrorId) mirrorAnchorIds.add(c.mirrorId); });
-      return { ...p, chords: repackChords(p.chords.filter((c) => !idSet.has(c.id)), totalBeats) };
-    });
-    const sections = mirrorAnchorIds.size
-      ? s.sections.map((sec) => sec.id !== patternId ? sec : {
-          ...sec,
-          lines: sec.lines.map((l) => ({ ...l, chords: l.chords.filter((a) => !mirrorAnchorIds.has(a.id)) })),
-        })
-      : s.sections;
-    return { progression, sections };
+    const nextSections = s.sections.map((sec) =>
+      sec.id !== sectionId ? sec : { ...sec, chords: sec.chords.filter((c) => !idSet.has(c.id)) },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
   shiftPatternChords: (patternId, chordIds, deltaBeats) => set((s) => {
