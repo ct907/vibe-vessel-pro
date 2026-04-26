@@ -1,11 +1,12 @@
-import { forwardRef } from "react";
+import { forwardRef, useRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, GripVertical, Trash2 } from "lucide-react";
+import { ArrowRight, GripVertical, Trash2, X } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
+import { useBasketSelectionStore } from "@/store/basket-selection";
 
 /**
  * Static, non-interactive chip used INSIDE basket Draggables. We can't reuse
@@ -13,18 +14,35 @@ import { cn } from "@/lib/utils";
  * (audition + sustain-on-hold), which capture touchstart and prevent
  * @hello-pangea/dnd from initiating a drag on touch devices.
  */
-function StaticChordChip({ chord, dragging }: { chord: ChordSymbol; dragging?: boolean }) {
+function StaticChordChip({
+  chord,
+  dragging,
+  selected,
+  badgeCount,
+}: {
+  chord: ChordSymbol;
+  dragging?: boolean;
+  selected?: boolean;
+  /** When > 1, render a "+N" pill on the dragging clone to show the multi-drag size. */
+  badgeCount?: number;
+}) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none",
+        "relative inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none transition-all",
         "px-2.5 py-1 text-sm bg-chord-chip/50 text-chord-chip-foreground",
+        selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade bg-primary/15 scale-105",
         dragging && "shadow-lg ring-2 ring-primary",
       )}
       style={{ pointerEvents: "none" }}
     >
       <GripVertical className="h-3 w-3 opacity-50" aria-hidden />
       {chord.display}
+      {badgeCount && badgeCount > 1 ? (
+        <span className="absolute -top-2 -right-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground shadow">
+          +{badgeCount - 1}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -35,6 +53,9 @@ interface Props {
   /** When true, basket chips become Draggables inside the surrounding DragDropContext. */
   draggable?: boolean;
 }
+
+const TAP_MAX_MS = 300;
+const TAP_MAX_PX = 8;
 
 /**
  * IMPORTANT: BasketBar must be a forwardRef component. @hello-pangea/dnd's
@@ -48,34 +69,77 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
   ref,
 ) {
   const { basket, clearBasket } = useSongStore();
+  const selected = useBasketSelectionStore((s) => s.selected);
+  const toggleSelected = useBasketSelectionStore((s) => s.toggle);
+  const clearSelected = useBasketSelectionStore((s) => s.clear);
+
+  // Tap detection (per-pointerdown). We track start time + position so we can
+  // tell apart a quick tap (toggle selection) from a long-press drag intent
+  // (handled by pangea, which won't fire our touchend toggle because the
+  // gesture leaves the chip).
+  const tapInfo = useRef<{ id: string; t: number; x: number; y: number } | null>(null);
+
   if (basket.length === 0) return <div ref={ref} hidden />;
+
+  const isSelected = (id: string) => selected.has(id);
+  const selectionSize = selected.size;
+
+  const onChipPointerDown = (id: string, e: React.PointerEvent) => {
+    tapInfo.current = { id, t: Date.now(), x: e.clientX, y: e.clientY };
+  };
+  const onChipPointerUp = (id: string, e: React.PointerEvent) => {
+    const info = tapInfo.current;
+    tapInfo.current = null;
+    if (!info || info.id !== id) return;
+    const dt = Date.now() - info.t;
+    const dx = Math.abs(e.clientX - info.x);
+    const dy = Math.abs(e.clientY - info.y);
+    if (dt > TAP_MAX_MS) return; // long-press → leave for pangea
+    if (dx > TAP_MAX_PX || dy > TAP_MAX_PX) return; // moved → drag intent
+    toggleSelected(id);
+  };
 
   const renderChips = () =>
     basket.map((b, i) => {
       if (!draggable) {
         return <ChordChip key={b.id} chord={b.chord} variant="ink" size="md" />;
       }
+      const sel = isSelected(b.id);
+      // Only selected chips are draggable. Unselected chips still render as
+      // a Draggable (pangea requires contiguous indices) but we omit
+      // dragHandleProps so the gesture is ignored — long-press on an
+      // unselected chip does nothing, per spec.
       return (
-        <Draggable key={b.id} draggableId={`basket:${b.id}`} index={i}>
+        <Draggable
+          key={b.id}
+          draggableId={`basket:${b.id}`}
+          index={i}
+          isDragDisabled={!sel}
+        >
           {(prov, snap) => (
             <div
               ref={prov.innerRef}
               {...prov.draggableProps}
-              {...prov.dragHandleProps}
+              {...(sel ? prov.dragHandleProps : {})}
               data-basket-chip="true"
+              data-basket-id={b.id}
               role="button"
-              aria-label={`Drag chord ${b.chord.display}`}
+              aria-pressed={sel}
+              aria-label={sel ? `Selected chord ${b.chord.display}. Long-press to drag.` : `Tap to select chord ${b.chord.display}`}
+              onPointerDown={(e) => onChipPointerDown(b.id, e)}
+              onPointerUp={(e) => onChipPointerUp(b.id, e)}
+              onPointerCancel={() => (tapInfo.current = null)}
               style={{
                 touchAction: "none",
                 userSelect: "none",
                 WebkitUserSelect: "none",
                 WebkitTouchCallout: "none",
-                cursor: snap.isDragging ? "grabbing" : "grab",
+                cursor: sel ? (snap.isDragging ? "grabbing" : "grab") : "pointer",
                 ...prov.draggableProps.style,
               }}
               className={cn(snap.isDragging && "opacity-90")}
             >
-              <StaticChordChip chord={b.chord} dragging={snap.isDragging} />
+              <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
             </div>
           )}
         </Draggable>
@@ -87,11 +151,55 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
       ref={ref}
       className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade/95 backdrop-blur shadow-[0_-8px_24px_-12px_hsl(var(--foreground)/0.2)]"
     >
-      <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground shrink-0">
-          Basket · {basket.length}
-        </span>
+      <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
+        {/* Header: count + selection state + clear actions */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+              Basket · {basket.length}
+            </span>
+            <span className="text-[11px] text-muted-foreground/90">
+              {selectionSize === 0
+                ? "Tap to select · long-press selected to drag"
+                : (
+                  <span className="text-primary font-medium">
+                    {selectionSize} selected · long-press any to drag {selectionSize > 1 ? "all" : ""}
+                  </span>
+                )}
+            </span>
+          </div>
 
+          <div className="flex items-center gap-1 shrink-0">
+            {selectionSize > 0 && (
+              <Button size="sm" variant="ghost" onClick={clearSelected} aria-label="Clear basket selection">
+                <X className="h-4 w-4" /> Clear selection
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                clearSelected();
+                clearBasket();
+              }}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" /> Discard
+            </Button>
+            {onSendToLyrics && (
+              <Button size="sm" variant="outline" onClick={onSendToLyrics}>
+                To Lyrics <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+            {onSendToProgressions && (
+              <Button size="sm" onClick={onSendToProgressions}>
+                To Progressions <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Chips area */}
         <div className="flex-1 min-w-0">
           {draggable ? (
             <Droppable
@@ -105,6 +213,9 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 // mounted in the basket so drops act as COPIES, not moves.
                 const item = basket[rubric.source.index];
                 if (!item) return null;
+                // Multi-drag badge: derived from the live selection store.
+                const sel = useBasketSelectionStore.getState().selected;
+                const count = sel.has(item.id) && sel.size > 1 ? sel.size : 1;
                 return (
                   <div
                     ref={prov.innerRef}
@@ -118,7 +229,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                       ...prov.draggableProps.style,
                     }}
                   >
-                    <StaticChordChip chord={item.chord} dragging />
+                    <StaticChordChip chord={item.chord} dragging badgeCount={count} />
                   </div>
                 );
               }}
@@ -137,27 +248,6 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
             </Droppable>
           ) : (
             <div className="flex flex-wrap items-center gap-2 py-1">{renderChips()}</div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={clearBasket}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 className="h-4 w-4" /> Discard
-          </Button>
-          {onSendToLyrics && (
-            <Button size="sm" variant="outline" onClick={onSendToLyrics}>
-              To Lyrics <ArrowRight className="h-4 w-4" />
-            </Button>
-          )}
-          {onSendToProgressions && (
-            <Button size="sm" onClick={onSendToProgressions}>
-              To Progressions <ArrowRight className="h-4 w-4" />
-            </Button>
           )}
         </div>
       </div>
