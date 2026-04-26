@@ -1309,57 +1309,9 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }),
   })); },
 
-  insertChordSpaceAt: (sectionId, lineId, col) => { pushHistory(get); set((s) => ({
-    sections: s.sections.map((sec) => {
-      if (sec.id !== sectionId) return sec;
-      return {
-        ...sec,
-        lines: sec.lines.map((l) => {
-          if (l.id !== lineId) return l;
-          const chords = l.chords.map((c) => {
-            const cc = c.chordCol ?? c.offset ?? 0;
-            return cc >= col ? { ...c, chordCol: cc + 1 } : { ...c, chordCol: cc };
-          });
-          const len = Math.max((l.chordRowLen ?? 0) + 1, col + 1);
-          return { ...l, chords, chordRowLen: len };
-        }),
-      };
-    }),
-  })); },
+  // (insertChordSpaceAt / removeChordCellAt removed — legacy column-based actions
+  //  unused by current UI; SSOT slots make them obsolete.)
 
-  removeChordCellAt: (sectionId, lineId, col) => {
-    pushHistory(get);
-    const state = get();
-    const sec = state.sections.find((x) => x.id === sectionId);
-    const line = sec?.lines.find((l) => l.id === lineId);
-    if (!sec || !line) return false;
-    const chordAt = line.chords.find((c) => (c.chordCol ?? c.offset ?? 0) === col);
-    if (chordAt) {
-      get().removeChordAnchor(sectionId, lineId, chordAt.id);
-      return true;
-    }
-    // Otherwise shift later chords back by 1
-    const hasLater = line.chords.some((c) => (c.chordCol ?? c.offset ?? 0) > col);
-    if (!hasLater && (line.chordRowLen ?? 0) <= 0) return false;
-    set((s) => ({
-      sections: s.sections.map((s2) => {
-        if (s2.id !== sectionId) return s2;
-        return {
-          ...s2,
-          lines: s2.lines.map((l) => {
-            if (l.id !== lineId) return l;
-            const chords = l.chords.map((c) => {
-              const cc = c.chordCol ?? c.offset ?? 0;
-              return cc > col ? { ...c, chordCol: cc - 1 } : { ...c, chordCol: cc };
-            });
-            const len = Math.max(0, (l.chordRowLen ?? 0) - 1);
-            return { ...l, chords, chordRowLen: len };
-          }),
-        };
-      }),
-    }));
-    return true;
-  },
 
   // Add or replace a chord anchor; mirror to bound pattern block.
   upsertChordAt: (sectionId, lineId, col, chord, anchorId) => {
