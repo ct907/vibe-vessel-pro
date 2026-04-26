@@ -281,6 +281,7 @@ function makeSection(type: SectionType = "verse", label?: string): { section: Se
       label: finalLabel,
       collapsed: false,
       lines: [initialLine()],
+      chords: [],
     },
     pattern: {
       id,
