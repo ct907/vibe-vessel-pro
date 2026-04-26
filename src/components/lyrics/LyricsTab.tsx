@@ -113,6 +113,8 @@ function chordsBySlot(chords: ChordAnchor[]): (ChordAnchor | undefined)[] {
 
 interface LineRowProps {
   sectionId: string;
+  /** The owning section — used to read line chords via the SSOT projection. */
+  section: Section;
   line: LyricLine;
   active?: boolean;
   isFirst: boolean;
@@ -133,6 +135,7 @@ interface LineRowProps {
 
 function LineRow({
   sectionId,
+  section,
   line,
   active,
   onAddLineAfter,
