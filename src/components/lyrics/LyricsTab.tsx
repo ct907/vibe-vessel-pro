@@ -532,27 +532,40 @@ function LineRow({
         </Button>
       </div>
 
-      {/* SELECTION TOOLBAR (only when something is selected on this row) */}
-      {selection.size > 0 && lineChords.some((c) => selection.has(c.id)) && (
+      {/* SELECTION TOOLBAR — visible whenever Edit Mode is on. Closing requires
+          either tapping Done or the pencil icon again. */}
+      {isEditMode && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
-          {/* Row 1: counter + close + copy/cut/paste + move arrows */}
+          {/* Row 1: counter + close + select-all + copy/cut/paste + move arrows */}
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-muted-foreground">{selection.size} selected</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => selection.set(lineChords.map((c) => c.id))}
+              disabled={lineChords.length === 0 || selection.size === lineChords.length}
+              aria-label="Select all chords"
+              title="Select all chords on this row"
+            >
+              Select all
+            </Button>
             <Button
               size="icon"
               variant="ghost"
               className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={() => { selection.clear(); setIsEditMode(false); }}
-              aria-label="Close selection"
-              title="Close (Esc)"
+              onClick={() => selection.clear()}
+              aria-label="Clear selection"
+              title="Clear selection"
+              disabled={selection.size === 0}
             >
               <X className="h-3.5 w-3.5" />
             </Button>
             <div className="ml-auto flex items-center gap-1">
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy}>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCopy} disabled={selection.size === 0}>
                 <Copy className="h-3.5 w-3.5" /> Copy
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut}>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={doCut} disabled={selection.size === 0}>
                 <Scissors className="h-3.5 w-3.5" /> Cut
               </Button>
               <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void doPaste()}>
@@ -562,6 +575,7 @@ function LineRow({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2"
+                disabled={selection.size === 0}
                 onClick={() => {
                   const ids = Array.from(selection.selected)
                     .map((id) => lineChords.find((c) => c.id === id))
@@ -580,6 +594,7 @@ function LineRow({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2"
+                disabled={selection.size === 0}
                 onClick={() => {
                   const ids = Array.from(selection.selected)
                     .map((id) => lineChords.find((c) => c.id === id))
@@ -603,12 +618,14 @@ function LineRow({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-destructive"
+              disabled={selection.size === 0}
               onClick={() => {
                 const ids = Array.from(selection.selected).filter((id) =>
                   lineChords.some((c) => c.id === id),
                 );
                 if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
                 selection.clear();
+                // Stay in Edit Mode so the user can keep working.
               }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
