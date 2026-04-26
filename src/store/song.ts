@@ -1970,54 +1970,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
   },
 
-  // -------- Slot-based chord row (20 fixed slots) --------
+  // -------- Slot-based chord row (SSOT-first) --------
   placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
     pushHistory(get);
     set((s) => {
-      let createdAnchorId: string | null = null;
-      const sections = s.sections.map((sec) => {
-        if (sec.id !== sectionId) return sec;
-        return {
-          ...sec,
-          lines: sec.lines.map((l) => {
-            if (l.id !== lineId) return l;
-            const occupied = new Set<number>();
-            l.chords.forEach((c) => { if (c.slotIndex != null) occupied.add(c.slotIndex); });
-            // Spacing rule: prefer a slot whose immediate neighbors are also
-            // empty so chord chips never visually crowd each other. Falls back
-            // to the next free slot when the row is too dense for spacing.
-            const slot = nearestSpacedFreeSlot(occupied, slotIndex);
-            if (slot < 0) return l; // row full — silently drop
-            const id = nanoid();
-            createdAnchorId = id;
-            const newAnchor: ChordAnchor = { id, offset: 0, slotIndex: slot, chord };
-            return { ...l, chords: [...l.chords, newAnchor].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)) };
-          }),
-        };
-      });
-      // Mirror to pattern.
-      let progression = s.progression;
-      let finalSections = sections;
-      if (createdAnchorId) {
-        const placed = placeMirroredChord(s.progression, sectionId, chord, createdAnchorId);
-        progression = placed.progression;
-        const pcId = placed.chordId;
-        if (pcId) {
-          finalSections = sections.map((sec) => {
-            if (sec.id !== sectionId) return sec;
-            return {
-              ...sec,
-              lines: sec.lines.map((l) => ({
-                ...l,
-                chords: l.chords.map((a) => (a.id === createdAnchorId ? { ...a, mirrorId: pcId } : a)),
-              })),
-            };
-          });
-        }
-        const updatedSection = finalSections.find((x) => x.id === sectionId);
-        if (updatedSection) progression = syncPatternFromAnchors(progression, updatedSection);
+      const sec = s.sections.find((x) => x.id === sectionId);
+      if (!sec) return {};
+      // Spacing rule: pick a slot whose neighbors are also free.
+      const occupied = new Set<number>();
+      for (const sc of sec.chords) {
+        if (sc.lyricsPlacement?.lineId === lineId) occupied.add(sc.lyricsPlacement.slotIndex);
       }
-      return { sections: finalSections, progression };
+      const slot = nearestSpacedFreeSlot(occupied, slotIndex);
+      if (slot < 0) return {}; // row full — silently drop
+      const newId = nanoid();
+      const placement = placeSectionChordInProgression(
+        s.progression,
+        sectionId,
+        sec.chords,
+        chord,
+        newId,
+        { lineId, slotIndex: slot },
+      );
+      const nextSections = s.sections.map((x) =>
+        x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({
+        sections: nextSections,
+        progression: placement.progression,
+        [SSOT_MODE]: true,
+      } as any);
     });
   },
 
