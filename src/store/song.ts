@@ -2419,115 +2419,125 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     if (!chordIds.length || deltaBeats === 0) return {};
     const sourcePattern = s.progression.find((p) => p.id === patternId);
     if (!sourcePattern) return {};
-    const sectionId = sourcePattern.sectionId;
-    const sectionPatterns = s.progression.filter((p) => p.sectionId === sectionId);
-    const sourceIdx = sectionPatterns.findIndex((p) => p.id === patternId);
+    const sectionId = sourcePattern.sectionId ?? sourcePattern.id;
+    const sec = s.sections.find((x) => x.id === sectionId);
+    if (!sec) return {};
 
-    // 1) Apply delta to each selected chord (clamp to >= 0.5).
+    // 1) Apply delta to selected SectionChords' progressionPlacement.lengthBeats.
     const idSet = new Set(chordIds);
-    const grown = sourcePattern.chords.map((c) =>
-      idSet.has(c.id) ? { ...c, lengthBeats: Math.max(0.5, c.lengthBeats + deltaBeats) } : c,
-    );
-    const sortedGrown = [...grown].sort((a, b) => a.startBeat - b.startBeat);
+    const grownSec: SectionChord[] = sec.chords.map((sc) => {
+      if (!idSet.has(sc.id) || !sc.progressionPlacement) return sc;
+      return {
+        ...sc,
+        progressionPlacement: {
+          ...sc.progressionPlacement,
+          lengthBeats: Math.max(0.5, sc.progressionPlacement.lengthBeats + deltaBeats),
+        },
+      };
+    });
 
-    // 2) Re-pack left-to-right; anything that doesn't fit overflows.
-    const totalBeats = sourcePattern.bars * sourcePattern.beatsPerBar;
-    const fitted: PatternChord[] = [];
-    const overflow: PatternChord[] = [];
-    let cursor = 0;
-    for (const c of sortedGrown) {
-      const remaining = totalBeats - cursor;
-      if (remaining <= 0) {
-        overflow.push({ ...c });
-        continue;
+    // 2) Walk through SCs assigned to this section's patterns in order; for
+    //    each, place into the next available block (in section order),
+    //    spawning continuation blocks when needed. Maintain stable order via
+    //    section.chords array order.
+    const sectionPatterns = s.progression
+      .map((p, i) => ({ p, i }))
+      .filter((x) => (x.p.sectionId ?? x.p.id) === sectionId);
+    const sourcePosInSection = sectionPatterns.findIndex((x) => x.p.id === patternId);
+    if (sourcePosInSection < 0) return {};
+
+    // Mutable copy of section's pattern blocks (ordered).
+    const blocks: PatternBlock[] = sectionPatterns.map((x) => ({ ...x.p, chords: [] }));
+    const blockUsage = blocks.map(() => 0); // beats consumed
+    // Track patternId remap as we place each SC.
+    const placementById = new Map<string, { patternId: string; startBeat: number; lengthBeats: number }>();
+
+    // We only re-pack SCs that were originally placed in patterns of THIS section.
+    // SCs in other sections are left alone.
+    // Strategy: walk grownSec (preserves section.chords order). For each SC
+    // belonging to this section's blocks, find the lowest-indexed block (>= the
+    // SC's original block index) with room.
+    const blockIndexById = new Map(blocks.map((b, i) => [b.id, i]));
+    for (const sc of grownSec) {
+      const pp = sc.progressionPlacement;
+      if (!pp) continue;
+      const origIdx = blockIndexById.get(pp.patternId);
+      if (origIdx == null) continue; // not in this section
+      const len = Math.max(0.5, pp.lengthBeats);
+      // For SCs originating in source pattern or later, start search at their
+      // original block index. For SCs in earlier blocks, leave them in place.
+      let searchFrom = origIdx;
+      if (origIdx < sourcePosInSection) {
+        const cap = blocks[origIdx].bars * blocks[origIdx].beatsPerBar;
+        const fits = blockUsage[origIdx] + len <= cap + 1e-9;
+        if (fits) {
+          placementById.set(sc.id, { patternId: blocks[origIdx].id, startBeat: blockUsage[origIdx], lengthBeats: len });
+          blockUsage[origIdx] += len;
+          continue;
+        }
+        searchFrom = origIdx;
       }
-      if (c.lengthBeats <= remaining + 1e-9) {
-        fitted.push({ ...c, startBeat: cursor });
-        cursor += c.lengthBeats;
-      } else {
-        // Split: fit a prefix in this block, overflow the rest as a new chord.
-        // To keep the model simple we drop the prefix and push the FULL chord
-        // to the next block (preserves chord identity & mirrorId).
-        overflow.push({ ...c });
-      }
-    }
-
-    // 3) Build new section pattern list, distributing overflow into subsequent blocks.
-    const newPatterns: PatternBlock[] = sectionPatterns.map((p) => p);
-    newPatterns[sourceIdx] = { ...sourcePattern, chords: fitted };
-
-    let pending = overflow;
-    for (let i = sourceIdx + 1; i < newPatterns.length && pending.length > 0; i++) {
-      const blk = newPatterns[i];
-      const cap = blk.bars * blk.beatsPerBar;
-      // Prepend pending chords, then push existing chords right, repack, and
-      // any new overflow continues to the next block.
-      const merged = [
-        ...pending.map((c) => ({ ...c })),
-        ...blk.chords.map((c) => ({ ...c })),
-      ];
-      // Re-sequence sequentially (ignore startBeat) since we're prepending.
-      let cur = 0;
-      const fit2: PatternChord[] = [];
-      const over2: PatternChord[] = [];
-      for (const c of merged) {
-        const remaining = cap - cur;
-        if (remaining <= 0) { over2.push(c); continue; }
-        if (c.lengthBeats <= remaining + 1e-9) {
-          fit2.push({ ...c, startBeat: cur });
-          cur += c.lengthBeats;
-        } else {
-          over2.push(c);
+      let placed = false;
+      for (let i = searchFrom; i < blocks.length; i++) {
+        const cap = blocks[i].bars * blocks[i].beatsPerBar;
+        if (blockUsage[i] + len <= cap + 1e-9) {
+          placementById.set(sc.id, { patternId: blocks[i].id, startBeat: blockUsage[i], lengthBeats: len });
+          blockUsage[i] += len;
+          placed = true;
+          break;
         }
       }
-      newPatterns[i] = { ...blk, chords: fit2 };
-      pending = over2;
-    }
-
-    // 4) If still overflowing, append a new block at end of section to absorb it.
-    if (pending.length > 0) {
-      const lastInSection = newPatterns[newPatterns.length - 1];
-      const newId = nanoid();
-      const cap = (lastInSection?.bars ?? 4) * (lastInSection?.beatsPerBar ?? 4);
-      let cur = 0;
-      const fit3: PatternChord[] = [];
-      for (const c of pending) {
-        const remaining = cap - cur;
-        if (remaining <= 0) break;
-        const len = Math.min(c.lengthBeats, remaining);
-        fit3.push({ ...c, startBeat: cur, lengthBeats: len });
-        cur += len;
+      if (!placed) {
+        // Spawn continuation block at end of section.
+        const ref = blocks[blocks.length - 1];
+        const newId = nanoid();
+        const newBlock: PatternBlock = {
+          id: newId,
+          sectionId,
+          label: `${ref.label} (cont.)`,
+          bars: ref.bars,
+          beatsPerBar: ref.beatsPerBar,
+          chords: [],
+        };
+        const cap = newBlock.bars * newBlock.beatsPerBar;
+        const placedLen = Math.min(len, cap);
+        blocks.push(newBlock);
+        blockUsage.push(placedLen);
+        blockIndexById.set(newId, blocks.length - 1);
+        placementById.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: placedLen });
       }
-      const newBlock: PatternBlock = {
-        id: newId,
-        sectionId,
-        label: `${lastInSection?.label ?? "Pattern"} +`,
-        bars: lastInSection?.bars ?? 4,
-        beatsPerBar: lastInSection?.beatsPerBar ?? 4,
-        chords: fit3,
-      };
-      newPatterns.push(newBlock);
     }
 
-    // 5) Splice the rebuilt section back into the global progression in place,
-    //    preserving original positions of other-section blocks.
-    const sectionBlockIds = new Set(sectionPatterns.map((p) => p.id));
+    // 3) Rewrite SectionChords with new placements.
+    const finalSecChords: SectionChord[] = grownSec.map((sc) => {
+      const np = placementById.get(sc.id);
+      if (!np) return sc;
+      return { ...sc, progressionPlacement: np };
+    });
+
+    const nextSections = s.sections.map((x) =>
+      x.id !== sectionId ? x : { ...x, chords: finalSecChords },
+    );
+
+    // 4) Splice new blocks (which may include new continuation blocks) back
+    //    into global progression at the section's original position.
+    const sectionBlockIds = new Set(sectionPatterns.map((x) => x.p.id));
     const rebuilt: PatternBlock[] = [];
     let inserted = false;
     for (const p of s.progression) {
       if (sectionBlockIds.has(p.id)) {
         if (!inserted) {
-          rebuilt.push(...newPatterns);
+          rebuilt.push(...blocks);
           inserted = true;
         }
-        // skip — already added via newPatterns
       } else {
         rebuilt.push(p);
       }
     }
-    if (!inserted) rebuilt.push(...newPatterns);
+    if (!inserted) rebuilt.push(...blocks);
 
-    return { progression: rebuilt };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections: nextSections, progression: rebuilt, [SSOT_MODE]: true } as any);
   }),
 
   reorderPatternChord: (patternId, chordId, toIndex) => set((s) => {
