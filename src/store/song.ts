@@ -2959,23 +2959,36 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return createdId;
   },
   removePatternBlock: (patternId) => set((s) => {
+    // SSOT-first: detach progressionPlacement from any SectionChord pointing
+    // at this pattern. If the SC also has no lyricsPlacement, drop it entirely
+    // (orphan). Then remove the pattern block from the progression.
     const target = s.progression.find((p) => p.id === patternId);
-    if (!target) return s;
+    if (!target) return {};
     const sid = target.sectionId ?? target.id;
     const siblings = s.progression.filter((p) => (p.sectionId ?? p.id) === sid);
-    if (siblings.length <= 1) return s; // can't remove the only block
-    // Detach mirror anchors that pointed into this block.
-    const mirrorIds = new Set(target.chords.map((c) => c.mirrorId).filter(Boolean) as string[]);
-    const sections = mirrorIds.size
-      ? s.sections.map((sec) => sec.id !== sid ? sec : {
-          ...sec,
-          lines: sec.lines.map((l) => ({
-            ...l,
-            chords: l.chords.map((a) => mirrorIds.has(a.mirrorId ?? "") ? { ...a, mirrorId: undefined } : a),
-          })),
-        })
-      : s.sections;
-    return { sections, progression: s.progression.filter((p) => p.id !== patternId) };
+    if (siblings.length <= 1) return {}; // can't remove the only block
+    const nextSections = s.sections.map((sec) => {
+      if (sec.id !== sid) return sec;
+      const next: SectionChord[] = [];
+      for (const sc of sec.chords) {
+        if (sc.progressionPlacement?.patternId !== patternId) {
+          next.push(sc);
+          continue;
+        }
+        if (sc.lyricsPlacement) {
+          // Keep as lyrics-only orphan.
+          next.push({ ...sc, progressionPlacement: undefined });
+        }
+        // else drop entirely
+      }
+      return { ...sec, chords: next };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({
+      sections: nextSections,
+      progression: s.progression.filter((p) => p.id !== patternId),
+      [SSOT_MODE]: true,
+    } as any);
   }),
   // SSOT-first: swap `chord` on SectionChords assigned to this pattern, in
   // section.chords order (which is the SSOT order). Lengths/placements are
