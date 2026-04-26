@@ -707,6 +707,40 @@ function refreshAllSectionChords(sections: Section[], progression: PatternBlock[
   });
 }
 
+/**
+ * SSOT-aware read for the lyrics view. Returns the {@link ChordAnchor} objects
+ * for a given line, ordered to match the section's SSOT (`section.chords`).
+ *
+ * Phase 2: lyrics UI uses this selector instead of `line.chords` directly so
+ * that ordering follows the SectionChord projection. The legacy ChordAnchor
+ * shape is preserved (id, slotIndex, mirrorId, …) because the renderer still
+ * depends on those fields.
+ */
+export function getLineChordsViaSSOT(section: Section, lineId: string): ChordAnchor[] {
+  const line = section.lines.find((l) => l.id === lineId);
+  if (!line) return [];
+  if (!section.chords || section.chords.length === 0) return line.chords;
+  const byId = new Map(line.chords.map((a) => [a.id, a] as const));
+  const out: ChordAnchor[] = [];
+  const seen = new Set<string>();
+  // Walk SSOT order first, picking anchors that belong to this line.
+  for (const sc of section.chords) {
+    if (sc.lyricsPlacement?.lineId !== lineId) continue;
+    const a = byId.get(sc.id);
+    if (a) {
+      out.push(a);
+      seen.add(a.id);
+    }
+  }
+  // Append any anchors not represented in SSOT yet (defensive — shouldn't
+  // happen since the projection covers every anchor, but keeps the UI safe
+  // during transient mismatches).
+  for (const a of line.chords) {
+    if (!seen.has(a.id)) out.push(a);
+  }
+  return out;
+}
+
 // ---------- Store ----------
 
 const seed = makeSection("verse");
