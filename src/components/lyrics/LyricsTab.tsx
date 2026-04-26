@@ -361,19 +361,9 @@ function LineRow({
             </span>
           )}
 
-          {/* Slot dividers — vertical lines between fixed-width slots. Hidden
-              while a drag is in flight so the dashed slot outlines show. */}
-          {!isAnyDragging && (
-            <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-              {Array.from({ length: CHORD_ROW_SLOTS - 1 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="absolute top-1 bottom-1 w-px bg-muted-foreground/12"
-                  style={{ left: `${(i + 1) * 28}px` }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Slot dividers are now rendered per-slot (border-l on each slot
+              past the first) so they stay aligned even when occupied slots
+              grow to fit long chord names (28–48px). */}
 
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
