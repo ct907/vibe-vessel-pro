@@ -56,8 +56,9 @@ Strategy: section.chords becomes the authoritative writer. After each batch of a
 - ✅ `placeSectionChordInProgression` ports the legacy `placeMirroredChord` continuation-block-spawning logic into the SSOT-first flow. Used by SSOT-first actions to assign a `progressionPlacement` to a brand-new SectionChord, spawning a continuation block when no existing pattern in the section has room.
 - ✅ `SSOT_MODE` marker on partial state updates.
 
-### 4b.2 — Migrate actions (IN PROGRESS, 19/25)
-- ✅ `placeChordInSlot` — SSOT-first with refined auto-reflow rules.
+### 4b.2 — Migrate actions (DONE, 23/23 active)
+All actively-used chord-mutating store actions are now SSOT-first:
+- ✅ `placeChordInSlot` (auto-reflow rules: empty-right, free placement, sandwich-only +2 shift)
 - ✅ `removeChordAnchor` / `removeChordAnchorsBatch`
 - ✅ `setPatternChordLength`
 - ✅ `addChordToPatternSlot`
@@ -68,18 +69,23 @@ Strategy: section.chords becomes the authoritative writer. After each batch of a
 - ✅ `movePatternChord`
 - ✅ `reorderPatternChord`
 - ✅ `shiftPatternChords`
-- ✅ `pasteChordsAt` — per-item `placeSectionChordInProgression`; drops colliding-slot SCs first.
-- ✅ `moveChordsAcrossLines` — same-row reslots; same-section cross-line updates `lyricsPlacement`; cross-section creates fresh SCs in target.
-- ✅ `resizePatternChordsWithOverflow` — mutates `progressionPlacement.lengthBeats`, walks SCs in section.chords order, redistributes across blocks, spawns continuation block on overflow.
-- ✅ `movePatternChordToPatternAt` — same-section reassigns `progressionPlacement.patternId` and re-splices section.chords (cross-section bails — not used by UI).
-- ✅ `movePatternChordsToSlot` — reorders SCs within pattern's group at slot.
-- ✅ `movePatternChordsTo` — same-section reassigns patternIds; cross-section creates fresh SCs.
-- ✅ `removePatternChordsBatch` — drops SCs by id from owning section.
+- ✅ `pasteChordsAt`
+- ✅ `moveChordsAcrossLines`
+- ✅ `resizePatternChordsWithOverflow`
+- ✅ `movePatternChordToPatternAt`
+- ✅ `movePatternChordsToSlot`
+- ✅ `movePatternChordsTo`
+- ✅ `removePatternChordsBatch`
+- ✅ `upsertChordAt` (edit-existing path swaps SC chord; create path delegates to `placeChordInSlot`)
+- ✅ `updatePatternChord` (chord/length patch on SectionChord)
+- ✅ `updatePattern` (bars/beatsPerBar resize re-bins SCs across blocks, spawns continuation on overflow)
+- ✅ `removePatternBlock` (SCs with lyricsPlacement become lyrics-only; orphans dropped)
+- `formatChordsInLine`, `formatChordsInSong` — mirror-safe (recompute by set wrapper).
 
-### 4b.3 — Remaining (mostly dead/legacy)
-- `insertChordSpaceAt`, `removeChordCellAt` — unused by current UI; candidates for removal.
-- `upsertChordAt`, `upsertChordAtWord`, `appendChordToLine`, `moveChordWordSlot` — operate on legacy word/column system; need migration or deprecation depending on UI usage.
-- `updatePatternChord`, `updatePattern`, `removePatternBlock` — pattern-level metadata edits; some still mirror-first.
+### 4b.3 — Dead code removed
+- ❌ `insertChordSpaceAt` / `removeChordCellAt` (legacy column-based)
+- ❌ `upsertChordAtWord` / `appendChordToLine` / `moveChordWordSlot` (legacy word-anchored)
+- ❌ `syncAnchorsFromPattern` helper (replaced by `deriveMirrorsFromSectionChords`)
 
 ### 4b.4 — Type cleanup (FINAL)
 - Delete `mirrorId` from `ChordAnchor` / `PatternChord` (pairing implicit via SectionChord.id).
