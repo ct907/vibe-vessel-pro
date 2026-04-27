@@ -1741,6 +1741,21 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       })),
     }));
   },
+
+  autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
+    pushHistory(get);
+    set((s) => {
+      const sec = s.sections.find((x) => x.id === sectionId);
+      if (!sec) return {};
+      const next = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
+      const nextSections = s.sections.map((x) => (x.id === sectionId ? next : x));
+      // Use SSOT-mode so line.chords + pattern.chords are rebuilt from the
+      // updated section.chords + section.lines.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ sections: nextSections, [SSOT_MODE]: true } as any);
+    });
+  },
+
   // -------- Slot-based chord row (SSOT-first) --------
   placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
     pushHistory(get);
