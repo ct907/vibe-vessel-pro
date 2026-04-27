@@ -1137,6 +1137,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     if (basket.length > 0 && picker) setPicker(null);
   }, [basket.length, picker]);
 
+  // Auto-layout watchdog: when a section's chord count grows (chords added
+  // from the Progressions tab assign default lyricsPlacement which can stack
+  // at slot 0), debounce a viewport-aware reflow so the user sees them spread
+  // out cleanly.
+  const prevCountsRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const grown: string[] = [];
+    sections.forEach((sec) => {
+      const prev = prevCountsRef.current[sec.id] ?? sec.chords.length;
+      if (sec.chords.length > prev) grown.push(sec.id);
+      prevCountsRef.current[sec.id] = sec.chords.length;
+    });
+    if (!grown.length) return;
+    const handle = window.setTimeout(() => {
+      grown.forEach((id) => autoLayoutSection(id, window.innerWidth, 28));
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [sections, autoLayoutSection]);
+
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
   const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
