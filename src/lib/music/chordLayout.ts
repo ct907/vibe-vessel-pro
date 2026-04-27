@@ -21,6 +21,17 @@ import {
 
 const CHAR_WIDTH_PX = 8;
 
+const dbg = (...args: unknown[]) => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
+      // eslint-disable-next-line no-console
+      console.log("[layout]", ...args);
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
 export interface LayoutConfig {
   /** Effective render width for the chord row, in CSS px. */
   screenWidth: number;
