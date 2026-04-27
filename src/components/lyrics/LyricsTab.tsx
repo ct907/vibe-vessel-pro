@@ -63,6 +63,7 @@ import {
   ClipboardPaste,
   Scissors,
   X,
+  Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
