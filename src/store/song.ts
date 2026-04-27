@@ -1746,7 +1746,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
     const before = get().sections.find((x) => x.id === sectionId);
     if (!before) {
-      return { changed: false, reason: "not-found" } as never;
+      return { changed: false, reason: "not-found" };
     }
     const next = formatChordsAndLyrics(before, { screenWidth, slotWidth });
     // Detect no-op: identical line shapes + identical chord placements.
@@ -1770,7 +1770,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
           console.log("[layout] autoLayoutSection no-op", { sectionId });
         }
       } catch { /* ignore */ }
-      return { changed: false, reason: "no-op" } as never;
+      return { changed: false, reason: "no-op" };
     }
     pushHistory(get);
     set((s) => {
@@ -1781,7 +1781,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
-    return { changed: true } as never;
+    return { changed: true };
   },
 
   // -------- Slot-based chord row (SSOT-first) --------
