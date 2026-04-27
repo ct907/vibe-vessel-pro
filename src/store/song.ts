@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
 import { getDefaults } from "@/store/defaults";
+import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 
 // ---------- Types ----------
 
