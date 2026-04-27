@@ -1744,17 +1744,44 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   },
 
   autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
+    const before = get().sections.find((x) => x.id === sectionId);
+    if (!before) {
+      return { changed: false, reason: "not-found" } as never;
+    }
+    const next = formatChordsAndLyrics(before, { screenWidth, slotWidth });
+    // Detect no-op: identical line shapes + identical chord placements.
+    const sameLines =
+      before.lines.length === next.lines.length &&
+      before.lines.every((l, i) => l.id === next.lines[i].id && l.text === next.lines[i].text);
+    const samePlacements =
+      before.chords.length === next.chords.length &&
+      before.chords.every((c, i) => {
+        const n = next.chords[i];
+        const a = c.lyricsPlacement;
+        const b = n?.lyricsPlacement;
+        if (!a && !b) return true;
+        if (!a || !b) return false;
+        return a.lineId === b.lineId && a.slotIndex === b.slotIndex;
+      });
+    if (sameLines && samePlacements) {
+      try {
+        if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
+          // eslint-disable-next-line no-console
+          console.log("[layout] autoLayoutSection no-op", { sectionId });
+        }
+      } catch { /* ignore */ }
+      return { changed: false, reason: "no-op" } as never;
+    }
     pushHistory(get);
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      const next = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
-      const nextSections = s.sections.map((x) => (x.id === sectionId ? next : x));
-      // Use SSOT-mode so line.chords + pattern.chords are rebuilt from the
-      // updated section.chords + section.lines.
+      const recomputed = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
+      const nextSections = s.sections.map((x) => (x.id === sectionId ? recomputed : x));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
+    return { changed: true } as never;
   },
 
   // -------- Slot-based chord row (SSOT-first) --------
