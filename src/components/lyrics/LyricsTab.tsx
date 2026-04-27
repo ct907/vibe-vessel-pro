@@ -63,6 +63,7 @@ import {
   ClipboardPaste,
   Scissors,
   X,
+  Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -728,6 +729,7 @@ function SectionCard({
     setSectionColor,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
+    autoLayoutSection,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
@@ -884,6 +886,13 @@ function SectionCard({
                   <Pencil className="h-4 w-4" /> Rename…
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem
+                onClick={() =>
+                  autoLayoutSection(section.id, window.innerWidth, 28)
+                }
+              >
+                <Wand2 className="h-4 w-4" /> Format chords & lyrics
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>
@@ -1096,6 +1105,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
+    autoLayoutSection,
   } = useSongStore();
 
   const [picker, setPicker] = useState<{
@@ -1126,6 +1136,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   useEffect(() => {
     if (basket.length > 0 && picker) setPicker(null);
   }, [basket.length, picker]);
+
+  // Auto-layout watchdog: when a section's chord count grows (chords added
+  // from the Progressions tab assign default lyricsPlacement which can stack
+  // at slot 0), debounce a viewport-aware reflow so the user sees them spread
+  // out cleanly.
+  const prevCountsRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const grown: string[] = [];
+    sections.forEach((sec) => {
+      const prev = prevCountsRef.current[sec.id] ?? sec.chords.length;
+      if (sec.chords.length > prev) grown.push(sec.id);
+      prevCountsRef.current[sec.id] = sec.chords.length;
+    });
+    if (!grown.length) return;
+    const handle = window.setTimeout(() => {
+      grown.forEach((id) => autoLayoutSection(id, window.innerWidth, 28));
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [sections, autoLayoutSection]);
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
