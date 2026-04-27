@@ -184,7 +184,7 @@ export interface SongState {
    * A4: re-split lyric lines to fit the viewport and repack chord positions
    * left-to-right. Pure positional re-layout (no chord identity changes).
    */
-  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => void;
+  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string };
   /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
   placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
