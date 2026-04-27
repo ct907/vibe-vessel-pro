@@ -2080,6 +2080,22 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const free = totalBeats - usedInPattern;
 
     const newId = nanoid();
+    // B1: assign a default lyricsPlacement so the chord shows up in the
+    // Lyrics view immediately. Auto-layout will reflow positions later;
+    // for now, drop on the section's first line at the next free slot.
+    const firstLine = sec.lines[0];
+    const lyricsPlacement: LyricsPlacement | undefined = firstLine
+      ? (() => {
+          const occupied = new Set<number>();
+          sec.chords.forEach((c) => {
+            if (c.lyricsPlacement?.lineId === firstLine.id) {
+              occupied.add(c.lyricsPlacement.slotIndex);
+            }
+          });
+          const slot = nearestFreeSlot(occupied, 0);
+          return slot >= 0 ? { lineId: firstLine.id, slotIndex: slot } : undefined;
+        })()
+      : undefined;
     let nextProgression = s.progression;
     let sectionChord: SectionChord;
     if (free + 1e-9 >= 0.5) {
@@ -2088,6 +2104,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sectionChord = {
         id: newId,
         chord,
+        lyricsPlacement,
         progressionPlacement: { patternId, startBeat: usedInPattern, lengthBeats: placedLen },
       };
     } else {
@@ -2098,6 +2115,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         sec.chords,
         chord,
         newId,
+        lyricsPlacement,
       );
       nextProgression = placement.progression;
       sectionChord = placement.sectionChord;
@@ -2475,6 +2493,21 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       }, 0);
       const freeInTarget = totalBeats - usedInTarget;
 
+      // B1: default lyricsPlacement so the chord appears in the Lyrics view.
+      const firstLine = sec.lines[0];
+      const lyricsPlacement: LyricsPlacement | undefined = firstLine
+        ? (() => {
+            const occupied = new Set<number>();
+            sec.chords.forEach((c) => {
+              if (c.lyricsPlacement?.lineId === firstLine.id) {
+                occupied.add(c.lyricsPlacement.slotIndex);
+              }
+            });
+            const slot = nearestFreeSlot(occupied, 0);
+            return slot >= 0 ? { lineId: firstLine.id, slotIndex: slot } : undefined;
+          })()
+        : undefined;
+
       let placement: { progression: PatternBlock[]; sectionChord: SectionChord };
       if (freeInTarget + 1e-9 >= 0.5) {
         const placedLen = Math.min(defaultLen, freeInTarget);
@@ -2483,6 +2516,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
           sectionChord: {
             id: newId,
             chord,
+            lyricsPlacement,
             progressionPlacement: { patternId, startBeat: usedInTarget, lengthBeats: placedLen },
           },
         };
@@ -2493,7 +2527,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
           sec.chords,
           chord,
           newId,
-          undefined,
+          lyricsPlacement,
         );
       }
 
