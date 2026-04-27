@@ -886,6 +886,13 @@ function SectionCard({
                   <Pencil className="h-4 w-4" /> Rename…
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem
+                onClick={() =>
+                  autoLayoutSection(section.id, window.innerWidth, 28)
+                }
+              >
+                <Wand2 className="h-4 w-4" /> Format chords & lyrics
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>
