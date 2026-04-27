@@ -729,6 +729,7 @@ function SectionCard({
     setSectionColor,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
+    autoLayoutSection,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
