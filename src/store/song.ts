@@ -184,7 +184,7 @@ export interface SongState {
    * A4: re-split lyric lines to fit the viewport and repack chord positions
    * left-to-right. Pure positional re-layout (no chord identity changes).
    */
-  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => void;
+  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string };
   /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
   placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
@@ -1744,17 +1744,44 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   },
 
   autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
+    const before = get().sections.find((x) => x.id === sectionId);
+    if (!before) {
+      return { changed: false, reason: "not-found" };
+    }
+    const next = formatChordsAndLyrics(before, { screenWidth, slotWidth });
+    // Detect no-op: identical line shapes + identical chord placements.
+    const sameLines =
+      before.lines.length === next.lines.length &&
+      before.lines.every((l, i) => l.id === next.lines[i].id && l.text === next.lines[i].text);
+    const samePlacements =
+      before.chords.length === next.chords.length &&
+      before.chords.every((c, i) => {
+        const n = next.chords[i];
+        const a = c.lyricsPlacement;
+        const b = n?.lyricsPlacement;
+        if (!a && !b) return true;
+        if (!a || !b) return false;
+        return a.lineId === b.lineId && a.slotIndex === b.slotIndex;
+      });
+    if (sameLines && samePlacements) {
+      try {
+        if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
+          // eslint-disable-next-line no-console
+          console.log("[layout] autoLayoutSection no-op", { sectionId });
+        }
+      } catch { /* ignore */ }
+      return { changed: false, reason: "no-op" };
+    }
     pushHistory(get);
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      const next = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
-      const nextSections = s.sections.map((x) => (x.id === sectionId ? next : x));
-      // Use SSOT-mode so line.chords + pattern.chords are rebuilt from the
-      // updated section.chords + section.lines.
+      const recomputed = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
+      const nextSections = s.sections.map((x) => (x.id === sectionId ? recomputed : x));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
+    return { changed: true };
   },
 
   // -------- Slot-based chord row (SSOT-first) --------

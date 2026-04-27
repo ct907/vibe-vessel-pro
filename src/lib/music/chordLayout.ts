@@ -21,6 +21,17 @@ import {
 
 const CHAR_WIDTH_PX = 8;
 
+const dbg = (...args: unknown[]) => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
+      // eslint-disable-next-line no-console
+      console.log("[layout]", ...args);
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
 export interface LayoutConfig {
   /** Effective render width for the chord row, in CSS px. */
   screenWidth: number;
@@ -124,6 +135,35 @@ export function formatChordsAndLyrics(
   const charsPerLine = Math.max(8, Math.floor(config.screenWidth / CHAR_WIDTH_PX));
   const slotsPerLine = Math.max(2, Math.floor(config.screenWidth / slotWidth));
 
+  dbg("formatChordsAndLyrics:input", {
+    sectionId: section.id,
+    screenWidth: config.screenWidth,
+    slotWidth,
+    charsPerLine,
+    slotsPerLine,
+    lineCount: section.lines.length,
+    chordCount: section.chords.length,
+  });
+
+  // 0) Orphan auto-fix: any chord whose lyricsPlacement.lineId no longer
+  //    exists on the section gets reassigned to the first line at slot 0
+  //    (the auto-layout pass will re-pack them properly afterwards).
+  const validLineIds = new Set(section.lines.map((l) => l.id));
+  const firstLineId = section.lines[0]?.id;
+  let orphanCount = 0;
+  const sourceChords: SectionChord[] = section.chords.map((sc) => {
+    const lp = sc.lyricsPlacement;
+    if (!lp) return sc;
+    if (validLineIds.has(lp.lineId)) return sc;
+    orphanCount += 1;
+    if (!firstLineId) {
+      // Section has no lines — drop the placement; chord stays in SSOT.
+      return { ...sc, lyricsPlacement: undefined };
+    }
+    return { ...sc, lyricsPlacement: { lineId: firstLineId, slotIndex: 0 } };
+  });
+  if (orphanCount > 0) dbg("orphans reassigned:", orphanCount);
+
   // 1) Split lines.
   const newLines: LyricLine[] = [];
   const lineMapping = new Map<string, string[]>();
@@ -136,12 +176,7 @@ export function formatChordsAndLyrics(
     const splits = splitLyricLine(line.text, charsPerLine);
     const ids: string[] = [];
     splits.forEach((text, idx) => {
-      // Reuse the original id for the first slice so anchors that were already
-      // bound to it stay attached without an extra remap step.
       const newId = idx === 0 ? line.id : nanoid();
-      // Each split line starts with no legacy anchors — line.chords is a
-      // legacy mirror that gets rebuilt by the SSOT inversion path. Leaving
-      // it empty here means the SSOT-mode setter will derive correct anchors.
       newLines.push({ id: newId, text, chords: [] as ChordAnchor[] });
       ids.push(newId);
     });
@@ -150,15 +185,13 @@ export function formatChordsAndLyrics(
 
   // 2) Redistribute chord lyricsPlacements across the split lines, then
   //    auto-layout positions per line.
-  const remappedChords: SectionChord[] = section.chords.map((sc) => {
+  const remappedChords: SectionChord[] = sourceChords.map((sc) => {
     const lp = sc.lyricsPlacement;
     if (!lp) return sc;
     const newIds = lineMapping.get(lp.lineId);
     if (!newIds || newIds.length === 1) {
       return sc;
     }
-    // Estimate which split this chord belongs to using the chord's slot
-    // position relative to the original (pre-split) line's character length.
     const original = section.lines.find((l) => l.id === lp.lineId);
     const totalChars = original?.text.length ?? 0;
     const ratio = lp.slotIndex / CHORD_ROW_SLOTS;
@@ -167,7 +200,7 @@ export function formatChordsAndLyrics(
     let target = newIds[newIds.length - 1];
     for (const id of newIds) {
       const len = newLines.find((l) => l.id === id)?.text.length ?? 0;
-      acc += len + 1; // +1 for the implicit space we split on
+      acc += len + 1;
       if (charPos < acc) {
         target = id;
         break;
@@ -177,6 +210,12 @@ export function formatChordsAndLyrics(
   });
 
   const finalChords = autoLayoutChordsPerLine(remappedChords, newLines, slotsPerLine);
+
+  dbg("formatChordsAndLyrics:output", {
+    newLineCount: newLines.length,
+    chordCount: finalChords.length,
+    orphansFixed: orphanCount,
+  });
 
   return {
     ...section,

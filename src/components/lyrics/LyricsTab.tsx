@@ -20,6 +20,7 @@ import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -887,9 +888,14 @@ function SectionCard({
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
-                onClick={() =>
-                  autoLayoutSection(section.id, window.innerWidth, 28)
-                }
+                onClick={() => {
+                  const res = autoLayoutSection(section.id, window.innerWidth, 28);
+                  if (res?.changed) {
+                    toast.success("Chords & lyrics formatted to fit your screen");
+                  } else {
+                    toast("Already laid out for this screen width");
+                  }
+                }}
               >
                 <Wand2 className="h-4 w-4" /> Format chords & lyrics
               </DropdownMenuItem>
@@ -1141,13 +1147,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   // from the Progressions tab assign default lyricsPlacement which can stack
   // at slot 0), debounce a viewport-aware reflow so the user sees them spread
   // out cleanly.
-  const prevCountsRef = useRef<Record<string, number>>({});
+  // Seed prevCounts on mount with the current values MINUS 1 so that any
+  // section that already has chords (e.g. added from Progressions while this
+  // tab was unmounted) is treated as "grown" and triggers a reflow once.
+  const prevCountsRef = useRef<Record<string, number> | null>(null);
   useEffect(() => {
+    if (prevCountsRef.current === null) {
+      const seed: Record<string, number> = {};
+      sections.forEach((sec) => {
+        // Seed at -1 so the first effect pass detects growth and reflows once.
+        seed[sec.id] = sec.chords.length > 0 ? sec.chords.length - 1 : 0;
+      });
+      prevCountsRef.current = seed;
+    }
+    const counts = prevCountsRef.current;
     const grown: string[] = [];
     sections.forEach((sec) => {
-      const prev = prevCountsRef.current[sec.id] ?? sec.chords.length;
+      const prev = counts[sec.id] ?? sec.chords.length;
       if (sec.chords.length > prev) grown.push(sec.id);
-      prevCountsRef.current[sec.id] = sec.chords.length;
+      counts[sec.id] = sec.chords.length;
     });
     if (!grown.length) return;
     const handle = window.setTimeout(() => {
