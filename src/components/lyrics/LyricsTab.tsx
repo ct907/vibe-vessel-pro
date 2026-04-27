@@ -1105,6 +1105,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     moveChordToSlot,
     moveChordsAcrossLines,
     placeChordInSlot,
+    autoLayoutSection,
   } = useSongStore();
 
   const [picker, setPicker] = useState<{
