@@ -1,180 +1,141 @@
-## Goals
+# Phase 1.5 — Fix C + Fix E (+ B, D, Orientation, Safety Net)
 
-Address 11 UX issues across the Lyrics tab, Progressions tab, BasketBar, and FocusedChordEditor without changing the SSOT model.
-
----
-
-## Lyrics Tab
-
-### L1. Pencil button no longer auto-selects all chords
-
-**File:** `src/components/lyrics/LyricsTab.tsx` (~lines 509–527)
-
-Currently entering Edit Mode pre-selects every chord on the row (`selection.set(lineChords.map(...))`). Remove that block so Edit Mode opens with an empty selection — the user does the picking.
-
-### L2. Add "Select all" to the chord-row context menu
-
-**File:** `src/components/lyrics/LyricsTab.tsx` (selection toolbar, lines 538–622)
-
-Add a small "Select all" button (or icon button with checkmark) in Row 1 of the toolbar that calls `selection.set(lineChords.map(c => c.id))`. Position it next to the counter so it remains discoverable while in Edit Mode.
-
-### L3. Don't auto-close context menu when selection becomes empty
-
-**File:** `src/components/lyrics/LyricsTab.tsx` (toolbar render guard, line 537)
-
-Today the toolbar render condition is `selection.size > 0 && lineChords.some(...)`. Replace with `isEditMode` so that while Edit Mode is on, the toolbar stays visible even with 0 selected chords (showing "0 selected · Select all · Done"). The toolbar is dismissed only by the **Done** button or by tapping the **pencil** again. The `useEffect` that clears selection on outside click (lines 298–321) should also be gated to NOT clear if `isEditMode` is true (or only clear selection — never close edit mode).
-
-### L4. Don't exit edit mode after Delete
-
-**File:** `src/components/lyrics/LyricsTab.tsx` (Delete button, ~lines 603–616)
-
-Currently Delete calls `selection.clear()` which (under L3) keeps the toolbar open since `isEditMode` stays true. Confirm Delete only clears `selection` and does NOT call `setIsEditMode(false)`. Same treatment for the toolbar's `X` Close-selection button (line 546): it should clear selection but keep edit mode on.
-
-### L5. Chord row "stuck not draggable" investigation
-
-**File:** `src/components/lyrics/LyricsTab.tsx` (Draggable wrapper around chip, lines 421–488)
-
-Chips can become non-draggable, likely because the inner `onClick` handler stops propagation/prevents the synthetic events `@hello-pangea/dnd` listens for during a slow press. We will:
-
-- Ensure the Draggable wrapper always renders `dragProvided.dragHandleProps` (it does), and
-- Add `onPointerDown` that does NOT call `stopPropagation` (only the `onClick` should), so dnd's sensor sees the press.
-- Reset the `lastSelectedRef` and any per-row pointer state when `selection.size === 0` to prevent stale capture.
-
-If reproducible after that, also remove `pointer-events-none` on the inner chord chip wrapper (line 462) when `isEditMode` is on so dnd's hit-testing finds the chip directly.
+Approved spec consolidated. Below is the implementation plan with file-level changes.
 
 ---
 
-## BasketBar
+## Fix C — FocusedChordEditor: full 80-slot grid + correct cursor
 
-### B1. Tap-to-focus chord should be immediately draggable
+**File:** `src/components/lyrics/FocusedChordEditor.tsx`
 
-**File:** `src/components/basket/BasketBar.tsx` (lines ~95–185)
+1. **Preview row → full 80-slot scrollable grid**
+   - Replace the current `slotMap` render (which uses `CHORD_ROW_SLOTS` but is laid out flex-without-min-width) with a horizontally-scrollable container:
+     - Outer: `overflow-x-auto`
+     - Inner: `flex` with `min-width: ${CHORD_ROW_SLOTS * 28}px`
+     - Render every slot 0..79; occupied slots show the chord, empty slots remain visible dividers.
+   - Highlight the active `slot` cell as today.
+   - Auto-scroll the active slot into view after each placement (`scrollIntoView({ inline: "nearest", block: "nearest" })` on the slot ref).
 
-Currently `isDragDisabled={!sel}` means an unselected chip can't be dragged at all; after a tap the chip becomes selected, but the user reports needing a second gesture. Root cause: the same pointer gesture that toggled selection is consumed by our tap detector and never reaches the dnd sensor. Fix:
+2. **Cursor advancement from actual placed slot**
+   - In `handlePick`, after `placeChordInSlot(...)`, read the freshest section from `useSongStore.getState()`, project line chords via `getLineChordsViaSSOT`, and find the just-placed chord by `id` (track `newId` if needed — otherwise pick the chord whose `slotIndex` is the largest ≤ requested target after the call).
+   - Compute `chordWidth = display.length <= 3 ? 1 : 2` and `nextSlot = min(CHORD_ROW_SLOTS - 1, placedSlot + chordWidth + 1)`.
+   - `setSlot(nextSlot)`.
+   - For the `upsertChordAt` (edit) branch keep existing behavior but also use `placedSlot + width + 1`.
 
-- After `toggleSelected(id)` in `onChipPointerUp`, do nothing else — but on the NEXT pointerdown the sensor will already see `isDragDisabled=false`. Verify by removing `touchAction:"none"` on unselected chips (only set it once selected) and confirming pangea's drag handle is active.
-- Alternative if still flaky: switch the strategy to `isDragDisabled={false}` for all basket chips, and use the tap detector only to toggle selection on quick taps (drag still wins on long-press / movement).
+3. **Capacity toast**
+   - When `nextSlot >= CHORD_ROW_SLOTS - 1` (i.e., 79), `toast.info("Row capacity reached (80 slots)")` once. No pre-warnings.
 
-### B2. Mobile drag clone offset (chord appears top-left of finger)
-
-**Files:** `src/components/basket/BasketBar.tsx` (renderClone), `src/components/lyrics/LyricsTab.tsx` (Draggable inside slot)
-
-`@hello-pangea/dnd` positions the clone using the original element's bounding rect. When the source element is `pointer-events-none` or wrapped in transformed parents (e.g. the row that gets `relative z-[60]` while focused, line 330), the clone offset can be miscalculated.
-
-Plan:
-
-- In BasketBar's `renderClone`, ensure no `transform` is applied to the parent during drag — remove `scale-105` from the `selected` styling on `StaticChordChip` since it's compounding with dnd's clone transform.
-- In LyricsTab, avoid applying `pointer-events-none` to the inner chip wrapper (line 462) — pangea uses pointer position relative to the dragged element, and pointer-events:none on the visible child can cause the offset to default to (0,0) of the parent on touch.
-- Verify by setting CSS `will-change: transform` on draggable chip parents to keep their transform origin stable.
-
----
-
-## FocusedChordEditor (Mobile)
-
-### F1. Don't elevate the underlying lyric/chord row; show clones inside the editor
-
-**File:** `src/components/lyrics/FocusedChordEditor.tsx` + `src/components/lyrics/LyricsTab.tsx`
-
-Currently the LineRow gets `relative z-[60] ring-2 ... shadow-lg` when active (line 330) which visually pops the row above other UI. Instead:
-
-1. In `LyricsTab.tsx`: remove the `active`-specific `z-[60]` / ring / shadow styling when the FocusedChordEditor is open on mobile (gate by `isMobile && picker`). Underlying rows stay at their normal z-depth.
-2. In `FocusedChordEditor.tsx`: just below the header (above the input field) render a **read-only clone** of:
-  - The lyric text (read `line.text`)
-  - The chord row with current chord chips placed at their slot positions:
-    - Sync state using section.chords [], both original and clone views refresh using SSOT.
-
-The clone updates live as `placeChordInSlot` / `upsertChordAt` mutate the store (the component already subscribes to `sections`). Add a clear visual separator between the clone and the input.
+4. **Debug logs (Fix D)** gated by `localStorage.LV_DEBUG_LAYOUT === "1"`:
+   ```
+   [editor] placed { requested, placedSlot, nextSlot, chordCount }
+   ```
 
 ---
 
-## Progressions Tab
+## Fix E — Auto-layout splits lines on chord overflow
 
-### P1. Add edit-pencil to pattern block (matches Lyrics tab)
+**File:** `src/lib/music/chordLayout.ts`
 
-**File:** `src/components/progressions/ProgressionsTab.tsx` (PatternBlock header, ~lines 295–326)
+1. **Add overflow-driven line splitting** (in addition to existing char-driven splits):
+   - After computing `newLines` from char-based splitting, group `remappedChords` by `lineId` (in SSOT order).
+   - For each line, sum `chordWidth(display) + 1` (spacing) across its chords. If total > `slotsPerLine`, create N-1 empty continuation lines (where N = `ceil(total / slotsPerLine)`) inserted immediately after that line.
+     - Continuation line shape: `{ id: nanoid(), text: "", chords: [], _isChordOverflow: true }`.
+   - Walk that line's chords left-to-right and assign each to the current continuation row, rolling to the next row when the cumulative width would exceed `slotsPerLine`. Slot positions are then computed by the existing `autoLayoutChordsPerLine` pass (cursor resets per line).
 
-Add a `<Pencil>` icon button next to the Trash icon that toggles `selectMode`. Behavior:
+2. **Type extension**
+   - Add optional `_isChordOverflow?: boolean` to `LyricLine` in `src/store/song.ts`. Marker only — not persisted decisions affecting SSOT semantics; treated as transient/UI flag (kept in state, ignored by save if needed — confirm at build time, but simplest is to allow it to persist so reflow stays stable across reloads).
 
-- Toggling on: `setSelectMode(true)`, do NOT pre-select chords.
-- Toggling off: `exitSelect()` (clears selection + select mode).
-- While `selectMode` is true, tapping a chord toggles its membership (already implemented at lines 266–275).
-- The unified context menu (P4) shows whenever `selectMode` is on, even with 0 selected (showing "0 selected · Select all · Done").
+3. **Return metadata** so callers can show the post-reflow banner:
+   - Change `formatChordsAndLyrics` to return `{ section, overflowRowsAdded: number }` (or attach via a transient property).
+   - Update `autoLayoutSection` in `src/store/song.ts` to return `{ changed, reason?, overflowRowsAdded? }`.
 
-Also remove the auto-close-on-empty effect (lines 147–150) since `selectMode` should now be controlled solely by the pencil / Done.
-
-### P2. Resize chord slots up to 48px to fit long names
-
-**File:** `src/components/progressions/ProgressionsTab.tsx` (slot styling at lines 394–402, 437)
-
-The pattern row uses `flex: span span 0%` for proportional widths inside a fixed grid, so 28→48px doesn't directly apply there. The 28px clamp is in the **lyrics chord row** (see `LyricsTab.tsx` line 370 `${(i+1)*28}px` and slot `w-7 = 28px` line 400).
-
-Plan (for the **lyrics** chord row, since that's where the 28px slot grid lives):
-
-- Replace fixed `w-7` slot with `min-w-[28px] max-w-[48px] w-fit` and let chord chip text size the slot via `width: fit-content`.
-- Update the divider positions (line 366–373): instead of fixed `(i+1) * 28`, render dividers as siblings between slots using flex `border-l` on each slot — this keeps dividers correct as widths vary.
-- Slot indices remain stable; only their on-screen widths change.
-
-Check if dynamic width of the slots are calculated when user initiates drag and drop action. Check if observer needs debouncing to prevent excessive rerenders.
-
-This applies only to lyrics chord row (where the 28px lives), not the beat-grid pattern block.
-
-### P3. Allow deleting an empty pattern block when other blocks exist
-
-**File:** `src/components/progressions/ProgressionsTab.tsx` (line 140 `canDeleteThisBlock` and ~316–322)
-
-Today deletion is allowed only when `blocksInSection > 1`, regardless of whether the block has chords. That's already what the user wants (block A can be emptied → moved → deleted as long as there's any other block in the SONG, not just the section). Update to song-level:
-
-- Change `canDeleteThisBlock` to `totalPatternBlocksInSong > 1`. Compute via `useSongStore` selecting all `sections.flatMap(s => s.progression).length`.
-
-The store action `removePatternBlock` already drops chords with no lyric placement and detaches mirrors, so empty deletion is safe.
-
-### P4. Unify "active chord" and "select mode" context menus
-
-**File:** `src/components/progressions/ProgressionsTab.tsx`
-
-Remove the separate `activeChord` state path. After the change:
-
-- Tapping a chord enters `selectMode` (or stays in it) and toggles that chord's selection — single chord = treated as a 1-item selection.
-- The context menu always reads from `selectedIds`. With `selectedIds.length === 1` it shows the same controls as before but without the "Length: N beats" text indicator (the user explicitly asked us to remove that text — lines 582–586).
-- Keyboard +/-/Del operate on `selectedIds` (already works via `removePatternChordsBatch` and `resizePatternChordsWithOverflow`).
-- Audition (`playChord`) still fires on tap when `selectedIds` becomes exactly 1 (preserves the single-tap audition UX).
-- The "Move to…" Select stays available whenever `selectedIds.length >= 1`.
-
-Specific edits:
-
-- Drop `activeChord` state, `setActiveChord` calls, the `useEffect` at lines 168–180, and the `active`/`activeIdx` derivations (lines 282–284).
-- In `handleChordTap`: always go through the selection-toggle path; if after toggle `selected.size === 0`, exit selectMode only if pencil hasn't been engaged manually. Track `manualSelectMode` ref (set true when pencil pressed).
-- Render the context menu when `selectMode === true` OR `selected.size > 0`.
-- Remove the `{showSingle && c && <span>... beats</span>}` block (lines 582–586).
-- Length controls work on `selectedIds`; if it's a single chord use `setPatternChordLength`, else `resizePatternChordsWithOverflow`.
+4. **Debug logs (Fix D)**:
+   ```
+   [layout] section { slotsPerLine, charsPerLine, linesBefore, linesAfter, overflowRowsAdded }
+   [layout] line-overflow { lineId, totalSlotsNeeded, slotsPerLine, rowsCreated }
+   ```
 
 ---
 
-## Out of scope (deferred)
+## Fix B — Pause watchdog while editor is open + fire once on close
 
-- Cross-tab chord sync (separate SSOT polish task).
-- Existing UI polish issues the user said to defer.
+**File:** `src/components/lyrics/LyricsTab.tsx`
+
+- Add a ref `editorOpenRef` set true while `<FocusedChordEditor />` is mounted (the `picker`/mobile editor branch already tracks open state — wire from there).
+- In the watchdog effect (lines ~1153-1175): if `editorOpenRef.current === true`, **skip scheduling** the 350 ms timer; record growth into `prevCountsRef` so we don't false-trigger after close, but mark `pendingReflowSections` (a ref-based Set).
+- On editor close (handler that currently calls `onClose`), schedule a single 350 ms `autoLayoutSection` call for each section in `pendingReflowSections`, then clear the set.
+- Capture `overflowRowsAdded` from the return value and feed Fix E's banner state.
 
 ---
 
-## Sequencing
+## Fix E (cont.) — Post-reflow banner
 
-Recommend implementing in this batch order so each piece can be smoke-tested:
+**File:** `src/components/lyrics/LyricsTab.tsx`
 
-1. **Lyrics edit-mode behavior**: L1, L2, L3, L4 (single coherent change set), **Drag fixes**: L5, B1, B2 (drag/touch behavior — interrelated), **Progressions context unification**: P1, P3, P4.
-2. **Lyrics chord-row width / slot resize**: P2.
-3. **FocusedChordEditor restructure**: F1.
+- New state `reflowNotice: { sectionId: string; newRowCount: number } | null`.
+- When `autoLayoutSection` returns `overflowRowsAdded > 0` from either the manual "Format chords & lyrics" button OR the watchdog, set `reflowNotice`.
+- Render an inline `Alert` (shadcn `alert.tsx`, `variant="default"`, custom `AlertCircle` icon) directly under the affected section card.
+- Message:
+  > **Layout adjusted:** Too many chords for one line. Extra chords moved to {N} new row(s). Remember to check and rearrange afterwards.
+- Dismiss button + `setTimeout` auto-dismiss at 10 s.
 
-After each batch, you can confirm console is clean before proceeding to the next.
+**Continuation row visual** (`LineRow` rendering in `LyricsTab.tsx`):
+- When `line._isChordOverflow && !line.text`, render a small subscript `↳ Chord overflow` label next to the chord row and apply `bg-muted/30` to the row container.
+
 ---
 
-## Implementation log (2026-04-26)
+## Orientation-change modal (NOT auto-layout)
 
-- L1–L4 done: pencil no longer pre-selects; Select-all button in toolbar; toolbar persists while in Edit Mode (controlled by Done/pencil only); outside-click & delete no longer exit edit mode.
-- L5 + B2: removed `scale-105` from selected basket chip (was compounding with dnd transform); kept inner chip `pointer-events-none` for handle stability.
-- B1: basket chips are now `isDragDisabled={false}` for all chips — quick tap toggles selection, long-press/movement initiates drag immediately.
-- F1: underlying lyric row no longer gets `z-[60]/ring/shadow` on mobile when picker is open; FocusedChordEditor now renders a live read-only Preview (chord row + lyric text) above the input.
-- P1: pencil button added to pattern block header, toggles `selectMode` without pre-selecting.
-- P2: lyrics chord row slots are now `28–48px w-fit` for occupied slots; dividers moved from absolutely-positioned to per-slot `border-l`.
-- P3: per-block deletion now gated by `totalBlocksInSong > 1` (read from `s.progression.length`) instead of per-section.
-- P4: removed `activeChord` state entirely; unified context menu rendered whenever `selectMode` is on (single-tap selects exclusively + auditions, second tap clears); removed the "N beats" length text indicator; Select-all also added to the menu's row 1.
+**File:** `src/components/lyrics/LyricsTab.tsx` (or a small new hook)
+
+- `useEffect` subscribes to `window.matchMedia('(orientation: portrait)').addEventListener('change', ...)`.
+- On change: do **not** call `autoLayoutSection`. Open a shadcn `Dialog`:
+  - Title: "Switched to {Landscape | Portrait} mode"
+  - Body: "To keep your lyrics and chord layout looking great, use **Export Lyrics** for a tidy {orientation} layout."
+  - Buttons: "Continue Editing" (close) and "Export Lyrics" (close + open existing `ExportLyricsSheet`).
+- Suppress the modal on first mount (only react to actual changes).
+- Confirm window-resize listeners are NOT calling `autoLayoutSection` anywhere — current code already only calls it from the manual button + watchdog, so nothing to remove. Verify during build.
+
+---
+
+## Safety net — residual overflow
+
+**File:** `src/components/lyrics/LyricsTab.tsx`
+
+- After `autoLayoutSection`, recompute per line whether `totalSlotsNeeded > slotsPerLine`. If true (should be impossible, but guards against future regressions), surface a warning `Alert` (`variant="destructive"`-ish, dismissible):
+  > Some chords may be off-screen. Press **Format Chords** to reorganize.
+
+Gated behind a small helper so we don't double-render with the info banner.
+
+---
+
+## Fix D — Debug logging summary (gated by `LV_DEBUG_LAYOUT`)
+
+- `src/lib/music/chordLayout.ts`: input/output, per-line overflow events, orphan reassignments (existing).
+- `src/store/song.ts`:
+  - `placeChordInSlot`: `{ target, occupied, sandwiched, needsReflow, finalSlot, fallback }`.
+  - `autoLayoutSection`: existing no-op log + `overflowRowsAdded`.
+- `src/components/lyrics/LyricsTab.tsx`: watchdog growth/grown[]/timer scheduled/fired/cancelled, editor open/close gating.
+- `src/components/lyrics/FocusedChordEditor.tsx`: per-pick log (above).
+
+---
+
+## Files touched
+
+- `src/lib/music/chordLayout.ts` — overflow line splitting, return metadata, logs.
+- `src/store/song.ts` — `LyricLine._isChordOverflow`, `autoLayoutSection` return shape, `placeChordInSlot` logs.
+- `src/components/lyrics/FocusedChordEditor.tsx` — 80-slot scrollable grid, cursor from store, auto-scroll, capacity toast, logs.
+- `src/components/lyrics/LyricsTab.tsx` — editor-open gating, post-reflow banner, continuation-row styling, orientation modal, safety-net banner, watchdog logs.
+
+---
+
+## Test protocol
+
+1. `localStorage.setItem('LV_DEBUG_LAYOUT', '1')`.
+2. Mobile viewport (~384 px). Open FocusedChordEditor on a verse. Add 10 chords sequentially.
+3. Expected during entry: chords appear in order across the 80-slot scrollable grid; preview auto-scrolls to follow cursor; no toasts; no reflow.
+4. Close editor → exactly one `autoLayoutSection` per affected section (logged); section now shows lyric line + 2 continuation rows with "↳ Chord overflow" label; info banner appears under section.
+5. Rotate device → modal opens offering Export Lyrics; no auto-layout fires.
+6. Press "Format chords & lyrics" with already-good layout → toast "Layout already optimal"; no banner.
+
+Awaiting approval to implement.
