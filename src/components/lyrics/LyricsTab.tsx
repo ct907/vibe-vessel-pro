@@ -1143,19 +1143,75 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     if (basket.length > 0 && picker) setPicker(null);
   }, [basket.length, picker]);
 
-  // Auto-layout watchdog: when a section's chord count grows (chords added
-  // from the Progressions tab assign default lyricsPlacement which can stack
-  // at slot 0), debounce a viewport-aware reflow so the user sees them spread
-  // out cleanly.
-  // Seed prevCounts on mount with the current values MINUS 1 so that any
-  // section that already has chords (e.g. added from Progressions while this
-  // tab was unmounted) is treated as "grown" and triggers a reflow once.
+  // Auto-layout watchdog: when a section's chord count grows, debounce a
+  // viewport-aware reflow so the user sees them spread out cleanly.
+  // Fix B: pause while the FocusedChordEditor is open. The editor sets a
+  // localStorage flag + dispatches `lv-editor-open`/`lv-editor-close`
+  // window events; while open we collect "grown" sections without firing,
+  // and flush exactly once on close.
   const prevCountsRef = useRef<Record<string, number> | null>(null);
+  const editorOpenRef = useRef(false);
+  const pendingGrownRef = useRef<Set<string>>(new Set());
+  const [overflowToastFor, setOverflowToastFor] = useState<Record<string, number>>({});
+  const [residualOverflowFor, setResidualOverflowFor] = useState<Record<string, boolean>>({});
+  const [orientationOpen, setOrientationOpen] = useState(false);
+
+  const dbgLog = (...args: unknown[]) => {
+    try {
+      if (window.localStorage.getItem("LV_DEBUG_LAYOUT") === "1") {
+        // eslint-disable-next-line no-console
+        console.log("[watchdog]", ...args);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const runReflow = (ids: string[]) => {
+    const overflowMap: Record<string, number> = {};
+    const residualMap: Record<string, boolean> = {};
+    ids.forEach((id) => {
+      const res = autoLayoutSection(id, window.innerWidth, 28);
+      dbgLog("reflow", id, res);
+      if (res?.overflowRowsAdded && res.overflowRowsAdded > 0) {
+        overflowMap[id] = res.overflowRowsAdded;
+      }
+      if (res?.residualOverflow && res.residualOverflow > 0) {
+        residualMap[id] = true;
+      }
+    });
+    if (Object.keys(overflowMap).length) {
+      setOverflowToastFor((prev) => ({ ...prev, ...overflowMap }));
+    }
+    if (Object.keys(residualMap).length) {
+      setResidualOverflowFor((prev) => ({ ...prev, ...residualMap }));
+    }
+  };
+
+  // Listen for editor open/close to gate the watchdog.
+  useEffect(() => {
+    const onOpen = () => {
+      editorOpenRef.current = true;
+      dbgLog("editor open — pausing");
+    };
+    const onClose = () => {
+      editorOpenRef.current = false;
+      const ids = Array.from(pendingGrownRef.current);
+      pendingGrownRef.current.clear();
+      dbgLog("editor close — flushing", ids);
+      if (ids.length) runReflow(ids);
+    };
+    window.addEventListener("lv-editor-open", onOpen);
+    window.addEventListener("lv-editor-close", onClose);
+    return () => {
+      window.removeEventListener("lv-editor-open", onOpen);
+      window.removeEventListener("lv-editor-close", onClose);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLayoutSection]);
+
   useEffect(() => {
     if (prevCountsRef.current === null) {
       const seed: Record<string, number> = {};
       sections.forEach((sec) => {
-        // Seed at -1 so the first effect pass detects growth and reflows once.
         seed[sec.id] = sec.chords.length > 0 ? sec.chords.length - 1 : 0;
       });
       prevCountsRef.current = seed;
@@ -1168,11 +1224,37 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       counts[sec.id] = sec.chords.length;
     });
     if (!grown.length) return;
+    if (editorOpenRef.current) {
+      grown.forEach((id) => pendingGrownRef.current.add(id));
+      dbgLog("editor open — queued", grown);
+      return;
+    }
     const handle = window.setTimeout(() => {
-      grown.forEach((id) => autoLayoutSection(id, window.innerWidth, 28));
+      dbgLog("scheduled reflow firing", grown);
+      runReflow(grown);
     }, 350);
     return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, autoLayoutSection]);
+
+  // Orientation change: don't auto-reflow destructively. Suggest export.
+  useEffect(() => {
+    let lastWidth = window.innerWidth;
+    const onResize = () => {
+      const w = window.innerWidth;
+      // Significant width change (e.g., rotation): prompt user instead of
+      // running auto-layout that could disturb their hand-tuned chord rows.
+      if (Math.abs(w - lastWidth) > 200) {
+        lastWidth = w;
+        setOrientationOpen(true);
+      } else {
+        lastWidth = w;
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
