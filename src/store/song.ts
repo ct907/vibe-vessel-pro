@@ -1883,6 +1883,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const nextSections = nextSectionsBase.map((x) =>
         x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
       );
+      if (__dbg) {
+        // eslint-disable-next-line no-console
+        console.log("[layout] placeChordInSlot", {
+          sectionId, lineId, requested: target, placeSlot,
+          neededReflow: needsReflow, fellBackToSpaced: needsReflow && placeSlot !== target,
+        });
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({
         sections: nextSections,
