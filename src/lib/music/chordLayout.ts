@@ -126,11 +126,16 @@ function autoLayoutChordsPerLine(
  * A4 entry point. Returns a new section with re-split lines and re-laid-out
  * chord positions. `section.chords` retains SSOT order; only its
  * `lyricsPlacement` fields and `section.lines` change.
+ *
+ * Also performs a chord-overflow pass: if any single line's chord footprint
+ * (sum of widths + spacing) exceeds the viewport's `slotsPerLine` capacity,
+ * synthesize empty continuation lines (`_isChordOverflow: true`) and spill
+ * the overflow chords onto them.
  */
 export function formatChordsAndLyrics(
   section: Section,
   config: LayoutConfig,
-): Section {
+): { section: Section; overflowRowsAdded: number; orphansFixed: number } {
   const slotWidth = Math.max(20, config.slotWidth ?? 28);
   const charsPerLine = Math.max(8, Math.floor(config.screenWidth / CHAR_WIDTH_PX));
   const slotsPerLine = Math.max(2, Math.floor(config.screenWidth / slotWidth));
@@ -145,9 +150,7 @@ export function formatChordsAndLyrics(
     chordCount: section.chords.length,
   });
 
-  // 0) Orphan auto-fix: any chord whose lyricsPlacement.lineId no longer
-  //    exists on the section gets reassigned to the first line at slot 0
-  //    (the auto-layout pass will re-pack them properly afterwards).
+  // 0) Orphan auto-fix.
   const validLineIds = new Set(section.lines.map((l) => l.id));
   const firstLineId = section.lines[0]?.id;
   let orphanCount = 0;
@@ -156,20 +159,38 @@ export function formatChordsAndLyrics(
     if (!lp) return sc;
     if (validLineIds.has(lp.lineId)) return sc;
     orphanCount += 1;
-    if (!firstLineId) {
-      // Section has no lines — drop the placement; chord stays in SSOT.
-      return { ...sc, lyricsPlacement: undefined };
-    }
+    if (!firstLineId) return { ...sc, lyricsPlacement: undefined };
     return { ...sc, lyricsPlacement: { lineId: firstLineId, slotIndex: 0 } };
   });
   if (orphanCount > 0) dbg("orphans reassigned:", orphanCount);
 
-  // 1) Split lines.
-  const newLines: LyricLine[] = [];
+  // 1) Drop pre-existing overflow rows so we recompute fresh each pass.
+  //    Re-attach their chords to the previous non-overflow row.
+  const compactedLines: LyricLine[] = [];
+  const overflowReassign = new Map<string, string>(); // overflowLineId -> parentLineId
+  let lastParentId: string | null = null;
+  section.lines.forEach((l) => {
+    if (l._isChordOverflow) {
+      if (lastParentId) overflowReassign.set(l.id, lastParentId);
+      return;
+    }
+    compactedLines.push(l);
+    lastParentId = l.id;
+  });
+  const reassignedChords: SectionChord[] = sourceChords.map((sc) => {
+    const lp = sc.lyricsPlacement;
+    if (!lp) return sc;
+    const parent = overflowReassign.get(lp.lineId);
+    if (!parent) return sc;
+    return { ...sc, lyricsPlacement: { lineId: parent, slotIndex: lp.slotIndex } };
+  });
+
+  // 2) Split lyric lines on character width.
+  const splitLines: LyricLine[] = [];
   const lineMapping = new Map<string, string[]>();
-  section.lines.forEach((line) => {
+  compactedLines.forEach((line) => {
     if (line.text.length <= charsPerLine) {
-      newLines.push(line);
+      splitLines.push(line);
       lineMapping.set(line.id, [line.id]);
       return;
     }
@@ -177,21 +198,18 @@ export function formatChordsAndLyrics(
     const ids: string[] = [];
     splits.forEach((text, idx) => {
       const newId = idx === 0 ? line.id : nanoid();
-      newLines.push({ id: newId, text, chords: [] as ChordAnchor[] });
+      splitLines.push({ id: newId, text, chords: [] as ChordAnchor[] });
       ids.push(newId);
     });
     lineMapping.set(line.id, ids);
   });
 
-  // 2) Redistribute chord lyricsPlacements across the split lines, then
-  //    auto-layout positions per line.
-  const remappedChords: SectionChord[] = sourceChords.map((sc) => {
+  // 3) Redistribute chord lyricsPlacements across the split lines.
+  const remappedChords: SectionChord[] = reassignedChords.map((sc) => {
     const lp = sc.lyricsPlacement;
     if (!lp) return sc;
     const newIds = lineMapping.get(lp.lineId);
-    if (!newIds || newIds.length === 1) {
-      return sc;
-    }
+    if (!newIds || newIds.length === 1) return sc;
     const original = section.lines.find((l) => l.id === lp.lineId);
     const totalChars = original?.text.length ?? 0;
     const ratio = lp.slotIndex / CHORD_ROW_SLOTS;
@@ -199,7 +217,7 @@ export function formatChordsAndLyrics(
     let acc = 0;
     let target = newIds[newIds.length - 1];
     for (const id of newIds) {
-      const len = newLines.find((l) => l.id === id)?.text.length ?? 0;
+      const len = splitLines.find((l) => l.id === id)?.text.length ?? 0;
       acc += len + 1;
       if (charPos < acc) {
         target = id;
@@ -209,17 +227,78 @@ export function formatChordsAndLyrics(
     return { ...sc, lyricsPlacement: { lineId: target, slotIndex: 0 } };
   });
 
-  const finalChords = autoLayoutChordsPerLine(remappedChords, newLines, slotsPerLine);
+  // 4) Chord-overflow split: for each line, if chord footprint > slotsPerLine,
+  //    synthesize continuation rows and spill chords onto them.
+  const SPACING = 1;
+  const cap = Math.max(1, Math.min(CHORD_ROW_SLOTS, slotsPerLine));
+  const finalLines: LyricLine[] = [];
+  const overflowRetarget = new Map<string, string>(); // chordId -> targetLineId
+  let overflowRowsAdded = 0;
+
+  // Group chords by line in SSOT order.
+  const byLine = new Map<string, SectionChord[]>();
+  remappedChords.forEach((c) => {
+    const lp = c.lyricsPlacement;
+    if (!lp) return;
+    const arr = byLine.get(lp.lineId) ?? [];
+    arr.push(c);
+    byLine.set(lp.lineId, arr);
+  });
+
+  splitLines.forEach((line) => {
+    finalLines.push(line);
+    const lineChords = byLine.get(line.id) ?? [];
+    // Walk chords; once a chord won't fit on the current row (with spacing),
+    // start a new overflow row.
+    let cursor = 0;
+    let currentTargetId = line.id;
+    for (const sc of lineChords) {
+      const w = chordSlotWidth(sc.chord.display);
+      if (cursor + w > cap && cursor !== 0) {
+        // Spawn a new overflow row.
+        const newId = nanoid();
+        finalLines.push({
+          id: newId,
+          text: "",
+          chords: [] as ChordAnchor[],
+          _isChordOverflow: true,
+        });
+        overflowRowsAdded += 1;
+        currentTargetId = newId;
+        cursor = 0;
+      }
+      if (currentTargetId !== line.id) {
+        overflowRetarget.set(sc.id, currentTargetId);
+      }
+      cursor += w + SPACING;
+    }
+  });
+
+  const retargetedChords = remappedChords.map((sc) => {
+    const lp = sc.lyricsPlacement;
+    if (!lp) return sc;
+    const target = overflowRetarget.get(sc.id);
+    if (!target) return sc;
+    return { ...sc, lyricsPlacement: { lineId: target, slotIndex: 0 } };
+  });
+
+  // 5) Final per-line left-pack pass.
+  const finalChords = autoLayoutChordsPerLine(retargetedChords, finalLines, slotsPerLine);
 
   dbg("formatChordsAndLyrics:output", {
-    newLineCount: newLines.length,
+    newLineCount: finalLines.length,
     chordCount: finalChords.length,
     orphansFixed: orphanCount,
+    overflowRowsAdded,
   });
 
   return {
-    ...section,
-    lines: newLines,
-    chords: finalChords,
+    section: {
+      ...section,
+      lines: finalLines,
+      chords: finalChords,
+    },
+    overflowRowsAdded,
+    orphansFixed: orphanCount,
   };
 }
