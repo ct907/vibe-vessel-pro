@@ -10,24 +10,39 @@ import {
   CHORD_ROW_SLOTS,
   type LyricLine,
 } from "@/store/song";
+import { toast } from "sonner";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   sectionId: string;
   lineId: string;
-  /** Initial slot the user tapped on. */
   initialSlot: number;
-  /** If editing an existing chord, its anchor id. */
   initialAnchorId?: string;
   onClose: () => void;
 }
 
+const SLOT_PX = 28;
+
+const dbg = (...args: unknown[]) => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
+      // eslint-disable-next-line no-console
+      console.log("[editor]", ...args);
+    }
+  } catch { /* ignore */ }
+};
+
+/** Width (in slots) the chord display will occupy. Mirrors chordLayout. */
+function chordSlotWidth(display: string): number {
+  return display.length <= 3 ? 1 : 2;
+}
+
 /**
- * Mobile-only full-screen overlay for adding chords to a lyric row.
- * Replaces the bottom sheet picker which fights the mobile keyboard. The user
- * sees the lyric line + chord row clone at the top and the picker at the
- * bottom; tapping a suggestion injects the chord directly into the row.
+ * Mobile full-screen overlay for adding chords to a lyric row. Renders the
+ * full 80-slot chord row in a horizontal scroller so users can see overflow
+ * accumulate; cursor advances by (placedSlot + chordWidth + 1) read directly
+ * from the store after each placement.
  */
 export function FocusedChordEditor({
   sectionId,
@@ -48,17 +63,37 @@ export function FocusedChordEditor({
   const [anchorId, setAnchorId] = useState<string | undefined>(initialAnchorId);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
-  // Keep slot/anchor in sync with the underlying store (e.g. if a chord is
-  // placed, advance to the next slot for fast successive entry).
+  // Mark editor open so the watchdog in LyricsTab pauses reflow until close.
+  useEffect(() => {
+    try { window.localStorage.setItem("LV_EDITOR_OPEN", "1"); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent("lv-editor-open"));
+    return () => {
+      try { window.localStorage.removeItem("LV_EDITOR_OPEN"); } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent("lv-editor-close"));
+    };
+  }, []);
+
   useEffect(() => {
     const lineChords = section ? getLineChordsViaSSOT(section, lineId) : [];
     const initialChord = lineChords.find((c) => c.id === initialAnchorId)?.chord;
     setQuery(initialChord?.display ?? "");
     setTimeout(() => inputRef.current?.focus(), 60);
-    // Only on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-scroll the slot row so the active slot stays visible.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const target = slot * SLOT_PX;
+    const viewLeft = el.scrollLeft;
+    const viewRight = viewLeft + el.clientWidth;
+    if (target < viewLeft + 40 || target > viewRight - 80) {
+      el.scrollTo({ left: Math.max(0, target - el.clientWidth / 2), behavior: "smooth" });
+    }
+  }, [slot]);
 
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
@@ -68,23 +103,52 @@ export function FocusedChordEditor({
     if (anchorId) {
       upsertChordAt(sectionId, lineId, slot, chord, anchorId);
       setAnchorId(undefined);
-      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + 1));
-    } else {
-      placeChordInSlot(sectionId, lineId, slot, chord);
-      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + 1));
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
+      return;
     }
-    setQuery("");
-    setTimeout(() => inputRef.current?.focus(), 30);
+
+    const requestedSlot = slot;
+    placeChordInSlot(sectionId, lineId, requestedSlot, chord);
+
+    // After placement, read the actual slot the store assigned (it may have
+    // shifted siblings, fallen back to nearest spaced slot, or clamped).
+    setTimeout(() => {
+      const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+      if (!fresh) return;
+      const lineChords = getLineChordsViaSSOT(fresh, lineId);
+      // Find the chord we just placed — newest with matching display at/near requestedSlot.
+      const candidates = lineChords
+        .filter((c) => c.chord.display === chord.display)
+        .sort((a, b) => Math.abs((a.slotIndex ?? 0) - requestedSlot) - Math.abs((b.slotIndex ?? 0) - requestedSlot));
+      const placed = candidates[0];
+      const placedSlot = placed?.slotIndex ?? requestedSlot;
+      const w = chordSlotWidth(chord.display);
+      const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
+
+      dbg("chord added", { requested: requestedSlot, placedSlot, nextCursor: next, count: lineChords.length });
+
+      if (placedSlot >= CHORD_ROW_SLOTS - 1) {
+        toast("Chord row is full — close the editor to auto-fit chords across multiple lines.");
+      }
+
+      setSlot(next);
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
+    }, 0);
   };
 
-  if (!line) {
-    // Underlying line was removed — bail out.
-    return null;
-  }
+  if (!line) return null;
+
+  const liveChords = section ? getLineChordsViaSSOT(section, lineId) : [];
+  const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
+  liveChords.forEach((c) => {
+    const s = c.slotIndex;
+    if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* BACKDROP */}
       <button
         type="button"
         aria-label="Close chord editor"
@@ -92,7 +156,6 @@ export function FocusedChordEditor({
         className="absolute inset-0 bg-black/60"
       />
 
-      {/* MODAL CARD */}
       <div className="relative m-4 flex flex-1 flex-col rounded-lg border border-border bg-background shadow-xl overflow-hidden">
         {/* HEADER */}
         <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
@@ -107,7 +170,7 @@ export function FocusedChordEditor({
           </Button>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
-              Slot {slot + 1} {anchorId ? "· editing" : "· adding"}
+              Slot {slot + 1} of {CHORD_ROW_SLOTS} {anchorId ? "· editing" : "· adding"}
             </p>
             <h2 className="text-sm font-semibold text-foreground truncate">
               Add Chords to {sectionLabel}
@@ -118,53 +181,47 @@ export function FocusedChordEditor({
           </Button>
         </div>
 
-        {/* LIVE CLONE of the lyric row + chord row being edited. Read-only:
-            updates as chords are placed. Replaces the previous behavior of
-            visually elevating the underlying row. */}
+        {/* PREVIEW: full 80-slot scrollable chord row + lyric. */}
         <div className="px-3 py-2 border-b border-border shrink-0 bg-muted/30">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-            Preview
+            Preview · scroll horizontally to see full row
           </p>
-          {(() => {
-            const liveChords = section ? getLineChordsViaSSOT(section, lineId) : [];
-            const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-            liveChords.forEach((c) => {
-              const s = c.slotIndex;
-              if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
-            });
-            return (
-              <>
+          <div
+            ref={scrollerRef}
+            className="overflow-x-auto rounded-sm bg-muted-foreground/10"
+            style={{ minHeight: 32 }}
+          >
+            <div
+              className="flex items-stretch"
+              style={{ minWidth: CHORD_ROW_SLOTS * SLOT_PX }}
+            >
+              {slotMap.map((c, i) => (
                 <div
-                  className="flex items-stretch rounded-sm bg-muted-foreground/10 overflow-x-auto"
-                  style={{ minHeight: 32 }}
-                >
-                  {slotMap.map((c, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "shrink-0 h-8 flex items-center justify-center px-0.5",
-                        c ? "min-w-[28px] max-w-[48px] w-fit" : "w-7",
-                        i > 0 && "border-l border-muted-foreground/15",
-                        i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
-                      )}
-                    >
-                      {c && (
-                        <span className="font-mono-chord text-xs font-semibold text-chord-chip-foreground truncate">
-                          {c.chord.display}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
-                  {line.text || (
-                    <span className="italic text-muted-foreground/70">(empty lyric line)</span>
+                  key={i}
+                  className={cn(
+                    "shrink-0 h-8 flex items-center justify-center px-0.5",
+                    "w-7",
+                    i > 0 && "border-l border-muted-foreground/15",
+                    i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
                   )}
-                </p>
-              </>
-            );
-          })()}
+                  style={{ width: SLOT_PX }}
+                >
+                  {c && (
+                    <span className="font-mono-chord text-[11px] font-semibold text-chord-chip-foreground truncate">
+                      {c.chord.display}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
+            {line.text || (
+              <span className="italic text-muted-foreground/70">(empty lyric line)</span>
+            )}
+          </p>
         </div>
+
         <div className="px-3 py-3 border-b border-border shrink-0">
           <Input
             ref={inputRef}
@@ -181,7 +238,6 @@ export function FocusedChordEditor({
           />
         </div>
 
-        {/* SUGGESTION GRID */}
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
           {!query.trim() && (
             <p className="text-sm text-muted-foreground mb-3">
