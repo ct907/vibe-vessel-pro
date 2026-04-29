@@ -190,7 +190,7 @@ export interface SongState {
    * A4: re-split lyric lines to fit the viewport and repack chord positions
    * left-to-right. Pure positional re-layout (no chord identity changes).
    */
-  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string };
+  autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string; overflowRowsAdded?: number; residualOverflow?: number };
   /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
   placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
@@ -1754,11 +1754,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     if (!before) {
       return { changed: false, reason: "not-found" };
     }
-    const next = formatChordsAndLyrics(before, { screenWidth, slotWidth });
-    // Detect no-op: identical line shapes + identical chord placements.
+    const result = formatChordsAndLyrics(before, { screenWidth, slotWidth });
+    const next = result.section;
     const sameLines =
       before.lines.length === next.lines.length &&
-      before.lines.every((l, i) => l.id === next.lines[i].id && l.text === next.lines[i].text);
+      before.lines.every((l, i) => l.id === next.lines[i].id && l.text === next.lines[i].text && !!l._isChordOverflow === !!next.lines[i]._isChordOverflow);
     const samePlacements =
       before.chords.length === next.chords.length &&
       before.chords.every((c, i) => {
@@ -1776,18 +1776,38 @@ export const useSongStore = create<SongState>((rawSet, get) => {
           console.log("[layout] autoLayoutSection no-op", { sectionId });
         }
       } catch { /* ignore */ }
-      return { changed: false, reason: "no-op" };
+      return { changed: false, reason: "no-op", overflowRowsAdded: 0 };
     }
     pushHistory(get);
+    let recomputedOverflow = result.overflowRowsAdded;
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      const recomputed = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
-      const nextSections = s.sections.map((x) => (x.id === sectionId ? recomputed : x));
+      const r2 = formatChordsAndLyrics(sec, { screenWidth, slotWidth });
+      recomputedOverflow = r2.overflowRowsAdded;
+      const nextSections = s.sections.map((x) => (x.id === sectionId ? r2.section : x));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
-    return { changed: true };
+
+    // Safety net: detect residual overflow (chords still beyond capacity).
+    const after = get().sections.find((x) => x.id === sectionId);
+    let residualOverflow = 0;
+    if (after) {
+      const slotsPerLine = Math.max(2, Math.floor(screenWidth / Math.max(20, slotWidth ?? 28)));
+      const byLine = new Map<string, number>();
+      after.chords.forEach((c) => {
+        const lp = c.lyricsPlacement;
+        if (!lp) return;
+        const w = c.chord.display.length <= 3 ? 1 : 2;
+        byLine.set(lp.lineId, (byLine.get(lp.lineId) ?? 0) + w + 1);
+      });
+      byLine.forEach((footprint) => {
+        if (footprint > slotsPerLine + 1) residualOverflow += 1;
+      });
+    }
+
+    return { changed: true, overflowRowsAdded: recomputedOverflow, residualOverflow };
   },
 
   // -------- Slot-based chord row (SSOT-first) --------
