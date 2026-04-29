@@ -959,8 +959,31 @@ function SectionCard({
           >
             {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
-        )}
-      </div>
+      )}
+
+      <Dialog open={orientationOpen} onOpenChange={setOrientationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Screen size changed</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Your viewport changed significantly. Auto-layout was not applied to avoid disturbing your chord placements.
+            For the best printable result at this width, consider exporting your lyrics.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrientationOpen(false)}>Keep current layout</Button>
+            <Button
+              onClick={() => {
+                setOrientationOpen(false);
+                sections.forEach((s) => autoLayoutSection(s.id, window.innerWidth, 28));
+              }}
+            >
+              Re-fit all sections
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
 
       {/* Body */}
       {!section.collapsed && (
