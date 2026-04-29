@@ -31,6 +31,12 @@ export interface LyricLine {
   chords: ChordAnchor[];
   /** Legacy: number of cursor cells in the chord row. Unused by the new word-anchored renderer. */
   chordRowLen?: number;
+  /**
+   * Auto-layout: when true, this line was synthesized by the chord-overflow
+   * pass to host chords that didn't fit on the parent lyric line at the
+   * current viewport. Renderers may show a subtle indicator. Persisted.
+   */
+  _isChordOverflow?: boolean;
 }
 
 export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
