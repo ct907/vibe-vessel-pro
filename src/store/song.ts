@@ -1812,6 +1812,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
   // -------- Slot-based chord row (SSOT-first) --------
   placeChordInSlot: (sectionId, lineId, slotIndex, chord) => {
+    const __dbg = (() => {
+      try {
+        return typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1";
+      } catch { return false; }
+    })();
     pushHistory(get);
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
