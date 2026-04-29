@@ -109,19 +109,16 @@ export function FocusedChordEditor({
     }
 
     const requestedSlot = slot;
+    const beforeIds = new Set(
+      (useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords ?? []).map((c) => c.id),
+    );
     placeChordInSlot(sectionId, lineId, requestedSlot, chord);
 
-    // After placement, read the actual slot the store assigned (it may have
-    // shifted siblings, fallen back to nearest spaced slot, or clamped).
     setTimeout(() => {
       const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
       if (!fresh) return;
       const lineChords = getLineChordsViaSSOT(fresh, lineId);
-      // Find the chord we just placed — newest with matching display at/near requestedSlot.
-      const candidates = lineChords
-        .filter((c) => c.chord.display === chord.display)
-        .sort((a, b) => Math.abs((a.slotIndex ?? 0) - requestedSlot) - Math.abs((b.slotIndex ?? 0) - requestedSlot));
-      const placed = candidates[0];
+      const placed = lineChords.find((c) => !beforeIds.has(c.id));
       const placedSlot = placed?.slotIndex ?? requestedSlot;
       const w = chordSlotWidth(chord.display);
       const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
