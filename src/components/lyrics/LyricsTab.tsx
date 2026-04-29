@@ -1409,22 +1409,58 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   return (
     <div className="space-y-4">
       {sections.map((sec, i) => (
-        <SectionCard
-          key={sec.id}
-          section={sec}
-          index={i}
-          total={sections.length}
-          displayName={getSectionDisplayName(sections, sec.id)}
-          activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
-          onPickerOpen={openPicker}
-          onPickerClose={() => setPicker(null)}
-          isAnyDragging={isAnyDragging}
-          draggingIds={draggingIds}
-          selection={selection}
-          sortMode={sortMode}
-          onMoveSection={(id, direction) => moveSection(id, direction)}
-        />
+        <div key={sec.id} className="space-y-2">
+          <SectionCard
+            section={sec}
+            index={i}
+            total={sections.length}
+            displayName={getSectionDisplayName(sections, sec.id)}
+            activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
+            onPickerOpen={openPicker}
+            onPickerClose={() => setPicker(null)}
+            isAnyDragging={isAnyDragging}
+            draggingIds={draggingIds}
+            selection={selection}
+            sortMode={sortMode}
+            onMoveSection={(id, direction) => moveSection(id, direction)}
+          />
+          {overflowToastFor[sec.id] ? (
+            <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+              <Wand2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium">Auto-fit added {overflowToastFor[sec.id]} chord row{overflowToastFor[sec.id] === 1 ? "" : "s"}</p>
+                <p className="text-muted-foreground">Chords overflowed your screen width and were spilled onto continuation rows.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => setOverflowToastFor((p) => { const n = { ...p }; delete n[sec.id]; return n; })}
+              >
+                Dismiss
+              </Button>
+            </div>
+          ) : null}
+          {residualOverflowFor[sec.id] ? (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground">
+              <X className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">Some chords still don't fit</p>
+                <p className="text-muted-foreground">Try removing or shortening chords, or rotate to landscape.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => setResidualOverflowFor((p) => { const n = { ...p }; delete n[sec.id]; return n; })}
+              >
+                Dismiss
+              </Button>
+            </div>
+          ) : null}
+        </div>
       ))}
+
 
       <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
         <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
