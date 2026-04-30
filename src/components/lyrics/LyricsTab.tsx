@@ -1254,6 +1254,42 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
+  // Issue #1: when a song is loaded that was last edited at a noticeably
+  // different screen width, auto-format every section for the current width
+  // and surface a friendly toast explaining what happened.
+  useEffect(() => {
+    type LayoutMeta = { lastEditedScreenWidth: number; lastEditedDevice: string; lastEditedAt: number };
+    const apply = (meta: LayoutMeta) => {
+      const currentWidth = window.innerWidth;
+      const savedWidth = meta.lastEditedScreenWidth;
+      if (!savedWidth) return;
+      const widthDiff = Math.abs(currentWidth - savedWidth);
+      if (widthDiff <= 100) return;
+      const sectionIds = useSongStore.getState().sections.map((s) => s.id);
+      sectionIds.forEach((id) => autoLayoutSection(id, currentWidth, 28));
+      const isSmaller = currentWidth < savedWidth;
+      const device = meta.lastEditedDevice || "another device";
+      toast.info(
+        `Formatted for ${isSmaller ? "smaller" : "larger"} screen — last edited on ${device} (${savedWidth}px). Everything was adjusted to fit.`,
+        { duration: 6000, icon: <Sparkles className="w-4 h-4" /> },
+      );
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cached = (window as any).__lvLastLayoutMeta as LayoutMeta | undefined;
+    if (cached) {
+      apply(cached);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__lvLastLayoutMeta = undefined;
+    }
+    const onLoaded = (e: Event) => {
+      const meta = (e as CustomEvent).detail?.layoutMeta as LayoutMeta | undefined;
+      if (meta) apply(meta);
+    };
+    window.addEventListener("lv-song-loaded", onLoaded);
+    return () => window.removeEventListener("lv-song-loaded", onLoaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
