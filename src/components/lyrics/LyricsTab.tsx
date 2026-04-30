@@ -65,6 +65,7 @@ import {
   Scissors,
   X,
   Wand2,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
