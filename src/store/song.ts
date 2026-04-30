@@ -2990,6 +2990,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
+    // Surface layout metadata so the UI can offer a friendly auto-format
+    // toast when the device width has changed since last save.
+    if (parsed.layoutMeta && typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new CustomEvent("lv-song-loaded", { detail: { layoutMeta: parsed.layoutMeta } }));
+      } catch { /* ignore */ }
+    }
   },
   toJSON: () => {
     const s = get();
