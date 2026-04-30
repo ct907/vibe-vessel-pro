@@ -65,6 +65,7 @@ import {
   Scissors,
   X,
   Wand2,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -73,6 +74,7 @@ import { useDndSelection } from "@/hooks/use-dnd-selection";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUIStore } from "@/store/ui";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
 // shape as before so OS-clipboard chord parsing still works the same way.
@@ -1145,16 +1147,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // Auto-layout watchdog: when a section's chord count grows, debounce a
   // viewport-aware reflow so the user sees them spread out cleanly.
-  // Fix B: pause while the FocusedChordEditor is open. The editor sets a
-  // localStorage flag + dispatches `lv-editor-open`/`lv-editor-close`
-  // window events; while open we collect "grown" sections without firing,
-  // and flush exactly once on close.
+  // Fix B (Issue #2): pause while the FocusedChordEditor is open via the
+  // shared UI store. We collect "grown" sections without firing, and flush
+  // exactly once when the editor closes.
   const prevCountsRef = useRef<Record<string, number> | null>(null);
-  const editorOpenRef = useRef(false);
   const pendingGrownRef = useRef<Set<string>>(new Set());
   const [overflowToastFor, setOverflowToastFor] = useState<Record<string, number>>({});
   const [residualOverflowFor, setResidualOverflowFor] = useState<Record<string, boolean>>({});
   const [orientationOpen, setOrientationOpen] = useState(false);
+  const editorOpen = useUIStore((s) => s.focusedEditorOpen);
+  const wasEditorOpenRef = useRef(false);
 
   const dbgLog = (...args: unknown[]) => {
     try {
@@ -1186,27 +1188,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
   };
 
-  // Listen for editor open/close to gate the watchdog.
+  // Flush pending reflows the moment the editor closes.
   useEffect(() => {
-    const onOpen = () => {
-      editorOpenRef.current = true;
-      dbgLog("editor open — pausing");
-    };
-    const onClose = () => {
-      editorOpenRef.current = false;
+    if (wasEditorOpenRef.current && !editorOpen) {
       const ids = Array.from(pendingGrownRef.current);
       pendingGrownRef.current.clear();
-      dbgLog("editor close — flushing", ids);
-      if (ids.length) runReflow(ids);
-    };
-    window.addEventListener("lv-editor-open", onOpen);
-    window.addEventListener("lv-editor-close", onClose);
-    return () => {
-      window.removeEventListener("lv-editor-open", onOpen);
-      window.removeEventListener("lv-editor-close", onClose);
-    };
+      dbgLog("editor closed — flushing", ids);
+      if (ids.length) {
+        const handle = window.setTimeout(() => runReflow(ids), 350);
+        wasEditorOpenRef.current = editorOpen;
+        return () => window.clearTimeout(handle);
+      }
+    }
+    wasEditorOpenRef.current = editorOpen;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLayoutSection]);
+  }, [editorOpen]);
 
   useEffect(() => {
     if (prevCountsRef.current === null) {
@@ -1224,7 +1220,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       counts[sec.id] = sec.chords.length;
     });
     if (!grown.length) return;
-    if (editorOpenRef.current) {
+    if (editorOpen) {
       grown.forEach((id) => pendingGrownRef.current.add(id));
       dbgLog("editor open — queued", grown);
       return;
@@ -1235,24 +1231,63 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }, 350);
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, autoLayoutSection]);
+  }, [sections, autoLayoutSection, editorOpen]);
 
-  // Orientation change: don't auto-reflow destructively. Suggest export.
+  // Orientation change (mobile only): suggest export instead of auto-reflow.
+  // Desktop window resizes across the portrait/landscape boundary should NOT
+  // open the modal — gate by touch-device detection.
   useEffect(() => {
-    let lastWidth = window.innerWidth;
-    const onResize = () => {
-      const w = window.innerWidth;
-      // Significant width change (e.g., rotation): prompt user instead of
-      // running auto-layout that could disturb their hand-tuned chord rows.
-      if (Math.abs(w - lastWidth) > 200) {
-        lastWidth = w;
-        setOrientationOpen(true);
-      } else {
-        lastWidth = w;
+    const isMobileDevice = () =>
+      "ontouchstart" in window ||
+      (navigator.maxTouchPoints ?? 0) > 0 ||
+      window.matchMedia("(pointer: coarse)").matches;
+    const mq = window.matchMedia("(orientation: portrait)");
+    const onChange = () => {
+      if (!isMobileDevice()) {
+        dbgLog("orientation changed but not a mobile device — skipping modal");
+        return;
       }
+      setOrientationOpen(true);
     };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // Modern browsers
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  // Issue #1: when a song is loaded that was last edited at a noticeably
+  // different screen width, auto-format every section for the current width
+  // and surface a friendly toast explaining what happened.
+  useEffect(() => {
+    type LayoutMeta = { lastEditedScreenWidth: number; lastEditedDevice: string; lastEditedAt: number };
+    const apply = (meta: LayoutMeta) => {
+      const currentWidth = window.innerWidth;
+      const savedWidth = meta.lastEditedScreenWidth;
+      if (!savedWidth) return;
+      const widthDiff = Math.abs(currentWidth - savedWidth);
+      if (widthDiff <= 100) return;
+      const sectionIds = useSongStore.getState().sections.map((s) => s.id);
+      sectionIds.forEach((id) => autoLayoutSection(id, currentWidth, 28));
+      const isSmaller = currentWidth < savedWidth;
+      const device = meta.lastEditedDevice || "another device";
+      toast.info(
+        `Formatted for ${isSmaller ? "smaller" : "larger"} screen — last edited on ${device} (${savedWidth}px). Everything was adjusted to fit.`,
+        { duration: 6000, icon: <Sparkles className="w-4 h-4" /> },
+      );
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cached = (window as any).__lvLastLayoutMeta as LayoutMeta | undefined;
+    if (cached) {
+      apply(cached);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__lvLastLayoutMeta = undefined;
+    }
+    const onLoaded = (e: Event) => {
+      const meta = (e as CustomEvent).detail?.layoutMeta as LayoutMeta | undefined;
+      if (meta) apply(meta);
+    };
+    window.addEventListener("lv-song-loaded", onLoaded);
+    return () => window.removeEventListener("lv-song-loaded", onLoaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

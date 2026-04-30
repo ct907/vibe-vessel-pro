@@ -191,8 +191,8 @@ export interface SongState {
    * left-to-right. Pure positional re-layout (no chord identity changes).
    */
   autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string; overflowRowsAdded?: number; residualOverflow?: number };
-  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
-  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
+  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. Returns the actual placement (or null if dropped). */
+  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => { id: string; lineId: string; slotIndex: number } | null;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
   moveChordToSlot: (sectionId: string, lineId: string, anchorId: string, slotIndex: number) => void;
   /** Move a set of anchors to a different row, starting at dropSlot, pushing collisions right. */
@@ -257,6 +257,18 @@ export interface SerializedSong {
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
+  /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
+  layoutMeta?: {
+    lastEditedScreenWidth: number;
+    lastEditedDevice: "mobile" | "tablet" | "desktop";
+    lastEditedAt: number;
+  };
+}
+
+export function getDeviceTypeForWidth(width: number): "mobile" | "tablet" | "desktop" {
+  if (width < 640) return "mobile";
+  if (width < 1024) return "tablet";
+  return "desktop";
 }
 
 // ---------- Factories ----------
@@ -1818,24 +1830,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       } catch { return false; }
     })();
     pushHistory(get);
+    let result: { id: string; lineId: string; slotIndex: number } | null = null;
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      // Auto-reflow placement: target the requested slot. If it collides with
-      // an existing chord OR violates the 1-slot spacing rule with its
-      // immediate neighbors, shift every chord at-or-after the desired slot
-      // by +2 to open a properly-spaced gap, then place at `target`.
       const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
       const lineChords = sec.chords
         .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
         .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
       const occupied = new Set<number>(lineChords.map((sc) => sc.lyricsPlacement!.slotIndex));
-      // Reflow rules:
-      //  - Rule 1: every chord must have an empty slot to its right.
-      //  - Rule 2: otherwise, chords can be placed freely on any empty slot.
-      //  - Rule 3: auto-reflow (shift later chords by +2) ONLY when dropped
-      //    on the spacing slot directly BETWEEN two existing chords, OR when
-      //    the target slot itself is already occupied.
       const occupiedHere = occupied.has(target);
       const sandwiched = occupied.has(target - 1) && occupied.has(target + 1);
       const needsReflow = occupiedHere || sandwiched;
@@ -1843,13 +1846,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       let nextSectionsBase = s.sections;
       let placeSlot = target;
       if (needsReflow) {
-        // Shift everything at-or-after target by +2 (clamped). If the tail
-        // would overflow CHORD_ROW_SLOTS we silently drop — row genuinely full.
         const shifted = lineChords
           .filter((sc) => sc.lyricsPlacement!.slotIndex >= target)
           .map((sc) => ({ id: sc.id, to: sc.lyricsPlacement!.slotIndex + 2 }));
         if (shifted.some((x) => x.to >= CHORD_ROW_SLOTS)) {
-          // Fallback: try a non-shifting spaced slot rather than losing chord.
           const fallback = nearestSpacedFreeSlot(occupied, target);
           if (fallback < 0) return {};
           placeSlot = fallback;
@@ -1883,6 +1883,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const nextSections = nextSectionsBase.map((x) =>
         x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
       );
+      result = { id: newId, lineId, slotIndex: placeSlot };
       if (__dbg) {
         // eslint-disable-next-line no-console
         console.log("[layout] placeChordInSlot", {
@@ -1897,6 +1898,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         [SSOT_MODE]: true,
       } as any);
     });
+    return result;
   },
 
   moveChordToSlot: (sectionId, lineId, anchorId, slotIndex) => {
@@ -2988,16 +2990,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
+    // Surface layout metadata so the UI can offer a friendly auto-format
+    // toast when the device width has changed since last save.
+    if (parsed.layoutMeta && typeof window !== "undefined") {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__lvLastLayoutMeta = parsed.layoutMeta;
+        window.dispatchEvent(new CustomEvent("lv-song-loaded", { detail: { layoutMeta: parsed.layoutMeta } }));
+      } catch { /* ignore */ }
+    }
   },
   toJSON: () => {
     const s = get();
+    // Strip transient overflow continuation rows: they are device-specific
+    // and should be regenerated by autoLayoutSection on load if needed.
+    const cleanedSections: Section[] = s.sections.map((sec) => ({
+      ...sec,
+      lines: sec.lines.filter((l) => !l._isChordOverflow),
+    }));
+    const width = typeof window !== "undefined" ? window.innerWidth : 0;
     return {
       version: 3,
       meta: s.meta,
-      sections: s.sections,
+      sections: cleanedSections,
       progression: s.progression,
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
       sound: useSoundStore.getState().toJSON(),
+      layoutMeta: width > 0 ? {
+        lastEditedScreenWidth: width,
+        lastEditedDevice: getDeviceTypeForWidth(width),
+        lastEditedAt: Date.now(),
+      } : undefined,
     };
   },
   };
