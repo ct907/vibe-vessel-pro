@@ -113,30 +113,20 @@ export function FocusedChordEditor({
     }
 
     const requestedSlot = slot;
-    const beforeIds = new Set(
-      (useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords ?? []).map((c) => c.id),
-    );
-    placeChordInSlot(sectionId, lineId, requestedSlot, chord);
+    const placed = placeChordInSlot(sectionId, lineId, requestedSlot, chord);
+    const placedSlot = placed?.slotIndex ?? requestedSlot;
+    const w = chordSlotWidth(chord.display);
+    const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
 
-    setTimeout(() => {
-      const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
-      if (!fresh) return;
-      const lineChords = getLineChordsViaSSOT(fresh, lineId);
-      const placed = lineChords.find((c) => !beforeIds.has(c.id));
-      const placedSlot = placed?.slotIndex ?? requestedSlot;
-      const w = chordSlotWidth(chord.display);
-      const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
+    dbg("chord added", { requested: requestedSlot, placedSlot, nextCursor: next });
 
-      dbg("chord added", { requested: requestedSlot, placedSlot, nextCursor: next, count: lineChords.length });
+    if (placedSlot >= CHORD_ROW_SLOTS - 1) {
+      toast("Chord row is full — close the editor to auto-fit chords across multiple lines.");
+    }
 
-      if (placedSlot >= CHORD_ROW_SLOTS - 1) {
-        toast("Chord row is full — close the editor to auto-fit chords across multiple lines.");
-      }
-
-      setSlot(next);
-      setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 30);
-    }, 0);
+    setSlot(next);
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
   };
 
   if (!line) return null;
