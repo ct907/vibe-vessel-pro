@@ -1818,24 +1818,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       } catch { return false; }
     })();
     pushHistory(get);
+    let result: { id: string; lineId: string; slotIndex: number } | null = null;
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      // Auto-reflow placement: target the requested slot. If it collides with
-      // an existing chord OR violates the 1-slot spacing rule with its
-      // immediate neighbors, shift every chord at-or-after the desired slot
-      // by +2 to open a properly-spaced gap, then place at `target`.
       const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slotIndex));
       const lineChords = sec.chords
         .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
         .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
       const occupied = new Set<number>(lineChords.map((sc) => sc.lyricsPlacement!.slotIndex));
-      // Reflow rules:
-      //  - Rule 1: every chord must have an empty slot to its right.
-      //  - Rule 2: otherwise, chords can be placed freely on any empty slot.
-      //  - Rule 3: auto-reflow (shift later chords by +2) ONLY when dropped
-      //    on the spacing slot directly BETWEEN two existing chords, OR when
-      //    the target slot itself is already occupied.
       const occupiedHere = occupied.has(target);
       const sandwiched = occupied.has(target - 1) && occupied.has(target + 1);
       const needsReflow = occupiedHere || sandwiched;
@@ -1843,13 +1834,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       let nextSectionsBase = s.sections;
       let placeSlot = target;
       if (needsReflow) {
-        // Shift everything at-or-after target by +2 (clamped). If the tail
-        // would overflow CHORD_ROW_SLOTS we silently drop — row genuinely full.
         const shifted = lineChords
           .filter((sc) => sc.lyricsPlacement!.slotIndex >= target)
           .map((sc) => ({ id: sc.id, to: sc.lyricsPlacement!.slotIndex + 2 }));
         if (shifted.some((x) => x.to >= CHORD_ROW_SLOTS)) {
-          // Fallback: try a non-shifting spaced slot rather than losing chord.
           const fallback = nearestSpacedFreeSlot(occupied, target);
           if (fallback < 0) return {};
           placeSlot = fallback;
@@ -1883,6 +1871,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const nextSections = nextSectionsBase.map((x) =>
         x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
       );
+      result = { id: newId, lineId, slotIndex: placeSlot };
       if (__dbg) {
         // eslint-disable-next-line no-console
         console.log("[layout] placeChordInSlot", {
@@ -1897,6 +1886,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         [SSOT_MODE]: true,
       } as any);
     });
+    return result;
   },
 
   moveChordToSlot: (sectionId, lineId, anchorId, slotIndex) => {
