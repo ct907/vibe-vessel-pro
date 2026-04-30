@@ -10,6 +10,7 @@ import {
   CHORD_ROW_SLOTS,
   type LyricLine,
 } from "@/store/song";
+import { useUIStore } from "@/store/ui";
 import { toast } from "sonner";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
