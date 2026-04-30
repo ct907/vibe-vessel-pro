@@ -137,17 +137,12 @@ export function formatChordsAndLyrics(
   config: LayoutConfig,
 ): { section: Section; overflowRowsAdded: number; orphansFixed: number } {
   const slotWidth = Math.max(20, config.slotWidth ?? 28);
-  // Reserve ~20% of the viewport for the right-edge chord-row controls
-  // (e.g. the pencil edit button) so the last chord is never crammed
-  // beneath them. Lyric character wrapping uses the full width.
-  const usableWidth = config.screenWidth * 0.8;
   const charsPerLine = Math.max(8, Math.floor(config.screenWidth / CHAR_WIDTH_PX));
-  const slotsPerLine = Math.max(2, Math.floor(usableWidth / slotWidth));
+  const slotsPerLine = Math.max(2, Math.floor(config.screenWidth / slotWidth));
 
   dbg("formatChordsAndLyrics:input", {
     sectionId: section.id,
     screenWidth: config.screenWidth,
-    usableWidth,
     slotWidth,
     charsPerLine,
     slotsPerLine,

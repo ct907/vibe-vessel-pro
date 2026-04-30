@@ -889,6 +889,18 @@ function SectionCard({
                   <Pencil className="h-4 w-4" /> Rename…
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem
+                onClick={() => {
+                  const res = autoLayoutSection(section.id, window.innerWidth, 28);
+                  if (res?.changed) {
+                    toast.success("Chords & lyrics formatted to fit your screen");
+                  } else {
+                    toast("Already laid out for this screen width");
+                  }
+                }}
+              >
+                <Wand2 className="h-4 w-4" /> Format chords & lyrics
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>

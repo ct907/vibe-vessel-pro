@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChordSymbol } from "@/lib/music/chords";
 import { holdChord, playChord } from "@/lib/music/audio";
-import { getChordChipClasses } from "@/lib/music/chordColor";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -133,7 +132,7 @@ export function ChordChip({
       ? "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60"
       : variant === "filled"
         ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
-        : getChordChipClasses(chord);
+        : "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60";
 
   return (
     <button

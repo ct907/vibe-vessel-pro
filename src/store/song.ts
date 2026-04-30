@@ -1806,8 +1806,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const after = get().sections.find((x) => x.id === sectionId);
     let residualOverflow = 0;
     if (after) {
-      // 80% usable-width rule (matches formatChordsAndLyrics).
-      const slotsPerLine = Math.max(2, Math.floor((screenWidth * 0.8) / Math.max(20, slotWidth ?? 28)));
+      const slotsPerLine = Math.max(2, Math.floor(screenWidth / Math.max(20, slotWidth ?? 28)));
       const byLine = new Map<string, number>();
       after.chords.forEach((c) => {
         const lp = c.lyricsPlacement;
