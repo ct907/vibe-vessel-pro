@@ -191,8 +191,8 @@ export interface SongState {
    * left-to-right. Pure positional re-layout (no chord identity changes).
    */
   autoLayoutSection: (sectionId: string, screenWidth: number, slotWidth?: number) => { changed: boolean; reason?: string; overflowRowsAdded?: number; residualOverflow?: number };
-  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. */
-  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => void;
+  /** Place a new chord into a specific slot. If occupied, walk right (then left) to nearest free slot. Returns the actual placement (or null if dropped). */
+  placeChordInSlot: (sectionId: string, lineId: string, slotIndex: number, chord: ChordSymbol) => { id: string; lineId: string; slotIndex: number } | null;
   /** Move an existing anchor to a slot in the same row. Swap with occupant if any. */
   moveChordToSlot: (sectionId: string, lineId: string, anchorId: string, slotIndex: number) => void;
   /** Move a set of anchors to a different row, starting at dropSlot, pushing collisions right. */
