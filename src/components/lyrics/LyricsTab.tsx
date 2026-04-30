@@ -1146,16 +1146,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // Auto-layout watchdog: when a section's chord count grows, debounce a
   // viewport-aware reflow so the user sees them spread out cleanly.
-  // Fix B: pause while the FocusedChordEditor is open. The editor sets a
-  // localStorage flag + dispatches `lv-editor-open`/`lv-editor-close`
-  // window events; while open we collect "grown" sections without firing,
-  // and flush exactly once on close.
+  // Fix B (Issue #2): pause while the FocusedChordEditor is open via the
+  // shared UI store. We collect "grown" sections without firing, and flush
+  // exactly once when the editor closes.
   const prevCountsRef = useRef<Record<string, number> | null>(null);
-  const editorOpenRef = useRef(false);
   const pendingGrownRef = useRef<Set<string>>(new Set());
   const [overflowToastFor, setOverflowToastFor] = useState<Record<string, number>>({});
   const [residualOverflowFor, setResidualOverflowFor] = useState<Record<string, boolean>>({});
   const [orientationOpen, setOrientationOpen] = useState(false);
+  const editorOpen = useUIStore((s) => s.focusedEditorOpen);
+  const wasEditorOpenRef = useRef(false);
 
   const dbgLog = (...args: unknown[]) => {
     try {
@@ -1187,27 +1187,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
   };
 
-  // Listen for editor open/close to gate the watchdog.
+  // Flush pending reflows the moment the editor closes.
   useEffect(() => {
-    const onOpen = () => {
-      editorOpenRef.current = true;
-      dbgLog("editor open — pausing");
-    };
-    const onClose = () => {
-      editorOpenRef.current = false;
+    if (wasEditorOpenRef.current && !editorOpen) {
       const ids = Array.from(pendingGrownRef.current);
       pendingGrownRef.current.clear();
-      dbgLog("editor close — flushing", ids);
-      if (ids.length) runReflow(ids);
-    };
-    window.addEventListener("lv-editor-open", onOpen);
-    window.addEventListener("lv-editor-close", onClose);
-    return () => {
-      window.removeEventListener("lv-editor-open", onOpen);
-      window.removeEventListener("lv-editor-close", onClose);
-    };
+      dbgLog("editor closed — flushing", ids);
+      if (ids.length) {
+        const handle = window.setTimeout(() => runReflow(ids), 350);
+        wasEditorOpenRef.current = editorOpen;
+        return () => window.clearTimeout(handle);
+      }
+    }
+    wasEditorOpenRef.current = editorOpen;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLayoutSection]);
+  }, [editorOpen]);
 
   useEffect(() => {
     if (prevCountsRef.current === null) {
@@ -1225,7 +1219,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       counts[sec.id] = sec.chords.length;
     });
     if (!grown.length) return;
-    if (editorOpenRef.current) {
+    if (editorOpen) {
       grown.forEach((id) => pendingGrownRef.current.add(id));
       dbgLog("editor open — queued", grown);
       return;
@@ -1236,7 +1230,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }, 350);
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, autoLayoutSection]);
+  }, [sections, autoLayoutSection, editorOpen]);
 
   // Orientation change: don't auto-reflow destructively. Suggest export.
   useEffect(() => {
