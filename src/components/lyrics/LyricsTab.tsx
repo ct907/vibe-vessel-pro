@@ -1232,22 +1232,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, autoLayoutSection, editorOpen]);
 
-  // Orientation change: don't auto-reflow destructively. Suggest export.
+  // Orientation change (mobile only): suggest export instead of auto-reflow.
+  // Desktop window resizes across the portrait/landscape boundary should NOT
+  // open the modal — gate by touch-device detection.
   useEffect(() => {
-    let lastWidth = window.innerWidth;
-    const onResize = () => {
-      const w = window.innerWidth;
-      // Significant width change (e.g., rotation): prompt user instead of
-      // running auto-layout that could disturb their hand-tuned chord rows.
-      if (Math.abs(w - lastWidth) > 200) {
-        lastWidth = w;
-        setOrientationOpen(true);
-      } else {
-        lastWidth = w;
+    const isMobileDevice = () =>
+      "ontouchstart" in window ||
+      (navigator.maxTouchPoints ?? 0) > 0 ||
+      window.matchMedia("(pointer: coarse)").matches;
+    const mq = window.matchMedia("(orientation: portrait)");
+    const onChange = () => {
+      if (!isMobileDevice()) {
+        dbgLog("orientation changed but not a mobile device — skipping modal");
+        return;
       }
+      setOrientationOpen(true);
     };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // Modern browsers
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
 
