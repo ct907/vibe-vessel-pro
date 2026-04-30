@@ -257,6 +257,18 @@ export interface SerializedSong {
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
+  /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
+  layoutMeta?: {
+    lastEditedScreenWidth: number;
+    lastEditedDevice: "mobile" | "tablet" | "desktop";
+    lastEditedAt: number;
+  };
+}
+
+export function getDeviceTypeForWidth(width: number): "mobile" | "tablet" | "desktop" {
+  if (width < 640) return "mobile";
+  if (width < 1024) return "tablet";
+  return "desktop";
 }
 
 // ---------- Factories ----------
