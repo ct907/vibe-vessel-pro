@@ -73,6 +73,7 @@ import { useDndSelection } from "@/hooks/use-dnd-selection";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUIStore } from "@/store/ui";
 
 // Module-scoped chord clipboard (cut/copy/paste across rows). We keep the same
 // shape as before so OS-clipboard chord parsing still works the same way.
