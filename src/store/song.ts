@@ -2994,6 +2994,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // toast when the device width has changed since last save.
     if (parsed.layoutMeta && typeof window !== "undefined") {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__lvLastLayoutMeta = parsed.layoutMeta;
         window.dispatchEvent(new CustomEvent("lv-song-loaded", { detail: { layoutMeta: parsed.layoutMeta } }));
       } catch { /* ignore */ }
     }
