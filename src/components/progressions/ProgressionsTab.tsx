@@ -437,8 +437,8 @@ function PatternBlock({
                                     onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
-                                    "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                                    isSel && "ring-2 ring-primary",
+                                    "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all",
+                                    isSel && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
                                   style={{
