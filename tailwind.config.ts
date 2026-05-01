@@ -4,6 +4,18 @@ export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
+  // Phase 1.5: chord color taxonomy uses dynamic Tailwind classes resolved at
+  // runtime via getChordColorClasses(). Safelist them so the production purge
+  // doesn't drop them.
+  safelist: [
+    "bg-yellow-700", "bg-yellow-300",
+    "bg-blue-800", "bg-blue-300",
+    "bg-pink-300",
+    "bg-gradient-to-r",
+    "text-stone-50", "text-zinc-900",
+    { pattern: /^from-(yellow|red|blue|purple|orange|pink)-(300|400|600|700|800|900|950)$/ },
+    { pattern: /^to-(yellow|red|blue|purple|orange|pink)-(300|400|600|700|800|900|950)$/ },
+  ],
   theme: {
     container: {
       center: true,
