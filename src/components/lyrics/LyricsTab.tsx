@@ -1268,6 +1268,34 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
+  // Phase 1.5: desktop window resize → debounced auto-reflow.
+  // Mobile devices use the orientation modal instead (above) so we don't
+  // double-fire and so the user's manual chord arrangement is preserved
+  // during a phone rotation.
+  useEffect(() => {
+    const isMobileDevice =
+      "ontouchstart" in window ||
+      (navigator.maxTouchPoints ?? 0) > 0 ||
+      window.matchMedia("(pointer: coarse)").matches;
+    if (isMobileDevice) return;
+    let t: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const w = window.innerWidth;
+        useSongStore.getState().sections.forEach((sec) => {
+          autoLayoutSection(sec.id, w, 28);
+        });
+        dbgLog("desktop resize reflow", { w });
+      }, 500);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(t);
+    };
+  }, [autoLayoutSection]);
+
   // Issue #1: when a song is loaded that was last edited at a noticeably
   // different screen width, auto-format every section for the current width
   // and surface a friendly toast explaining what happened.
