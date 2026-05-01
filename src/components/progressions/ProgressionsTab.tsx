@@ -455,7 +455,7 @@ function PatternBlock({
                                   <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
                                     {c.chord.display}
                                   </span>
-                                  <span className="font-mono-chord text-[10px] text-chord-chip-foreground/70 leading-tight">
+                                  <span className="font-mono-chord text-[10px] opacity-70 leading-tight">
                                     {formatBeats(c.lengthBeats)}b
                                   </span>
                                 </button>
