@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
+import { getChordColorClasses } from "@/lib/music/chordColor";
 import { cn } from "@/lib/utils";
 import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
 import {
@@ -417,10 +418,11 @@ function PatternBlock({
                         data-pattern-slot={slotIdx}
                       >
                         {occupied && c && (
-                          <Draggable draggableId={c.id} index={0}>
+                          <Draggable draggableId={c.id} index={0} isDragDisabled={selectMode}>
                             {(dragProvided, dragSnapshot) => {
                               if (dragSnapshot.isDragging) { justDraggedAtRef.current = Date.now(); }
                               const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
+                              const colors = getChordColorClasses(c.chord);
                               return (
                                 <button
                                   type="button"
@@ -437,7 +439,10 @@ function PatternBlock({
                                     onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
-                                    "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all",
+                                    "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all hover:opacity-90",
+                                    colors.bg,
+                                    colors.text,
+                                    selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
                                     isSel && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
