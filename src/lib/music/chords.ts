@@ -395,6 +395,41 @@ export const COMMON_QUALITIES: Quality[] = [
   "5",
 ];
 
+/** Family grouping for picker grids and chord-browse legends. */
+export type ChordFamily =
+  | "major" | "minor" | "dominant" | "altered" | "diminished" | "special" | "neutral";
+
+export const CHORD_FAMILY_LABEL: Record<ChordFamily, string> = {
+  major: "Major",
+  minor: "Minor",
+  dominant: "Dominant",
+  altered: "Altered Dominant",
+  diminished: "Diminished",
+  special: "Suspended / Augmented",
+  neutral: "Power",
+};
+
+export const QUALITY_FAMILY: Record<Quality, ChordFamily> = {
+  maj: "major", maj7: "major", maj9: "major", maj11: "major", maj13: "major",
+  "6": "major", "6/9": "major", add9: "major", add11: "major",
+  min: "minor", min7: "minor", min9: "minor", min11: "minor", min13: "minor",
+  min6: "minor", minMaj7: "minor",
+  "7": "dominant", "9": "dominant",
+  "7alt": "altered", "7#5": "altered", "7b9": "altered", "7#9": "altered",
+  dim: "diminished", dim7: "diminished", m7b5: "diminished",
+  sus2: "special", sus4: "special", aug: "special",
+  "5": "neutral",
+};
+
+/** COMMON_QUALITIES grouped by family, preserving family order. */
+export function commonQualitiesByFamily(): Array<{ family: ChordFamily; qualities: Quality[] }> {
+  const order: ChordFamily[] = ["major", "minor", "dominant", "altered", "diminished", "special", "neutral"];
+  return order.map((family) => ({
+    family,
+    qualities: COMMON_QUALITIES.filter((q) => QUALITY_FAMILY[q] === family),
+  }));
+}
+
 export const ALL_ROOTS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
 
 export interface ChordSuggestion {
