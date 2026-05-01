@@ -156,6 +156,7 @@ function LineRow({
     removeChordAnchorsBatch,
     pasteChordsAt,
     moveChordToSlot,
+    autoLayoutSection,
     undo,
     redo,
   } = useSongStore();
