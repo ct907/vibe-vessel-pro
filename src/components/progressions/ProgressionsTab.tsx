@@ -246,12 +246,14 @@ function PatternBlock({
       return;
     }
     // Unified default: single tap selects this chord exclusively, opens the
-    // context menu, and auditions. Tapping the same chord again clears it.
+    // context menu. Audition only fires when NOT in select/edit mode so the
+    // tap meaning stays unambiguous while editing.
     const alreadyOnly = selected.size === 1 && selected.has(chordId);
+    const wasInSelectMode = selectMode;
     setSelectMode(!alreadyOnly);
     setSelected(alreadyOnly ? new Set() : new Set([chordId]));
     lastSelectedRef.current = alreadyOnly ? null : chordId;
-    if (!alreadyOnly) {
+    if (!alreadyOnly && !wasInSelectMode) {
       const c = sortedChords.find((x) => x.id === chordId);
       if (c) void playChord(c.chord);
     }
