@@ -224,7 +224,6 @@ export async function playProgression(
   lastBpm = bpm;
 
   const { onChordStart, onEnd, loopBeats, octave = 4 } = options;
-  const ac = getAudioContext();
 
   type Payload = ScheduledChord & { __index: number };
   const payloads: [number, Payload][] = events.map((e, i) => [
