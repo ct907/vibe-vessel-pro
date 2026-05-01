@@ -232,6 +232,9 @@ function LineRow({
     writeOSClipboard(chordClipboard);
     if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
     selection.clear();
+    if (ids.length) {
+      window.setTimeout(() => autoLayoutSection(sectionId, window.innerWidth, 28), 0);
+    }
   };
   const doPaste = async (atSlot?: number) => {
     const slot = atSlot ?? 0;
