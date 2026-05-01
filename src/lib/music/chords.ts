@@ -375,12 +375,24 @@ export function transposeKey(root: string, semitones: number): string {
 
 // ---------- Suggestions for the picker sheet ----------
 
+// Phase 1.5: ordered by harmonic family for picker grids and basket browsers.
+// Order: Major-family → Minor-family → Dominant → Altered dominants →
+// Diminished → Special (sus/aug) → Neutral (power).
 export const COMMON_QUALITIES: Quality[] = [
-  "maj", "min", "7", "maj7", "min7", "sus2", "sus4", "9", "maj9", "min9",
-  "6", "min6", "dim", "aug", "add9", "m7b5",
-  // Phase 1.5
-  "5", "7alt", "7#5", "7b9", "7#9",
-  "maj11", "maj13", "min11", "min13", "add11", "6/9",
+  // Major-family
+  "maj", "maj7", "maj9", "maj11", "maj13", "6", "6/9", "add9", "add11",
+  // Minor-family
+  "min", "min7", "min9", "min11", "min13", "min6", "minMaj7",
+  // Dominant-family
+  "7", "9",
+  // Altered dominants
+  "7alt", "7#5", "7b9", "7#9",
+  // Diminished-family
+  "dim", "dim7", "m7b5",
+  // Special-family
+  "sus2", "sus4", "aug",
+  // Neutral
+  "5",
 ];
 
 export const ALL_ROOTS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
