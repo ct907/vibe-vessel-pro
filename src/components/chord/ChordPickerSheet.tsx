@@ -9,6 +9,7 @@ import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from
 import { playChord } from "@/lib/music/audio";
 import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
 
