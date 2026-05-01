@@ -175,8 +175,10 @@ function PatternBlock({
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedIds.length > 0) {
           e.preventDefault();
+          const willEmptyBlock = selectedIds.length >= sortedChords.length;
           removePatternChordsBatch(pattern.id, selectedIds);
           setSelected(new Set());
+          if (willEmptyBlock) exitSelect();
           return;
         }
       }
