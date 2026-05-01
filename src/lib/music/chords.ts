@@ -161,11 +161,23 @@ export function parseChord(input: string): ChordSymbol | null {
   if (!root) return null;
   let rest = trimmed.slice(consumed);
   let bass: string | undefined;
-  const slashIdx = rest.indexOf("/");
-  if (slashIdx >= 0) {
-    const b = normalizeRoot(rest.slice(slashIdx + 1));
-    if (b) bass = b;
-    rest = rest.slice(0, slashIdx);
+  // Special case: "6/9" is a quality, not a slash-bass. Detect before splitting.
+  const isSixNine = /^6\/9(?![A-Ga-g0-9])/.test(rest);
+  if (!isSixNine) {
+    const slashIdx = rest.indexOf("/");
+    if (slashIdx >= 0) {
+      const b = normalizeRoot(rest.slice(slashIdx + 1));
+      if (b) bass = b;
+      rest = rest.slice(0, slashIdx);
+    }
+  } else {
+    // Allow "C6/9/E" → quality 6/9, bass E
+    const tail = rest.slice(3); // after "6/9"
+    if (tail.startsWith("/")) {
+      const b = normalizeRoot(tail.slice(1));
+      if (b) bass = b;
+    }
+    rest = "6/9";
   }
   let quality: Quality = "maj";
   for (const [re, q] of QUALITY_MAP) {
