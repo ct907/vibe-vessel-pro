@@ -627,8 +627,10 @@ function PatternBlock({
               disabled={!hasSel}
               onClick={() => {
                 if (selectedIds.length === 0) return;
+                const willEmptyBlock = selectedIds.length >= sortedChords.length;
                 removePatternChordsBatch(pattern.id, selectedIds);
                 setSelected(new Set());
+                if (willEmptyBlock) exitSelect();
               }}
               aria-label="Delete"
               title="Delete (Del)"
