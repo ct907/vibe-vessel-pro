@@ -256,7 +256,7 @@ function PatternBlock({
     setSelectMode(!alreadyOnly);
     setSelected(alreadyOnly ? new Set() : new Set([chordId]));
     lastSelectedRef.current = alreadyOnly ? null : chordId;
-    if (!alreadyOnly && !wasInSelectMode) {
+    if (!alreadyOnly && !wasInSelectMode && !selectMode) {
       const c = sortedChords.find((x) => x.id === chordId);
       if (c) void playChord(c.chord);
     }
