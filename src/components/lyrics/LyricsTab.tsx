@@ -903,18 +903,8 @@ function SectionCard({
                   <Pencil className="h-4 w-4" /> Rename…
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={() => {
-                  const res = autoLayoutSection(section.id, window.innerWidth, 28);
-                  if (res?.changed) {
-                    toast.success("Chords & lyrics formatted to fit your screen");
-                  } else {
-                    toast("Already laid out for this screen width");
-                  }
-                }}
-              >
-                <Wand2 className="h-4 w-4" /> Format chords & lyrics
-              </DropdownMenuItem>
+              {/* Phase 1.5: per-section "Format chords & lyrics" removed.
+                  Use Song Settings → Format Chords for a song-wide reflow. */}
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                 <Copy className="h-4 w-4" /> Duplicate
               </DropdownMenuItem>
@@ -1267,6 +1257,34 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     mq.addEventListener?.("change", onChange);
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
+
+  // Phase 1.5: desktop window resize → debounced auto-reflow.
+  // Mobile devices use the orientation modal instead (above) so we don't
+  // double-fire and so the user's manual chord arrangement is preserved
+  // during a phone rotation.
+  useEffect(() => {
+    const isMobileDevice =
+      "ontouchstart" in window ||
+      (navigator.maxTouchPoints ?? 0) > 0 ||
+      window.matchMedia("(pointer: coarse)").matches;
+    if (isMobileDevice) return;
+    let t: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const w = window.innerWidth;
+        useSongStore.getState().sections.forEach((sec) => {
+          autoLayoutSection(sec.id, w, 28);
+        });
+        dbgLog("desktop resize reflow", { w });
+      }, 500);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(t);
+    };
+  }, [autoLayoutSection]);
 
   // Issue #1: when a song is loaded that was last edited at a noticeably
   // different screen width, auto-format every section for the current width

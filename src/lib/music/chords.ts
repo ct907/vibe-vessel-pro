@@ -7,7 +7,11 @@ export const NOTES_FLAT  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A"
 export type Quality =
   | "maj" | "min" | "dim" | "aug" | "sus2" | "sus4"
   | "maj7" | "min7" | "7" | "dim7" | "m7b5" | "minMaj7"
-  | "maj9" | "min9" | "9" | "6" | "min6" | "add9";
+  | "maj9" | "min9" | "9" | "6" | "min6" | "add9"
+  // Phase 1.5 additions
+  | "5" | "7alt" | "7#5" | "7b9" | "7#9"
+  | "maj11" | "maj13" | "min11" | "min13"
+  | "add11" | "6/9";
 
 export interface ChordSymbol {
   root: string;          // normalized: C, C#, Db, etc.
@@ -16,27 +20,47 @@ export interface ChordSymbol {
   display: string;       // pretty form, e.g. "Fmaj7"
 }
 
-// Order matters: longer/more-specific patterns must come before shorter ones.
-// Each alternative is independently anchored to the start of `rest`.
+// QUALITY_MAP ordering rule (Phase 1.5):
+//   - Sorted by the longest literal alternative in each regex, DESCENDING.
+//   - When ties, more-specific (more accidentals) wins.
+//   - Shortest single-character qualities (9, 7, 6, 5) MUST be checked LAST.
+//   - When adding a new quality, RE-SORT the entire array — never splice
+//     into the middle. The chord-parser regression test enforces this.
 const QUALITY_MAP: Array<[RegExp, Quality]> = [
-  [/^(?:dim7|°7)/i, "dim7"],
-  [/^(?:m7b5|ø)/, "m7b5"],
-  [/^(?:dim|°)/i, "dim"],
+  // 5+ chars
   [/^(?:minMaj7|mMaj7|mM7)/, "minMaj7"],
-  [/^(?:maj9|M9)/, "maj9"],
-  [/^(?:maj7|M7|Δ7?)/, "maj7"],
-  [/^(?:min9|m9)/, "min9"],
-  [/^(?:min7|m7)/, "min7"],
-  [/^(?:min6|m6)/, "min6"],
-  [/^(?:min|m(?!aj))/, "min"],
-  [/^(?:aug|\+)/i, "aug"],
-  [/^sus2/i, "sus2"],
-  [/^(?:sus4|sus)/i, "sus4"],
-  [/^add9/i, "add9"],
-  [/^9/, "9"],
-  [/^7/, "7"],
-  [/^6/, "6"],
-  [/^(?:maj|M(?!7|9))/, "maj"],
+  [/^(?:maj13|M13)/,         "maj13"],
+  [/^(?:maj11|M11)/,         "maj11"],
+  [/^(?:min13|m13)/,         "min13"],
+  [/^(?:min11|m11)/,         "min11"],
+  [/^add11/i,                "add11"],
+  // 4 chars
+  [/^(?:dim7|°7)/i,          "dim7"],
+  [/^(?:m7b5|ø)/,            "m7b5"],
+  [/^(?:maj9|M9)/,           "maj9"],
+  [/^(?:maj7|M7|Δ7?)/,       "maj7"],
+  [/^(?:min9|m9)/,           "min9"],
+  [/^(?:min7|m7)/,           "min7"],
+  [/^(?:min6|m6)/,           "min6"],
+  [/^7alt/i,                 "7alt"],
+  [/^sus2/i,                 "sus2"],
+  [/^sus4/i,                 "sus4"],
+  [/^add9/i,                 "add9"],
+  // 3 chars (altered dominants must precede bare ^7)
+  [/^7#5/,                   "7#5"],
+  [/^7b9/,                   "7b9"],
+  [/^7#9/,                   "7#9"],
+  [/^6\/9/,                  "6/9"],
+  [/^(?:dim|°)/i,            "dim"],
+  [/^(?:min|m(?!aj))/,       "min"],
+  [/^(?:aug|\+)/i,           "aug"],
+  [/^sus/i,                  "sus4"],
+  [/^(?:maj|M(?!7|9|11|13))/,"maj"],
+  // 1 char (must be last)
+  [/^9/,                     "9"],
+  [/^7/,                     "7"],
+  [/^6/,                     "6"],
+  [/^5(?!\d)/,               "5"],
 ];
 
 const QUALITY_INTERVALS: Record<Quality, number[]> = {
@@ -58,12 +82,27 @@ const QUALITY_INTERVALS: Record<Quality, number[]> = {
   "6":    [0, 4, 7, 9],
   min6:   [0, 3, 7, 9],
   add9:   [0, 4, 7, 14],
+  // Phase 1.5
+  "5":     [0, 7],
+  "7alt":  [0, 4, 8, 10],
+  "7#5":   [0, 4, 8, 10],
+  "7b9":   [0, 4, 7, 10, 13],
+  "7#9":   [0, 4, 7, 10, 15],
+  maj11:   [0, 4, 7, 11, 14, 17],
+  maj13:   [0, 4, 7, 11, 14, 21],
+  min11:   [0, 3, 7, 10, 14, 17],
+  min13:   [0, 3, 7, 10, 14, 21],
+  add11:   [0, 4, 7, 17],
+  "6/9":   [0, 4, 7, 9, 14],
 };
 
 const QUALITY_PRETTY: Record<Quality, string> = {
   maj: "", min: "m", dim: "dim", aug: "aug", sus2: "sus2", sus4: "sus4",
   maj7: "maj7", min7: "m7", "7": "7", dim7: "dim7", m7b5: "m7b5", minMaj7: "mMaj7",
   maj9: "maj9", min9: "m9", "9": "9", "6": "6", min6: "m6", add9: "add9",
+  "5": "5", "7alt": "7alt", "7#5": "7#5", "7b9": "7b9", "7#9": "7#9",
+  maj11: "maj11", maj13: "maj13", min11: "m11", min13: "m13",
+  add11: "add11", "6/9": "6/9",
 };
 
 // Roots that don't exist in standard practice — silently fold to their
@@ -122,11 +161,23 @@ export function parseChord(input: string): ChordSymbol | null {
   if (!root) return null;
   let rest = trimmed.slice(consumed);
   let bass: string | undefined;
-  const slashIdx = rest.indexOf("/");
-  if (slashIdx >= 0) {
-    const b = normalizeRoot(rest.slice(slashIdx + 1));
-    if (b) bass = b;
-    rest = rest.slice(0, slashIdx);
+  // Special case: "6/9" is a quality, not a slash-bass. Detect before splitting.
+  const isSixNine = /^6\/9(?![A-Ga-g0-9])/.test(rest);
+  if (!isSixNine) {
+    const slashIdx = rest.indexOf("/");
+    if (slashIdx >= 0) {
+      const b = normalizeRoot(rest.slice(slashIdx + 1));
+      if (b) bass = b;
+      rest = rest.slice(0, slashIdx);
+    }
+  } else {
+    // Allow "C6/9/E" → quality 6/9, bass E
+    const tail = rest.slice(3); // after "6/9"
+    if (tail.startsWith("/")) {
+      const b = normalizeRoot(tail.slice(1));
+      if (b) bass = b;
+    }
+    rest = "6/9";
   }
   let quality: Quality = "maj";
   for (const [re, q] of QUALITY_MAP) {
@@ -325,7 +376,11 @@ export function transposeKey(root: string, semitones: number): string {
 // ---------- Suggestions for the picker sheet ----------
 
 export const COMMON_QUALITIES: Quality[] = [
-  "maj", "min", "7", "maj7", "min7", "sus2", "sus4", "9", "maj9", "min9", "6", "min6", "dim", "aug", "add9", "m7b5",
+  "maj", "min", "7", "maj7", "min7", "sus2", "sus4", "9", "maj9", "min9",
+  "6", "min6", "dim", "aug", "add9", "m7b5",
+  // Phase 1.5
+  "5", "7alt", "7#5", "7b9", "7#9",
+  "maj11", "maj13", "min11", "min13", "add11", "6/9",
 ];
 
 export const ALL_ROOTS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
@@ -342,6 +397,11 @@ const QUALITY_HUMAN: Record<Quality, string> = {
   dim7: "diminished 7th", m7b5: "half-diminished", minMaj7: "minor-major 7th",
   maj9: "major 9th", min9: "minor 9th", "9": "dominant 9th",
   "6": "sixth", min6: "minor 6th", add9: "add 9",
+  "5": "power", "7alt": "altered dominant",
+  "7#5": "dominant 7 sharp 5", "7b9": "dominant 7 flat 9", "7#9": "dominant 7 sharp 9",
+  maj11: "major 11th", maj13: "major 13th",
+  min11: "minor 11th", min13: "minor 13th",
+  add11: "add 11", "6/9": "six nine",
 };
 
 const ACC_HUMAN = (r: string) => r.replace("#", "-sharp").replace("b", "-flat");

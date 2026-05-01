@@ -137,8 +137,12 @@ export function formatChordsAndLyrics(
   config: LayoutConfig,
 ): { section: Section; overflowRowsAdded: number; orphansFixed: number } {
   const slotWidth = Math.max(20, config.slotWidth ?? 28);
-  const charsPerLine = Math.max(8, Math.floor(config.screenWidth / CHAR_WIDTH_PX));
-  const slotsPerLine = Math.max(2, Math.floor(config.screenWidth / slotWidth));
+  // Phase 1.5: device-aware usable width — leave margin for the row's edit
+  // affordance (pencil) and avoid edge crowding. Mobile/tablet 80%, desktop 90%.
+  const factor = config.screenWidth < 1024 ? 0.8 : 0.9;
+  const usableWidth = config.screenWidth * factor;
+  const charsPerLine = Math.max(8, Math.floor(usableWidth / CHAR_WIDTH_PX));
+  const slotsPerLine = Math.max(2, Math.floor(usableWidth / slotWidth));
 
   dbg("formatChordsAndLyrics:input", {
     sectionId: section.id,

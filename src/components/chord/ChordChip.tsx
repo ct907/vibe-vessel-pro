@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChordSymbol } from "@/lib/music/chords";
+import { getChordColorClasses } from "@/lib/music/chordColor";
 import { holdChord, playChord } from "@/lib/music/audio";
 import { cn } from "@/lib/utils";
 
@@ -127,12 +128,14 @@ export function ChordChip({
 
   const sizeCls =
     size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
+  // Phase 1.5: chord-tinted backgrounds for ink/card variants. The "filled"
+  // variant remains a generic primary fill for non-chord uses (e.g. basket
+  // controls).
+  const colors = getChordColorClasses(chord);
   const variantCls =
-    variant === "ink"
-      ? "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60"
-      : variant === "filled"
-        ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
-        : "bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60";
+    variant === "filled"
+      ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
+      : `${colors.bg} ${colors.text} hover:opacity-90`;
 
   return (
     <button
