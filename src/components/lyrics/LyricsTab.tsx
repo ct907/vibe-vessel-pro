@@ -635,7 +635,17 @@ function LineRow({
                 );
                 if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
                 selection.clear();
-                // Stay in Edit Mode so the user can keep working.
+                // Collapse any now-empty overflow rows so lyrics-side delete
+                // looks as clean as progression-side delete.
+                window.setTimeout(
+                  () => autoLayoutSection(sectionId, window.innerWidth, 28),
+                  0,
+                );
+                // If we just deleted every chord on this row, drop edit mode
+                // so the user isn't stuck in a stub toolbar.
+                if (ids.length >= lineChords.length) {
+                  setIsEditMode(false);
+                }
               }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
