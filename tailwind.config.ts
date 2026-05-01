@@ -13,8 +13,8 @@ export default {
     "bg-pink-300",
     "bg-gradient-to-r",
     "text-stone-50", "text-zinc-900",
-    { pattern: /^from-(yellow|red|blue|purple|orange|pink)-(300|400|600|700|800|900|950)$/ },
-    { pattern: /^to-(yellow|red|blue|purple|orange|pink)-(300|400|600|700|800|900|950)$/ },
+    { pattern: /^from-(yellow|red|blue|purple|orange|pink|green)-(300|400|600|700|800|900|950)$/ },
+    { pattern: /^to-(yellow|red|blue|purple|orange|pink|green)-(300|400|600|700|800|900|950)$/ },
   ],
   theme: {
     container: {

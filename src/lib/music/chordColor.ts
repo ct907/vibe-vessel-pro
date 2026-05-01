@@ -37,7 +37,7 @@ export function getChordColorClasses(chord: ChordSymbol): ChordColorClasses {
     case "maj11":
     case "maj13":
     case "add11":
-      return { bg: "bg-gradient-to-r from-yellow-600 to-red-950", text: "text-stone-50" };
+      return { bg: "bg-gradient-to-r from-yellow-600 to-red-700", text: "text-stone-50" };
 
     // Minor-extended (gradient)
     case "min7":
@@ -56,7 +56,7 @@ export function getChordColorClasses(chord: ChordSymbol): ChordColorClasses {
     case "7#5":
     case "7b9":
     case "7#9":
-      return { bg: "bg-gradient-to-r from-orange-900 to-red-950", text: "text-stone-50" };
+      return { bg: "bg-gradient-to-r from-green-700 to-red-800", text: "text-stone-50" };
 
     // Minor-major (gradient)
     case "minMaj7":
