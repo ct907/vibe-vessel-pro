@@ -24,7 +24,9 @@ let started = false;
 export async function ensureAudio(): Promise<void> {
   if (!started) {
     await Tone.start(); // resumes the underlying AudioContext on user gesture
-    // Build the chain after the gesture so the AC is in a "running" state.
+    // Adopt Tone's raw AudioContext so scheduled times line up with Tone.now().
+    const raw = Tone.getContext().rawContext as unknown as AudioContext;
+    getAudioContext(raw);
     getMasterChain();
     started = true;
     applySettings(useSoundStore.getState());

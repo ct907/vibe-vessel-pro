@@ -13,7 +13,14 @@
 
 let ctx: AudioContext | null = null;
 
-export function getAudioContext(): AudioContext {
+/**
+ * Returns the shared AudioContext used by both the Web Audio synthesis layer
+ * and Tone.js scheduling. Callers may inject the context explicitly (the
+ * engine layer passes Tone's raw context after Tone.start()) so that
+ * scheduled times line up with `Tone.now()` exactly.
+ */
+export function getAudioContext(injected?: AudioContext): AudioContext {
+  if (injected && !ctx) ctx = injected;
   if (ctx) return ctx;
   const Ctor: typeof AudioContext =
     (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
