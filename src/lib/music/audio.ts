@@ -233,12 +233,8 @@ export async function playProgression(
   ]);
 
   const part = new Tone.Part((time, value: Payload) => {
-    // Convert Tone "time" (its AudioContext time) to our shared AC time.
-    // Since Tone uses the same underlying AudioContext (we never created a
-    // separate one — getAudioContext() returns Tone's context after Tone.start),
-    // they are equal. But to stay defensive, rebase via Tone.now().
-    const offset = time - Tone.now();
-    const startAt = ac.currentTime + Math.max(0, offset);
+    // `time` is in the shared AudioContext clock (Tone uses our raw AC).
+    const startAt = time;
     const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
     spawnChord(value.chord, startAt, startAt + durSec, octave);
     if (onChordStart) {
