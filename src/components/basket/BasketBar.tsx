@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, GripVertical, Trash2, X } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { ChordSymbol } from "@/lib/music/chords";
+import { getChordColorClasses } from "@/lib/music/chordColor";
 import { cn } from "@/lib/utils";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 
