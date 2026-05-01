@@ -1806,7 +1806,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const after = get().sections.find((x) => x.id === sectionId);
     let residualOverflow = 0;
     if (after) {
-      const slotsPerLine = Math.max(2, Math.floor(screenWidth / Math.max(20, slotWidth ?? 28)));
+      const factor = screenWidth < 1024 ? 0.8 : 0.9;
+      const slotsPerLine = Math.max(2, Math.floor((screenWidth * factor) / Math.max(20, slotWidth ?? 28)));
       const byLine = new Map<string, number>();
       after.chords.forEach((c) => {
         const lp = c.lyricsPlacement;
