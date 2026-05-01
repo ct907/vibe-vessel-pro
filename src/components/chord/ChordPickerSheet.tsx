@@ -9,6 +9,7 @@ import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from
 import { playChord } from "@/lib/music/audio";
 import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
 
@@ -251,25 +252,67 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
 // ============================================================================
 // Helper dropdowns shown to the right of the chord input.
 // They compose into the typed query string; the user can still type freely.
+// Phase 1.5: Type × Variant (context-sensitive) + altered-dominant chips +
+// slash-bass select. Covers the full vocabulary in COMMON_QUALITIES.
 // ============================================================================
 
-type TypeKey = "maj" | "m" | "dim" | "aug";
-type ExtKey = "none" | "7" | "9" | "11";
+type TypeKey = "maj" | "m" | "dim" | "aug" | "sus" | "5";
 
 const TYPE_OPTIONS: { value: TypeKey; label: string }[] = [
   { value: "maj", label: "maj" },
   { value: "m",   label: "m" },
   { value: "dim", label: "dim" },
   { value: "aug", label: "aug" },
-];
-const EXT_OPTIONS: { value: ExtKey; label: string }[] = [
-  { value: "none", label: "—" },
-  { value: "7",    label: "7" },
-  { value: "9",    label: "9" },
-  { value: "11",   label: "11" },
+  { value: "sus", label: "sus" },
+  { value: "5",   label: "5" },
 ];
 
-/** Pull a normalized root from the start of the query, or default to "C". */
+// Variant suffixes per Type. Empty string = base triad / no variant.
+const VARIANTS_BY_TYPE: Record<TypeKey, { value: string; label: string }[]> = {
+  maj: [
+    { value: "",      label: "—" },
+    { value: "6",     label: "6" },
+    { value: "7",     label: "7" },
+    { value: "9",     label: "9" },
+    { value: "11",    label: "11" },
+    { value: "13",    label: "13" },
+    { value: "6/9",   label: "6/9" },
+    { value: "add9",  label: "add9" },
+    { value: "add11", label: "add11" },
+  ],
+  m: [
+    { value: "",     label: "—" },
+    { value: "6",    label: "6" },
+    { value: "7",    label: "7" },
+    { value: "9",    label: "9" },
+    { value: "11",   label: "11" },
+    { value: "13",   label: "13" },
+    { value: "Maj7", label: "Maj7" },
+  ],
+  dim: [
+    { value: "",     label: "—" },
+    { value: "7",    label: "7" },
+    { value: "m7b5", label: "ø" },
+  ],
+  aug: [
+    { value: "",  label: "—" },
+    { value: "7", label: "7" },
+  ],
+  sus: [
+    { value: "2", label: "2" },
+    { value: "4", label: "4" },
+  ],
+  "5": [{ value: "", label: "—" }],
+};
+
+const ALTERED_CHIPS: { value: "" | "alt" | "#5" | "b9" | "#9"; label: string }[] = [
+  { value: "",    label: "plain" },
+  { value: "alt", label: "alt" },
+  { value: "#5",  label: "#5" },
+  { value: "b9",  label: "b9" },
+  { value: "#9",  label: "#9" },
+];
+
 function rootOf(query: string): string {
   return normalizeRoot(query.trim()) ?? "C";
 }
@@ -277,36 +320,80 @@ function rootLen(query: string): number {
   const m = query.trim().match(/^[A-Ga-g][#b]?/);
   return m ? m[0].length : 0;
 }
-/** Parse the slash-bass off the end, returning [coreTail, bass|""]. */
 function splitSlash(tail: string): [string, string] {
+  if (/^6\/9(?!\/)/.test(tail)) {
+    const after = tail.slice(3);
+    if (after.startsWith("/")) {
+      const bass = normalizeRoot(after.slice(1)) ?? "";
+      return ["6/9", bass];
+    }
+    return ["6/9", ""];
+  }
   const i = tail.indexOf("/");
   if (i < 0) return [tail, ""];
   const bass = normalizeRoot(tail.slice(i + 1)) ?? "";
   return [tail.slice(0, i), bass];
 }
-/** Detect the type segment at the start of the (post-root, pre-slash) tail. */
+
 function detectType(core: string): TypeKey {
   const c = core.toLowerCase();
+  if (c.startsWith("sus")) return "sus";
+  if (/^5(?!\d)/.test(c)) return "5";
   if (c.startsWith("maj")) return "maj";
+  if (c.startsWith("m") && !c.startsWith("maj")) return "m";
   if (c.startsWith("dim") || c.startsWith("°")) return "dim";
   if (c.startsWith("aug") || c.startsWith("+")) return "aug";
-  if (c.startsWith("m") && !c.startsWith("maj")) return "m";
   return "maj";
 }
-function stripTypePrefix(core: string, type: TypeKey): string {
-  const c = core;
-  const lc = c.toLowerCase();
-  if (type === "maj" && lc.startsWith("maj")) return c.slice(3);
-  if (type === "m"   && lc.startsWith("m") && !lc.startsWith("maj")) return c.slice(1);
-  if (type === "dim" && lc.startsWith("dim")) return c.slice(3);
-  if (type === "aug" && lc.startsWith("aug")) return c.slice(3);
-  return c; // no explicit prefix typed — treat as default ("maj")
+
+function detectVariant(core: string, type: TypeKey): string {
+  const lc = core.toLowerCase();
+  if (type === "maj") {
+    if (lc === "") return "";
+    if (lc.startsWith("maj13")) return "13";
+    if (lc.startsWith("maj11")) return "11";
+    if (lc.startsWith("maj9"))  return "9";
+    if (lc.startsWith("maj7"))  return "7";
+    if (lc.startsWith("6/9"))   return "6/9";
+    if (lc.startsWith("add11")) return "add11";
+    if (lc.startsWith("add9"))  return "add9";
+    if (/^7(alt|#5|b9|#9)?/.test(lc)) return "7";
+    if (lc.startsWith("13"))    return "13";
+    if (lc.startsWith("11"))    return "11";
+    if (lc.startsWith("9"))     return "9";
+    if (lc.startsWith("6"))     return "6";
+    return "";
+  }
+  if (type === "m") {
+    const rest = lc.slice(1);
+    if (rest.startsWith("maj7")) return "Maj7";
+    if (rest.startsWith("13"))   return "13";
+    if (rest.startsWith("11"))   return "11";
+    if (rest.startsWith("9"))    return "9";
+    if (rest.startsWith("7b5"))  return ""; // m7b5 detected at type=dim/m? we surface under dim
+    if (rest.startsWith("7"))    return "7";
+    if (rest.startsWith("6"))    return "6";
+    return "";
+  }
+  if (type === "dim") {
+    const rest = lc.replace(/^dim|^°/, "");
+    if (rest.startsWith("7")) return "7";
+    return "";
+  }
+  if (type === "aug") {
+    const rest = lc.replace(/^aug|^\+/, "");
+    if (rest.startsWith("7")) return "7";
+    return "";
+  }
+  if (type === "sus") {
+    return lc.includes("2") ? "2" : "4";
+  }
+  return "";
 }
-function detectExt(rest: string): ExtKey {
-  if (/^11/.test(rest)) return "11";
-  if (/^9/.test(rest))  return "9";
-  if (/^7/.test(rest))  return "7";
-  return "none";
+
+function detectAltered(core: string): "" | "alt" | "#5" | "b9" | "#9" {
+  const m = core.match(/^7(alt|#5|b9|#9)/);
+  return (m?.[1] as any) ?? "";
 }
 
 interface HelpersProps { query: string; onChange: (q: string) => void; }
@@ -317,25 +404,37 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
   const tail = query.trim().slice(rl);
   const [core, bass] = splitSlash(tail);
   const typeVal = detectType(core);
-  const rest = stripTypePrefix(core, typeVal);
-  const extVal = detectExt(rest);
+  const variantVal = detectVariant(core, typeVal);
+  const alteredVal = typeVal === "maj" && variantVal === "7" ? detectAltered(core) : "";
 
-  const compose = (t: TypeKey, e: ExtKey, b: string) => {
-    // Pretty-print the type so it round-trips with the parser.
-    const typeStr =
-      t === "maj" ? (e === "none" ? "" : "maj") // "C" + "7" = C7 (dom); "C" + "maj"+"7" handled by ext below
-                  : t === "m" ? "m"
-                  : t === "dim" ? "dim"
-                  : "aug";
-    // Special: when type=maj and ext is set, we want major-7th/9th, so emit "maj7"/"maj9".
-    let suffix = typeStr;
-    if (e !== "none") {
-      if (t === "maj") suffix = "maj" + e;       // Cmaj7, Cmaj9, Cmaj11
-      else if (t === "m") suffix = "m" + e;      // Cm7, Cm9
-      else if (t === "dim") suffix = "dim" + e;  // Cdim7
-      else suffix = typeStr + e;                  // Caug7
-    } else if (t === "maj") {
-      suffix = ""; // plain major
+  const variants = VARIANTS_BY_TYPE[typeVal];
+
+  const compose = (
+    t: TypeKey,
+    v: string,
+    alt: "" | "alt" | "#5" | "b9" | "#9",
+    b: string,
+  ): string => {
+    let suffix = "";
+    if (t === "maj") {
+      if (v === "")      suffix = "";
+      else if (v === "6" || v === "6/9" || v === "add9" || v === "add11") suffix = v;
+      else if (v === "7") suffix = "7" + alt;
+      else                suffix = "maj" + v;
+    } else if (t === "m") {
+      if (v === "")          suffix = "m";
+      else if (v === "Maj7") suffix = "mMaj7";
+      else                   suffix = "m" + v;
+    } else if (t === "dim") {
+      if (v === "")          suffix = "dim";
+      else if (v === "m7b5") suffix = "m7b5";
+      else                   suffix = "dim" + v;
+    } else if (t === "aug") {
+      suffix = v === "7" ? "aug7" : "aug";
+    } else if (t === "sus") {
+      suffix = "sus" + (v || "4");
+    } else if (t === "5") {
+      suffix = "5";
     }
     const slash = b ? `/${b}` : "";
     return `${root}${suffix}${slash}`;
@@ -343,10 +442,15 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
 
   const slashOptions = ALL_ROOTS.filter((r) => r !== root);
 
+  const handleType = (next: TypeKey) => {
+    const firstVariant = VARIANTS_BY_TYPE[next][0]?.value ?? "";
+    onChange(compose(next, firstVariant, "", bass));
+  };
+
   return (
     <>
-      <Select value={typeVal} onValueChange={(v) => onChange(compose(v as TypeKey, extVal, bass))}>
-        <SelectTrigger className="h-10 w-[68px] px-2 text-xs font-mono-chord">
+      <Select value={typeVal} onValueChange={(v) => handleType(v as TypeKey)}>
+        <SelectTrigger className="h-10 w-[68px] px-2 text-xs font-mono-chord" aria-label="Chord type">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -356,19 +460,28 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
         </SelectContent>
       </Select>
 
-      <Select value={extVal} onValueChange={(v) => onChange(compose(typeVal, v as ExtKey, bass))}>
-        <SelectTrigger className="h-10 w-[64px] px-2 text-xs font-mono-chord">
+      <Select
+        value={variantVal || "__base"}
+        onValueChange={(v) => onChange(compose(typeVal, v === "__base" ? "" : v, "", bass))}
+      >
+        <SelectTrigger className="h-10 w-[78px] px-2 text-xs font-mono-chord" aria-label="Chord variant">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {EXT_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value} className="text-xs font-mono-chord">{o.label}</SelectItem>
+          {variants.map((o) => (
+            <SelectItem
+              key={o.value || "__base"}
+              value={o.value || "__base"}
+              className="text-xs font-mono-chord"
+            >
+              {o.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
-      <Select value={bass || "__none"} onValueChange={(v) => onChange(compose(typeVal, extVal, v === "__none" ? "" : v))}>
-        <SelectTrigger className="h-10 w-[72px] px-2 text-xs font-mono-chord">
+      <Select value={bass || "__none"} onValueChange={(v) => onChange(compose(typeVal, variantVal, alteredVal, v === "__none" ? "" : v))}>
+        <SelectTrigger className="h-10 w-[72px] px-2 text-xs font-mono-chord" aria-label="Slash bass">
           <SelectValue placeholder="/—" />
         </SelectTrigger>
         <SelectContent>
@@ -378,6 +491,26 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
           ))}
         </SelectContent>
       </Select>
+
+      {typeVal === "maj" && variantVal === "7" && (
+        <div className="flex items-center gap-1 ml-1" role="group" aria-label="Altered dominant">
+          {ALTERED_CHIPS.map((c) => (
+            <button
+              key={c.value || "plain"}
+              type="button"
+              onClick={() => onChange(compose("maj", "7", c.value, bass))}
+              className={cn(
+                "h-7 px-2 rounded text-[10px] font-mono-chord border transition-colors",
+                alteredVal === c.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border hover:bg-accent",
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }

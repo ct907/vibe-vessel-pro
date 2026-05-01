@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, GripVertical, Trash2, X } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { ChordSymbol } from "@/lib/music/chords";
+import { getChordColorClasses } from "@/lib/music/chordColor";
 import { cn } from "@/lib/utils";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 
@@ -26,17 +27,20 @@ function StaticChordChip({
   /** When > 1, render a "+N" pill on the dragging clone to show the multi-drag size. */
   badgeCount?: number;
 }) {
+  const colors = getChordColorClasses(chord);
   return (
     <span
       className={cn(
         "relative inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none transition-colors",
-        "px-2.5 py-1 text-sm bg-chord-chip/50 text-chord-chip-foreground",
-        selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade bg-primary/15",
+        "px-2.5 py-1 text-sm",
+        colors.bg,
+        colors.text,
+        selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade",
         dragging && "shadow-lg ring-2 ring-primary",
       )}
       style={{ pointerEvents: "none" }}
     >
-      <GripVertical className="h-3 w-3 opacity-50" aria-hidden />
+      <GripVertical className="h-3 w-3 opacity-60" aria-hidden />
       {chord.display}
       {badgeCount && badgeCount > 1 ? (
         <span className="absolute -top-2 -right-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground shadow">

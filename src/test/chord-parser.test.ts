@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChord } from "@/lib/music/chords";
+import { COMMON_QUALITIES, parseChord, QUALITY_FAMILY, commonQualitiesByFamily } from "@/lib/music/chords";
 
 describe("parseChord — Phase 1.5 extended qualities", () => {
   it("parses power chord", () => {
@@ -50,5 +50,20 @@ describe("parseChord — regression guards (ordering invariant)", () => {
     const c = parseChord("Fmaj13/A");
     expect(c?.quality).toBe("maj13");
     expect(c?.bass).toBe("A");
+  });
+});
+
+describe("COMMON_QUALITIES — picker vocabulary", () => {
+  it("every entry has a known family", () => {
+    for (const q of COMMON_QUALITIES) {
+      expect(QUALITY_FAMILY[q]).toBeDefined();
+    }
+  });
+  it("groups partition the array exactly", () => {
+    const grouped = commonQualitiesByFamily().flatMap((g) => g.qualities);
+    expect(grouped.sort()).toEqual([...COMMON_QUALITIES].sort());
+  });
+  it("first family is Major (ordering invariant)", () => {
+    expect(commonQualitiesByFamily()[0].family).toBe("major");
   });
 });
