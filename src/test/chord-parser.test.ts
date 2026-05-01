@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChord } from "@/lib/music/chords";
+import { COMMON_QUALITIES, parseChord, QUALITY_FAMILY, commonQualitiesByFamily } from "@/lib/music/chords";
 
 describe("parseChord — Phase 1.5 extended qualities", () => {
   it("parses power chord", () => {
