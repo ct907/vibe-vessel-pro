@@ -1753,11 +1753,17 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
   formatChordsInSong: () => {
     pushHistory(get);
+    // Phase 1.5: a single song-wide action that (1) snaps each lyric line's
+    // chords onto word boundaries and (2) reflows for the current viewport.
+    const w = typeof window !== "undefined" ? window.innerWidth : 800;
     set((s) => ({
-      sections: s.sections.map((sec) => ({
-        ...sec,
-        lines: sec.lines.map((l) => snapLineToWords(l)),
-      })),
+      sections: s.sections.map((sec) => {
+        const snapped: Section = {
+          ...sec,
+          lines: sec.lines.map((l) => snapLineToWords(l)),
+        };
+        return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
+      }),
     }));
   },
 
