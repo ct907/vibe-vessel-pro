@@ -276,6 +276,7 @@ function PatternBlock({
       className={cn(
         "rounded-lg border shadow-primary/40 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+        selectMode && !isFocused && "ring-2 ring-primary/40",
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
