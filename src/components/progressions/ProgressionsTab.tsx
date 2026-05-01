@@ -175,8 +175,10 @@ function PatternBlock({
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedIds.length > 0) {
           e.preventDefault();
+          const willEmptyBlock = selectedIds.length >= sortedChords.length;
           removePatternChordsBatch(pattern.id, selectedIds);
           setSelected(new Set());
+          if (willEmptyBlock) exitSelect();
           return;
         }
       }
@@ -246,12 +248,14 @@ function PatternBlock({
       return;
     }
     // Unified default: single tap selects this chord exclusively, opens the
-    // context menu, and auditions. Tapping the same chord again clears it.
+    // context menu. Audition only fires when NOT in select/edit mode so the
+    // tap meaning stays unambiguous while editing.
     const alreadyOnly = selected.size === 1 && selected.has(chordId);
+    const wasInSelectMode = selectMode;
     setSelectMode(!alreadyOnly);
     setSelected(alreadyOnly ? new Set() : new Set([chordId]));
     lastSelectedRef.current = alreadyOnly ? null : chordId;
-    if (!alreadyOnly) {
+    if (!alreadyOnly && !wasInSelectMode) {
       const c = sortedChords.find((x) => x.id === chordId);
       if (c) void playChord(c.chord);
     }
@@ -272,6 +276,7 @@ function PatternBlock({
       className={cn(
         "rounded-lg border shadow-primary/40 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+        selectMode && !isFocused && "ring-2 ring-primary/40",
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -432,8 +437,8 @@ function PatternBlock({
                                     onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
-                                    "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors",
-                                    isSel && "ring-2 ring-primary",
+                                    "relative my-1 ml-0.5 rounded-md border border-chord-chip/40 bg-chord-chip/50 text-chord-chip-foreground hover:bg-chord-chip/60 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all",
+                                    isSel && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
                                     dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
                                   )}
                                   style={{
@@ -623,8 +628,10 @@ function PatternBlock({
               disabled={!hasSel}
               onClick={() => {
                 if (selectedIds.length === 0) return;
+                const willEmptyBlock = selectedIds.length >= sortedChords.length;
                 removePatternChordsBatch(pattern.id, selectedIds);
                 setSelected(new Set());
+                if (willEmptyBlock) exitSelect();
               }}
               aria-label="Delete"
               title="Delete (Del)"

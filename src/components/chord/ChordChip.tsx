@@ -152,10 +152,10 @@ export function ChordChip({
         onLongPress?.();
       }}
       className={cn(
-        "inline-flex items-center rounded-md font-mono-chord font-semibold transition-colors select-none",
+        "inline-flex items-center rounded-md font-mono-chord font-semibold transition-all select-none",
         sizeCls,
         variantCls,
-        selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+        selected && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.04]",
         className,
       )}
     >
