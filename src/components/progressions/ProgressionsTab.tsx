@@ -489,7 +489,7 @@ function PatternBlock({
                   width: "3px",
                 }}
               >
-                <span className="absolute left-0 right-0 bottom-0 top-[7px] rounded-sm bg-[hsl(var(--chord-chip))] shadow-[0_0_8px_hsl(var(--chord-chip))]" />
+                <span className="absolute left-0 right-0 bottom-0 top-[7px] rounded-sm bg-[var(--chord-chip)] shadow-[0_0_8px_var(--chord-chip)]" />
                 <span
                   className="absolute top-0 left-1/2 -translate-x-1/2"
                   style={{
@@ -497,8 +497,8 @@ function PatternBlock({
                     height: 0,
                     borderLeft: "5px solid transparent",
                     borderRight: "5px solid transparent",
-                    borderTop: "7px solid hsl(var(--chord-chip))",
-                    filter: "drop-shadow(0 0 4px hsl(var(--chord-chip)))",
+                    borderTop: "7px solid var(--chord-chip)",
+                    filter: "drop-shadow(0 0 4px var(--chord-chip))",
                   }}
                 />
               </div>
@@ -825,7 +825,7 @@ function SectionGroup({
                             "h-7 w-7 rounded border border-border transition-transform",
                             isActive && "ring-2 ring-primary scale-110",
                           )}
-                          style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                          style={{ backgroundColor: `color-mix(in oklch, var(--section-tint-${c}) 50%, transparent)` }}
                         />
                       );
                     })}

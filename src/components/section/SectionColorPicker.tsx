@@ -28,7 +28,7 @@ export type SectionColor = (typeof SECTION_COLOR_KEYS)[number];
 export function sectionTintStyle(color: string | null | undefined): React.CSSProperties | undefined {
   if (!color || !SECTION_COLOR_KEYS.includes(color as SectionColor)) return undefined;
   return {
-    backgroundColor: `hsl(var(--section-tint-${color}) / 0.5)`,
+    backgroundColor: `color-mix(in oklch, var(--section-tint-${color}) 50%, transparent)`,
   };
 }
 
@@ -54,7 +54,7 @@ export function SectionColorPicker({ value, onChange, className }: Props) {
             <span
               aria-hidden
               className="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full ring-1 ring-border"
-              style={{ backgroundColor: `hsl(var(--section-tint-${value}))` }}
+              style={{ backgroundColor: `var(--section-tint-${value})` }}
             />
           )}
         </Button>
@@ -74,7 +74,7 @@ export function SectionColorPicker({ value, onChange, className }: Props) {
                   "h-7 w-7 rounded-md border border-border transition-transform",
                   isActive && "ring-2 ring-primary scale-110",
                 )}
-                style={{ backgroundColor: `hsl(var(--section-tint-${c}))` }}
+                style={{ backgroundColor: `var(--section-tint-${c})` }}
               />
             );
           })}
