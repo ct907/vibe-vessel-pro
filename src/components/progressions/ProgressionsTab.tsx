@@ -252,18 +252,21 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
-    // Unified default: single tap selects this chord exclusively, opens the
-    // context menu. Audition only fires when NOT in select/edit mode so the
-    // tap meaning stays unambiguous while editing.
-    const alreadyOnly = selected.size === 1 && selected.has(chordId);
-    const wasInSelectMode = selectMode;
-    setSelectMode(!alreadyOnly);
-    setSelected(alreadyOnly ? new Set() : new Set([chordId]));
-    lastSelectedRef.current = alreadyOnly ? null : chordId;
-    if (!alreadyOnly && !wasInSelectMode && !selectMode) {
-      const c = sortedChords.find((x) => x.id === chordId);
-      if (c) void playChord(c.chord);
+    // Edit Mode (pencil): tap toggles selection only — no audition, no editor.
+    if (selectMode) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(chordId)) next.delete(chordId);
+        else next.add(chordId);
+        return next;
+      });
+      lastSelectedRef.current = chordId;
+      return;
     }
+    // Composition mode: audition + open FocusedChordEditor (mirrors Lyrics tab).
+    const c = sortedChords.find((x) => x.id === chordId);
+    if (c) void playChord(c.chord);
+    onEditChordOpen(pattern.id, chordId);
   };
 
   // The "active" chord is the single-selection case. Multi-selection hides
@@ -438,9 +441,6 @@ function PatternBlock({
                                     e.stopPropagation();
                                     handleChordTap(c.id, e);
                                   }}
-                                  onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
                                     "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all hover:opacity-90",
@@ -1124,6 +1124,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       </div>
 
       <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
+
+      {chordEditor && (
+        <FocusedChordEditor
+          mode="progression"
+          sectionId={chordEditor.sectionId}
+          patternId={chordEditor.patternId}
+          chordId={chordEditor.chordId}
+          onClose={() => setChordEditor(null)}
+        />
+      )}
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteSection}
