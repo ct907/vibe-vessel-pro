@@ -91,11 +91,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-paper text-foreground flex flex-col">
+      <div className="mx-auto w-full max-w-6xl px-4 pt-3">
+        <h1 className="font-display leading-none" style={{ fontSize: "28px" }}>
+          SongNote
+        </h1>
+      </div>
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
-          <h1 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h1>
+          <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
           <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
 
