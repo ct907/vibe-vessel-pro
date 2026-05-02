@@ -1,62 +1,76 @@
-# UI Polish & Interaction Fixes
+## Root cause discovered (covers issues 1 + 2)
 
-Four small, isolated patches across three files. No logic refactors.
+`BasketBar` is currently rendered **twice** when the Chords tab is active:
 
-## 1. BasketBar — fix "drag-after-select needs two gestures"
+1. Once at the layout level in `src/pages/Index.tsx` (with `draggable={true}`, lives inside the global `DragDropContext`).
+2. Once again at the bottom of `src/components/chords/ChordsTab.tsx` (with `draggable={false}` — the default).
+
+Both are `fixed bottom-0 inset-x-0 z-30`, so they stack on top of each other. The non-draggable copy intercepts pointer events on some chips (the exact ones depend on render order / stacking), which explains:
+
+- Issue 1: chips placed from the first row appear "not draggable" (the non-draggable overlay receives the touch) and the third chip shows a visual offset (two chips are rendered at slightly different positions when the draggable wrapper adds inline drag styles).
+- Issue 2: the user has to drag once to "wake up" — that first drag is consumed by the non-draggable overlay; only after some state shuffles does the underlying draggable instance receive the next gesture.
+
+Removing the duplicate is the primary fix. Everything else builds on that.
+
+## 1. Remove duplicate BasketBar in ChordsTab
+
+**File:** `src/components/chords/ChordsTab.tsx`
+- Delete the `<BasketBar … />` render at the bottom of the component and its `import`.
+- The layout-level `BasketBar` in `Index.tsx` already provides `onSendToLyrics` / `onSendToProgressions` for the active tab, so no functionality is lost.
+
+This single change should resolve both Issue 1 (chip 2/3 visual + drag glitches) and most of Issue 2 (the "drag to confirm" extra step).
+
+## 2. Make basket chips drag immediately on tap-after-select (Issue 2 confirmation)
 
 **File:** `src/components/basket/BasketBar.tsx`
 
-The current `<Draggable>` wrapper applies a `cn(snap.isDragging && "opacity-90")` className AND swaps from `<ChordChip>` (when `!draggable`) vs `StaticChordChip` inside the inner div based on selection-related re-renders. The selection toggle (`toggleSelected`) updates Zustand → re-renders the Draggable child → its inner `<StaticChordChip>` receives a new `selected` prop, which changes its className. Pangea's pointer sensor is fine with className changes on the handle node itself, BUT the `aria-pressed` and `aria-label` on the wrapper div ALSO change on selection — which is harmless — however the real culprit is that `tapInfo.current` is set on `pointerdown`, and on `pointerup` after a successful tap we call `toggleSelected`. The very next `pointerdown` (the user's drag attempt) starts on a freshly re-rendered DOM node. Pangea relies on the dragHandle's stable identity across the gesture; the tap's pointerup already ended the gesture, so the next pointerdown should work — UNLESS our `touchAction: "none"` + tap detector is consuming the initial movement.
+The current `onChipPointerDown` already returns early when the chip is selected, but the `cursor: snap.isDragging ? "grabbing" : "grab"` and the `opacity` change happen via inline style on the same element pangea is observing. We will:
 
-**Root cause:** `tapInfo.current` is left dangling after a real tap completes (we set it to `null` correctly), but on touch devices the tap-to-select pointerup fires *before* pangea's long-press timer would, and the immediate follow-up touchstart re-enters `onChipPointerDown` setting a fresh `tapInfo`. If the user then drags within `TAP_MAX_MS` (300ms) AND `TAP_MAX_PX` (8px), `onChipPointerUp` will call `toggleSelected` again — DESELECTING the chip — instead of committing the drag. Pangea's drag may also have started, but the deselection on release makes it look like "the first drag did nothing."
+- Keep the early-return-when-selected behaviour.
+- Move the drag visual indicators (`opacity`, `cursor`) onto the inner `StaticChordChip` wrapper instead of the outer Draggable element so pangea's element identity stays 100% stable across selection toggles.
+- Ensure no `key` on the Draggable changes when `selected` toggles (it already uses `b.id` — verified).
+- Keep `touchAction: "none"` on the Draggable element so the browser doesn't claim the gesture as a scroll on the very first drag after selection.
 
-**Fix:**
-- When the chip is already selected on `pointerdown`, skip arming `tapInfo` so any subsequent movement goes straight to pangea's drag sensor without our tap detector competing.
-- Equivalently: in `onChipPointerUp`, if `selected` is already true, do NOT toggle on a second tap unless the user clearly intends to deselect (we'll accept this minor UX trade — selected chips toggle off only via the explicit "Clear selection" button or by a tap that doesn't move).
-- Keep DOM identity stable: do NOT change keys or wrapper structure based on `sel`. Move the `aria-pressed` and `aria-label` updates to data attributes only (no structural change). The current code already keeps the same `<div ref={prov.innerRef}>` — good — but we'll remove the `cn(snap.isDragging && "opacity-90")` className swap (apply opacity via style instead) so React doesn't reconcile className mid-gesture.
+Result: tap selects, the very next drag immediately moves the chip — no intermediate "wake-up" gesture.
 
-Concretely:
-- In `onChipPointerDown`: `if (isSelected(id)) { tapInfo.current = null; return; }`
-- Replace `className={cn(snap.isDragging && "opacity-90")}` with `style={{ ...prov.draggableProps.style, opacity: snap.isDragging ? 0.9 : 1, ... }}`.
+## 3. BasketBar header layout (Issue 3)
 
-## 2. BasketBar — fully opaque background
+**File:** `src/components/basket/BasketBar.tsx`
 
-**File:** `src/components/basket/BasketBar.tsx` (line ~146)
+Restructure the top row of the basket:
 
-Change:
-```
-bg-paper-shade/95 backdrop-blur shadow-[...]
-```
-to:
-```
-bg-paper-shade shadow-[...]
-```
-Drop the `/95` alpha and `backdrop-blur`.
+- Row A (own line): `Basket · N` count label + the action buttons cluster (`Clear selection`, `Discard`, `To Lyrics`, `To Progressions`).
+- Row B (own line, full width below Row A): the helper text — `Tap to select · long-press selected to drag` / `N selected · drag any to move {all}` (note: "long-press" wording will be updated to plain "drag" since chips are now immediately draggable after selection).
 
-## 3. "Add to basket" button — charcoal style
+Implementation: split the existing `flex flex-col` inside the header into two `<div>` rows; move the helper `<span>` out of its current sibling-stack into its own row.
 
-**File:** `src/components/chords/ChordsTab.tsx` (line 229)
+## 4. Add non-sticky "SongNote" app title (Issue 4)
 
-Replace:
-```
-className="h-12 bg-indigo-300 text-chord-chip-foreground shadow-lg shadow-indigo-300 text-base px-6 py-6"
-```
-with:
-```
-className="h-12 bg-zinc-800 text-zinc-50 hover:bg-zinc-700 shadow-lg text-base px-6 py-6"
+**File:** `src/pages/Index.tsx`
+
+Add a new heading element above the `<TransportHeader />`:
+
+```tsx
+<div className="mx-auto w-full max-w-6xl px-4 pt-3">
+  <h1 className="font-display" style={{ fontSize: "28px", lineHeight: 1 }}>
+    SongNote
+  </h1>
+</div>
+<TransportHeader … />
 ```
 
-## 4. FocusedChordEditor header — header-sized
-
-**File:** `src/components/lyrics/FocusedChordEditor.tsx` (lines 164–169)
-
-- Keep the small "Slot N of M · adding/editing" caption as-is (it's the eyebrow).
-- Change the `<h2>` from `text-sm font-semibold` to `text-xl font-bold`.
+- Placed as a normal block flow element (not `sticky`/`fixed`), so it scrolls away naturally.
+- `TransportHeader` keeps its existing `sticky top-2` behaviour and remains pinned after the title scrolls off.
+- Uses the existing `font-display` family token (title font style) at exactly 28px as requested.
+- Convert the existing `sr-only` `<h1>` inside `<main>` to an `<h2>` so we don't ship two visible/structural h1s.
 
 ## Files touched
 
-- `src/components/basket/BasketBar.tsx` — fixes 1 & 3
-- `src/components/chords/ChordsTab.tsx` — fix 2
-- `src/components/lyrics/FocusedChordEditor.tsx` — fix 4
+- `src/components/chords/ChordsTab.tsx` — remove duplicate BasketBar + import.
+- `src/components/basket/BasketBar.tsx` — drag-handle stability tweak + header restructure (2 rows) + helper text wording update.
+- `src/pages/Index.tsx` — add non-sticky `SongNote` title; demote `sr-only` h1 → h2.
 
-No store, no types, no test changes.
+## Out of scope
+
+- No changes to the Lyrics or Progressions tabs.
+- No changes to the chord color system, picker sheet, or audio engine.
