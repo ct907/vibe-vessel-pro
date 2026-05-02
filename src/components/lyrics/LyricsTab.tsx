@@ -491,7 +491,7 @@ function LineRow({
                                 {playing && (
                                   <span
                                     aria-hidden
-                                    className="absolute inset-0 rounded-md ring-2 ring-[hsl(var(--chord-chip))] animate-pulse pointer-events-none"
+                                    className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
                                   />
                                 )}
                               </div>
@@ -927,7 +927,7 @@ function SectionCard({
                           "h-7 w-7 rounded border border-border transition-transform",
                           isActive && "ring-2 ring-primary scale-110",
                         )}
-                        style={{ backgroundColor: `hsl(var(--section-tint-${c}) / 0.5)` }}
+                        style={{ backgroundColor: `color-mix(in oklch, var(--section-tint-${c}) 50%, transparent)` }}
                       />
                     );
                   })}

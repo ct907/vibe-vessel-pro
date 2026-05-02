@@ -239,16 +239,16 @@ export function FocusedChordEditor({
           )}
           <div className="grid grid-cols-2 gap-2">
             {suggestions.map((s) => {
-              const { bg, text } = getChordColorClasses(s.symbol);
+              const colors = getChordColorClasses(s.symbol);
               return (
                 <button
                   key={s.symbol.display}
                   type="button"
                   onClick={() => handlePick(s.symbol)}
+                  style={colors.style}
                   className={cn(
-                    bg,
-                    text,
-                    "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left hover:opacity-90 transition-opacity",
+                    colors.className,
+                    "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left",
                   )}
                 >
                   <div className="min-w-0">

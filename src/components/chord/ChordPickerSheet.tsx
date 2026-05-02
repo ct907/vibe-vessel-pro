@@ -196,14 +196,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
             >
               <div className="flex gap-2 w-max pb-2">
                 {suggestions.map((s) => {
-                  const { bg, text } = getChordColorClasses(s.symbol);
+                  const colors = getChordColorClasses(s.symbol);
                   return (
                     <button
                       key={s.symbol.display}
+                      style={colors.style}
                       className={cn(
-                        bg,
-                        text,
-                        "group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left hover:opacity-90 transition-opacity min-w-[110px]",
+                        colors.className,
+                        "group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
                       )}
                       onClick={() => handlePick(s.symbol)}
                     >
@@ -228,14 +228,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
             <div className="overflow-y-auto -mx-1 px-1 flex-1 min-h-0" style={{ maxHeight: `${gridMaxHeight}px` }}>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {suggestions.map((s) => {
-                  const { bg, text } = getChordColorClasses(s.symbol);
+                  const colors = getChordColorClasses(s.symbol);
                   return (
                     <button
                       key={s.symbol.display}
+                      style={colors.style}
                       className={cn(
-                        bg,
-                        text,
-                        "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left hover:opacity-90 transition-opacity",
+                        colors.className,
+                        "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
                       )}
                       onClick={() => handlePick(s.symbol)}
                     >

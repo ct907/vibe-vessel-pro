@@ -128,14 +128,14 @@ export function ChordChip({
 
   const sizeCls =
     size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
-  // Phase 1.5: chord-tinted backgrounds for ink/card variants. The "filled"
-  // variant remains a generic primary fill for non-chord uses (e.g. basket
-  // controls).
+  // Chord-tinted backgrounds for ink/card variants come from inline style
+  // (oklch + oklch-interpolated gradients). The "filled" variant remains a
+  // generic primary fill for non-chord uses (e.g. basket controls).
   const colors = getChordColorClasses(chord);
-  const variantCls =
-    variant === "filled"
-      ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
-      : `${colors.bg} ${colors.text} hover:opacity-90`;
+  const isFilled = variant === "filled";
+  const variantCls = isFilled
+    ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
+    : colors.className;
 
   return (
     <button
@@ -154,6 +154,7 @@ export function ChordChip({
         releaseHold();
         onLongPress?.();
       }}
+      style={isFilled ? undefined : colors.style}
       className={cn(
         "inline-flex items-center rounded-md font-mono-chord font-semibold transition-all select-none",
         sizeCls,

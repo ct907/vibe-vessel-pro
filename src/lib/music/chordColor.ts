@@ -1,81 +1,115 @@
-// Phase 1.5 chord color taxonomy.
+// Pastel chord color taxonomy (OKLCH).
 //
-// Maps chord quality to a Tailwind background + foreground class pair.
-// Solid colors for triads / bright colors; horizontal gradients for
-// extended / dominant / altered families.
+// Each chord quality maps to an inline `style` (background + foreground color)
+// plus a small `className` that carries hover behavior. Multi-color families
+// use `linear-gradient(to right in oklch, A, B)` so the gradient interpolates
+// in OKLCH and avoids the muddy midpoints you'd get from default sRGB
+// interpolation.
 //
-// IMPORTANT: any new color literal added here MUST also be present in
-// `tailwind.config.ts`'s `safelist` (literal or matching pattern), otherwise
-// it will be purged in production builds.
+// All OKLCH literals were generated from the requested hex palette.
 
+import type { CSSProperties } from "react";
 import type { ChordSymbol } from "./chords";
 
 export interface ChordColorClasses {
+  /** Inline style carrying background (solid or oklch gradient) + text color. */
+  style: CSSProperties;
+  /** Hover/transition utility class — no color classes here. */
+  className: string;
+  /** Back-compat: empty strings so legacy callers using `bg`/`text` still compile. */
   bg: string;
   text: string;
 }
 
-export function getChordColorClasses(chord: ChordSymbol): ChordColorClasses {
-  switch (chord.quality) {
-    // Solid triads
-    case "maj":
-      return { bg: "bg-yellow-700", text: "text-stone-50" };
-    case "min":
-      return { bg: "bg-blue-800", text: "text-stone-50" };
+// Dark slate text for AA contrast on every pastel.
+const TEXT = "oklch(0.25 0.02 260)";
+const HOVER = "transition-opacity hover:opacity-90";
 
-    // Bright (added-tone, no 7th)
+// Pastel palette (hex -> oklch).
+const SOFT_PEACH    = "oklch(0.9294 0.0816 89.78)";   // #FDE6A9
+const POWDER_BLUE   = "oklch(0.9092 0.0316 243.72)";  // #D0E4F5
+const PALE_BUTTER   = "oklch(0.9597 0.0633 94.68)";   // #FFF2C2
+const ICE_BLUE      = "oklch(0.9469 0.0209 236.76)";  // #E1F0FA
+const WARM_SAND     = "oklch(0.9272 0.0651 83.56)";   // #FCE4B6
+const ROSE          = "oklch(0.8689 0.0539 11.07)";   // #F5C6CB
+const SKY_BLUE      = "oklch(0.9046 0.0400 263.66)";  // #D2E0FB
+const LAVENDER      = "oklch(0.8897 0.0407 307.95)";  // #E2D4F0
+const APRICOT       = "oklch(0.9013 0.0465 54.45)";   // #F8D7C2
+const PERIWINKLE    = "oklch(0.8744 0.0387 264.35)";  // #C9D6F0
+const MINT          = "oklch(0.9088 0.0353 150.52)";  // #D1E8D5
+const MUTED_BLUSH   = "oklch(0.8693 0.0443 18.04)";   // #F0C9C9
+const DUSTY_BLUE    = "oklch(0.8626 0.0268 274.07)";  // #CCD1E4
+const LILAC         = "oklch(0.8460 0.0483 311.68)";  // #D7C4E4
+const SOFT_THISTLE  = "oklch(0.8865 0.0337 308.94)";  // #E0D4EB
+const PALE_GOLD     = WARM_SAND;                       // #FCE4B6
+const COTTON_CANDY  = "oklch(0.9065 0.0471 350.82)";  // #FAD4E4
+const PALE_LEMON    = "oklch(0.9565 0.0595 94.86)";   // #FDF1C4
+const BABY_BLUE     = "oklch(0.9265 0.0286 238.25)";  // #D6EAF8
+
+const solid = (color: string): CSSProperties => ({ background: color, color: TEXT });
+const grad  = (a: string, b: string): CSSProperties => ({
+  background: `linear-gradient(to right in oklch, ${a}, ${b})`,
+  color: TEXT,
+});
+
+function styleFor(quality: ChordSymbol["quality"]): CSSProperties {
+  switch (quality) {
+    // Plain triads
+    case "maj":     return solid(SOFT_PEACH);
+    case "min":     return solid(POWDER_BLUE);
+
+    // Gentle (added-tone, no 7th)
     case "6":
     case "add9":
-    case "6/9":
-      return { bg: "bg-yellow-300", text: "text-zinc-900" };
-    case "min6":
-      return { bg: "bg-blue-300", text: "text-zinc-900" };
+    case "6/9":     return solid(PALE_BUTTER);
+    case "min6":    return solid(ICE_BLUE);
 
-    // Major-extended (gradient)
+    // Major-extended
     case "maj7":
     case "maj9":
     case "maj11":
     case "maj13":
-    case "add11":
-      return { bg: "bg-gradient-to-r from-yellow-600 to-red-700", text: "text-stone-50" };
+    case "add11":   return grad(WARM_SAND, ROSE);
 
-    // Minor-extended (gradient)
+    // Minor-extended
     case "min7":
     case "min9":
     case "min11":
-    case "min13":
-      return { bg: "bg-gradient-to-r from-blue-700 to-purple-950", text: "text-stone-50" };
+    case "min13":   return grad(SKY_BLUE, LAVENDER);
 
-    // Dominant (gradient)
+    // Dominant
     case "7":
-    case "9":
-      return { bg: "bg-gradient-to-r from-orange-800 to-blue-600", text: "text-stone-50" };
+    case "9":       return grad(APRICOT, PERIWINKLE);
 
-    // Altered dominant (gradient)
+    // Altered dominant
     case "7alt":
     case "7#5":
     case "7b9":
-    case "7#9":
-      return { bg: "bg-gradient-to-r from-green-700 to-red-800", text: "text-stone-50" };
+    case "7#9":     return grad(MINT, MUTED_BLUSH);
 
-    // Minor-major (gradient)
-    case "minMaj7":
-      return { bg: "bg-gradient-to-r from-purple-800 to-yellow-600", text: "text-stone-50" };
-
-    // Diminished family (gradient)
+    // Diminished family
     case "dim":
     case "dim7":
-    case "m7b5":
-      return { bg: "bg-gradient-to-r from-blue-800 to-purple-950", text: "text-stone-50" };
+    case "m7b5":    return grad(DUSTY_BLUE, LILAC);
 
-    // Suspended / augmented (bright)
+    // Minor-major
+    case "minMaj7": return grad(SOFT_THISTLE, PALE_GOLD);
+
+    // Suspended / augmented
     case "sus2":
     case "sus4":
-    case "aug":
-      return { bg: "bg-pink-300", text: "text-zinc-900" };
+    case "aug":     return solid(COTTON_CANDY);
 
     // Power chord
-    case "5":
-      return { bg: "bg-gradient-to-r from-yellow-300 to-blue-300", text: "text-zinc-900" };
+    case "5":       return grad(PALE_LEMON, BABY_BLUE);
   }
+}
+
+export function getChordColorClasses(chord: ChordSymbol): ChordColorClasses {
+  return {
+    style: styleFor(chord.quality),
+    className: HOVER,
+    bg: "",
+    text: "",
+  };
 }
