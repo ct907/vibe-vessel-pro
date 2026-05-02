@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
-import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode } from "@/lib/music/chords";
+import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,28 +9,9 @@ import { cn } from "@/lib/utils";
 import { Plus, Music, X } from "lucide-react";
 import { BasketBar } from "@/components/basket/BasketBar";
 
-// All qualities shown together, in display order.
-const ALL_QUALITIES: Quality[] = [
-  "maj",
-  "min",
-  "dim",
-  "aug",
-  "sus2",
-  "sus4",
-  "maj7",
-  "min7",
-  "7",
-  "dim7",
-  "m7b5",
-  "minMaj7",
-  "maj9",
-  "min9",
-  "9",
-  "add9",
-  "6",
-  "min6",
-];
-
+// Phase 1.5: render the full picker vocabulary (31 qualities) so all chord
+// families — including power, 6/9, extended, and altered dominants — appear
+// in each scale-degree row. Row-level dedupe collapses enharmonic duplicates.
 const qualitySuffix = (q: Quality): string => (q === "maj" ? "" : q === "min" ? "m" : q);
 
 interface ChordsTabProps {
@@ -61,7 +42,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     return ladder.map((deg) => {
       const variants: ChordSymbol[] = [];
       const seenInRow = new Set<string>();
-      for (const q of ALL_QUALITIES) {
+      for (const q of COMMON_QUALITIES) {
         const parsed = parseChord(deg.chord.root + qualitySuffix(q));
         if (!parsed) continue;
         if (seenInRow.has(parsed.display)) continue;

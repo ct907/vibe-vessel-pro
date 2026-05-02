@@ -6,6 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from "@/lib/music/chords";
+import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -194,51 +195,65 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
               style={{ maxHeight: `${gridMaxHeight}px` }}
             >
               <div className="flex gap-2 w-max pb-2">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.symbol.display}
-                    className="group flex flex-col items-start gap-0.5 rounded-md border border-border bg-card px-3 py-2 text-left hover:bg-accent transition-colors min-w-[110px]"
-                    onClick={() => handlePick(s.symbol)}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="font-mono-chord font-semibold ink-chord">{s.symbol.display}</span>
-                      <span
-                        role="button"
-                        aria-label={`Preview ${s.symbol.display}`}
-                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                        className="ml-auto rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-background"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground truncate w-full">{s.label}</div>
-                  </button>
-                ))}
+                {suggestions.map((s) => {
+                  const { bg, text } = getChordColorClasses(s.symbol);
+                  return (
+                    <button
+                      key={s.symbol.display}
+                      className={cn(
+                        bg,
+                        text,
+                        "group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left hover:opacity-90 transition-opacity min-w-[110px]",
+                      )}
+                      onClick={() => handlePick(s.symbol)}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <span className="font-mono-chord font-semibold">{s.symbol.display}</span>
+                        <span
+                          role="button"
+                          aria-label={`Preview ${s.symbol.display}`}
+                          onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
+                          className="ml-auto rounded-full p-1 bg-black/10 hover:bg-black/20"
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                      <div className="text-[10px] opacity-80 truncate w-full">{s.label}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
             <div className="overflow-y-auto -mx-1 px-1 flex-1 min-h-0" style={{ maxHeight: `${gridMaxHeight}px` }}>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.symbol.display}
-                    className="group flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-left hover:bg-accent transition-colors"
-                    onClick={() => handlePick(s.symbol)}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono-chord font-semibold ink-chord">{s.symbol.display}</div>
-                      <div className="text-xs text-muted-foreground truncate">{s.label}</div>
-                    </div>
-                    <span
-                      role="button"
-                      aria-label={`Preview ${s.symbol.display}`}
-                      onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                      className="rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-background"
+                {suggestions.map((s) => {
+                  const { bg, text } = getChordColorClasses(s.symbol);
+                  return (
+                    <button
+                      key={s.symbol.display}
+                      className={cn(
+                        bg,
+                        text,
+                        "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left hover:opacity-90 transition-opacity",
+                      )}
+                      onClick={() => handlePick(s.symbol)}
                     >
-                      <Play className="h-4 w-4" />
-                    </span>
-                  </button>
-                ))}
+                      <div className="min-w-0">
+                        <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
+                        <div className="text-xs opacity-80 truncate">{s.label}</div>
+                      </div>
+                      <span
+                        role="button"
+                        aria-label={`Preview ${s.symbol.display}`}
+                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
+                        className="rounded-full p-1.5 bg-black/10 hover:bg-black/20"
+                      >
+                        <Play className="h-4 w-4" />
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
