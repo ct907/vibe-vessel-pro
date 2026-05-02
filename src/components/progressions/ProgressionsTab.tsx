@@ -723,6 +723,7 @@ interface SectionGroupProps {
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
+  onEditChordOpen: (patternId: string, chordId: string) => void;
   /** When true: hide block counter & delete; show up/down reorder arrows. */
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
@@ -738,6 +739,7 @@ function SectionGroup({
   onPickerOpen,
   onRequestDeleteSection,
   onRequestDeleteBlock,
+  onEditChordOpen,
   sortMode,
   onMoveSection,
 }: SectionGroupProps) {
