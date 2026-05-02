@@ -940,8 +940,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
+  const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
+
+  const openChordEditor = (patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
+  };
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
   const groupedSections = sections
@@ -1084,6 +1091,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onPickerOpen={openPicker}
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
+          onEditChordOpen={openChordEditor}
           sortMode={sortMode}
           onMoveSection={(id, direction) => moveSection(id, direction)}
         />
