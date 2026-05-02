@@ -87,6 +87,14 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
   const selectionSize = selected.size;
 
   const onChipPointerDown = (id: string, e: React.PointerEvent) => {
+    // If the chip is already selected, skip arming the tap detector so any
+    // subsequent movement is owned exclusively by pangea's drag sensor.
+    // This fixes the regression where the first drag after select did nothing
+    // because pointerup deselected the chip mid-gesture.
+    if (isSelected(id)) {
+      tapInfo.current = null;
+      return;
+    }
     tapInfo.current = { id, t: Date.now(), x: e.clientX, y: e.clientY };
   };
   const onChipPointerUp = (id: string, e: React.PointerEvent) => {
@@ -136,9 +144,9 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 WebkitUserSelect: "none",
                 WebkitTouchCallout: "none",
                 cursor: snap.isDragging ? "grabbing" : "grab",
+                opacity: snap.isDragging ? 0.9 : 1,
                 ...prov.draggableProps.style,
               }}
-              className={cn(snap.isDragging && "opacity-90")}
             >
               <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
             </div>
@@ -150,7 +158,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
   return (
     <div
       ref={ref}
-      className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade/95 backdrop-blur shadow-[0_-8px_24px_-12px_color-mix(in_oklch,var(--foreground)_20%,transparent)]"
+      className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade shadow-[0_-8px_24px_-12px_color-mix(in_oklch,var(--foreground)_20%,transparent)]"
     >
       <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
         {/* Header: count + selection state + clear actions */}

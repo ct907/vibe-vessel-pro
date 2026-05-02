@@ -226,7 +226,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           <Button
             onClick={sendSelected}
             size="default"
-            className="h-12 bg-indigo-300 text-chord-chip-foreground shadow-lg shadow-indigo-300 text-base px-6 py-6"
+            className="h-12 bg-zinc-800 text-zinc-50 hover:bg-zinc-700 shadow-lg text-base px-6 py-6"
           >
             <Plus className="h-5 w-5" /> Add {selectedCount} to basket
           </Button>
