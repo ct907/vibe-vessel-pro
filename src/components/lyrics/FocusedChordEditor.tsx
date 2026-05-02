@@ -164,7 +164,7 @@ export function FocusedChordEditor({
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
               Slot {slot + 1} of {CHORD_ROW_SLOTS} {anchorId ? "· editing" : "· adding"}
             </p>
-            <h2 className="text-sm font-semibold text-foreground truncate">
+            <h2 className="text-xl font-bold text-foreground truncate">
               Add Chords to {sectionLabel}
             </h2>
           </div>
