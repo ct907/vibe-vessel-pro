@@ -134,7 +134,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               data-basket-id={b.id}
               role="button"
               aria-pressed={sel}
-              aria-label={sel ? `Selected chord ${b.chord.display}. Long-press to drag.` : `Chord ${b.chord.display}. Tap to select, long-press to drag.`}
+              aria-label={sel ? `Selected chord ${b.chord.display}. Drag to move.` : `Chord ${b.chord.display}. Tap to select, then drag.`}
               onPointerDown={(e) => onChipPointerDown(b.id, e)}
               onPointerUp={(e) => onChipPointerUp(b.id, e)}
               onPointerCancel={() => (tapInfo.current = null)}
@@ -143,12 +143,17 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 userSelect: "none",
                 WebkitUserSelect: "none",
                 WebkitTouchCallout: "none",
-                cursor: snap.isDragging ? "grabbing" : "grab",
-                opacity: snap.isDragging ? 0.9 : 1,
                 ...prov.draggableProps.style,
               }}
             >
-              <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
+              <div
+                style={{
+                  cursor: snap.isDragging ? "grabbing" : "grab",
+                  opacity: snap.isDragging ? 0.9 : 1,
+                }}
+              >
+                <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
+              </div>
             </div>
           )}
         </Draggable>
@@ -161,22 +166,11 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
       className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade shadow-[0_-8px_24px_-12px_color-mix(in_oklch,var(--foreground)_20%,transparent)]"
     >
       <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
-        {/* Header: count + selection state + clear actions */}
+        {/* Row A: count + action buttons */}
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Basket · {basket.length}
-            </span>
-            <span className="text-[11px] text-muted-foreground/90">
-              {selectionSize === 0
-                ? "Tap to select · long-press selected to drag"
-                : (
-                  <span className="text-primary font-medium">
-                    {selectionSize} selected · long-press any to drag {selectionSize > 1 ? "all" : ""}
-                  </span>
-                )}
-            </span>
-          </div>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Basket · {basket.length}
+          </span>
 
           <div className="flex items-center gap-1 shrink-0">
             {selectionSize > 0 && (
@@ -206,6 +200,17 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Row B: helper text on its own line */}
+        <div className="text-[11px] text-muted-foreground/90">
+          {selectionSize === 0 ? (
+            "Tap to select · drag to move"
+          ) : (
+            <span className="text-primary font-medium">
+              {selectionSize} selected · drag any to move {selectionSize > 1 ? "all" : ""}
+            </span>
+          )}
         </div>
 
         {/* Chips area */}

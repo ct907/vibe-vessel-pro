@@ -7,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Plus, Music, X } from "lucide-react";
-import { BasketBar } from "@/components/basket/BasketBar";
 
 // Phase 1.5: render the full picker vocabulary (31 qualities) so all chord
 // families — including power, 6/9, extended, and altered dominants — appear
@@ -242,10 +241,6 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
         </div>
       )}
 
-      <BasketBar
-        onSendToLyrics={() => onSwitchTab?.("lyrics")}
-        onSendToProgressions={() => onSwitchTab?.("progressions")}
-      />
     </div>
   );
 }
