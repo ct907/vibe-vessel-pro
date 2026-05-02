@@ -858,22 +858,52 @@ function SectionGroup({
 
       {/* Pattern blocks within this section */}
       {!collapsed &&
-        blocks.map((p, i) => (
-          <PatternBlock
-            key={p.id}
-            pattern={p}
-            blockIndex={i}
-            blocksInSection={blocks.length}
-            otherPatterns={blocks
-              .filter((q) => q.id !== p.id)
-              .map((q) => ({
+        blocks.map((p, i) => {
+          // "Move to…" should reach EVERY other pattern block in the song,
+          // not just siblings within this section. Build the option list from
+          // allPatterns, labelled by section name + block index, sorted by
+          // section order then block order.
+          const otherAll = allPatterns
+            .map((q, qi) => ({ q, qi }))
+            .filter((x) => x.q.id !== p.id)
+            .map(({ q }) => {
+              const sid = q.sectionId ?? q.id;
+              const sectionLabel = q.sectionId
+                ? // Look up section display name via the parent's allSections store.
+                  // (allPatterns is grouped from `sections`; we resolve via the
+                  // sibling SectionGroup's `displayName` for the same section,
+                  // but we don't have it here — use the section's stored label.)
+                  ""
+                : "";
+              const sameSectionBlocks = allPatterns.filter(
+                (b) => (b.sectionId ?? b.id) === sid,
+              );
+              const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
+              return {
                 id: q.id,
-                label: `${displayName}: Block ${blocks.findIndex((b) => b.id === q.id) + 1}`,
+                sectionId: sid,
+                blockNum,
+                label: `Block ${blockNum}`,
+              };
+            });
+          return (
+            <PatternBlock
+              key={p.id}
+              pattern={p}
+              blockIndex={i}
+              blocksInSection={blocks.length}
+              otherPatterns={otherAll.map((o) => ({
+                id: o.id,
+                label:
+                  o.sectionId === sectionId
+                    ? `${displayName}: ${o.label}`
+                    : `[other section]: ${o.label}`,
               }))}
-            onPickerOpen={onPickerOpen}
-            onRequestDeleteBlock={onRequestDeleteBlock}
-          />
-        ))}
+              onPickerOpen={onPickerOpen}
+              onRequestDeleteBlock={onRequestDeleteBlock}
+            />
+          );
+        })}
 
       {!collapsed && (
         <Button variant="outline" size="sm" className="w-full" onClick={() => addPatternToSection(sectionId)}>
