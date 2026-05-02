@@ -98,6 +98,7 @@ function PatternBlock({
   otherPatterns,
   onPickerOpen,
   onRequestDeleteBlock,
+  onEditChordOpen,
 }: PatternProps) {
   const {
     updatePattern,
