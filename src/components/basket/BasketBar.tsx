@@ -33,12 +33,10 @@ function StaticChordChip({
       className={cn(
         "relative inline-flex items-center gap-1 rounded-md font-mono-chord font-semibold select-none transition-colors",
         "px-2.5 py-1 text-sm",
-        colors.bg,
-        colors.text,
         selected && "ring-2 ring-primary ring-offset-1 ring-offset-paper-shade",
         dragging && "shadow-lg ring-2 ring-primary",
       )}
-      style={{ pointerEvents: "none" }}
+      style={{ ...colors.style, pointerEvents: "none" }}
     >
       <GripVertical className="h-3 w-3 opacity-60" aria-hidden />
       {chord.display}
