@@ -441,7 +441,6 @@ function PatternBlock({
                                     e.stopPropagation();
                                     handleChordTap(c.id, e);
                                   }}
-                                  }}
                                   className={cn(
                                     "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all hover:opacity-90",
                                     colors.className,
