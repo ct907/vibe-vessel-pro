@@ -891,6 +891,7 @@ function SectionGroup({
               otherPatterns={otherAll}
               onPickerOpen={onPickerOpen}
               onRequestDeleteBlock={onRequestDeleteBlock}
+              onEditChordOpen={onEditChordOpen}
             />
           );
         })}
