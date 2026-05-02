@@ -1006,7 +1006,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       return;
     }
 
-    // Cross-block: validate capacity for the chord(s) being moved.
+    // Cross-block (and possibly cross-section): validate capacity for the
+    // chord(s) being moved. movePatternChordToPatternAt now handles both
+    // intra- and cross-section moves.
     const fromPattern = state.progression.find((p) => p.id === fromId);
     if (!fromPattern) return;
     const movingIds = [draggableId];
@@ -1024,7 +1026,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       });
       return;
     }
-    movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
+    state.movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {
