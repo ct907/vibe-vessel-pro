@@ -83,6 +83,8 @@ interface PatternProps {
   otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
+  /** Open the FocusedChordEditor to replace a chord's family. */
+  onEditChordOpen: (patternId: string, chordId: string) => void;
 }
 
 function formatBeats(n: number) {
