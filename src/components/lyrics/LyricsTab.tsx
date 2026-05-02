@@ -251,7 +251,10 @@ function LineRow({
   };
 
   // ---- Selection helpers (range-select via shift) ----
-  const sortedChords = [...lineChords].sort((a, b) => slotOf(a) - slotOf(b));
+  // SSOT order is authoritative — getLineChordsViaSSOT already returns chords
+  // in section.chords order. Re-sorting by slotIndex would override cross-tab
+  // reorders done in the progression view, so we trust the SSOT array as-is.
+  const sortedChords = lineChords;
   const lastSelectedRef = useRef<string | null>(null);
   const selectRangeTo = (anchorId: string, additive: boolean) => {
     const anchor = lastSelectedRef.current;
