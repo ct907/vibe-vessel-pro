@@ -238,30 +238,37 @@ export function FocusedChordEditor({
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
-            {suggestions.map((s) => (
-              <button
-                key={s.symbol.display}
-                type="button"
-                onClick={() => handlePick(s.symbol)}
-                className="group flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-3 text-left hover:bg-accent transition-colors"
-              >
-                <div className="min-w-0">
-                  <div className="font-mono-chord font-semibold ink-chord">{s.symbol.display}</div>
-                  <div className="text-xs text-muted-foreground truncate">{s.label}</div>
-                </div>
-                <span
-                  role="button"
-                  aria-label={`Preview ${s.symbol.display}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void playChord(s.symbol);
-                  }}
-                  className="rounded-full p-2 text-muted-foreground hover:text-primary hover:bg-background"
+            {suggestions.map((s) => {
+              const { bg, text } = getChordColorClasses(s.symbol);
+              return (
+                <button
+                  key={s.symbol.display}
+                  type="button"
+                  onClick={() => handlePick(s.symbol)}
+                  className={cn(
+                    bg,
+                    text,
+                    "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left hover:opacity-90 transition-opacity",
+                  )}
                 >
-                  <Play className="h-4 w-4" />
-                </span>
-              </button>
-            ))}
+                  <div className="min-w-0">
+                    <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
+                    <div className="text-xs opacity-80 truncate">{s.label}</div>
+                  </div>
+                  <span
+                    role="button"
+                    aria-label={`Preview ${s.symbol.display}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void playChord(s.symbol);
+                    }}
+                    className="rounded-full p-2 bg-black/10 hover:bg-black/20"
+                  >
+                    <Play className="h-4 w-4" />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
