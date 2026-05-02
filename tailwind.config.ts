@@ -4,18 +4,10 @@ export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
-  // Phase 1.5: chord color taxonomy uses dynamic Tailwind classes resolved at
-  // runtime via getChordColorClasses(). Safelist them so the production purge
-  // doesn't drop them.
-  safelist: [
-    "bg-yellow-700", "bg-yellow-300",
-    "bg-blue-800", "bg-blue-300",
-    "bg-pink-300",
-    "bg-gradient-to-r",
-    "text-stone-50", "text-zinc-900",
-    { pattern: /^from-(yellow|red|blue|purple|orange|pink|green)-(300|400|600|700|800|900|950)$/ },
-    { pattern: /^to-(yellow|red|blue|purple|orange|pink|green)-(300|400|600|700|800|900|950)$/ },
-  ],
+  // Chord chip colors are now applied via inline `style` (oklch literals and
+  // gradients with `in oklch` interpolation) — no Tailwind classes needed.
+  // The section-tint backgrounds are applied via inline `style` too, so no
+  // safelist patterns are required for those.
   theme: {
     container: {
       center: true,
@@ -26,59 +18,59 @@ export default {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
         paper: {
-          DEFAULT: "hsl(var(--paper))",
-          shade: "hsl(var(--paper-shade))",
+          DEFAULT: "var(--paper)",
+          shade: "var(--paper-shade)",
         },
-        rule: "hsl(var(--rule))",
-        "ink-soft": "hsl(var(--ink-soft))",
-        "chord-ink": "hsl(var(--chord-ink))",
+        rule: "var(--rule)",
+        "ink-soft": "var(--ink-soft)",
+        "chord-ink": "var(--chord-ink)",
         "chord-chip": {
-          DEFAULT: "hsl(var(--chord-chip))",
-          foreground: "hsl(var(--chord-chip-foreground))",
+          DEFAULT: "var(--chord-chip)",
+          foreground: "var(--chord-chip-foreground)",
         },
         sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+          DEFAULT: "var(--sidebar-background)",
+          foreground: "var(--sidebar-foreground)",
+          primary: "var(--sidebar-primary)",
+          "primary-foreground": "var(--sidebar-primary-foreground)",
+          accent: "var(--sidebar-accent)",
+          "accent-foreground": "var(--sidebar-accent-foreground)",
+          border: "var(--sidebar-border)",
+          ring: "var(--sidebar-ring)",
         },
       },
       borderRadius: {
