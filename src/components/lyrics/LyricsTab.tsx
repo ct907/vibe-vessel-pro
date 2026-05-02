@@ -408,9 +408,10 @@ function LineRow({
                     data-slot-index={slotIdx}
                     className={cn(
                       "relative shrink-0 h-9 flex items-center justify-start",
-                      // Width: 28px floor for empty slots, fit-content with a
-                      // 48px cap for occupied slots so long chord names fit.
-                      occupied ? "min-w-[28px] max-w-[48px] w-fit" : "w-7",
+                      // Stable widths: empty slots are 28px; occupied slots
+                      // are a definite 40px so the row layout doesn't collapse
+                      // when pangea detaches the dragging chip from flow.
+                      occupied ? "w-10" : "w-7",
                       // Per-slot left border acts as the vertical divider
                       // between adjacent slots (skip the first one).
                       slotIdx > 0 && !isAnyDragging && "border-l border-muted-foreground/12",
