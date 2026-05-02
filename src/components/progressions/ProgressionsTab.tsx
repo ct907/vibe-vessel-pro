@@ -742,6 +742,7 @@ function SectionGroup({
   const updateSection = useSongStore((s) => s.updateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
+  const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
