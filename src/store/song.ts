@@ -2461,10 +2461,71 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     if (!fromPattern || !toPattern) return {};
     const fromSectionId = fromPattern.sectionId ?? fromPattern.id;
     const toSectionId = toPattern.sectionId ?? toPattern.id;
+
+    // ---- Cross-section move ----
+    // Detach the SectionChord from its source section (drops the lyrics
+    // anchor, mirroring movePatternChordsTo's cross-section behavior) and
+    // re-add it to the target section at a chosen position within
+    // `toPatternId`'s SC group. The chord type is preserved.
     if (fromSectionId !== toSectionId) {
-      // Cross-section: not supported by this action — bail.
-      return {};
+      const fromSec = s.sections.find((x) => x.id === fromSectionId);
+      const toSec = s.sections.find((x) => x.id === toSectionId);
+      if (!fromSec || !toSec) return {};
+      const moving = fromSec.chords.find((c) => c.id === chordId);
+      if (!moving || !moving.progressionPlacement) return {};
+      const newId = nanoid();
+      const remapped: SectionChord = {
+        id: newId,
+        chord: moving.chord,
+        progressionPlacement: {
+          patternId: toPatternId,
+          startBeat: 0,
+          lengthBeats: moving.progressionPlacement.lengthBeats,
+        },
+      };
+      // Compute insertion point in target section.chords based on toIndex
+      // within the destination pattern's SC group.
+      const targetSCs = toSec.chords.filter(
+        (c) => c.progressionPlacement?.patternId === toPatternId,
+      );
+      const insertAt = Math.max(0, Math.min(targetSCs.length, toIndex));
+      const anchorBeforeId = insertAt === 0 ? null : targetSCs[insertAt - 1].id;
+      const nextToChords: SectionChord[] = [];
+      if (anchorBeforeId === null) {
+        let inserted = false;
+        for (const c of toSec.chords) {
+          if (!inserted && c.progressionPlacement?.patternId === toPatternId) {
+            nextToChords.push(remapped);
+            inserted = true;
+          }
+          nextToChords.push(c);
+        }
+        if (!inserted) nextToChords.push(remapped);
+      } else {
+        let inserted = false;
+        for (const c of toSec.chords) {
+          nextToChords.push(c);
+          if (!inserted && c.id === anchorBeforeId) {
+            nextToChords.push(remapped);
+            inserted = true;
+          }
+        }
+        if (!inserted) nextToChords.push(remapped);
+      }
+      const nextSections = s.sections.map((x) => {
+        if (x.id === fromSectionId) {
+          return { ...x, chords: x.chords.filter((c) => c.id !== chordId) };
+        }
+        if (x.id === toSectionId) {
+          return { ...x, chords: nextToChords };
+        }
+        return x;
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     }
+
+    // ---- Same-section move / reorder ----
     const sectionId = fromSectionId;
     const sec = s.sections.find((x) => x.id === sectionId);
     if (!sec) return {};

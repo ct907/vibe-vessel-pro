@@ -6,6 +6,7 @@ import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type Patt
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
+import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,8 @@ interface PatternProps {
   otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
+  /** Open the FocusedChordEditor to replace a chord's family. */
+  onEditChordOpen: (patternId: string, chordId: string) => void;
 }
 
 function formatBeats(n: number) {
@@ -96,6 +99,7 @@ function PatternBlock({
   otherPatterns,
   onPickerOpen,
   onRequestDeleteBlock,
+  onEditChordOpen,
 }: PatternProps) {
   const {
     updatePattern,
@@ -248,18 +252,21 @@ function PatternBlock({
       lastSelectedRef.current = chordId;
       return;
     }
-    // Unified default: single tap selects this chord exclusively, opens the
-    // context menu. Audition only fires when NOT in select/edit mode so the
-    // tap meaning stays unambiguous while editing.
-    const alreadyOnly = selected.size === 1 && selected.has(chordId);
-    const wasInSelectMode = selectMode;
-    setSelectMode(!alreadyOnly);
-    setSelected(alreadyOnly ? new Set() : new Set([chordId]));
-    lastSelectedRef.current = alreadyOnly ? null : chordId;
-    if (!alreadyOnly && !wasInSelectMode && !selectMode) {
-      const c = sortedChords.find((x) => x.id === chordId);
-      if (c) void playChord(c.chord);
+    // Edit Mode (pencil): tap toggles selection only — no audition, no editor.
+    if (selectMode) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(chordId)) next.delete(chordId);
+        else next.add(chordId);
+        return next;
+      });
+      lastSelectedRef.current = chordId;
+      return;
     }
+    // Composition mode: audition + open FocusedChordEditor (mirrors Lyrics tab).
+    const c = sortedChords.find((x) => x.id === chordId);
+    if (c) void playChord(c.chord);
+    onEditChordOpen(pattern.id, chordId);
   };
 
   // The "active" chord is the single-selection case. Multi-selection hides
@@ -433,10 +440,6 @@ function PatternBlock({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleChordTap(c.id, e);
-                                  }}
-                                  onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    onPickerOpen(pattern.id, slotIdx, c.id);
                                   }}
                                   className={cn(
                                     "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all hover:opacity-90",
@@ -720,6 +723,7 @@ interface SectionGroupProps {
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
+  onEditChordOpen: (patternId: string, chordId: string) => void;
   /** When true: hide block counter & delete; show up/down reorder arrows. */
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
@@ -735,6 +739,7 @@ function SectionGroup({
   onPickerOpen,
   onRequestDeleteSection,
   onRequestDeleteBlock,
+  onEditChordOpen,
   sortMode,
   onMoveSection,
 }: SectionGroupProps) {
@@ -742,6 +747,7 @@ function SectionGroup({
   const updateSection = useSongStore((s) => s.updateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
+  const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
@@ -858,22 +864,37 @@ function SectionGroup({
 
       {/* Pattern blocks within this section */}
       {!collapsed &&
-        blocks.map((p, i) => (
-          <PatternBlock
-            key={p.id}
-            pattern={p}
-            blockIndex={i}
-            blocksInSection={blocks.length}
-            otherPatterns={blocks
-              .filter((q) => q.id !== p.id)
-              .map((q) => ({
+        blocks.map((p, i) => {
+          // "Move to…" should reach EVERY other pattern block in the song,
+          // not just siblings within this section. Build the option list from
+          // allPatterns, labelled by section name + block index.
+          const otherAll = allPatterns
+            .filter((q) => q.id !== p.id)
+            .map((q) => {
+              const sid = q.sectionId ?? q.id;
+              const sameSectionBlocks = allPatterns.filter(
+                (b) => (b.sectionId ?? b.id) === sid,
+              );
+              const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
+              const sectionName = getSectionDisplayName(allSections, sid);
+              return {
                 id: q.id,
-                label: `${displayName}: Block ${blocks.findIndex((b) => b.id === q.id) + 1}`,
-              }))}
-            onPickerOpen={onPickerOpen}
-            onRequestDeleteBlock={onRequestDeleteBlock}
-          />
-        ))}
+                label: `${sectionName}: Block ${blockNum}`,
+              };
+            });
+          return (
+            <PatternBlock
+              key={p.id}
+              pattern={p}
+              blockIndex={i}
+              blocksInSection={blocks.length}
+              otherPatterns={otherAll}
+              onPickerOpen={onPickerOpen}
+              onRequestDeleteBlock={onRequestDeleteBlock}
+              onEditChordOpen={onEditChordOpen}
+            />
+          );
+        })}
 
       {!collapsed && (
         <Button variant="outline" size="sm" className="w-full" onClick={() => addPatternToSection(sectionId)}>
@@ -919,8 +940,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
+  const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
+
+  const openChordEditor = (patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
+  };
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
   const groupedSections = sections
@@ -991,7 +1019,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       return;
     }
 
-    // Cross-block: validate capacity for the chord(s) being moved.
+    // Cross-block (and possibly cross-section): validate capacity for the
+    // chord(s) being moved. movePatternChordToPatternAt now handles both
+    // intra- and cross-section moves.
     const fromPattern = state.progression.find((p) => p.id === fromId);
     if (!fromPattern) return;
     const movingIds = [draggableId];
@@ -1009,7 +1039,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       });
       return;
     }
-    movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
+    state.movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {
@@ -1061,6 +1091,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onPickerOpen={openPicker}
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
+          onEditChordOpen={openChordEditor}
           sortMode={sortMode}
           onMoveSection={(id, direction) => moveSection(id, direction)}
         />
@@ -1092,6 +1123,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       </div>
 
       <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
+
+      {chordEditor && (
+        <FocusedChordEditor
+          mode="progression"
+          sectionId={chordEditor.sectionId}
+          patternId={chordEditor.patternId}
+          chordId={chordEditor.chordId}
+          onClose={() => setChordEditor(null)}
+        />
+      )}
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteSection}
