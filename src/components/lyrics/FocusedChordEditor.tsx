@@ -16,13 +16,26 @@ import { toast } from "sonner";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Props {
+interface LyricsModeProps {
+  mode?: "lyrics";
   sectionId: string;
   lineId: string;
   initialSlot: number;
   initialAnchorId?: string;
   onClose: () => void;
 }
+
+interface ProgressionModeProps {
+  mode: "progression";
+  sectionId: string;
+  /** Pattern block holding the chord being edited. */
+  patternId: string;
+  /** SectionChord id (== PatternChord id under SSOT) being edited. */
+  chordId: string;
+  onClose: () => void;
+}
+
+type Props = LyricsModeProps | ProgressionModeProps;
 
 const SLOT_PX = 28;
 
@@ -41,36 +54,50 @@ function chordSlotWidth(display: string): number {
 }
 
 /**
- * Mobile full-screen overlay for adding chords to a lyric row. Renders the
- * full 80-slot chord row in a horizontal scroller so users can see overflow
- * accumulate; cursor advances by (placedSlot + chordWidth + 1) read directly
- * from the store after each placement.
+ * Full-screen overlay for adding or editing a chord.
+ *
+ * Two modes:
+ *  - "lyrics" (default): adds chords to a lyric row, slot-by-slot, with a
+ *    full 80-slot preview scroller.
+ *  - "progression": replaces the chord family of a single chord in the
+ *    progression view (tap-to-edit). Renders a compact preview of the
+ *    pattern block instead of the lyric row.
  */
-export function FocusedChordEditor({
-  sectionId,
-  lineId,
-  initialSlot,
-  initialAnchorId,
-  onClose,
-}: Props) {
+export function FocusedChordEditor(props: Props) {
   const sections = useSongStore((s) => s.sections);
   const placeChordInSlot = useSongStore((s) => s.placeChordInSlot);
   const upsertChordAt = useSongStore((s) => s.upsertChordAt);
+  const updatePatternChord = useSongStore((s) => s.updatePatternChord);
+  const progression = useSongStore((s) => s.progression);
 
-  const section = sections.find((s) => s.id === sectionId);
-  const line: LyricLine | undefined = section?.lines.find((l) => l.id === lineId);
+  const isProgression = props.mode === "progression";
+  const section = sections.find((s) => s.id === props.sectionId);
   const sectionLabel = section ? getSectionDisplayName(sections, section.id) : "";
 
-  const [slot, setSlot] = useState(initialSlot);
-  const [anchorId, setAnchorId] = useState<string | undefined>(initialAnchorId);
+  // ---- Lyrics-mode state ----
+  const lyricsLineId = !isProgression ? props.lineId : "";
+  const lyricsInitialSlot = !isProgression ? props.initialSlot : 0;
+  const lyricsInitialAnchorId = !isProgression ? props.initialAnchorId : undefined;
+  const line: LyricLine | undefined = !isProgression
+    ? section?.lines.find((l) => l.id === lyricsLineId)
+    : undefined;
+
+  // ---- Progression-mode lookups ----
+  const progPattern = isProgression
+    ? progression.find((p) => p.id === props.patternId)
+    : undefined;
+  const progChord = isProgression
+    ? section?.chords.find((c) => c.id === props.chordId)
+    : undefined;
+
+  const [slot, setSlot] = useState(lyricsInitialSlot);
+  const [anchorId, setAnchorId] = useState<string | undefined>(lyricsInitialAnchorId);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
 
-  // Mark editor open so the watchdog in LyricsTab pauses reflow until close.
-  // useEffect cleanup is guaranteed by React on unmount/error/route change.
   useEffect(() => {
     setEditorOpen(true);
     dbg("mounted — focusedEditorOpen: true");
@@ -81,15 +108,20 @@ export function FocusedChordEditor({
   }, [setEditorOpen]);
 
   useEffect(() => {
-    const lineChords = section ? getLineChordsViaSSOT(section, lineId) : [];
-    const initialChord = lineChords.find((c) => c.id === initialAnchorId)?.chord;
-    setQuery(initialChord?.display ?? "");
+    if (isProgression) {
+      setQuery(progChord?.chord.display ?? "");
+    } else {
+      const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
+      const initialChord = lineChords.find((c) => c.id === lyricsInitialAnchorId)?.chord;
+      setQuery(initialChord?.display ?? "");
+    }
     setTimeout(() => inputRef.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-scroll the slot row so the active slot stays visible.
+  // Auto-scroll the slot row so the active slot stays visible (lyrics only).
   useEffect(() => {
+    if (isProgression) return;
     const el = scrollerRef.current;
     if (!el) return;
     const target = slot * SLOT_PX;
@@ -98,15 +130,22 @@ export function FocusedChordEditor({
     if (target < viewLeft + 40 || target > viewRight - 80) {
       el.scrollTo({ left: Math.max(0, target - el.clientWidth / 2), behavior: "smooth" });
     }
-  }, [slot]);
+  }, [slot, isProgression]);
 
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
   const handlePick = (chord: ChordSymbol) => {
+    if (isProgression) {
+      // Replace the chord family of the tapped progression chord.
+      updatePatternChord(props.patternId, props.chordId, { chord });
+      props.onClose();
+      return;
+    }
+
     if (!line) return;
     if (anchorId) {
-      upsertChordAt(sectionId, lineId, slot, chord, anchorId);
+      upsertChordAt(props.sectionId, lyricsLineId, slot, chord, anchorId);
       setAnchorId(undefined);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
@@ -114,7 +153,7 @@ export function FocusedChordEditor({
     }
 
     const requestedSlot = slot;
-    const placed = placeChordInSlot(sectionId, lineId, requestedSlot, chord);
+    const placed = placeChordInSlot(props.sectionId, lyricsLineId, requestedSlot, chord);
     const placedSlot = placed?.slotIndex ?? requestedSlot;
     const w = chordSlotWidth(chord.display);
     const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
@@ -130,21 +169,34 @@ export function FocusedChordEditor({
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
-  if (!line) return null;
+  if (!isProgression && !line) return null;
+  if (isProgression && (!progPattern || !progChord)) return null;
 
-  const liveChords = section ? getLineChordsViaSSOT(section, lineId) : [];
+  // Build preview slot map for lyrics mode.
+  const liveChords = !isProgression && section
+    ? getLineChordsViaSSOT(section, lyricsLineId)
+    : [];
   const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-  liveChords.forEach((c) => {
-    const s = c.slotIndex;
-    if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
-  });
+  if (!isProgression) {
+    liveChords.forEach((c) => {
+      const s = c.slotIndex;
+      if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
+    });
+  }
+
+  const headerEyebrow = isProgression
+    ? `Editing chord · ${progChord!.chord.display}`
+    : `Slot ${slot + 1} of ${CHORD_ROW_SLOTS} ${anchorId ? "· editing" : "· adding"}`;
+  const headerTitle = isProgression
+    ? `Edit Chord in ${sectionLabel}`
+    : `Add Chords to ${sectionLabel}`;
 
   return (
     <div className="fixed inset-0 z-50 flex">
       <button
         type="button"
         aria-label="Close chord editor"
-        onClick={onClose}
+        onClick={props.onClose}
         className="absolute inset-0 bg-black/60"
       />
 
@@ -154,7 +206,7 @@ export function FocusedChordEditor({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onClose}
+            onClick={props.onClose}
             className="h-9 px-2 text-muted-foreground"
             aria-label="Close chord editor"
           >
@@ -162,57 +214,71 @@ export function FocusedChordEditor({
           </Button>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
-              Slot {slot + 1} of {CHORD_ROW_SLOTS} {anchorId ? "· editing" : "· adding"}
+              {headerEyebrow}
             </p>
-            <h2 className="text-xl font-bold text-foreground truncate">
-              Add Chords to {sectionLabel}
-            </h2>
+            <h2 className="text-xl font-bold text-foreground truncate">{headerTitle}</h2>
           </div>
-          <Button size="sm" variant="default" onClick={onClose} className="h-9 px-3">
+          <Button size="sm" variant="default" onClick={props.onClose} className="h-9 px-3">
             Done
           </Button>
         </div>
 
-        {/* PREVIEW: full 80-slot scrollable chord row + lyric. */}
-        <div className="px-3 py-2 border-b border-border shrink-0 bg-muted/30">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-            Preview · scroll horizontally to see full row
-          </p>
-          <div
-            ref={scrollerRef}
-            className="overflow-x-auto rounded-sm bg-muted-foreground/10"
-            style={{ minHeight: 32 }}
-          >
+        {/* PREVIEW */}
+        {!isProgression && (
+          <div className="px-3 py-2 border-b border-border shrink-0 bg-muted/30">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              Preview · scroll horizontally to see full row
+            </p>
             <div
-              className="flex items-stretch"
-              style={{ minWidth: CHORD_ROW_SLOTS * SLOT_PX }}
+              ref={scrollerRef}
+              className="overflow-x-auto rounded-sm bg-muted-foreground/10"
+              style={{ minHeight: 32 }}
             >
-              {slotMap.map((c, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "shrink-0 h-8 flex items-center justify-center px-0.5",
-                    "w-7",
-                    i > 0 && "border-l border-muted-foreground/15",
-                    i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
-                  )}
-                  style={{ width: SLOT_PX }}
-                >
-                  {c && (
-                    <span className="font-mono-chord text-[11px] font-semibold text-chord-chip-foreground truncate">
-                      {c.chord.display}
-                    </span>
-                  )}
-                </div>
-              ))}
+              <div
+                className="flex items-stretch"
+                style={{ minWidth: CHORD_ROW_SLOTS * SLOT_PX }}
+              >
+                {slotMap.map((c, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "shrink-0 h-8 flex items-center justify-center px-0.5",
+                      "w-7",
+                      i > 0 && "border-l border-muted-foreground/15",
+                      i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
+                    )}
+                    style={{ width: SLOT_PX }}
+                  >
+                    {c && (
+                      <span className="font-mono-chord text-[11px] font-semibold text-chord-chip-foreground truncate">
+                        {c.chord.display}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
+            <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
+              {line!.text || (
+                <span className="italic text-muted-foreground/70">(empty lyric line)</span>
+              )}
+            </p>
           </div>
-          <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
-            {line.text || (
-              <span className="italic text-muted-foreground/70">(empty lyric line)</span>
-            )}
-          </p>
-        </div>
+        )}
+
+        {isProgression && progChord && (
+          <div className="px-3 py-3 border-b border-border shrink-0 bg-muted/30">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              Current chord
+            </p>
+            <span
+              className="inline-flex items-center rounded-md border border-black/10 px-3 py-1.5 font-mono-chord font-semibold text-base"
+              style={getChordColorClasses(progChord.chord).style}
+            >
+              {progChord.chord.display}
+            </span>
+          </div>
+        )}
 
         <div className="px-3 py-3 border-b border-border shrink-0">
           <Input
