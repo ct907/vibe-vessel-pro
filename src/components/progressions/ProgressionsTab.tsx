@@ -6,6 +6,7 @@ import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type Patt
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
+import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
