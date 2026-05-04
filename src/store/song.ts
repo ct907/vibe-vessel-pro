@@ -2961,6 +2961,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       return { progression };
     });
   },
+  removePatternBlock: (patternId) => set((s) => {
     // SSOT-first: detach progressionPlacement from any SectionChord pointing
     // at this pattern. If the SC also has no lyricsPlacement, drop it entirely
     // (orphan). Then remove the pattern block from the progression.
