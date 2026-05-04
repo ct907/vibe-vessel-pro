@@ -488,6 +488,46 @@ function PatternBlock({
                   </Droppable>
                 );
               })}
+
+              {/* Item 4 — left/right edge drop strips: dropping a chord onto
+                  these appends to the previous / next block when capacity
+                  allows. The actual neighbor lookup happens in onDragEnd. */}
+              <Droppable
+                droppableId={`pattern:${pattern.id}:edge-left`}
+                direction="horizontal"
+                type="chord"
+              >
+                {(p, snap) => (
+                  <div
+                    ref={p.innerRef}
+                    {...p.droppableProps}
+                    className={cn(
+                      "absolute left-0 top-0 bottom-0 w-3 z-20",
+                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
+                    )}
+                  >
+                    {p.placeholder}
+                  </div>
+                )}
+              </Droppable>
+              <Droppable
+                droppableId={`pattern:${pattern.id}:edge-right`}
+                direction="horizontal"
+                type="chord"
+              >
+                {(p, snap) => (
+                  <div
+                    ref={p.innerRef}
+                    {...p.droppableProps}
+                    className={cn(
+                      "absolute right-0 top-0 bottom-0 w-3 z-20",
+                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
+                    )}
+                  >
+                    {p.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
           );
         })()}
