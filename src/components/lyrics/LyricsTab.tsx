@@ -713,6 +713,14 @@ function LineRow({
           rows={1}
           onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
           onKeyDown={(e) => {
+            // Item 5 — "/" intercepts to open New Section dialog. Skip during IME.
+            if (e.key === "/" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              setSlashType("verse");
+              setSlashCustomLabel("");
+              setSlashDialog(true);
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               const newId = onAddLineAfter();
