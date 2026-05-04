@@ -113,9 +113,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               role="button"
               aria-pressed={sel}
               aria-label={sel ? `Selected chord ${b.chord.display}. Drag to move.` : `Chord ${b.chord.display}. Tap to select, then drag.`}
-              onPointerDown={(e) => onChipPointerDown(b.id, e)}
-              onPointerUp={(e) => onChipPointerUp(b.id, e)}
-              onPointerCancel={() => (tapInfo.current = null)}
+              onClick={() => onChipClick(b.id)}
               style={{
                 touchAction: "none",
                 userSelect: "none",
