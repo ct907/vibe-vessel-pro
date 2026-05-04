@@ -87,6 +87,10 @@ interface PatternProps {
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
+  /** Drag-handle wiring from the surrounding Draggable (Item 3). Optional so
+   *  the component still works in non-DnD contexts. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  blockDragHandleProps?: any;
 }
 
 function formatBeats(n: number) {
