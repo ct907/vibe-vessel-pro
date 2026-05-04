@@ -233,6 +233,8 @@ export interface SongState {
   addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
   addPatternToSection: (sectionId: string) => string;
+  /** Reorder a pattern block within its section (Phase 3 / Item 3). */
+  reorderPatternBlockInSection: (sectionId: string, fromIndex: number, toIndex: number) => void;
   /** Remove a single pattern block. No-op if it's the only block in its section. */
   removePatternBlock: (patternId: string) => void;
   /** Replace a pattern's chords (used for variation suggestions). Lengths preserved. */
