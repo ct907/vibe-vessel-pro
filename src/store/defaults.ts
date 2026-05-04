@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+export type DefaultLandingTab = "lyrics" | "chords" | "progressions" | null;
+
 export interface Defaults {
   /** Default chord length (in beats) when adding a chord to a pattern block. */
   defaultChordLengthBeats: number;
@@ -7,12 +9,15 @@ export interface Defaults {
   defaultPatternBars: number;
   /** Default octave used when adding & auditioning chords. */
   defaultOctave: number;
+  /** Tab to auto-open from the landing page. null = no auto-skip. */
+  defaultLandingTab: DefaultLandingTab;
 }
 
 export const DEFAULTS_FALLBACK: Defaults = {
   defaultChordLengthBeats: 2,
   defaultPatternBars: 4,
   defaultOctave: 4,
+  defaultLandingTab: null,
 };
 
 const STORAGE_KEY = "songwriters-notebook:defaults:v1";
