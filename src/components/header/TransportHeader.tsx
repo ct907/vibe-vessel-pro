@@ -80,6 +80,22 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
   const [transposeOffset, setTransposeOffset] = useState(0);
+  const metronome = useMetronomeStore();
+
+  // Drive the metronome from playback + meta. Starts/stops with isPlaying;
+  // updates rate/time-signature live without needing a restart.
+  useEffect(() => {
+    if (isPlaying && metronome.enabled) {
+      startMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
+    } else {
+      stopMetronome();
+    }
+    return () => stopMetronome();
+  }, [isPlaying, metronome.enabled]);
+
+  useEffect(() => {
+    updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
+  }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
 
   // Keep BPM input in sync if the store value changes externally (load, reset).
   useEffect(() => {
