@@ -26,7 +26,10 @@ import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useTheme } from "@/hooks/use-theme";
+import { useMetronomeStore } from "@/store/metronome";
+import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
