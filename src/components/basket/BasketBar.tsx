@@ -75,37 +75,15 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
   const toggleSelected = useBasketSelectionStore((s) => s.toggle);
   const clearSelected = useBasketSelectionStore((s) => s.clear);
 
-  // Tap detection (per-pointerdown). We track start time + position so we can
-  // tell apart a quick tap (toggle selection) from a long-press drag intent
-  // (handled by pangea, which won't fire our touchend toggle because the
-  // gesture leaves the chip).
-  const tapInfo = useRef<{ id: string; t: number; x: number; y: number } | null>(null);
-
   if (basket.length === 0) return <div ref={ref} hidden />;
 
   const isSelected = (id: string) => selected.has(id);
   const selectionSize = selected.size;
 
-  const onChipPointerDown = (id: string, e: React.PointerEvent) => {
-    // If the chip is already selected, skip arming the tap detector so any
-    // subsequent movement is owned exclusively by pangea's drag sensor.
-    // This fixes the regression where the first drag after select did nothing
-    // because pointerup deselected the chip mid-gesture.
-    if (isSelected(id)) {
-      tapInfo.current = null;
-      return;
-    }
-    tapInfo.current = { id, t: Date.now(), x: e.clientX, y: e.clientY };
-  };
-  const onChipPointerUp = (id: string, e: React.PointerEvent) => {
-    const info = tapInfo.current;
-    tapInfo.current = null;
-    if (!info || info.id !== id) return;
-    const dt = Date.now() - info.t;
-    const dx = Math.abs(e.clientX - info.x);
-    const dy = Math.abs(e.clientY - info.y);
-    if (dt > TAP_MAX_MS) return; // long-press → leave for pangea
-    if (dx > TAP_MAX_PX || dy > TAP_MAX_PX) return; // moved → drag intent
+  // Selection toggles via onClick. Pangea suppresses synthetic clicks after a
+  // real drag, so taps still toggle and drags are owned exclusively by the
+  // library's sensor (no competing pointer handlers).
+  const onChipClick = (id: string) => {
     toggleSelected(id);
   };
 
