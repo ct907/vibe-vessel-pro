@@ -294,6 +294,16 @@ function PatternBlock({
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {blockDragHandleProps && (
+          <span
+            {...blockDragHandleProps}
+            className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing -ml-1 p-1 touch-none"
+            aria-label="Drag to reorder pattern block"
+            title="Drag to reorder"
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
+        )}
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
           Block {blockIndex + 1}
         </span>
