@@ -878,39 +878,58 @@ function SectionGroup({
         )}
       </div>
 
-      {/* Pattern blocks within this section */}
-      {!collapsed &&
-        blocks.map((p, i) => {
-          // "Move to…" should reach EVERY other pattern block in the song,
-          // not just siblings within this section. Build the option list from
-          // allPatterns, labelled by section name + block index.
-          const otherAll = allPatterns
-            .filter((q) => q.id !== p.id)
-            .map((q) => {
-              const sid = q.sectionId ?? q.id;
-              const sameSectionBlocks = allPatterns.filter(
-                (b) => (b.sectionId ?? b.id) === sid,
-              );
-              const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
-              const sectionName = getSectionDisplayName(allSections, sid);
-              return {
-                id: q.id,
-                label: `${sectionName}: Block ${blockNum}`,
-              };
-            });
-          return (
-            <PatternBlock
-              key={p.id}
-              pattern={p}
-              blockIndex={i}
-              blocksInSection={blocks.length}
-              otherPatterns={otherAll}
-              onPickerOpen={onPickerOpen}
-              onRequestDeleteBlock={onRequestDeleteBlock}
-              onEditChordOpen={onEditChordOpen}
-            />
-          );
-        })}
+      {/* Pattern blocks within this section. Wrapped in a Droppable of
+          type="patternblock" so chord drags (type="chord") never land here. */}
+      {!collapsed && (
+        <Droppable droppableId={`patternblock:${sectionId}`} type="patternblock">
+          {(dropProvided) => (
+            <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-3">
+              {blocks.map((p, i) => {
+                const otherAll = allPatterns
+                  .filter((q) => q.id !== p.id)
+                  .map((q) => {
+                    const sid = q.sectionId ?? q.id;
+                    const sameSectionBlocks = allPatterns.filter(
+                      (b) => (b.sectionId ?? b.id) === sid,
+                    );
+                    const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
+                    const sectionName = getSectionDisplayName(allSections, sid);
+                    return {
+                      id: q.id,
+                      label: `${sectionName}: Block ${blockNum}`,
+                    };
+                  });
+                return (
+                  <Draggable key={p.id} draggableId={`patternblock:${p.id}`} index={i}>
+                    {(dragProvided, dragSnapshot) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        className={cn(
+                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg rounded-lg",
+                        )}
+                        style={dragProvided.draggableProps.style}
+                      >
+                        <PatternBlock
+                          pattern={p}
+                          blockIndex={i}
+                          blocksInSection={blocks.length}
+                          otherPatterns={otherAll}
+                          onPickerOpen={onPickerOpen}
+                          onRequestDeleteBlock={onRequestDeleteBlock}
+                          onEditChordOpen={onEditChordOpen}
+                          blockDragHandleProps={dragProvided.dragHandleProps}
+                        />
+                      </div>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {dropProvided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      )}
 
       {!collapsed && (
         <Button variant="outline" size="sm" className="w-full" onClick={() => addPatternToSection(sectionId)}>
