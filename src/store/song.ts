@@ -2930,7 +2930,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
     return createdId;
   },
-  removePatternBlock: (patternId) => set((s) => {
+  reorderPatternBlockInSection: (sectionId, fromIndex, toIndex) => {
+    pushHistory(get);
+    set((s) => {
+      // Indices into the section's local block list.
+      const sectionBlocks = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+      if (fromIndex < 0 || fromIndex >= sectionBlocks.length) return s;
+      const clamped = Math.max(0, Math.min(sectionBlocks.length - 1, toIndex));
+      if (clamped === fromIndex) return s;
+      const reordered = [...sectionBlocks];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(clamped, 0, moved);
+      // Rebuild full progression: for each section in section-order, splice
+      // in either reordered (this section) or its original ordered blocks.
+      const groups = new Map<string, PatternBlock[]>();
+      s.progression.forEach((p) => {
+        const sid = p.sectionId ?? p.id;
+        const arr = groups.get(sid) ?? [];
+        arr.push(p);
+        groups.set(sid, arr);
+      });
+      groups.set(sectionId, reordered);
+      const progression: PatternBlock[] = [];
+      s.sections.forEach((sec) => (groups.get(sec.id) ?? []).forEach((p) => progression.push(p)));
+      // Append orphans (sectionId not matching any current section).
+      s.progression.forEach((p) => {
+        const sid = p.sectionId ?? p.id;
+        if (!s.sections.some((sec) => sec.id === sid) && !progression.includes(p)) progression.push(p);
+      });
+      return { progression };
+    });
+  },
     // SSOT-first: detach progressionPlacement from any SectionChord pointing
     // at this pattern. If the SC also has no lyricsPlacement, drop it entirely
     // (orphan). Then remove the pattern block from the progression.
