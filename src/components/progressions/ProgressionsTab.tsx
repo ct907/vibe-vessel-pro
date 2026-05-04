@@ -105,6 +105,7 @@ function PatternBlock({
   onPickerOpen,
   onRequestDeleteBlock,
   onEditChordOpen,
+  blockDragHandleProps,
 }: PatternProps) {
   const {
     updatePattern,
