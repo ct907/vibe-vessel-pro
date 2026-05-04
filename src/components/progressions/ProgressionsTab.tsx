@@ -27,6 +27,7 @@ import {
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
+  GripVertical,
 } from "lucide-react";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
