@@ -745,6 +745,47 @@ function LineRow({
           className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
         />
       </div>
+
+      {/* Item 5 — "/" → new section dialog */}
+      <Dialog open={slashDialog} onOpenChange={setSlashDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New section</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Select value={slashType} onValueChange={(v) => setSlashType(v as SectionType)}>
+              <SelectTrigger className="capitalize">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SECTION_TYPES.map((t) => (
+                  <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {slashType === "custom" && (
+              <Input
+                autoFocus
+                placeholder="Custom name (optional)"
+                value={slashCustomLabel}
+                onChange={(e) => setSlashCustomLabel(e.target.value)}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSlashDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
+                setSlashDialog(false);
+                lyricInputRef.current?.focus();
+              }}
+            >
+              Add section
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
