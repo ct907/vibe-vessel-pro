@@ -1,4 +1,4 @@
-import { forwardRef, useRef } from "react";
+import { forwardRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
@@ -56,8 +56,6 @@ interface Props {
   draggable?: boolean;
 }
 
-const TAP_MAX_MS = 300;
-const TAP_MAX_PX = 8;
 
 /**
  * IMPORTANT: BasketBar must be a forwardRef component. @hello-pangea/dnd's
