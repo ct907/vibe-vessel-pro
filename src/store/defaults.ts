@@ -47,6 +47,7 @@ interface DefaultsState extends Defaults {
   setDefaultChordLength: (n: number) => void;
   setDefaultPatternBars: (n: number) => void;
   setDefaultOctave: (n: number) => void;
+  setDefaultLandingTab: (t: DefaultLandingTab) => void;
   reset: () => void;
 }
 
@@ -57,16 +58,17 @@ export const useDefaultsStore = create<DefaultsState>((set, get) => ({
   setDefaultChordLength: (n) => set({ defaultChordLengthBeats: clamp(n, 0.5, 16) }),
   setDefaultPatternBars: (n) => set({ defaultPatternBars: Math.max(1, Math.min(32, Math.round(n))) }),
   setDefaultOctave: (n) => set({ defaultOctave: Math.max(2, Math.min(6, Math.round(n))) }),
+  setDefaultLandingTab: (t) => set({ defaultLandingTab: t }),
   reset: () => set({ ...DEFAULTS_FALLBACK }),
 }));
 
 // Persist on every change.
 useDefaultsStore.subscribe((s) => {
   try {
-    const { defaultChordLengthBeats, defaultPatternBars, defaultOctave } = s;
+    const { defaultChordLengthBeats, defaultPatternBars, defaultOctave, defaultLandingTab } = s;
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ defaultChordLengthBeats, defaultPatternBars, defaultOctave }),
+      JSON.stringify({ defaultChordLengthBeats, defaultPatternBars, defaultOctave, defaultLandingTab }),
     );
   } catch {
     /* ignore quota */
@@ -80,5 +82,6 @@ export function getDefaults(): Defaults {
     defaultChordLengthBeats: s.defaultChordLengthBeats,
     defaultPatternBars: s.defaultPatternBars,
     defaultOctave: s.defaultOctave,
+    defaultLandingTab: s.defaultLandingTab,
   };
 }
