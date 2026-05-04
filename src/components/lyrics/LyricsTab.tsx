@@ -178,9 +178,13 @@ function LineRow({
     pasteChordsAt,
     moveChordToSlot,
     autoLayoutSection,
+    addSection,
     undo,
     redo,
   } = useSongStore();
+  const [slashDialog, setSlashDialog] = useState(false);
+  const [slashType, setSlashType] = useState<SectionType>("verse");
+  const [slashCustomLabel, setSlashCustomLabel] = useState("");
   const isMobile = useIsMobile();
   // Phase 2 SSOT: read line chords through the section's SectionChord[]
   // projection. The legacy ChordAnchor shape is preserved (renderer still
