@@ -32,6 +32,7 @@ function loadFromStorage(): Defaults {
       defaultChordLengthBeats: clamp(Number(parsed.defaultChordLengthBeats) || DEFAULTS_FALLBACK.defaultChordLengthBeats, 0.5, 16),
       defaultPatternBars: Math.max(1, Math.min(32, Math.round(Number(parsed.defaultPatternBars) || DEFAULTS_FALLBACK.defaultPatternBars))),
       defaultOctave: Math.max(2, Math.min(6, Math.round(Number(parsed.defaultOctave) || DEFAULTS_FALLBACK.defaultOctave))),
+      defaultLandingTab: (["lyrics", "chords", "progressions"].includes(parsed.defaultLandingTab) ? parsed.defaultLandingTab : null) as DefaultLandingTab,
     };
   } catch {
     return DEFAULTS_FALLBACK;
