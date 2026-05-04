@@ -66,7 +66,17 @@ const Index = () => {
   useEffect(() => {
     hydrateFromStorage();
     const unsub = startAutosave();
-    return () => unsub();
+    // Throttled recents push: every 30s while song changes, snapshot title + json.
+    let lastPush = 0;
+    const unsubRecents = useSongStore.subscribe((state) => {
+      const now = Date.now();
+      if (now - lastPush < 30_000) return;
+      lastPush = now;
+      try {
+        pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
+      } catch { /* ignore */ }
+    });
+    return () => { unsub(); unsubRecents(); };
   }, []);
 
   // Single global DragDropContext routes drops to whichever tab owns the
