@@ -454,76 +454,91 @@ function LineRow({
                       onPickerOpen(line.id, slotIdx);
                     }}
                   >
-                    {occupied && (
-                      <Draggable draggableId={anchor!.id} index={0}>
-                        {(dragProvided, dragSnapshot) => {
-                          const beingDragged = draggingIds.has(anchor!.id);
-                          const isPrimary = dragSnapshot.isDragging;
-                          const hideForMulti = beingDragged && !isPrimary;
-                          return (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              data-chip-anchor={anchor!.id}
-                              className={cn(
-                                "h-full flex items-center justify-center",
-                                hideForMulti && "opacity-30",
+                    {occupied && (() => {
+                      const renderChip = (
+                        dragProvided: any,
+                        dragSnapshot: any,
+                        portalled: boolean,
+                      ) => {
+                        const beingDragged = draggingIds.has(anchor!.id);
+                        const isPrimary = dragSnapshot.isDragging;
+                        const hideForMulti = beingDragged && !isPrimary;
+                        return (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            {...dragProvided.dragHandleProps}
+                            data-chip-anchor={anchor!.id}
+                            className={cn(
+                              "h-full flex items-center justify-center",
+                              hideForMulti && "opacity-30",
+                            )}
+                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.shiftKey) {
+                                selectRangeTo(anchor!.id, true);
+                                return;
+                              }
+                              if (e.metaKey || e.ctrlKey) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              if (isEditMode) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              void playChord(anchor!.chord);
+                              onChordFocus(line.id);
+                              onPickerOpen(line.id, slotIdx, anchor!.id);
+                            }}
+                          >
+                            <div className="relative pointer-events-none">
+                              <ChordChip
+                                chord={anchor!.chord}
+                                variant="ink"
+                                size="sm"
+                                selected={selection.has(anchor!.id)}
+                                audition={false}
+                              />
+                              {isPrimary && draggingIds.size > 1 && (
+                                <span
+                                  className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
+                                  aria-label={`${draggingIds.size} chords selected`}
+                                >
+                                  +{draggingIds.size - 1}
+                                </span>
                               )}
-                              style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Modifier-key shortcuts always work as multi-select.
-                                if (e.shiftKey) {
-                                  selectRangeTo(anchor!.id, true);
-                                  return;
-                                }
-                                if (e.metaKey || e.ctrlKey) {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                  return;
-                                }
-                                // Edit Mode: tap toggles selection only —
-                                // never opens the picker, never auditions.
-                                if (isEditMode) {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                  return;
-                                }
-                                // Composition Mode: audition + open picker.
-                                void playChord(anchor!.chord);
-                                onChordFocus(line.id);
-                                onPickerOpen(line.id, slotIdx, anchor!.id);
-                              }}
-                            >
-                              <div className="relative pointer-events-none">
-                                <ChordChip
-                                  chord={anchor!.chord}
-                                  variant="ink"
-                                  size="sm"
-                                  selected={selection.has(anchor!.id)}
-                                  audition={false}
+                              {playing && !portalled && (
+                                <span
+                                  aria-hidden
+                                  className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
                                 />
-                                {isPrimary && draggingIds.size > 1 && (
-                                  <span
-                                    className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
-                                    aria-label={`${draggingIds.size} chords selected`}
-                                  >
-                                    +{draggingIds.size - 1}
-                                  </span>
-                                )}
-                                {playing && (
-                                  <span
-                                    aria-hidden
-                                    className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
-                                  />
-                                )}
-                              </div>
+                              )}
                             </div>
-                          );
-                        }}
-                      </Draggable>
-                    )}
+                          </div>
+                        );
+                      };
+                      return (
+                        <Draggable
+                          draggableId={anchor!.id}
+                          index={0}
+                          // Portal the dragging clone to <body> so the chip's transform
+                          // is computed against the viewport, not the (mutating) slot
+                          // wrapper. Fixes the "drag preview jumps" regression.
+                        >
+                          {(dragProvided, dragSnapshot) => {
+                            const node = renderChip(dragProvided, dragSnapshot, false);
+                            if (dragSnapshot.isDragging && typeof document !== "undefined") {
+                              return ReactDOM.createPortal(node, document.body);
+                            }
+                            return node;
+                          }}
+                        </Draggable>
+                      );
+                    })()}
                     {dropProvided.placeholder}
                   </div>
                 )}
