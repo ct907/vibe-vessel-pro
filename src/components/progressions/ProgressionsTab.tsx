@@ -1016,6 +1016,20 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     const { destination, source, draggableId } = result;
     if (!destination) return;
     const dst = destination.droppableId.split(":");
+
+    // Item 3 — pattern block reorder within a section.
+    if (dst[0] === "patternblock") {
+      const sectionId = dst[1];
+      const src = source.droppableId.split(":");
+      if (src[0] !== "patternblock" || src[1] !== sectionId) return;
+      useSongStore.getState().reorderPatternBlockInSection(
+        sectionId,
+        source.index,
+        destination.index,
+      );
+      return;
+    }
+
     if (dst[0] !== "pattern") return;
     const toId = dst[1];
     const toSlot = Number(dst[2]);
