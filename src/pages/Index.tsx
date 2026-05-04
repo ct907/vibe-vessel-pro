@@ -79,7 +79,7 @@ const Index = () => {
       console.log("[DnD] -> lyrics handler");
       return lyricsOnDragEnd?.(result);
     }
-    if (dstPrefix === "pattern") {
+    if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
       console.log("[DnD] -> progressions handler");
       return progressionsOnDragEnd?.(result);
     }
