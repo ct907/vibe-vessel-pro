@@ -14,7 +14,15 @@ import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
 
 const Index = () => {
-  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">("lyrics");
+  const [searchParams] = useSearchParams();
+  const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
+  const initialTab = ((): "lyrics" | "chords" | "progressions" => {
+    const q = searchParams.get("tab");
+    if (q === "lyrics" || q === "chords" || q === "progressions") return q;
+    if (defaultLandingTab) return defaultLandingTab;
+    return "lyrics";
+  })();
+  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">(initialTab);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
