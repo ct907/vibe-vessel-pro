@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
@@ -9,6 +10,8 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
+import { useDefaultsStore } from "@/store/defaults";
+import { pushRecent } from "@/lib/recent-projects";
 
 const Index = () => {
   const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">("lyrics");
