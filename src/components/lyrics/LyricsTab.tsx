@@ -101,12 +101,32 @@ const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "out
 const slotOf = (a: ChordAnchor): number =>
   a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
 
-/** Build a slot → chord map from a chord list. Slots without a chord map to undefined. */
+/**
+ * Build slot → chord map from a chord list, prioritizing SSOT array order.
+ * Each chord's stored `slotIndex` is treated as a *preference*: it's used
+ * when the slot is still free AND >= previous chord's placed slot + 1.
+ * Otherwise the chord falls into the next free slot. This keeps reorders
+ * from the Progressions tab visible here even when slotIndex values are
+ * stale relative to the canonical Section.chords order.
+ */
 function chordsBySlot(chords: ChordAnchor[]): (ChordAnchor | undefined)[] {
   const out: (ChordAnchor | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
+  let lastPlaced = -1;
   chords.forEach((c) => {
-    const s = c.slotIndex;
-    if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) out[s] = c;
+    const pref = c.slotIndex;
+    let target = -1;
+    if (pref != null && pref > lastPlaced && pref < CHORD_ROW_SLOTS && out[pref] === undefined) {
+      target = pref;
+    } else {
+      // Next free slot strictly after lastPlaced.
+      for (let i = Math.max(0, lastPlaced + 1); i < CHORD_ROW_SLOTS; i++) {
+        if (out[i] === undefined) { target = i; break; }
+      }
+    }
+    if (target >= 0) {
+      out[target] = c;
+      lastPlaced = target;
+    }
   });
   return out;
 }

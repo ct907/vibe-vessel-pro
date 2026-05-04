@@ -442,7 +442,7 @@ function PatternBlock({
                                     handleChordTap(c.id, e);
                                   }}
                                   className={cn(
-                                    "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-all hover:opacity-90",
+                                    "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90",
                                     colors.className,
                                     selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
                                     isSel && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
@@ -450,7 +450,7 @@ function PatternBlock({
                                   )}
                                   style={{
                                     ...colors.style,
-                                    width: `calc(${widthPct}% - 4px)`,
+                                    width: dragSnapshot.isDragging ? undefined : `calc(${widthPct}% - 4px)`,
                                     touchAction: "none",
                                     ...dragProvided.draggableProps.style,
                                   }}

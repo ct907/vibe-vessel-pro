@@ -1921,20 +1921,32 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         (c) => c.id !== anchorId && c.lyricsPlacement?.lineId === lineId && c.lyricsPlacement.slotIndex === target,
       );
       const myPrev = me.lyricsPlacement.slotIndex;
-      const nextSections = s.sections.map((x) =>
-        x.id !== sectionId
-          ? x
-          : {
-              ...x,
-              chords: x.chords.map((c) => {
-                if (c.id === anchorId && c.lyricsPlacement)
-                  return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: target } };
-                if (occupant && c.id === occupant.id && c.lyricsPlacement)
-                  return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: myPrev } };
-                return c;
-              }),
-            },
-      );
+      const nextSections = s.sections.map((x) => {
+        if (x.id !== sectionId) return x;
+        // 1) Update slotIndex on the moved chord (and swap with occupant if any).
+        const withSlots = x.chords.map((c) => {
+          if (c.id === anchorId && c.lyricsPlacement)
+            return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: target } };
+          if (occupant && c.id === occupant.id && c.lyricsPlacement)
+            return { ...c, lyricsPlacement: { ...c.lyricsPlacement, slotIndex: myPrev } };
+          return c;
+        });
+        // 2) Reorder SSOT array so chords on THIS line appear in slotIndex order.
+        //    Chords on other lines / progression-only chords keep their relative
+        //    positions; we only permute the indices currently occupied by the
+        //    line's chords.
+        const lineIdxs: number[] = [];
+        withSlots.forEach((c, i) => {
+          if (c.lyricsPlacement?.lineId === lineId) lineIdxs.push(i);
+        });
+        const lineChords = lineIdxs.map((i) => withSlots[i]);
+        lineChords.sort((a, b) =>
+          (a.lyricsPlacement!.slotIndex ?? 0) - (b.lyricsPlacement!.slotIndex ?? 0),
+        );
+        const reordered = withSlots.slice();
+        lineIdxs.forEach((i, k) => { reordered[i] = lineChords[k]; });
+        return { ...x, chords: reordered };
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({ sections: nextSections, [SSOT_MODE]: true } as any);
     });
