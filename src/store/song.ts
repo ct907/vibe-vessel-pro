@@ -2757,30 +2757,47 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
-  movePatternChord: (patternId, chordId, direction) => set((s) => {
+  movePatternChord: (patternId, chordId, direction) => {
     // SSOT-first: reorder within the SectionChord array (only those bound to
     // this pattern), then derive mirrors. Identity is preserved (id stable).
-    const pattern = s.progression.find((p) => p.id === patternId);
-    if (!pattern) return {};
+    // Item 4: at the edge of a block, hop to the previous/next block when
+    // there is enough capacity in the neighbor.
+    const sBefore = get();
+    const pattern = sBefore.progression.find((p) => p.id === patternId);
+    if (!pattern) return;
     const sectionId = pattern.sectionId ?? pattern.id;
-    const sec = s.sections.find((x) => x.id === sectionId);
-    if (!sec) return {};
+    const sec = sBefore.sections.find((x) => x.id === sectionId);
+    if (!sec) return;
     const inPattern = sec.chords.filter((c) => c.progressionPlacement?.patternId === patternId);
     const idx = inPattern.findIndex((c) => c.id === chordId);
+    if (idx < 0) return;
     const swapWith = idx + direction;
-    if (idx < 0 || swapWith < 0 || swapWith >= inPattern.length) return {};
-    // Swap order WITHIN section.chords, preserving relative positions of chords from other patterns.
-    const a = inPattern[idx];
-    const b = inPattern[swapWith];
-    const nextSections = s.sections.map((x) => {
-      if (x.id !== sectionId) return x;
-      // Build new list: walk original; when we hit one of the two swapped, emit the other.
-      const next = x.chords.map((c) => (c.id === a.id ? b : c.id === b.id ? a : c));
-      return { ...x, chords: next };
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return ({ sections: nextSections, [SSOT_MODE]: true } as any);
-  }),
+    if (swapWith >= 0 && swapWith < inPattern.length) {
+      set((s) => {
+        const a = inPattern[idx];
+        const b = inPattern[swapWith];
+        const nextSections = s.sections.map((x) => {
+          if (x.id !== sectionId) return x;
+          const next = x.chords.map((c) => (c.id === a.id ? b : c.id === b.id ? a : c));
+          return { ...x, chords: next };
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return ({ sections: nextSections, [SSOT_MODE]: true } as any);
+      });
+      return;
+    }
+    // Edge — try moving into the neighbor block (Item 4).
+    const progIdx = sBefore.progression.findIndex((p) => p.id === patternId);
+    const neighborIdx = progIdx + direction;
+    const neighbor = sBefore.progression[neighborIdx];
+    if (!neighbor) return;
+    const movingLen = inPattern[idx].progressionPlacement?.lengthBeats ?? 0;
+    const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
+    const neighborCap = neighbor.bars * neighbor.beatsPerBar;
+    if (neighborUsed + movingLen > neighborCap + 1e-9) return;
+    const toSlot = direction > 0 ? Math.floor(neighborUsed) : Math.max(0, neighborCap - movingLen);
+    get().movePatternChordToPatternAt(patternId, neighbor.id, chordId, toSlot);
+  },
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
     // SSOT-first: drop the listed SectionChords (id === SectionChord.id) from
