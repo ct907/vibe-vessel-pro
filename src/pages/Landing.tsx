@@ -1,0 +1,148 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { useSongStore } from "@/store/song";
+import { useDefaultsStore } from "@/store/defaults";
+import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
+import { BookOpen, Music, ListMusic, FileText, Trash2 } from "lucide-react";
+
+type TabKey = "lyrics" | "chords" | "progressions";
+
+const TAB_INFO: Array<{ key: TabKey; title: string; description: string; Icon: typeof BookOpen }> = [
+  {
+    key: "lyrics",
+    title: "Lyrics",
+    description:
+      "Write lyrics line by line. Drop chords directly above the words and organize the song into sections.",
+    Icon: FileText,
+  },
+  {
+    key: "chords",
+    title: "Chords",
+    description:
+      "Build a palette of chords for the song. Audition voicings and add favourites to the basket for quick reuse.",
+    Icon: Music,
+  },
+  {
+    key: "progressions",
+    title: "Progressions",
+    description:
+      "Arrange chord pattern blocks per section. Press play to hear the full progression in your chosen sound.",
+    Icon: ListMusic,
+  },
+];
+
+export default function Landing() {
+  const navigate = useNavigate();
+  const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
+  const setDefaultLandingTab = useDefaultsStore((s) => s.setDefaultLandingTab);
+  const loadFromJSON = useSongStore((s) => s.loadFromJSON);
+  const [recents, setRecents] = useState<RecentProject[]>([]);
+
+  useEffect(() => {
+    setRecents(listRecent());
+  }, []);
+
+  const goTo = (tab: TabKey) => navigate(`/app?tab=${tab}`);
+
+  const openRecent = (r: RecentProject) => {
+    loadFromJSON(r.snapshot);
+    navigate("/app");
+  };
+
+  const headingId = useMemo(() => "landing-heading", []);
+
+  return (
+    <div className="min-h-screen bg-paper text-foreground">
+      <header className="mx-auto max-w-5xl px-4 pt-8 pb-4 flex items-center gap-3">
+        <BookOpen className="h-7 w-7 ink-chord" />
+        <div>
+          <h1 id={headingId} className="font-display text-3xl leading-none">SongNote</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            A songwriter's notebook for lyrics, chords, and progressions.
+          </p>
+        </div>
+        <div className="ml-auto">
+          <Button variant="outline" asChild>
+            <Link to="/app">Open editor</Link>
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 pb-24" aria-labelledby={headingId}>
+        <section aria-label="Tabs">
+          <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">Start where you want</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            {TAB_INFO.map(({ key, title, description, Icon }) => {
+              const isDefault = defaultLandingTab === key;
+              return (
+                <article
+                  key={key}
+                  className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3 shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-5 w-5 ink-chord" />
+                    <h3 className="font-display text-lg">{title}</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground flex-1">{description}</p>
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        checked={isDefault}
+                        onCheckedChange={(b) => setDefaultLandingTab(b ? key : null)}
+                        aria-label={`Set ${title} as default tab`}
+                      />
+                      Default
+                    </label>
+                    <Button size="sm" onClick={() => goTo(key)}>
+                      Open {title}
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mt-10" aria-label="Recent projects">
+          <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">Recent projects</h2>
+          {recents.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">
+              No recent projects yet. Open the editor and your saved songs will appear here.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {recents.map((r) => (
+                <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+                  <button
+                    type="button"
+                    className="flex-1 text-left hover:underline"
+                    onClick={() => openRecent(r)}
+                  >
+                    <div className="font-medium">{r.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {new Date(r.savedAt).toLocaleString()}
+                    </div>
+                  </button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      removeRecent(r.id);
+                      setRecents(listRecent());
+                    }}
+                    aria-label={`Remove ${r.name} from recents`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}

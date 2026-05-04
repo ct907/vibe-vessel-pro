@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
@@ -9,9 +10,19 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
+import { useDefaultsStore } from "@/store/defaults";
+import { pushRecent } from "@/lib/recent-projects";
 
 const Index = () => {
-  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">("lyrics");
+  const [searchParams] = useSearchParams();
+  const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
+  const initialTab = ((): "lyrics" | "chords" | "progressions" => {
+    const q = searchParams.get("tab");
+    if (q === "lyrics" || q === "chords" || q === "progressions") return q;
+    if (defaultLandingTab) return defaultLandingTab;
+    return "lyrics";
+  })();
+  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">(initialTab);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
@@ -55,7 +66,17 @@ const Index = () => {
   useEffect(() => {
     hydrateFromStorage();
     const unsub = startAutosave();
-    return () => unsub();
+    // Throttled recents push: every 30s while song changes, snapshot title + json.
+    let lastPush = 0;
+    const unsubRecents = useSongStore.subscribe((state) => {
+      const now = Date.now();
+      if (now - lastPush < 30_000) return;
+      lastPush = now;
+      try {
+        pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
+      } catch { /* ignore */ }
+    });
+    return () => { unsub(); unsubRecents(); };
   }, []);
 
   // Single global DragDropContext routes drops to whichever tab owns the
@@ -79,7 +100,7 @@ const Index = () => {
       console.log("[DnD] -> lyrics handler");
       return lyricsOnDragEnd?.(result);
     }
-    if (dstPrefix === "pattern") {
+    if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
       console.log("[DnD] -> progressions handler");
       return progressionsOnDragEnd?.(result);
     }

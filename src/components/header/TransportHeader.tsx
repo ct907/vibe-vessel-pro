@@ -26,7 +26,10 @@ import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useTheme } from "@/hooks/use-theme";
+import { useMetronomeStore } from "@/store/metronome";
+import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
@@ -77,6 +80,22 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
   const [transposeOffset, setTransposeOffset] = useState(0);
+  const metronome = useMetronomeStore();
+
+  // Drive the metronome from playback + meta. Starts/stops with isPlaying;
+  // updates rate/time-signature live without needing a restart.
+  useEffect(() => {
+    if (isPlaying && metronome.enabled) {
+      startMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
+    } else {
+      stopMetronome();
+    }
+    return () => stopMetronome();
+  }, [isPlaying, metronome.enabled]);
+
+  useEffect(() => {
+    updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
+  }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
 
   // Keep BPM input in sync if the store value changes externally (load, reset).
   useEffect(() => {
@@ -272,6 +291,36 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">Metronome</span>
+                      <Switch
+                        checked={metronome.enabled}
+                        onCheckedChange={(b) => {
+                          metronome.setEnabled(b);
+                          if (b && !isPlaying) previewClick(metronome.volume);
+                        }}
+                        aria-label="Toggle metronome"
+                      />
+                    </div>
+                    {metronome.enabled && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vol</span>
+                        <Slider
+                          value={[Math.round(metronome.volume * 100)]}
+                          min={0}
+                          max={100}
+                          step={1}
+                          onValueChange={(v) => metronome.setVolume((v[0] ?? 0) / 100)}
+                          className="flex-1"
+                        />
+                        <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground">
+                          {Math.round(metronome.volume * 100)}%
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between gap-2">

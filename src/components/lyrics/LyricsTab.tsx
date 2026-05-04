@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import {
   Droppable,
   Draggable,
@@ -177,9 +178,13 @@ function LineRow({
     pasteChordsAt,
     moveChordToSlot,
     autoLayoutSection,
+    addSection,
     undo,
     redo,
   } = useSongStore();
+  const [slashDialog, setSlashDialog] = useState(false);
+  const [slashType, setSlashType] = useState<SectionType>("verse");
+  const [slashCustomLabel, setSlashCustomLabel] = useState("");
   const isMobile = useIsMobile();
   // Phase 2 SSOT: read line chords through the section's SectionChord[]
   // projection. The legacy ChordAnchor shape is preserved (renderer still
@@ -454,76 +459,91 @@ function LineRow({
                       onPickerOpen(line.id, slotIdx);
                     }}
                   >
-                    {occupied && (
-                      <Draggable draggableId={anchor!.id} index={0}>
-                        {(dragProvided, dragSnapshot) => {
-                          const beingDragged = draggingIds.has(anchor!.id);
-                          const isPrimary = dragSnapshot.isDragging;
-                          const hideForMulti = beingDragged && !isPrimary;
-                          return (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              data-chip-anchor={anchor!.id}
-                              className={cn(
-                                "h-full flex items-center justify-center",
-                                hideForMulti && "opacity-30",
+                    {occupied && (() => {
+                      const renderChip = (
+                        dragProvided: any,
+                        dragSnapshot: any,
+                        portalled: boolean,
+                      ) => {
+                        const beingDragged = draggingIds.has(anchor!.id);
+                        const isPrimary = dragSnapshot.isDragging;
+                        const hideForMulti = beingDragged && !isPrimary;
+                        return (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            {...dragProvided.dragHandleProps}
+                            data-chip-anchor={anchor!.id}
+                            className={cn(
+                              "h-full flex items-center justify-center",
+                              hideForMulti && "opacity-30",
+                            )}
+                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.shiftKey) {
+                                selectRangeTo(anchor!.id, true);
+                                return;
+                              }
+                              if (e.metaKey || e.ctrlKey) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              if (isEditMode) {
+                                selection.toggle(anchor!.id);
+                                lastSelectedRef.current = anchor!.id;
+                                return;
+                              }
+                              void playChord(anchor!.chord);
+                              onChordFocus(line.id);
+                              onPickerOpen(line.id, slotIdx, anchor!.id);
+                            }}
+                          >
+                            <div className="relative pointer-events-none">
+                              <ChordChip
+                                chord={anchor!.chord}
+                                variant="ink"
+                                size="sm"
+                                selected={selection.has(anchor!.id)}
+                                audition={false}
+                              />
+                              {isPrimary && draggingIds.size > 1 && (
+                                <span
+                                  className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
+                                  aria-label={`${draggingIds.size} chords selected`}
+                                >
+                                  +{draggingIds.size - 1}
+                                </span>
                               )}
-                              style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Modifier-key shortcuts always work as multi-select.
-                                if (e.shiftKey) {
-                                  selectRangeTo(anchor!.id, true);
-                                  return;
-                                }
-                                if (e.metaKey || e.ctrlKey) {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                  return;
-                                }
-                                // Edit Mode: tap toggles selection only —
-                                // never opens the picker, never auditions.
-                                if (isEditMode) {
-                                  selection.toggle(anchor!.id);
-                                  lastSelectedRef.current = anchor!.id;
-                                  return;
-                                }
-                                // Composition Mode: audition + open picker.
-                                void playChord(anchor!.chord);
-                                onChordFocus(line.id);
-                                onPickerOpen(line.id, slotIdx, anchor!.id);
-                              }}
-                            >
-                              <div className="relative pointer-events-none">
-                                <ChordChip
-                                  chord={anchor!.chord}
-                                  variant="ink"
-                                  size="sm"
-                                  selected={selection.has(anchor!.id)}
-                                  audition={false}
+                              {playing && !portalled && (
+                                <span
+                                  aria-hidden
+                                  className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
                                 />
-                                {isPrimary && draggingIds.size > 1 && (
-                                  <span
-                                    className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
-                                    aria-label={`${draggingIds.size} chords selected`}
-                                  >
-                                    +{draggingIds.size - 1}
-                                  </span>
-                                )}
-                                {playing && (
-                                  <span
-                                    aria-hidden
-                                    className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
-                                  />
-                                )}
-                              </div>
+                              )}
                             </div>
-                          );
-                        }}
-                      </Draggable>
-                    )}
+                          </div>
+                        );
+                      };
+                      return (
+                        <Draggable
+                          draggableId={anchor!.id}
+                          index={0}
+                          // Portal the dragging clone to <body> so the chip's transform
+                          // is computed against the viewport, not the (mutating) slot
+                          // wrapper. Fixes the "drag preview jumps" regression.
+                        >
+                          {(dragProvided, dragSnapshot) => {
+                            const node = renderChip(dragProvided, dragSnapshot, false);
+                            if (dragSnapshot.isDragging && typeof document !== "undefined") {
+                              return ReactDOM.createPortal(node, document.body);
+                            }
+                            return node;
+                          }}
+                        </Draggable>
+                      );
+                    })()}
                     {dropProvided.placeholder}
                   </div>
                 )}
@@ -693,6 +713,14 @@ function LineRow({
           rows={1}
           onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
           onKeyDown={(e) => {
+            // Item 5 — "/" intercepts to open New Section dialog. Skip during IME.
+            if (e.key === "/" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              setSlashType("verse");
+              setSlashCustomLabel("");
+              setSlashDialog(true);
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               const newId = onAddLineAfter();
@@ -717,6 +745,47 @@ function LineRow({
           className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
         />
       </div>
+
+      {/* Item 5 — "/" → new section dialog */}
+      <Dialog open={slashDialog} onOpenChange={setSlashDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New section</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Select value={slashType} onValueChange={(v) => setSlashType(v as SectionType)}>
+              <SelectTrigger className="capitalize">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SECTION_TYPES.map((t) => (
+                  <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {slashType === "custom" && (
+              <Input
+                autoFocus
+                placeholder="Custom name (optional)"
+                value={slashCustomLabel}
+                onChange={(e) => setSlashCustomLabel(e.target.value)}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSlashDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
+                setSlashDialog(false);
+                lyricInputRef.current?.focus();
+              }}
+            >
+              Add section
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

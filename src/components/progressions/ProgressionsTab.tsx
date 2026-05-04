@@ -27,6 +27,7 @@ import {
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
+  GripVertical,
 } from "lucide-react";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
@@ -86,6 +87,10 @@ interface PatternProps {
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
+  /** Drag-handle wiring from the surrounding Draggable (Item 3). Optional so
+   *  the component still works in non-DnD contexts. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  blockDragHandleProps?: any;
 }
 
 function formatBeats(n: number) {
@@ -100,6 +105,7 @@ function PatternBlock({
   onPickerOpen,
   onRequestDeleteBlock,
   onEditChordOpen,
+  blockDragHandleProps,
 }: PatternProps) {
   const {
     updatePattern,
@@ -288,6 +294,16 @@ function PatternBlock({
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {blockDragHandleProps && (
+          <span
+            {...blockDragHandleProps}
+            className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing -ml-1 p-1 touch-none"
+            aria-label="Drag to reorder pattern block"
+            title="Drag to reorder"
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
+        )}
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
           Block {blockIndex + 1}
         </span>
@@ -472,6 +488,46 @@ function PatternBlock({
                   </Droppable>
                 );
               })}
+
+              {/* Item 4 — left/right edge drop strips: dropping a chord onto
+                  these appends to the previous / next block when capacity
+                  allows. The actual neighbor lookup happens in onDragEnd. */}
+              <Droppable
+                droppableId={`pattern:${pattern.id}:edge-left`}
+                direction="horizontal"
+                type="chord"
+              >
+                {(p, snap) => (
+                  <div
+                    ref={p.innerRef}
+                    {...p.droppableProps}
+                    className={cn(
+                      "absolute left-0 top-0 bottom-0 w-3 z-20",
+                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
+                    )}
+                  >
+                    {p.placeholder}
+                  </div>
+                )}
+              </Droppable>
+              <Droppable
+                droppableId={`pattern:${pattern.id}:edge-right`}
+                direction="horizontal"
+                type="chord"
+              >
+                {(p, snap) => (
+                  <div
+                    ref={p.innerRef}
+                    {...p.droppableProps}
+                    className={cn(
+                      "absolute right-0 top-0 bottom-0 w-3 z-20",
+                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
+                    )}
+                  >
+                    {p.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
           );
         })()}
@@ -862,39 +918,58 @@ function SectionGroup({
         )}
       </div>
 
-      {/* Pattern blocks within this section */}
-      {!collapsed &&
-        blocks.map((p, i) => {
-          // "Move to…" should reach EVERY other pattern block in the song,
-          // not just siblings within this section. Build the option list from
-          // allPatterns, labelled by section name + block index.
-          const otherAll = allPatterns
-            .filter((q) => q.id !== p.id)
-            .map((q) => {
-              const sid = q.sectionId ?? q.id;
-              const sameSectionBlocks = allPatterns.filter(
-                (b) => (b.sectionId ?? b.id) === sid,
-              );
-              const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
-              const sectionName = getSectionDisplayName(allSections, sid);
-              return {
-                id: q.id,
-                label: `${sectionName}: Block ${blockNum}`,
-              };
-            });
-          return (
-            <PatternBlock
-              key={p.id}
-              pattern={p}
-              blockIndex={i}
-              blocksInSection={blocks.length}
-              otherPatterns={otherAll}
-              onPickerOpen={onPickerOpen}
-              onRequestDeleteBlock={onRequestDeleteBlock}
-              onEditChordOpen={onEditChordOpen}
-            />
-          );
-        })}
+      {/* Pattern blocks within this section. Wrapped in a Droppable of
+          type="patternblock" so chord drags (type="chord") never land here. */}
+      {!collapsed && (
+        <Droppable droppableId={`patternblock:${sectionId}`} type="patternblock">
+          {(dropProvided) => (
+            <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-3">
+              {blocks.map((p, i) => {
+                const otherAll = allPatterns
+                  .filter((q) => q.id !== p.id)
+                  .map((q) => {
+                    const sid = q.sectionId ?? q.id;
+                    const sameSectionBlocks = allPatterns.filter(
+                      (b) => (b.sectionId ?? b.id) === sid,
+                    );
+                    const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
+                    const sectionName = getSectionDisplayName(allSections, sid);
+                    return {
+                      id: q.id,
+                      label: `${sectionName}: Block ${blockNum}`,
+                    };
+                  });
+                return (
+                  <Draggable key={p.id} draggableId={`patternblock:${p.id}`} index={i}>
+                    {(dragProvided, dragSnapshot) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        className={cn(
+                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg rounded-lg",
+                        )}
+                        style={dragProvided.draggableProps.style}
+                      >
+                        <PatternBlock
+                          pattern={p}
+                          blockIndex={i}
+                          blocksInSection={blocks.length}
+                          otherPatterns={otherAll}
+                          onPickerOpen={onPickerOpen}
+                          onRequestDeleteBlock={onRequestDeleteBlock}
+                          onEditChordOpen={onEditChordOpen}
+                          blockDragHandleProps={dragProvided.dragHandleProps}
+                        />
+                      </div>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {dropProvided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      )}
 
       {!collapsed && (
         <Button variant="outline" size="sm" className="w-full" onClick={() => addPatternToSection(sectionId)}>
@@ -981,12 +1056,43 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     const { destination, source, draggableId } = result;
     if (!destination) return;
     const dst = destination.droppableId.split(":");
+
+    // Item 3 — pattern block reorder within a section.
+    if (dst[0] === "patternblock") {
+      const sectionId = dst[1];
+      const src = source.droppableId.split(":");
+      if (src[0] !== "patternblock" || src[1] !== sectionId) return;
+      useSongStore.getState().reorderPatternBlockInSection(
+        sectionId,
+        source.index,
+        destination.index,
+      );
+      return;
+    }
+
     if (dst[0] !== "pattern") return;
-    const toId = dst[1];
-    const toSlot = Number(dst[2]);
+    let toId = dst[1];
+    let toSlot = Number(dst[2]);
+
+    // Item 4 — edge drop strips: redirect to the previous/next pattern block.
+    const state = useSongStore.getState();
+    if (dst[2] === "edge-left" || dst[2] === "edge-right") {
+      const idx = state.progression.findIndex((p) => p.id === toId);
+      if (idx < 0) return;
+      const neighborIdx = dst[2] === "edge-left" ? idx - 1 : idx + 1;
+      const neighbor = state.progression[neighborIdx];
+      if (!neighbor) {
+        toast({ title: "No adjacent block", description: "There's no neighboring pattern block to move into.", variant: "destructive" });
+        return;
+      }
+      toId = neighbor.id;
+      const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
+      // Append at the next free slot in the neighbor (rounded down to a beat).
+      toSlot = Math.floor(neighborUsed);
+    }
+
     if (!toId || Number.isNaN(toSlot)) return;
 
-    const state = useSongStore.getState();
     const toPattern = state.progression.find((p) => p.id === toId);
     if (!toPattern) return;
     const toCap = toPattern.bars * toPattern.beatsPerBar;
