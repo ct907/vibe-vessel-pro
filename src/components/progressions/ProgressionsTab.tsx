@@ -1071,11 +1071,28 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     }
 
     if (dst[0] !== "pattern") return;
-    const toId = dst[1];
-    const toSlot = Number(dst[2]);
+    let toId = dst[1];
+    let toSlot = Number(dst[2]);
+
+    // Item 4 — edge drop strips: redirect to the previous/next pattern block.
+    const state = useSongStore.getState();
+    if (dst[2] === "edge-left" || dst[2] === "edge-right") {
+      const idx = state.progression.findIndex((p) => p.id === toId);
+      if (idx < 0) return;
+      const neighborIdx = dst[2] === "edge-left" ? idx - 1 : idx + 1;
+      const neighbor = state.progression[neighborIdx];
+      if (!neighbor) {
+        toast({ title: "No adjacent block", description: "There's no neighboring pattern block to move into.", variant: "destructive" });
+        return;
+      }
+      toId = neighbor.id;
+      const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
+      // Append at the next free slot in the neighbor (rounded down to a beat).
+      toSlot = Math.floor(neighborUsed);
+    }
+
     if (!toId || Number.isNaN(toSlot)) return;
 
-    const state = useSongStore.getState();
     const toPattern = state.progression.find((p) => p.id === toId);
     if (!toPattern) return;
     const toCap = toPattern.bars * toPattern.beatsPerBar;
