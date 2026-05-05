@@ -1544,6 +1544,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const ids = Array.from(draggingIds);
     setDraggingIds(new Set());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cleanup = (window as any).__lvDndPointerCleanup as (() => void) | undefined;
+    if (cleanup) { cleanup(); (window as any).__lvDndPointerCleanup = undefined; }
     justDraggedAtRef.current = Date.now();
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
