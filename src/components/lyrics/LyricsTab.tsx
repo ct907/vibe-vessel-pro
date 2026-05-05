@@ -1506,6 +1506,29 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
+    // Begin tracking pointer position so the portalled clone can follow it.
+    const onMove = (e: PointerEvent | TouchEvent) => {
+      let x = 0, y = 0;
+      if ("touches" in e && e.touches.length > 0) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      } else if ("clientX" in e) {
+        x = (e as PointerEvent).clientX;
+        y = (e as PointerEvent).clientY;
+      }
+      pointerPosRef.current = { x, y };
+    };
+    window.addEventListener("pointermove", onMove as EventListener, { passive: true });
+    window.addEventListener("touchmove", onMove as EventListener, { passive: true });
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove as EventListener);
+      window.removeEventListener("touchmove", onMove as EventListener);
+      pointerPosRef.current = null;
+    };
+    // Stash for cleanup on drag end.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__lvDndPointerCleanup = cleanup;
+
     if (start.draggableId.startsWith("basket:")) {
       setDraggingIds(new Set([start.draggableId]));
       return;
