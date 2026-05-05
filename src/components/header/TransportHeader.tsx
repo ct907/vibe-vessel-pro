@@ -83,15 +83,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const metronome = useMetronomeStore();
 
   // Drive the metronome from playback + meta. Starts/stops with isPlaying;
-  // updates rate/time-signature live without needing a restart.
+  // updates rate/time-signature live without needing a restart. The actual
+  // start moment is set in handlePlay so it lines up with the first chord.
   useEffect(() => {
-    if (isPlaying && metronome.enabled) {
-      startMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
-    } else {
-      stopMetronome();
-    }
+    if (!isPlaying) stopMetronome();
     return () => stopMetronome();
-  }, [isPlaying, metronome.enabled]);
+  }, [isPlaying]);
 
   useEffect(() => {
     updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
