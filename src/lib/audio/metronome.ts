@@ -57,10 +57,9 @@ function tick() {
 export function startMetronome(opts: Opts) {
   stopMetronome();
   const ctx = getAudioContext();
-  // Resume in case it's suspended (must be called after a user gesture).
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   current = { ...opts };
-  nextNoteTime = ctx.currentTime + 0.05;
+  nextNoteTime = opts.startAt != null ? opts.startAt : ctx.currentTime + 0.05;
   beatInBar = 0;
   tick();
 }
