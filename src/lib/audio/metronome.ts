@@ -12,6 +12,8 @@ interface Opts {
   beatsPerBar: number;
   /** 0..1 */
   volume: number;
+  /** Optional: start the first tick at this AudioContext time (sec). */
+  startAt?: number;
 }
 
 let timerId: number | null = null;
