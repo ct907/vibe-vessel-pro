@@ -468,6 +468,43 @@ function LineRow({
                         const beingDragged = draggingIds.has(anchor!.id);
                         const isPrimary = dragSnapshot.isDragging;
                         const hideForMulti = beingDragged && !isPrimary;
+                        // When this is the in-flow original of a chip currently
+                        // being dragged via the portal clone, render an invisible
+                        // placeholder so the slot keeps its size but the chip
+                        // doesn't visually duplicate.
+                        if (isPrimary && !portalled) {
+                          return (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              {...dragProvided.dragHandleProps}
+                              data-chip-anchor={anchor!.id}
+                              className="h-full w-full opacity-0 pointer-events-none"
+                              style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
+                              aria-hidden
+                            />
+                          );
+                        }
+                        // Portalled clone follows the user's pointer position
+                        // (works around mobile drift caused by source-slot collapse).
+                        let cloneStyle: React.CSSProperties = {
+                          touchAction: "none",
+                          ...dragProvided.draggableProps.style,
+                        };
+                        if (portalled) {
+                          const p = pointerPosRef.current;
+                          if (p) {
+                            cloneStyle = {
+                              ...cloneStyle,
+                              position: "fixed",
+                              top: 0,
+                              left: 0,
+                              transform: `translate3d(${p.x - 20}px, ${p.y - 18}px, 0)`,
+                              pointerEvents: "none",
+                              zIndex: 9999,
+                            };
+                          }
+                        }
                         return (
                           <div
                             ref={dragProvided.innerRef}
@@ -478,7 +515,7 @@ function LineRow({
                               "h-full flex items-center justify-center",
                               hideForMulti && "opacity-30",
                             )}
-                            style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
+                            style={cloneStyle}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (e.shiftKey) {
@@ -530,16 +567,15 @@ function LineRow({
                         <Draggable
                           draggableId={anchor!.id}
                           index={0}
-                          // Portal the dragging clone to <body> so the chip's transform
-                          // is computed against the viewport, not the (mutating) slot
-                          // wrapper. Fixes the "drag preview jumps" regression.
                         >
                           {(dragProvided, dragSnapshot) => {
-                            const node = renderChip(dragProvided, dragSnapshot, false);
                             if (dragSnapshot.isDragging && typeof document !== "undefined") {
-                              return ReactDOM.createPortal(node, document.body);
+                              return ReactDOM.createPortal(
+                                renderChip(dragProvided, dragSnapshot, true),
+                                document.body,
+                              );
                             }
-                            return node;
+                            return renderChip(dragProvided, dragSnapshot, false);
                           }}
                         </Draggable>
                       );
