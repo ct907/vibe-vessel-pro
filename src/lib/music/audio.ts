@@ -203,6 +203,8 @@ export interface PlayProgressionOptions {
   onEnd?: () => void;
   loopBeats?: number;
   octave?: number;
+  /** Optional: AudioContext time at which playback should start. */
+  startAt?: number;
 }
 
 export async function playProgression(
@@ -223,7 +225,7 @@ export async function playProgression(
   }
   lastBpm = bpm;
 
-  const { onChordStart, onEnd, loopBeats, octave = 4 } = options;
+  const { onChordStart, onEnd, loopBeats, octave = 4, startAt } = options;
 
   type Payload = ScheduledChord & { __index: number };
   const payloads: [number, Payload][] = events.map((e, i) => [
@@ -233,9 +235,9 @@ export async function playProgression(
 
   const part = new Tone.Part((time, value: Payload) => {
     // `time` is in the shared AudioContext clock (Tone uses our raw AC).
-    const startAt = time;
+    const startAtT = time;
     const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
-    spawnChord(value.chord, startAt, startAt + durSec, octave);
+    spawnChord(value.chord, startAtT, startAtT + durSec, octave);
     if (onChordStart) {
       Tone.getDraw().schedule(() => onChordStart(value.__index), time);
     }
@@ -253,7 +255,12 @@ export async function playProgression(
   }
   activePart = part;
 
-  transport.start();
+  if (startAt != null) {
+    // Convert AudioContext time to Tone seconds (Tone shares the same clock).
+    transport.start(startAt);
+  } else {
+    transport.start();
+  }
 
   return { stop: () => stopProgression() };
 }
