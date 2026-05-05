@@ -1,200 +1,96 @@
-# Next batch — 6 enhancements & fixes
 
-Six independent items. Sequenced low → high blast radius. Each item is self-contained and lands in a working state.
+# Round of bug fixes & enhancements
 
----
+Grouped into three phases. Each item lists only the files and key logic.
 
-## Item 1 — Metronome (header nav menu)
+## Phase 1 — DnD, slash key, metronome timing (correctness)
 
-**Goal:** Audible click on every beat at `meta.bpm`, accent on beat 1 (+2 semitones higher), governed by `meta.beatsPerBar`.
+### 1. Lyrics drag still offset on mobile + ghost still visible
+`src/components/lyrics/LyricsTab.tsx`
+- The portalled clone uses pangea's `draggableProps.style` (transform from item origin). On mobile this still drifts because the source slot collapses. Fix by computing the clone position from `e.clientX/clientY` (pointer-following ghost):
+  - Track `pointerPos` via `pointermove` listeners installed on drag start (using `onDragStart` from the global DnD context, exposed via `useDndStore`).
+  - In the portalled clone, override `style.transform = translate3d(${x - w/2}px, ${y - h/2}px, 0)` and `style.position: fixed; top: 0; left: 0`.
+  - Hide the original chip while dragging: in `renderChip`, when `dragSnapshot.isDragging && !portalled`, render an empty placeholder div of the same size instead of the chip.
 
-**Where the control lives**
+### 2. Progressions drag-to-reorder broken (focus theft)
+`src/components/progressions/ProgressionsTab.tsx`
+- Pattern block `<div>` and `<button>` chords have implicit focus traps. Pangea's draggable only accepts pointer-down on a non-interactive ancestor; the chord `<button>` inside captures pointer events first.
+- Fix: remove implicit focusability when not in sort/edit mode:
+  - On the section card root, only set `tabIndex={0}` when `sortMode` is on; otherwise `tabIndex={-1}`.
+  - On `PatternBlock` root, do not set tabIndex; ensure the chord chip `<button>`s only get `dragHandleProps` when `selectMode` (pencil) is OFF — currently they always have it. Wrap chord chip with non-button element while still draggable (`<div role="button">`) so the GripVertical handle on the parent block stays the only drag affordance for block reorder.
+  - Add `data-no-block-drag` regions; the block `Draggable` already only listens on `blockDragHandleProps` (GripVertical). Verify the GripVertical still receives the pointerdown by ensuring no parent `onPointerDownCapture` returns early.
 
-- Inside the existing `Menu` sheet in `TransportHeader.tsx`, **above** the BPM and Time-Signature controls.
-- Toggle (Switch) labelled "Metronome", plus a small volume slider (0–100%).
+### 3. Auto-create lyric row when chord row overflows / appends
+`src/store/song.ts`
+- After `placeChordInSlot`, `moveChordToSlot`, `pasteChordsAt`, `upsertChordAt` and after auto-layout: if the chord lands in the last `_isChordOverflow` row OR creates one, ensure the *next* line exists. Update `autoLayoutSection`'s overflow synth pass to also append a fresh empty lyric line (non-overflow) after the last overflow line if absent.
 
-**Engine**
+### 4. Mobile `/` key doesn't trigger new-section dialog
+`src/components/lyrics/LyricsTab.tsx`
+- Mobile soft keyboards fire `keydown` with `key=""` or `Unidentified`. Detect via `onBeforeInput` instead:
+  - Add `onBeforeInput={(e) => { if (e.data === "/") { e.preventDefault(); openSlashDialog(); } }}` to the lyric `<textarea>`. Keep the existing `onKeyDown` path for desktop.
 
-- New file `src/lib/audio/metronome.ts` exporting `startMetronome(opts)` / `stopMetronome()`.
-- Uses the shared `AudioContext` from `src/lib/audio/context.ts` (so volume sits inside the existing master chain — connect to `voiceBus` or directly to `destination` based on volume control).
-- Click = short oscillator + envelope (sine, 5 ms attack / 60 ms decay).
-  - Beat 1: `880 Hz * 2^(2/12)` (= +2 semitones above the standard 880 Hz accent tone).
-  - Other beats: `880 Hz`.
-- Scheduler: lookahead loop (every 25 ms, schedule clicks ≤100 ms ahead) — avoids `setInterval` jitter and stays in sync if BPM changes mid-play.
+### 5. Metronome aligns with first note
+`src/components/header/TransportHeader.tsx`, `src/lib/audio/metronome.ts`
+- Currently metronome starts ~50ms ahead of `playProgression()` (separate timing origins). Fix by starting both from the same anchor:
+  - Add `startMetronome({ ..., startAt })` parameter using shared `getAudioContext().currentTime + lookahead`.
+  - In `handlePlay`, after `await ensureAudio()` capture `startAt = getAudioContext().currentTime + 0.1`. Pass to `Tone.Transport.start("+0.1")` (Tone accepts time string) and to `startMetronome({ startAt })`. Both then schedule against the same clock.
 
-**Store**
+## Phase 2 — Sound: Pan-Delay-To-The-Beat
 
-- New `useMetronomeStore` (`src/store/metronome.ts`) with `enabled`, `volume`, `setEnabled`, `setVolume`. Persist to `localStorage` like `defaults.ts`.
-- React effect in `TransportHeader` watches `(enabled, isPlaying, bpm, beatsPerBar)` and calls `startMetronome` / `stopMetronome`.
-- Optional standalone preview tick when toggled on while not playing (single beat audition).
+### 6. Pan delay sweep
+`src/store/sound.ts`, `src/lib/audio/context.ts`, `src/components/sound/SoundPanel.tsx`, `src/lib/music/audio.ts`
+- `FX`: add `delayPan: boolean` (default false).
+- `MasterChain`: convert delay output path to stereo —
+  - Insert `panner = ctx.createStereoPanner()` between `delay` and `delayWet`.
+  - Add an LFO `panLfo = ctx.createOscillator()` (triangle) → `panLfoGain` → `panner.pan` with depth 1.0 (so pan sweeps fully -1..+1 = 100L..100R).
+  - Expose `setDelayPan(enabled, bpm)`: when enabled, `panLfo.frequency = bpm/60 / 4` (one full L→R→L cycle per bar at 4/4 — uses song's `beatsPerBar` from caller); set gain to 1; when disabled, gain to 0 and pan to 0. Source signal stays unaffected because LFO only modulates `panner` on the wet path.
+- `applyFX`: call `setDelayPan(fx.delayPan, bpm * (4/beatsPerBar))` so cycle = 1 bar. Pass beatsPerBar through.
+- SoundPanel: Add Switch labeled "Pan Delay To The Beat" inside Delay section.
 
-**Exit criteria**
+## Phase 3 — Desktop chord picker, octave, edit mode
 
-- Toggle ON + Play → audible click at correct BPM, every `beatsPerBar` beats has a higher-pitch accent.
-- Changing BPM mid-playback updates click rate within 1 beat.
-- Toggle OFF immediately stops clicks; song audio unaffected.
+### 7. Edit-mode arrow keys reorder chord (lyrics + progressions)
+`src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`
+- When pencil edit mode is on with single selection, attach a `keydown` handler to `window`: ArrowLeft/Right calls `moveChordToSlot` (lyrics) or `movePatternChord` (progressions). Already exists in toolbar buttons — just bind keys to those handlers and gate by `isEditMode && selectedIds.length === 1` and check `document.activeElement` isn't a textarea/input.
+- SSOT updates already cascade across views.
 
----
+### 8. Desktop chord-picker max-height = 50vh
+`src/components/chord/ChordPickerSheet.tsx`
+- For `!isMobile`, override `sheetMaxHeight = window.innerHeight * 0.5` and `gridMaxHeight` accordingly.
 
-## Item 2 — Lyrics drag visual offset (still broken)
+### 9. Octave setting in chord context menu (sticky default)
+`src/store/sound.ts` (or a new `src/store/chord-prefs.ts`), `src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`
+- New persisted store `useChordPrefsStore` with `defaultOctave: number` (default 4).
+- All call sites that add a chord via picker (`placeChordInSlot`, `addChordToPatternSlot`, etc.) read `defaultOctave` and store it as a per-chord-anchor `octave?: number` on `ChordAnchor`/`PatternChord`/`SectionChord`.
+- Render in the edit-mode toolbar (both tabs): `<Select>` Oct 2/3/4/5/6. Selecting changes `defaultOctave` AND applies to all currently-selected chords (`updateChordOctave(ids, oct)` action on song store).
+- `playChord(chord, dur, octave)` already accepts octave — pass anchor's stored octave, falling back to `defaultOctave`.
 
-**Goal:** Dragged lyric-row chip stays under the finger from frame 1.
+### 10. Desktop: chord click opens picker (not FocusedChordEditor)
+`src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`
+- Lyrics tab: chord chip onClick already calls `onPickerOpen` — verify it never routes to FocusedChordEditor when `!isMobile`. Currently `LyricsTab` only opens picker (good). FocusedChordEditor is invoked from `ProgressionsTab.handleChordTap` → `onEditChordOpen`.
+- In ProgressionsTab `handleChordTap`, if `!isMobile && !selectMode` open the chord picker for replacement instead: call `openPicker(pattern.id, c.startBeat, c.id)` (passes `replaceChordId`).
 
-**Diagnosis recap**
+### 11. Desktop: chord picker grid 4 columns
+`src/components/chord/ChordPickerSheet.tsx`
+- Desktop grid: change `grid-cols-2 sm:grid-cols-3` → `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` (or simply `grid-cols-4` when `!isMobile`).
 
-- Phase 1 (Progressions) fix worked, lyrics version did not. Root cause is different here: the lyric Draggable is wrapped in a slot whose width changes (`w-7` → `w-10`) the moment the chip leaves layout flow, and the chip is centred inside a parent `div` rather than positioned absolutely. Pangea's transform is calculated against the original parent rect, so when the parent shrinks the snapshot, the visual jumps.
+### 12. Desktop: scroll active row to 30% viewport on edit
+`src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`
+- New helper `scrollRowToTop(el, fraction = 0.3)`: `const rect = el.getBoundingClientRect(); window.scrollBy({ top: rect.top - window.innerHeight*0.3, behavior: "smooth" });`.
+- Call it in:
+  - LyricsTab `onChordFocus` and `onPickerOpen` (desktop only) using `rowRef.current`.
+  - ProgressionsTab `handleChordTap` (desktop only) using `blockRef.current`.
 
-**Fix — backup plan: portal renderClone to body**
-
-- `LyricsTab.tsx` lines 458–525: convert the `Draggable` from inline render to `renderClone`.
-- The `renderClone` returns the same chip but is portalled to `document.body`, so its position is computed against the viewport, not the (now collapsed) slot. This is the recommended pangea pattern for chips inside a flex/grid where parent geometry mutates during drag.
-- Inline render still draws the resting chip; clone replaces it during drag.
-
-**Belt-and-braces (only if portal clone alone doesn't fully resolve):**
-
-- Stabilize slot width during any active drag: `(occupied || isAnyDragging) ? "w-10" : "w-7"` so the slot doesn't shrink under the moving chip.
-
-**Files**
-
-- `src/components/lyrics/LyricsTab.tsx` (Draggable block ~458–525, slot className ~430–445).
-
-**Exit criteria**
-
-- Press-hold + drag any lyric chip → chip tracks finger frame 1, no jump to top-left.
-- Drop targets (slots) still highlight correctly; multi-drag "+N" badge still shows on the clone.
-
----
-
-## Item 3 — Progressions tab: drag-to-reorder pattern blocks (single drag only)
-
-**Goal:** Long-press a pattern block header → drag → reorder within the section. No multi-select.
-
-**Scope**
-
-- Reorder applies to **pattern blocks within a section**, single-drag only.
-- Section reorder (already covered by sortMode arrows) stays untouched.
-- No multi-select pattern: any tap-and-hold on a pattern block immediately initiates a single drag.
-
-**Implementation**
-
-- In `SectionGroup` (`ProgressionsTab.tsx` ~732), wrap `blocks.map(...)` in a new `Droppable` with `droppableId={`patternblock:${sectionId}`}` and `type="patternblock"` (separate `type` from the existing `type="chord"` so chord drags don't try to drop into the block-list droppable).
-- Each `PatternBlock` gets a `Draggable draggableId={`patternblock:${p.id}`}` with `index={i}`.
-- The drag handle is the section-block header strip (small grip icon `GripVertical`, only visible on hover/touch). Avoids hijacking taps on chord cells.
-- Add a new tab-level handler in `ProgressionsTab.onDragEnd`: when `dst[0] === "patternblock"`, call a new store action `reorderPatternBlockInSection(sectionId, fromIndex, toIndex)`.
-
-**Store**
-
-- `src/store/song.ts`: add `reorderPatternBlockInSection(sectionId, from, to)`. Mutates the relative order of `progression[]` entries whose `sectionId === sectionId`. Pushes history.
-
-**Exit criteria**
-
-- Long-press grip on Block 2 → drag above Block 1 → order swaps; Lyrics view syncs accordingly after drag to reorder.
-- Chord drags still work inside the same section (different `type` keeps droppables separate).
-- Section reorder via sortMode arrows still works.
+### 13. Desktop: chord picker 75% screen width
+`src/components/chord/ChordPickerSheet.tsx`, `src/components/ui/sheet.tsx`
+- The bottom sheet defaults to full width. On desktop, override `SheetContent` className via `style={{ width: "75vw", marginLeft: "auto", marginRight: "auto" }}` and add `left-[12.5vw] right-[12.5vw]` (override default `inset-x-0`). Keep mobile full width.
 
 ---
 
-## Item 4 — Move chord into previous pattern block when space allows
+## Implementation order
 
-**Goal:** When a chord is dragged off the left edge of its current pattern block, or when the left arrow is pressed in the context menu, accept the drop into the **previous** block if it has free beats.
+1. **Phase 1** (correctness fixes) — biggest user-visible breakage.
+2. **Phase 2** (Pan Delay) — isolated audio change.
+3. **Phase 3** (desktop polish + octave) — UX layer.
 
-**Behaviour**
-
-- Already supported: cross-block drop already calls `movePatternChordToPatternAt` with capacity check (`ProgressionsTab.tsx` lines 1022–1042). Item is really about **discoverability and edge-of-block UX**.
-- Add a thin "drop strip" droppable to the left of each block (and optionally to the right) with `droppableId={`pattern:${prevPatternId}:append`}`. When a chord is dragged over it, or when the the left arrow is pressed in the context menu,  it appends to the previous block at the next free slot if capacity allows; otherwise shows a destructive ring.
-- Reuse the existing `addChordToPatternSlot` / `movePatternChordToPatternAt` logic; just translate `:append` → `prevPattern.bars * prevPattern.beatsPerBar - freeSlot` in the drag-end handler.
-
-**Files**
-
-- `src/components/progressions/ProgressionsTab.tsx`: render a 12px-wide droppable before/after the slot grid in `PatternBlock`.
-- `src/components/progressions/ProgressionsTab.tsx onDragEnd`: handle `:append` suffix, compute target slot, validate fit, call existing store action. No new store action needed.
-
-**Exit criteria**
-
-- Block A (4 beats free) | Block B (chord X). Drag X onto strip immediately right of A → X moves into A's first free slot.
-- If A has no room → strip turns red, drop is rejected with toast.
-- Existing in-block reorder and full cross-block drop unaffected.
-
----
-
-## Item 5 — Typing "/" in a lyric textarea opens a "New Section" dialog
-
-**Goal:** Anywhere in a lyric textarea, pressing `/` (always intercepted) opens a dialog with the same section-type selector used elsewhere (verse, chorus, pre-chorus, bridge, intro, outro, custom).
-
-**Implementation**
-
-- `LyricsTab.tsx` `<textarea>` `onKeyDown` (line ~695): if `e.key === "/"`, `e.preventDefault()` and open a new local dialog state `slashDialog = { afterLineId: line.id }`.
-- New `Dialog` reuses the existing `Select` over `SECTION_TYPES` (already defined at line 98) plus an optional custom name input(when type is `custom`).
-- On accept: call `addSection(type, label?)` (already exists, line 1126 of `song.ts`) and add an empty first lyric line. The new section is appended after the current section by default; a follow-up enhancement could support insertion-at-position, but per the request just create the section.
-
-**Edge cases**
-
-- Always intercepts `/` even mid-word (per user choice). Users who actually want a slash character can paste it — acceptable trade-off.
-- Composition-IME safety: skip when `e.isComposing` to avoid breaking IME input.
-
-**Exit criteria**
-
-- Type `/` in any lyric line → dialog opens, focus on selector.
-- Pick "Chorus" → new chorus section appended; dialog closes; original lyric line unchanged (no `/` inserted).
-- Cancel → no mutation.
-
----
-
-## Item 6 — Landing page at `/` (editor moves to `/app`)
-
-**Routes (`src/App.tsx`)**
-
-- `/` → new `Landing.tsx`
-- `/app` → existing `Index.tsx`
-- `/defaults` and `*` unchanged.
-
-**Landing page contents (`src/pages/Landing.tsx`)**
-
-- Header: "SongNote" wordmark + tagline.
-- Description block with three cards: **Lyrics** / **Chords** / **Progressions**, each with 1-line role + "Open" button → navigates to `/app` and pre-selects that tab via URL state (`/app?tab=lyrics`).
-- "Set as default view" toggle next to each tab card (radio group: lyrics/chords/progressions/landing). Stored in:
-  1. `useDefaultsStore` (new field `defaultLandingTab: "lyrics" | "chords" | "progressions" | null`), and
-  2. mirrored into the song save-file JSON via `meta.defaultTab` so opening a project respects the song's preferred tab (project setting overrides global if present).
-- Recent projects list: read from `localStorage` only.
-  - New helper `src/lib/recent-projects.ts` exporting `pushRecent({ name, savedAt, snapshot })` and `listRecent(): RecentProject[]`.
-  - Hook into the existing autosave path (`startAutosave` in `song.ts`) and into `loadProjectFromFile` to record entries.
-  - Each entry: `{ id, name, savedAt, snapshot }` (full song JSON in localStorage; cap list at 10).
-  - Click a recent → load snapshot into store → navigate to `/app`.
-  - "No recent projects" empty state.
-
-**Index.tsx changes**
-
-- On mount, if URL has `?tab=…`, set initial tab from it.
-- Continue writing to localStorage so the landing's recent list stays fresh.
-- If `meta.defaultTab` (from loaded project) or `defaultLandingTab` is set, use it to initialize the tab.
-
-**Backend?** Not needed — user picked "Local only". Leave a `// TODO: cloud sync` comment in `recent-projects.ts` as a clean integration point.
-
-**Exit criteria**
-
-- Visiting `/` shows landing with three tab cards, default-tab toggle, and recent projects (or empty state).
-- "Open Lyrics" button → `/app?tab=lyrics` lands on the editor with Lyrics active.
-- Default tab toggle persists across reloads.
-- Loading a song-file with `meta.defaultTab` set opens that tab automatically.
-- Direct navigation to `/app` still works.
-
----
-
-## Phase order
-
-```text
-Item 1 (metronome)            ── isolated audio module
-Item 2 (lyrics drag fix)      ── isolated, unblocks DnD QA
-Item 3 (block reorder)        ── new droppable type, contained
-Item 4 (cross-block move UX)  ── builds on Item 3 droppables
-Item 5 (slash → new section)  ── single textarea handler + dialog
-Item 6 (landing page)         ── new route, no risk to editor
-```
-
-Items 1–5 ship inside the existing editor. Item 6 changes routing — done last so any regression is obvious in isolation.
-
-## Cross-cutting risks
-
-- **Item 3 droppable types**: must use `type="patternblock"` distinct from chord drops, otherwise a dragged chord could land in the wrong droppable.
-- **Item 5 IME**: skip `/` interception when `e.isComposing` to protect IME users.
-- **Item 6 storage size**: cap recent projects list at 10 and store snapshots compressed-as-JSON only (no images/binary).
+After Phase 3, I will append a one-paragraph note to `.lovable/plan.md` recording these fixes.
