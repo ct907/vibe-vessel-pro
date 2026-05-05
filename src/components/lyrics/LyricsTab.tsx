@@ -712,6 +712,18 @@ function LineRow({
           value={line.text}
           rows={1}
           onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
+          onBeforeInput={(e: React.FormEvent<HTMLTextAreaElement> & { data?: string }) => {
+            // Mobile soft keyboards often fire keydown with key="" / "Unidentified".
+            // beforeinput reliably reports the inserted character.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const data = (e as any).data;
+            if (data === "/") {
+              e.preventDefault();
+              setSlashType("verse");
+              setSlashCustomLabel("");
+              setSlashDialog(true);
+            }
+          }}
           onKeyDown={(e) => {
             // Item 5 — "/" intercepts to open New Section dialog. Skip during IME.
             if (e.key === "/" && !e.nativeEvent.isComposing) {
