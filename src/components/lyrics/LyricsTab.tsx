@@ -508,6 +508,24 @@ function LineRow({
                               pointerEvents: "none",
                               zIndex: 9999,
                             };
+                          } else {
+                            // Fallback: seed from source element rect so the
+                            // first frame doesn't snap to Pangea's default.
+                            const srcEl = document.querySelector(
+                              `[data-chip-anchor="${anchor!.id}"]`,
+                            ) as HTMLElement | null;
+                            if (srcEl) {
+                              const r = srcEl.getBoundingClientRect();
+                              cloneStyle = {
+                                ...cloneStyle,
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                transform: `translate3d(${r.left}px, ${r.top}px, 0)`,
+                                pointerEvents: "none",
+                                zIndex: 9999,
+                              };
+                            }
                           }
                         }
                         return (
@@ -1506,6 +1524,26 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
+    // Tear down any stale listeners from a previous aborted drag.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prev = (window as any).__lvDndPointerCleanup;
+    if (typeof prev === "function") {
+      try { prev(); } catch { /* noop */ }
+    }
+
+    // Seed pointer position immediately from the source element's center, so
+    // the portalled clone has a valid coordinate on its very first render
+    // (mobile pointer events fire AFTER the first paint, causing the ghost
+    // to jump to 0,0 otherwise).
+    const seedSel = start.draggableId.startsWith("basket:")
+      ? `[data-basket-id="${start.draggableId.slice("basket:".length)}"]`
+      : `[data-chip-anchor="${start.draggableId}"]`;
+    const seedEl = document.querySelector(seedSel) as HTMLElement | null;
+    if (seedEl) {
+      const r = seedEl.getBoundingClientRect();
+      pointerPosRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+
     // Begin tracking pointer position so the portalled clone can follow it.
     const onMove = (e: PointerEvent | TouchEvent) => {
       let x = 0, y = 0;
