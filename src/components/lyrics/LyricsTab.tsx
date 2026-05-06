@@ -508,6 +508,24 @@ function LineRow({
                               pointerEvents: "none",
                               zIndex: 9999,
                             };
+                          } else {
+                            // Fallback: seed from source element rect so the
+                            // first frame doesn't snap to Pangea's default.
+                            const srcEl = document.querySelector(
+                              `[data-chip-anchor="${anchor!.id}"]`,
+                            ) as HTMLElement | null;
+                            if (srcEl) {
+                              const r = srcEl.getBoundingClientRect();
+                              cloneStyle = {
+                                ...cloneStyle,
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                transform: `translate3d(${r.left}px, ${r.top}px, 0)`,
+                                pointerEvents: "none",
+                                zIndex: 9999,
+                              };
+                            }
                           }
                         }
                         return (
