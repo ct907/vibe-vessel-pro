@@ -82,10 +82,7 @@ import { useUIStore } from "@/store/ui";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
-// Module-scoped pointer tracker — read by the portalled drag clone so the
-// chip follows the user's finger/cursor exactly (fixes mobile drift caused
-// by the source slot collapsing during drag).
-const pointerPosRef: { current: { x: number; y: number } | null } = { current: null };
+// (Pangea handles pointer-following natively via renderClone.)
 
 function parseChordTextToClips(text: string): ChordClip[] {
   const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
