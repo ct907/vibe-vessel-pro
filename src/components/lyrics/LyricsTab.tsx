@@ -1478,49 +1478,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
-    // Tear down any stale listeners from a previous aborted drag.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prev = (window as any).__lvDndPointerCleanup;
-    if (typeof prev === "function") {
-      try { prev(); } catch { /* noop */ }
-    }
-
-    // Seed pointer position immediately from the source element's center, so
-    // the portalled clone has a valid coordinate on its very first render
-    // (mobile pointer events fire AFTER the first paint, causing the ghost
-    // to jump to 0,0 otherwise).
-    const seedSel = start.draggableId.startsWith("basket:")
-      ? `[data-basket-id="${start.draggableId.slice("basket:".length)}"]`
-      : `[data-chip-anchor="${start.draggableId}"]`;
-    const seedEl = document.querySelector(seedSel) as HTMLElement | null;
-    if (seedEl) {
-      const r = seedEl.getBoundingClientRect();
-      pointerPosRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }
-
-    // Begin tracking pointer position so the portalled clone can follow it.
-    const onMove = (e: PointerEvent | TouchEvent) => {
-      let x = 0, y = 0;
-      if ("touches" in e && e.touches.length > 0) {
-        x = e.touches[0].clientX;
-        y = e.touches[0].clientY;
-      } else if ("clientX" in e) {
-        x = (e as PointerEvent).clientX;
-        y = (e as PointerEvent).clientY;
-      }
-      pointerPosRef.current = { x, y };
-    };
-    window.addEventListener("pointermove", onMove as EventListener, { passive: true });
-    window.addEventListener("touchmove", onMove as EventListener, { passive: true });
-    const cleanup = () => {
-      window.removeEventListener("pointermove", onMove as EventListener);
-      window.removeEventListener("touchmove", onMove as EventListener);
-      pointerPosRef.current = null;
-    };
-    // Stash for cleanup on drag end.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__lvDndPointerCleanup = cleanup;
-
     if (start.draggableId.startsWith("basket:")) {
       setDraggingIds(new Set([start.draggableId]));
       return;
@@ -1536,9 +1493,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const ids = Array.from(draggingIds);
     setDraggingIds(new Set());
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cleanup = (window as any).__lvDndPointerCleanup as (() => void) | undefined;
-    if (cleanup) { cleanup(); (window as any).__lvDndPointerCleanup = undefined; }
     justDraggedAtRef.current = Date.now();
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
