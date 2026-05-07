@@ -82,10 +82,7 @@ import { useUIStore } from "@/store/ui";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
-// Module-scoped pointer tracker — read by the portalled drag clone so the
-// chip follows the user's finger/cursor exactly (fixes mobile drift caused
-// by the source slot collapsing during drag).
-const pointerPosRef: { current: { x: number; y: number } | null } = { current: null };
+// (Pangea handles pointer-following natively via renderClone.)
 
 function parseChordTextToClips(text: string): ChordClip[] {
   const tokens = text.split(/[\s,;|\n\r\t]+/).map((t) => t.trim()).filter(Boolean);
@@ -416,13 +413,29 @@ function LineRow({
           {slots.map((anchor, slotIdx) => {
             const occupied = !!anchor;
             const playing = !!anchor && playingAnchorId === anchor.id;
-            // Spacing rule preview: while dragging, an empty slot whose
-            // immediate neighbor already holds a chord is an invalid drop
-            // target (the store will auto-shift to the next spaced slot).
-            // Mark it visually so the user understands why a slot won't accept.
             const leftOccupied = slotIdx > 0 && !!slots[slotIdx - 1];
             const rightOccupied = slotIdx < CHORD_ROW_SLOTS - 1 && !!slots[slotIdx + 1];
             const isInvalidDrop = !occupied && (leftOccupied || rightOccupied);
+
+            // Renders the visible chord chip. `dragging` triggers selected ring.
+            const renderStaticChip = (a: NonNullable<typeof anchor>) => (
+              <div className="relative pointer-events-none">
+                <ChordChip
+                  chord={a.chord}
+                  variant="ink"
+                  size="sm"
+                  selected={selection.has(a.id)}
+                  audition={false}
+                />
+                {playing && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
+                  />
+                )}
+              </div>
+            );
+
             return (
               <Droppable
                 key={`slot-${slotIdx}`}
@@ -430,6 +443,40 @@ function LineRow({
                 direction="horizontal"
                 type="chord"
                 isDropDisabled={false}
+                renderClone={(dragProvided, _snap, _rubric) => {
+                  // Pangea-native clone — follows the finger automatically.
+                  if (!anchor) return <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps} />;
+                  return (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      {...dragProvided.dragHandleProps}
+                      className="h-9 flex items-center justify-center"
+                      style={{
+                        touchAction: "none",
+                        ...dragProvided.draggableProps.style,
+                      }}
+                    >
+                      <div className="relative pointer-events-none">
+                        <ChordChip
+                          chord={anchor.chord}
+                          variant="ink"
+                          size="sm"
+                          selected
+                          audition={false}
+                        />
+                        {draggingIds.size > 1 && (
+                          <span
+                            className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
+                            aria-label={`${draggingIds.size} chords selected`}
+                          >
+                            +{draggingIds.size - 1}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }}
               >
                 {(dropProvided, dropSnapshot) => (
                   <div
@@ -438,12 +485,7 @@ function LineRow({
                     data-slot-index={slotIdx}
                     className={cn(
                       "relative shrink-0 h-9 flex items-center justify-start",
-                      // Stable widths: empty slots are 28px; occupied slots
-                      // are a definite 40px so the row layout doesn't collapse
-                      // when pangea detaches the dragging chip from flow.
                       occupied ? "w-10" : "w-7",
-                      // Per-slot left border acts as the vertical divider
-                      // between adjacent slots (skip the first one).
                       slotIdx > 0 && !isAnyDragging && "border-l border-muted-foreground/12",
                       isAnyDragging &&
                         !occupied &&
@@ -458,158 +500,70 @@ function LineRow({
                     onClick={(e) => {
                       if (occupied) return;
                       e.stopPropagation();
-                      // Edit Mode: never open picker on empty-slot tap.
                       if (isEditMode) return;
                       onChordFocus(line.id);
                       onPickerOpen(line.id, slotIdx);
                     }}
                   >
-                    {occupied && (() => {
-                      const renderChip = (
-                        dragProvided: any,
-                        dragSnapshot: any,
-                        portalled: boolean,
-                      ) => {
-                        const beingDragged = draggingIds.has(anchor!.id);
-                        const isPrimary = dragSnapshot.isDragging;
-                        const hideForMulti = beingDragged && !isPrimary;
-                        // When this is the in-flow original of a chip currently
-                        // being dragged via the portal clone, render an invisible
-                        // placeholder so the slot keeps its size but the chip
-                        // doesn't visually duplicate.
-                        if (isPrimary && !portalled) {
+                    {occupied && (
+                      <Draggable
+                        draggableId={anchor!.id}
+                        index={0}
+                        isDragDisabled={!isEditMode}
+                      >
+                        {(dragProvided, dragSnapshot) => {
+                          const beingDragged = draggingIds.has(anchor!.id);
+                          const hideForMulti = beingDragged && !dragSnapshot.isDragging;
                           return (
                             <div
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
                               {...dragProvided.dragHandleProps}
                               data-chip-anchor={anchor!.id}
-                              className="h-full w-full opacity-0 pointer-events-none"
-                              style={{ touchAction: "none", ...dragProvided.draggableProps.style }}
-                              aria-hidden
-                            />
-                          );
-                        }
-                        // Portalled clone follows the user's pointer position
-                        // (works around mobile drift caused by source-slot collapse).
-                        let cloneStyle: React.CSSProperties = {
-                          touchAction: "none",
-                          ...dragProvided.draggableProps.style,
-                        };
-                        if (portalled) {
-                          const p = pointerPosRef.current;
-                          if (p) {
-                            cloneStyle = {
-                              ...cloneStyle,
-                              position: "fixed",
-                              top: 0,
-                              left: 0,
-                              transform: `translate3d(${p.x - 20}px, ${p.y - 18}px, 0)`,
-                              pointerEvents: "none",
-                              zIndex: 9999,
-                            };
-                          } else {
-                            // Fallback: seed from source element rect so the
-                            // first frame doesn't snap to Pangea's default.
-                            const srcEl = document.querySelector(
-                              `[data-chip-anchor="${anchor!.id}"]`,
-                            ) as HTMLElement | null;
-                            if (srcEl) {
-                              const r = srcEl.getBoundingClientRect();
-                              cloneStyle = {
-                                ...cloneStyle,
-                                position: "fixed",
-                                top: 0,
-                                left: 0,
-                                transform: `translate3d(${r.left}px, ${r.top}px, 0)`,
-                                pointerEvents: "none",
-                                zIndex: 9999,
-                              };
-                            }
-                          }
-                        }
-                        return (
-                          <div
-                            ref={dragProvided.innerRef}
-                            {...dragProvided.draggableProps}
-                            {...dragProvided.dragHandleProps}
-                            data-chip-anchor={anchor!.id}
-                            className={cn(
-                              "h-full flex items-center justify-center",
-                              hideForMulti && "opacity-30",
-                            )}
-                            style={cloneStyle}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (e.shiftKey) {
-                                selectRangeTo(anchor!.id, true);
-                                return;
-                              }
-                              if (e.metaKey || e.ctrlKey) {
-                                selection.toggle(anchor!.id);
-                                lastSelectedRef.current = anchor!.id;
-                                return;
-                              }
-                              if (isEditMode) {
-                                selection.toggle(anchor!.id);
-                                lastSelectedRef.current = anchor!.id;
-                                return;
-                              }
-                              void playChord(anchor!.chord);
-                              onChordFocus(line.id);
-                              onPickerOpen(line.id, slotIdx, anchor!.id);
-                            }}
-                          >
-                            <div className="relative pointer-events-none">
-                              <ChordChip
-                                chord={anchor!.chord}
-                                variant="ink"
-                                size="sm"
-                                selected={selection.has(anchor!.id)}
-                                audition={false}
-                              />
-                              {isPrimary && draggingIds.size > 1 && (
-                                <span
-                                  className="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-5 min-w-5 px-1 shadow-md"
-                                  aria-label={`${draggingIds.size} chords selected`}
-                                >
-                                  +{draggingIds.size - 1}
-                                </span>
+                              className={cn(
+                                "h-full flex items-center justify-center",
+                                hideForMulti && "opacity-30",
+                                dragSnapshot.isDragging && "opacity-0",
+                                isEditMode && "cursor-grab",
                               )}
-                              {playing && !portalled && (
-                                <span
-                                  aria-hidden
-                                  className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
-                                />
-                              )}
+                              style={{
+                                touchAction: isEditMode ? "none" : "auto",
+                                ...dragProvided.draggableProps.style,
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (e.shiftKey) {
+                                  selectRangeTo(anchor!.id, true);
+                                  return;
+                                }
+                                if (e.metaKey || e.ctrlKey) {
+                                  selection.toggle(anchor!.id);
+                                  lastSelectedRef.current = anchor!.id;
+                                  return;
+                                }
+                                if (isEditMode) {
+                                  selection.toggle(anchor!.id);
+                                  lastSelectedRef.current = anchor!.id;
+                                  return;
+                                }
+                                void playChord(anchor!.chord);
+                                onChordFocus(line.id);
+                                onPickerOpen(line.id, slotIdx, anchor!.id);
+                              }}
+                            >
+                              {renderStaticChip(anchor!)}
                             </div>
-                          </div>
-                        );
-                      };
-                      return (
-                        <Draggable
-                          draggableId={anchor!.id}
-                          index={0}
-                        >
-                          {(dragProvided, dragSnapshot) => {
-                            if (dragSnapshot.isDragging && typeof document !== "undefined") {
-                              return ReactDOM.createPortal(
-                                renderChip(dragProvided, dragSnapshot, true),
-                                document.body,
-                              );
-                            }
-                            return renderChip(dragProvided, dragSnapshot, false);
-                          }}
-                        </Draggable>
-                      );
-                    })()}
+                          );
+                        }}
+                      </Draggable>
+                    )}
                     {dropProvided.placeholder}
                   </div>
                 )}
               </Droppable>
             );
           })}
-        </div>
+          </div>
 
         {/* Edit pencil — toggles Edit Mode. Entering Edit Mode closes the
             picker, blurs inputs, and pre-selects all chords so the context
@@ -1524,49 +1478,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   // ---- Drag handlers ----
   const onDragStart = (start: { draggableId: string }) => {
-    // Tear down any stale listeners from a previous aborted drag.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prev = (window as any).__lvDndPointerCleanup;
-    if (typeof prev === "function") {
-      try { prev(); } catch { /* noop */ }
-    }
-
-    // Seed pointer position immediately from the source element's center, so
-    // the portalled clone has a valid coordinate on its very first render
-    // (mobile pointer events fire AFTER the first paint, causing the ghost
-    // to jump to 0,0 otherwise).
-    const seedSel = start.draggableId.startsWith("basket:")
-      ? `[data-basket-id="${start.draggableId.slice("basket:".length)}"]`
-      : `[data-chip-anchor="${start.draggableId}"]`;
-    const seedEl = document.querySelector(seedSel) as HTMLElement | null;
-    if (seedEl) {
-      const r = seedEl.getBoundingClientRect();
-      pointerPosRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }
-
-    // Begin tracking pointer position so the portalled clone can follow it.
-    const onMove = (e: PointerEvent | TouchEvent) => {
-      let x = 0, y = 0;
-      if ("touches" in e && e.touches.length > 0) {
-        x = e.touches[0].clientX;
-        y = e.touches[0].clientY;
-      } else if ("clientX" in e) {
-        x = (e as PointerEvent).clientX;
-        y = (e as PointerEvent).clientY;
-      }
-      pointerPosRef.current = { x, y };
-    };
-    window.addEventListener("pointermove", onMove as EventListener, { passive: true });
-    window.addEventListener("touchmove", onMove as EventListener, { passive: true });
-    const cleanup = () => {
-      window.removeEventListener("pointermove", onMove as EventListener);
-      window.removeEventListener("touchmove", onMove as EventListener);
-      pointerPosRef.current = null;
-    };
-    // Stash for cleanup on drag end.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__lvDndPointerCleanup = cleanup;
-
     if (start.draggableId.startsWith("basket:")) {
       setDraggingIds(new Set([start.draggableId]));
       return;
@@ -1582,9 +1493,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const onDragEnd = (result: DropResult) => {
     const ids = Array.from(draggingIds);
     setDraggingIds(new Set());
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cleanup = (window as any).__lvDndPointerCleanup as (() => void) | undefined;
-    if (cleanup) { cleanup(); (window as any).__lvDndPointerCleanup = undefined; }
     justDraggedAtRef.current = Date.now();
     if (!result.destination) return;
     const { source, destination, draggableId } = result;

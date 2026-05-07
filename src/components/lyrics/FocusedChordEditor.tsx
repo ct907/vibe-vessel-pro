@@ -13,7 +13,7 @@ import {
 } from "@/store/song";
 import { useUIStore } from "@/store/ui";
 import { toast } from "sonner";
-import { Play, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LyricsModeProps {
@@ -280,6 +280,58 @@ export function FocusedChordEditor(props: Props) {
           </div>
         )}
 
+        {/* Reorder controls — operate on the chord currently being edited. */}
+        {(() => {
+          const moveChordToSlot = useSongStore.getState().moveChordToSlot;
+          const movePatternChord = useSongStore.getState().movePatternChord;
+          const canReorder = isProgression
+            ? !!progChord
+            : !!anchorId;
+          const onMove = (dir: -1 | 1) => {
+            if (isProgression) {
+              if (!progChord) return;
+              movePatternChord(props.patternId, props.chordId, dir);
+            } else {
+              if (!anchorId || !section) return;
+              const live = getLineChordsViaSSOT(section, lyricsLineId);
+              const cur = live.find((c) => c.id === anchorId);
+              if (!cur || cur.slotIndex == null) return;
+              const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, cur.slotIndex + dir));
+              if (target === cur.slotIndex) return;
+              moveChordToSlot(props.sectionId, lyricsLineId, anchorId, target);
+            }
+          };
+          return (
+            <div className="flex items-center justify-between gap-2 px-3 pt-2">
+              <span className="text-[11px] text-muted-foreground">Reorder this chord</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2"
+                  disabled={!canReorder}
+                  onClick={() => onMove(-1)}
+                  aria-label="Move chord left"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2"
+                  disabled={!canReorder}
+                  onClick={() => onMove(1)}
+                  aria-label="Move chord right"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="px-3 py-3 border-b border-border shrink-0">
           <Input
             ref={inputRef}
@@ -291,6 +343,19 @@ export function FocusedChordEditor(props: Props) {
               if (e.key === "Enter" && exact) {
                 e.preventDefault();
                 handlePick(exact);
+              } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                e.preventDefault();
+                const dir: -1 | 1 = e.key === "ArrowLeft" ? -1 : 1;
+                if (isProgression) {
+                  useSongStore.getState().movePatternChord(props.patternId, props.chordId, dir);
+                } else if (anchorId && section) {
+                  const live = getLineChordsViaSSOT(section, lyricsLineId);
+                  const cur = live.find((c) => c.id === anchorId);
+                  if (cur && cur.slotIndex != null) {
+                    const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, cur.slotIndex + dir));
+                    useSongStore.getState().moveChordToSlot(props.sectionId, lyricsLineId, anchorId, target);
+                  }
+                }
               }
             }}
           />
