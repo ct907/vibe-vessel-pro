@@ -110,24 +110,19 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
               data-basket-id={b.id}
               role="button"
               aria-pressed={sel}
-              aria-label={sel ? `Selected chord ${b.chord.display}. Drag to move.` : `Chord ${b.chord.display}. Tap to select, then drag.`}
+              aria-label={sel ? `Selected chord ${b.chord.display}. Drag to move.` : `Chord ${b.chord.display}. Drag to move, tap to multi-select.`}
               onClick={() => onChipClick(b.id)}
               style={{
                 touchAction: "none",
                 userSelect: "none",
                 WebkitUserSelect: "none",
                 WebkitTouchCallout: "none",
+                cursor: snap.isDragging ? "grabbing" : "grab",
+                opacity: snap.isDragging ? 0 : 1,
                 ...prov.draggableProps.style,
               }}
             >
-              <div
-                style={{
-                  cursor: snap.isDragging ? "grabbing" : "grab",
-                  opacity: snap.isDragging ? 0.9 : 1,
-                }}
-              >
-                <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
-              </div>
+              <StaticChordChip chord={b.chord} dragging={snap.isDragging} selected={sel} />
             </div>
           )}
         </Draggable>
