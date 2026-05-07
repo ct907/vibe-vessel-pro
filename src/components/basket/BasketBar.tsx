@@ -174,7 +174,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
         {/* Row B: helper text on its own line */}
         <div className="text-[11px] text-muted-foreground/90">
           {selectionSize === 0 ? (
-            "Tap to select · drag to move"
+            "Drag to move · tap to multi-select"
           ) : (
             <span className="text-primary font-medium">
               {selectionSize} selected · drag any to move {selectionSize > 1 ? "all" : ""}
