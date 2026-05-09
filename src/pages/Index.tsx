@@ -83,32 +83,54 @@ const Index = () => {
   // Single global DragDropContext routes drops to whichever tab owns the
   // destination droppable. Basket-source drags work cross-tab because the
   // BasketBar is a sibling of <main> inside this same context.
+  // Freeze the basket selection at drag-start (immune to mid-drag clear()
+  // races) and pause autosave so per-chord intermediate writes don't get
+  // persisted during multi-chord drags.
+  const onBeforeDragStart = (start: { draggableId: string }) => {
+    beginInteraction();
+    if (start.draggableId.startsWith("basket:")) {
+      const id = start.draggableId.slice("basket:".length);
+      const { selected } = useBasketSelectionStore.getState();
+      const frozen = selected.has(id) && selected.size > 1
+        ? new Set(selected)
+        : new Set([id]);
+      useDndStore.getState().setDraggingIds(frozen);
+    }
+  };
   const onDragStart = (start: { draggableId: string }) => {
     const { lyricsOnDragStart } = useDndStore.getState();
     lyricsOnDragStart?.(start);
   };
   const onDragEnd = (result: DropResult) => {
-    const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
-    const dstPrefix = result.destination?.droppableId.split(":")[0];
-    // eslint-disable-next-line no-console
-    console.log("[DnD] onDragEnd", {
-      result,
-      destination: result.destination?.droppableId,
-      source: result.source?.droppableId,
-      dstPrefix,
-    });
-    if (dstPrefix === "slot") {
-      console.log("[DnD] -> lyrics handler");
-      return lyricsOnDragEnd?.(result);
+    try {
+      const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
+      const dstPrefix = result.destination?.droppableId.split(":")[0];
+      // eslint-disable-next-line no-console
+      console.log("[DnD] onDragEnd", {
+        result,
+        destination: result.destination?.droppableId,
+        source: result.source?.droppableId,
+        dstPrefix,
+      });
+      if (dstPrefix === "slot") {
+        console.log("[DnD] -> lyrics handler");
+        lyricsOnDragEnd?.(result);
+      } else if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
+        console.log("[DnD] -> progressions handler");
+        progressionsOnDragEnd?.(result);
+      } else {
+        // No destination (drop cancelled) — still notify both so per-tab
+        // draggingIds state clears (handlers return early when destination is
+        // null).
+        lyricsOnDragEnd?.(result);
+        progressionsOnDragEnd?.(result);
+      }
+    } finally {
+      // Always release: clears both the frozen drag set and the autosave
+      // gate, even if a handler throws.
+      useDndStore.getState().clear();
+      endInteraction();
     }
-    if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
-      console.log("[DnD] -> progressions handler");
-      return progressionsOnDragEnd?.(result);
-    }
-    // No destination (drop cancelled) — still notify lyrics so its draggingIds
-    // state clears (its handler returns early when destination is null).
-    lyricsOnDragEnd?.(result);
-    progressionsOnDragEnd?.(result);
   };
 
   return (
