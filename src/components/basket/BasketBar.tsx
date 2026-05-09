@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ function DragCloneBadge({
   children,
 }: {
   id: string;
-  children: (count: number) => React.ReactNode;
+  children: (count: number) => JSX.Element;
 }) {
   const liveSelected = useBasketSelectionStore((s) => s.selected);
   const frozen = useDndStore((s) => s.draggingIds);
