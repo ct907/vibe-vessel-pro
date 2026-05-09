@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { ChordSymbol } from "@/lib/music/chords";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { cn } from "@/lib/utils";
 import { useBasketSelectionStore } from "@/store/basket-selection";
+import { useDndStore } from "@/store/dnd";
 
 /**
  * Static, non-interactive chip used INSIDE basket Draggables. We can't reuse
@@ -47,6 +48,28 @@ function StaticChordChip({
       ) : null}
     </span>
   );
+}
+
+/**
+ * Subscribes to the live basket selection (and the frozen drag-snapshot the
+ * global DragDropContext writes at drag-start) so the "+N" badge on the
+ * dragging clone updates if selection changes mid-drag and is immune to a
+ * `clear()` race between resolveDragIds and the actual drop.
+ */
+function DragCloneBadge({
+  id,
+  children,
+}: {
+  id: string;
+  children: (count: number) => React.ReactNode;
+}) {
+  const liveSelected = useBasketSelectionStore((s) => s.selected);
+  const frozen = useDndStore((s) => s.draggingIds);
+  // Prefer the frozen snapshot taken at drag-start (immune to mid-drag
+  // clear()); fall back to live selection if for some reason it's empty.
+  const sourceSet = frozen.size > 0 ? frozen : liveSelected;
+  const count = sourceSet.has(id) && sourceSet.size > 1 ? sourceSet.size : 1;
+  return <>{children(count)}</>;
 }
 
 interface Props {
