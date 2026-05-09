@@ -196,9 +196,6 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                 // mounted in the basket so drops act as COPIES, not moves.
                 const item = basket[rubric.source.index];
                 if (!item) return null;
-                // Multi-drag badge: derived from the live selection store.
-                const sel = useBasketSelectionStore.getState().selected;
-                const count = sel.has(item.id) && sel.size > 1 ? sel.size : 1;
                 return (
                   <div
                     ref={prov.innerRef}
@@ -212,7 +209,11 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
                       ...prov.draggableProps.style,
                     }}
                   >
-                    <StaticChordChip chord={item.chord} dragging badgeCount={count} />
+                    <DragCloneBadge id={item.id}>
+                      {(count) => (
+                        <StaticChordChip chord={item.chord} dragging badgeCount={count} />
+                      )}
+                    </DragCloneBadge>
                   </div>
                 );
               }}
