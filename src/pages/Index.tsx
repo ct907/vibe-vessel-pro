@@ -142,7 +142,7 @@ const Index = () => {
       </div>
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
-      <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DragDropContext onBeforeDragStart={onBeforeDragStart} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
