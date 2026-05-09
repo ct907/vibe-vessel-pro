@@ -8,8 +8,9 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
-import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
+import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
+import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
 
@@ -82,32 +83,54 @@ const Index = () => {
   // Single global DragDropContext routes drops to whichever tab owns the
   // destination droppable. Basket-source drags work cross-tab because the
   // BasketBar is a sibling of <main> inside this same context.
+  // Freeze the basket selection at drag-start (immune to mid-drag clear()
+  // races) and pause autosave so per-chord intermediate writes don't get
+  // persisted during multi-chord drags.
+  const onBeforeDragStart = (start: { draggableId: string }) => {
+    beginInteraction();
+    if (start.draggableId.startsWith("basket:")) {
+      const id = start.draggableId.slice("basket:".length);
+      const { selected } = useBasketSelectionStore.getState();
+      const frozen = selected.has(id) && selected.size > 1
+        ? new Set(selected)
+        : new Set([id]);
+      useDndStore.getState().setDraggingIds(frozen);
+    }
+  };
   const onDragStart = (start: { draggableId: string }) => {
     const { lyricsOnDragStart } = useDndStore.getState();
     lyricsOnDragStart?.(start);
   };
   const onDragEnd = (result: DropResult) => {
-    const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
-    const dstPrefix = result.destination?.droppableId.split(":")[0];
-    // eslint-disable-next-line no-console
-    console.log("[DnD] onDragEnd", {
-      result,
-      destination: result.destination?.droppableId,
-      source: result.source?.droppableId,
-      dstPrefix,
-    });
-    if (dstPrefix === "slot") {
-      console.log("[DnD] -> lyrics handler");
-      return lyricsOnDragEnd?.(result);
+    try {
+      const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
+      const dstPrefix = result.destination?.droppableId.split(":")[0];
+      // eslint-disable-next-line no-console
+      console.log("[DnD] onDragEnd", {
+        result,
+        destination: result.destination?.droppableId,
+        source: result.source?.droppableId,
+        dstPrefix,
+      });
+      if (dstPrefix === "slot") {
+        console.log("[DnD] -> lyrics handler");
+        lyricsOnDragEnd?.(result);
+      } else if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
+        console.log("[DnD] -> progressions handler");
+        progressionsOnDragEnd?.(result);
+      } else {
+        // No destination (drop cancelled) — still notify both so per-tab
+        // draggingIds state clears (handlers return early when destination is
+        // null).
+        lyricsOnDragEnd?.(result);
+        progressionsOnDragEnd?.(result);
+      }
+    } finally {
+      // Always release: clears both the frozen drag set and the autosave
+      // gate, even if a handler throws.
+      useDndStore.getState().clear();
+      endInteraction();
     }
-    if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
-      console.log("[DnD] -> progressions handler");
-      return progressionsOnDragEnd?.(result);
-    }
-    // No destination (drop cancelled) — still notify lyrics so its draggingIds
-    // state clears (its handler returns early when destination is null).
-    lyricsOnDragEnd?.(result);
-    progressionsOnDragEnd?.(result);
   };
 
   return (
@@ -119,7 +142,7 @@ const Index = () => {
       </div>
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
-      <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DragDropContext onBeforeDragStart={onBeforeDragStart} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 

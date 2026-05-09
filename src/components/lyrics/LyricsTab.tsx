@@ -509,11 +509,17 @@ function LineRow({
                       <Draggable
                         draggableId={anchor!.id}
                         index={0}
-                        isDragDisabled={!isEditMode}
+                        // Desktop: chip is always draggable (mouse drag has its
+                        // own movement threshold so a click still auditions /
+                        // opens the editor). Mobile: gate behind Edit Mode to
+                        // avoid the gesture conflict with ChordChip's own
+                        // touch handlers.
+                        isDragDisabled={isMobile && !isEditMode}
                       >
                         {(dragProvided, dragSnapshot) => {
                           const beingDragged = draggingIds.has(anchor!.id);
                           const hideForMulti = beingDragged && !dragSnapshot.isDragging;
+                          const dragEnabled = !isMobile || isEditMode;
                           return (
                             <div
                               ref={dragProvided.innerRef}
@@ -524,10 +530,12 @@ function LineRow({
                                 "h-full flex items-center justify-center",
                                 hideForMulti && "opacity-30",
                                 dragSnapshot.isDragging && "opacity-0",
-                                isEditMode && "cursor-grab",
+                                dragEnabled && "cursor-grab",
                               )}
                               style={{
-                                touchAction: isEditMode ? "none" : "auto",
+                                // Only suppress browser touch scrolling when
+                                // drag is actually enabled on this device.
+                                touchAction: dragEnabled && isMobile ? "none" : "auto",
                                 ...dragProvided.draggableProps.style,
                               }}
                               onClick={(e) => {
