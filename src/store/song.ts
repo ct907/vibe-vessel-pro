@@ -3168,8 +3168,32 @@ export function hydrateFromStorage() {
   } catch { /* ignore */ }
 }
 
+// Counter-based interaction gate. While > 0, autosave skips writes; on
+// release (count returns to 0), it forces one save with the final state.
+// Used by the global DragDropContext to avoid persisting per-chord
+// intermediate states during a multi-chord drag.
+let interactionDepth = 0;
+let pendingSaveDuringInteraction = false;
+export function beginInteraction() {
+  interactionDepth++;
+}
+export function endInteraction() {
+  if (interactionDepth > 0) interactionDepth--;
+  if (interactionDepth === 0 && pendingSaveDuringInteraction) {
+    pendingSaveDuringInteraction = false;
+    try {
+      const state = useSongStore.getState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.toJSON()));
+    } catch { /* quota etc */ }
+  }
+}
+
 export function startAutosave() {
   return useSongStore.subscribe((state) => {
+    if (interactionDepth > 0) {
+      pendingSaveDuringInteraction = true;
+      return;
+    }
     try {
       const json = state.toJSON();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(json));

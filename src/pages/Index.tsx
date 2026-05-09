@@ -8,8 +8,9 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
-import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
+import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
+import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
 
