@@ -119,9 +119,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
     } catch { /* ignore */ }
-    // Drop a stale focused-pattern cursor that no longer exists in the
-    // current progression (e.g. after section delete or cross-tab edit).
-    let activeFocusedId = focusedPatternId;
+    // Pressing the Play button always starts from the first chord of the
+    // first section UNLESS the user explicitly chose "Play from here"
+    // (which sets startFromChordId). Without this gate, focusedPatternId —
+    // which gets implicitly set on any pattern interaction (chord tap,
+    // edit-mode toggle, etc.) — would silently change where playback
+    // begins, leaving Play feeling like it does nothing if the focused
+    // block happens to be empty or far down the song.
+    const startFromChordId = usePlaybackStore.getState().startFromChordId;
+    let activeFocusedId = startFromChordId ? focusedPatternId : null;
     if (activeFocusedId && !progression.some((p) => p.id === activeFocusedId)) {
       usePlaybackStore.getState().setStartFromChord(null, null);
       activeFocusedId = null;
@@ -150,7 +156,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       return;
     }
 
-    const startFromChordId = usePlaybackStore.getState().startFromChordId;
     let playEvents = events;
     let playMeta = meta2;
     if (startFromChordId) {
