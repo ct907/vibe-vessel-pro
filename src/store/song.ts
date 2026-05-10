@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
+import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/lib/music/chords";
+import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
@@ -1032,12 +1033,36 @@ function snapshot(s: { sections: Section[]; progression: PatternBlock[] }): Hist
   };
 }
 
+/** History grouping: while depth > 0, only the FIRST pushHistory in the
+ *  group actually snapshots. Compound actions (cut + autoLayout, paste +
+ *  reflow, drag move + reflow) wrap themselves in withHistoryGroup so the
+ *  user undoes the whole thing in one press. */
+let historyGroupDepth = 0;
+let historyGroupSnapshotted = false;
+
 /** Call BEFORE mutating sections/progression in a chord-row action. */
 function pushHistory(get: () => SongState) {
+  if (historyGroupDepth > 0) {
+    if (historyGroupSnapshotted) return;
+    historyGroupSnapshotted = true;
+  }
   const s = get();
   undoStack.push(snapshot(s));
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
   redoStack.length = 0;
+}
+
+/** Run `fn` so any nested pushHistory calls collapse into a single undo step. */
+export function withHistoryGroup<T>(fn: () => T): T {
+  const wasTop = historyGroupDepth === 0;
+  historyGroupDepth++;
+  if (wasTop) historyGroupSnapshotted = false;
+  try {
+    return fn();
+  } finally {
+    historyGroupDepth--;
+    if (historyGroupDepth === 0) historyGroupSnapshotted = false;
+  }
 }
 
 export const useSongStore = create<SongState>((rawSet, get) => {
@@ -1141,6 +1166,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   })),
   removeSection: (id) => set((s) => {
     if (s.sections.length <= 1) return s;
+    // Cross-tab cleanup: if the deleted section owns the focused/start
+    // playback cursor, drop it so the play button starts from the top.
+    try {
+      const pb = usePlaybackStore.getState();
+      const removedPatternIds = new Set(s.progression.filter((p) => (p.sectionId ?? p.id) === id).map((p) => p.id));
+      if (pb.focusedPatternId && removedPatternIds.has(pb.focusedPatternId)) {
+        pb.setStartFromChord(null, null);
+      }
+    } catch { /* ignore */ }
     return {
       sections: s.sections.filter((sec) => sec.id !== id),
       progression: s.progression.filter((p) => p.sectionId !== id),
@@ -2987,6 +3021,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const sid = target.sectionId ?? target.id;
     const siblings = s.progression.filter((p) => (p.sectionId ?? p.id) === sid);
     if (siblings.length <= 1) return {}; // can't remove the only block
+    // Cross-tab: clear playback cursor if it pointed at this block.
+    try {
+      const pb = usePlaybackStore.getState();
+      if (pb.focusedPatternId === patternId) pb.setStartFromChord(null, null);
+    } catch { /* ignore */ }
     const nextSections = s.sections.map((sec) => {
       if (sec.id !== sid) return sec;
       const next: SectionChord[] = [];
@@ -3096,21 +3135,59 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }
 
     if (parsed.version !== 2 && parsed.version !== 3) return;
+    // Re-validate every chord through parseChord. Any chord whose display
+    // can't be re-parsed is rejected — we replace the whole load with a
+    // fresh empty section rather than letting malformed strings into the DOM.
+    const validateChord = (c: unknown): ChordSymbol | null => {
+      if (!c || typeof c !== "object") return null;
+      const display = (c as { display?: unknown }).display;
+      if (typeof display !== "string") return null;
+      return parseChord(display);
+    };
+    let invalidCount = 0;
     const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
-    // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
-    // Also ensure `chords: []` exists (the wrapped set will recompute the SSOT projection).
     const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
       ...sec,
-      lines: sec.lines.map((l) => ensureSlotsForLine(l)),
-      chords: sec.chords ?? [],
+      lines: sec.lines.map((l) => {
+        const ll = ensureSlotsForLine(l);
+        return {
+          ...ll,
+          chords: ll.chords
+            .map((a) => {
+              const v = validateChord(a.chord);
+              if (!v) { invalidCount++; return null; }
+              return { ...a, chord: v };
+            })
+            .filter((a): a is NonNullable<typeof a> => !!a),
+        };
+      }),
+      chords: (sec.chords ?? [])
+        .map((sc) => {
+          const v = validateChord(sc.chord);
+          if (!v) { invalidCount++; return null; }
+          return { ...sc, chord: v };
+        })
+        .filter((sc): sc is NonNullable<typeof sc> => !!sc),
     }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
-    // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
     const migratedProgression = progressionLoaded.map((p) => ({
       ...p,
       sectionId: p.sectionId ?? p.id,
-      chords: repackChords(p.chords, p.bars * p.beatsPerBar),
+      chords: repackChords(
+        (p.chords as Array<{ chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string }>)
+          .map((c) => {
+            const v = validateChord(c.chord);
+            if (!v) { invalidCount++; return null; }
+            return { ...c, chord: v };
+          })
+          .filter((c): c is { chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string } => !!c),
+        p.bars * p.beatsPerBar,
+      ),
     }));
+    if (invalidCount > 0 && typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.warn(`[song.load] dropped ${invalidCount} invalid chord(s) from imported file`);
+    }
     set({
       meta: { beatsPerBar: 4, beatUnit: 4, ...(parsed.meta ?? get().meta) },
       sections: sectionsLoaded,

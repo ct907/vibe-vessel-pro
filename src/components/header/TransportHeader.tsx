@@ -113,8 +113,21 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   const handlePlay = async () => {
     await ensureAudio();
-    const startIdx = focusedPatternId
-      ? Math.max(0, progression.findIndex((p) => p.id === focusedPatternId))
+    // Defensive: AudioContext may be suspended after autoplay-policy
+    // restrictions (Safari, mobile). resume() is idempotent.
+    try {
+      const ac = getAudioContext();
+      if (ac.state === "suspended") await ac.resume();
+    } catch { /* ignore */ }
+    // Drop a stale focused-pattern cursor that no longer exists in the
+    // current progression (e.g. after section delete or cross-tab edit).
+    let activeFocusedId = focusedPatternId;
+    if (activeFocusedId && !progression.some((p) => p.id === activeFocusedId)) {
+      usePlaybackStore.getState().setStartFromChord(null, null);
+      activeFocusedId = null;
+    }
+    const startIdx = activeFocusedId
+      ? Math.max(0, progression.findIndex((p) => p.id === activeFocusedId))
       : 0;
     const ordered =
       startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
@@ -142,7 +155,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     let playMeta = meta2;
     if (startFromChordId) {
       const i = meta2.findIndex((m) => m.patternChordId === startFromChordId);
-      if (i > 0) {
+      if (i < 0) {
+        // Stale start cursor — chord no longer exists. Clear it and fall
+        // through to playing from the beginning.
+        usePlaybackStore.getState().setStartFromChord(null, null);
+      } else if (i > 0) {
         const offset = events[i].startBeat;
         const total = cursorBeat;
         playEvents = events.map((_, k) => {
