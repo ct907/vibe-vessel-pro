@@ -3174,13 +3174,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       ...p,
       sectionId: p.sectionId ?? p.id,
       chords: repackChords(
-        p.chords
-          .map((c: { chord: ChordSymbol }) => {
+        (p.chords as Array<{ chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string }>)
+          .map((c) => {
             const v = validateChord(c.chord);
             if (!v) { invalidCount++; return null; }
             return { ...c, chord: v };
           })
-          .filter((c: unknown): c is { chord: ChordSymbol } => !!c),
+          .filter((c): c is { chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string } => !!c),
         p.bars * p.beatsPerBar,
       ),
     }));
