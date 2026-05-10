@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { SensorAPI, PreDragActions, FluidDragActions } from "@hello-pangea/dnd";
+import type {
+  SensorAPI,
+  PreDragActions,
+  FluidDragActions,
+} from "@hello-pangea/dnd";
+import { markTouch } from "./touch-recency";
 
 /**
  * Custom touch sensor for @hello-pangea/dnd.
@@ -134,6 +139,9 @@ export function useInstantTouchSensor(api: SensorAPI) {
 
   const onTouchStart = useCallback(
     (e: TouchEvent) => {
+      // Mark every real touch so the companion mouse sensor can ignore the
+      // synthetic mousedown iOS/Android dispatches a few hundred ms later.
+      markTouch();
       if (e.defaultPrevented) return;
       if (phaseRef.current.type !== "IDLE") return;
       const id = api.findClosestDraggableId(e);

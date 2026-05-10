@@ -472,22 +472,40 @@ function LineRow({
                   // so the slot has collapsed and pangea's measurement is
                   // briefly unavailable. Without a fallback the clone snaps
                   // to the portal's (0,0) until the next move arrives.
-                  // Seed top/left from the source rect so the clone always
-                  // starts under the user's pointer.
+                  // Seed top/left from the source rect (captured in
+                  // onBeforeDragStart while the source was still mounted) so
+                  // the clone always starts under the user's pointer.
                   const pangeaStyle = (dragProvided.draggableProps.style ?? {}) as React.CSSProperties;
                   const hasPosition =
                     pangeaStyle.position === "fixed" &&
-                    (pangeaStyle.top != null || pangeaStyle.left != null);
+                    pangeaStyle.top != null &&
+                    pangeaStyle.left != null &&
+                    !(pangeaStyle.top === 0 && pangeaStyle.left === 0);
                   let cloneStyle: React.CSSProperties = {
                     touchAction: "none",
                     ...pangeaStyle,
                   };
                   if (!hasPosition) {
+                    // Try the live DOM first; fall back to the rect captured in
+                    // onBeforeDragStart (the source is unmounted by the time
+                    // renderClone runs in some configurations).
+                    let r: { top: number; left: number; width: number; height: number } | null = null;
                     const srcEl = document.querySelector(
                       `[data-chip-anchor="${anchor.id}"]`,
                     ) as HTMLElement | null;
                     if (srcEl) {
-                      const r = srcEl.getBoundingClientRect();
+                      const dr = srcEl.getBoundingClientRect();
+                      if (dr.width > 0 && dr.height > 0) {
+                        r = { top: dr.top, left: dr.left, width: dr.width, height: dr.height };
+                      }
+                    }
+                    if (!r) {
+                      const stashed = useDndStore.getState().sourceRect;
+                      if (stashed && stashed.draggableId === anchor.id) {
+                        r = { top: stashed.top, left: stashed.left, width: stashed.width, height: stashed.height };
+                      }
+                    }
+                    if (r) {
                       cloneStyle = {
                         ...cloneStyle,
                         position: "fixed",

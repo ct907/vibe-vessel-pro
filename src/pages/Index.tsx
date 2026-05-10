@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   DragDropContext,
-  useMouseSensor,
   useKeyboardSensor,
   type DropResult,
 } from "@hello-pangea/dnd";
 import { useInstantTouchSensor } from "@/lib/dnd/instant-touch-sensor";
+import { useInstantMouseSensor } from "@/lib/dnd/instant-mouse-sensor";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
 import { SongTitleHeader } from "@/components/song/SongTitleHeader";
@@ -102,6 +102,30 @@ const Index = () => {
         : new Set([id]);
       useDndStore.getState().setDraggingIds(frozen);
     }
+    // Snapshot the source element's bounding rect WHILE it's still mounted
+    // (pangea unmounts the source as soon as renderClone takes over). The
+    // renderClone reads this from the dnd store as a position fallback when
+    // pangea's draggableProps.style is briefly missing top/left on the very
+    // first frame of a drag.
+    try {
+      const lyricsId = start.draggableId; // chord anchor id in lyrics rows
+      const sel = `[data-chip-anchor="${CSS.escape(lyricsId)}"]`;
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          useDndStore.getState().setSourceRect({
+            draggableId: start.draggableId,
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+          });
+        }
+      }
+    } catch {
+      /* ignore — fallback is best-effort */
+    }
   };
   const onDragStart = (start: { draggableId: string }) => {
     const { lyricsOnDragStart } = useDndStore.getState();
@@ -152,14 +176,17 @@ const Index = () => {
         onBeforeDragStart={onBeforeDragStart}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        // Replace pangea's bundled touch sensor (which forces a 120ms
-        // long-press before drag starts — see useTouchSensor in
-        // node_modules/@hello-pangea/dnd) with one that promotes a touch
-        // into a drag the moment the user moves past a small threshold.
-        // Quick taps still fire onClick (selection); finger-drag starts
-        // the drag instantly.
+        // Custom sensor stack:
+        //  - useInstantMouseSensor: like pangea's mouse sensor, but skips the
+        //    synthetic mousedown iOS/Android dispatch after a real touchend
+        //    and only preventDefaults once movement crosses a drag threshold —
+        //    so plain taps still fire onClick on touch devices.
+        //  - useKeyboardSensor: pangea's stock keyboard sensor for a11y.
+        //  - useInstantTouchSensor: promotes touch into a drag on the first
+        //    movement past a small threshold (no 120ms long-press required),
+        //    while quick taps still fire onClick for selection.
         enableDefaultSensors={false}
-        sensors={[useMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
+        sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
       >
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
