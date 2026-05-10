@@ -83,11 +83,12 @@ import { useUIStore } from "@/store/ui";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
-/** Prefix applied to lyric-tab chord Draggable IDs so they don't collide with
- *  the same chord IDs registered by ProgressionsTab in pangea's flat
- *  draggable registry (last-mounted wins, which leaves lyric drags pointing
- *  at the wrong source droppable). */
-const LYRIC_DRAGGABLE_PREFIX = "lyric:";
+/** Prefix applied to lyric-tab chord Draggable IDs so they live in a
+ *  separate namespace from the same chord's Draggable in ProgressionsTab.
+ *  Pangea's draggable registry is a flat map keyed by draggableId — with
+ *  both tabs forceMount'd and SSOT-mirrored chord IDs, an unprefixed ID
+ *  would silently lose to the later-mounted (progressions) entry. */
+const LYRIC_DRAGGABLE_PREFIX = "L-";
 
 const stripLyricPrefix = (id: string): string =>
   id.startsWith(LYRIC_DRAGGABLE_PREFIX)
@@ -602,27 +603,22 @@ function LineRow({
                   >
                     {occupied && (
                       <Draggable
-                        // Prefix the chord ID so it never collides with the
-                        // SAME chord rendered as a Draggable in the (always-
-                        // mounted, but possibly hidden) ProgressionsTab —
-                        // pangea's draggable registry is a flat map keyed by
-                        // draggableId, so duplicate IDs across tabs cause the
-                        // last-mounted Draggable to silently win. See the
-                        // "[DnD] onDragEnd" log entries with source: pattern:…
-                        // when the user is on the lyrics tab.
+                        // L-<id> namespace — ProgressionsTab uses P-<id> for the
+                        // same chord. Both tabs are forceMount'd and share
+                        // SSOT-mirrored ids, so the prefix keeps pangea's flat
+                        // draggable registry from picking the wrong Draggable.
                         draggableId={`${LYRIC_DRAGGABLE_PREFIX}${anchor!.id}`}
                         index={0}
-                        // Desktop: chip is always draggable (mouse drag has its
-                        // own movement threshold so a click still auditions /
-                        // opens the editor). Mobile: gate behind Edit Mode to
-                        // avoid the gesture conflict with ChordChip's own
-                        // touch handlers.
-                        isDragDisabled={isMobile && !isEditMode}
+                        // Always draggable: the custom instant-touch sensor
+                        // promotes touch into a drag past a small movement
+                        // threshold, so a tap (no movement) still fires
+                        // onClick for audition + editor open — no Edit-Mode
+                        // gate needed.
+                        isDragDisabled={false}
                       >
                         {(dragProvided, dragSnapshot) => {
                           const beingDragged = draggingIds.has(anchor!.id);
                           const hideForMulti = beingDragged && !dragSnapshot.isDragging;
-                          const dragEnabled = !isMobile || isEditMode;
                           return (
                             <div
                               ref={dragProvided.innerRef}
@@ -630,15 +626,12 @@ function LineRow({
                               {...dragProvided.dragHandleProps}
                               data-chip-anchor={anchor!.id}
                               className={cn(
-                                "h-full flex items-center justify-center",
+                                "h-full flex items-center justify-center cursor-grab",
                                 hideForMulti && "opacity-30",
                                 dragSnapshot.isDragging && "opacity-0",
-                                dragEnabled && "cursor-grab",
                               )}
                               style={{
-                                // Only suppress browser touch scrolling when
-                                // drag is actually enabled on this device.
-                                touchAction: dragEnabled && isMobile ? "none" : "auto",
+                                touchAction: "none",
                                 ...dragProvided.draggableProps.style,
                               }}
                               onClick={(e) => {

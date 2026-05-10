@@ -44,6 +44,17 @@ import { toast } from "@/hooks/use-toast";
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
 
+/** Prefix applied to progressions-tab chord Draggable IDs. Pairs with
+ *  LyricsTab's L- prefix so each tab has its own namespace inside pangea's
+ *  flat draggable registry (last-mounted wins, so without prefixes the
+ *  same SSOT chord id would collide across tabs). */
+const PATTERN_DRAGGABLE_PREFIX = "P-";
+
+const stripPatternPrefix = (id: string): string =>
+  id.startsWith(PATTERN_DRAGGABLE_PREFIX)
+    ? id.slice(PATTERN_DRAGGABLE_PREFIX.length)
+    : id;
+
 /** Bars number input that allows the field to be temporarily empty while typing. */
 function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState<string>(String(value));
@@ -419,7 +430,11 @@ function PatternBlock({
                         data-pattern-slot={slotIdx}
                       >
                         {occupied && c && (
-                          <Draggable draggableId={c.id} index={0} isDragDisabled={selectMode}>
+                          <Draggable
+                            draggableId={`${PATTERN_DRAGGABLE_PREFIX}${c.id}`}
+                            index={0}
+                            isDragDisabled={selectMode}
+                          >
                             {(dragProvided, dragSnapshot) => {
                               if (dragSnapshot.isDragging) { justDraggedAtRef.current = Date.now(); }
                               const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
@@ -1070,8 +1085,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     if (src[0] !== "pattern") return;
     const fromId = src[1];
     if (!fromId) return;
+    // Strip the P- namespace before talking to the store — the store keys
+    // chords by their raw SSOT id, not the per-tab Draggable id.
+    const draggedChordId = stripPatternPrefix(draggableId);
     if (fromId === toId) {
-      state.movePatternChordToSlot(toId, draggableId, toSlot);
+      state.movePatternChordToSlot(toId, draggedChordId, toSlot);
       return;
     }
 
@@ -1080,7 +1098,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     // intra- and cross-section moves.
     const fromPattern = state.progression.find((p) => p.id === fromId);
     if (!fromPattern) return;
-    const movingIds = [draggableId];
+    const movingIds = [draggedChordId];
     const movingLen = fromPattern.chords
       .filter((c) => movingIds.includes(c.id))
       .reduce((s, c) => s + c.lengthBeats, 0);
@@ -1095,7 +1113,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       });
       return;
     }
-    state.movePatternChordToPatternAt(fromId, toId, draggableId, toSlot);
+    state.movePatternChordToPatternAt(fromId, toId, draggedChordId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {

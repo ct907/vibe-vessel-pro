@@ -758,6 +758,72 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
 
 // ---------- SSOT inversion (Phase 4b) ----------
 /**
+ * Reassigns `lyricsPlacement.slotIndex` on every SectionChord so the lyric
+ * row reflects the SSOT array order, while preserving the SET of occupied
+ * slot positions per line.
+ *
+ * Why: lyrics-side reorders update `slotIndex` directly, but progression-
+ * side reorders only shuffle the SSOT array. Without this pass the lyric
+ * row would render in stale order (the bug the user reported). Running
+ * this at the entry of `deriveMirrorsFromSectionChords` means every SSOT
+ * mutation — past and future — gets the sync for free.
+ *
+ * Algorithm (per line):
+ *  1. Walk `section.chords` in array order, collecting the chords whose
+ *     `lyricsPlacement.lineId === line.id`.
+ *  2. Collect their CURRENT slot indices (defined → those values; missing
+ *     → fall back to a synthesized 0..n sequence).
+ *  3. Sort the slot list ascending; reassign so the i-th chord in SSOT
+ *     order gets the i-th slot. The footprint of occupied columns is
+ *     unchanged — only which chord sits at each gets swapped.
+ *
+ * Idempotent: if SSOT order already matches slot order, the per-chord
+ * assignment yields the same value and the section object is returned
+ * unchanged (no React re-renders triggered downstream).
+ */
+function recomputeLyricsSlotsForSection(section: Section): Section {
+  const byLine = new Map<string, SectionChord[]>();
+  for (const sc of section.chords) {
+    const lp = sc.lyricsPlacement;
+    if (!lp) continue;
+    const bucket = byLine.get(lp.lineId);
+    if (bucket) bucket.push(sc);
+    else byLine.set(lp.lineId, [sc]);
+  }
+  if (byLine.size === 0) return section;
+
+  // Build per-chord target slot map. We only mutate chords whose target
+  // differs from their current slotIndex, so unchanged inputs short-circuit.
+  const newSlot = new Map<string, number>();
+  let changed = false;
+  for (const [, chordsOnLine] of byLine) {
+    if (chordsOnLine.length <= 1) continue; // single chord can't be re-ordered
+    const slots = chordsOnLine
+      .map((sc, i) => sc.lyricsPlacement?.slotIndex ?? i)
+      .slice()
+      .sort((a, b) => a - b);
+    chordsOnLine.forEach((sc, i) => {
+      const cur = sc.lyricsPlacement?.slotIndex;
+      const next = slots[i];
+      if (cur !== next) {
+        newSlot.set(sc.id, next);
+        changed = true;
+      }
+    });
+  }
+  if (!changed) return section;
+
+  return {
+    ...section,
+    chords: section.chords.map((sc) => {
+      const target = newSlot.get(sc.id);
+      if (target == null || !sc.lyricsPlacement) return sc;
+      return { ...sc, lyricsPlacement: { ...sc.lyricsPlacement, slotIndex: target } };
+    }),
+  };
+}
+
+/**
  * Inverse of `recomputeSectionChordsFromMirrors`: given an updated
  * `section.chords` (SSOT), rebuild `line.chords` and the section's pattern
  * blocks' chords so the legacy mirrors stay in sync.
@@ -773,9 +839,14 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
  * Pattern chord `startBeat` is recomputed left-to-right (no spacing rule).
  */
 function deriveMirrorsFromSectionChords(
-  section: Section,
+  rawSection: Section,
   sectionPatterns: PatternBlock[],
 ): { section: Section; patterns: PatternBlock[] } {
+  // Reassign lyricsPlacement.slotIndex so the lyric row follows the SSOT
+  // array order. Without this, dragging a chord in ProgressionsTab would
+  // shuffle the SSOT but leave stale slot indices behind, so the lyric
+  // row would render in the old order.
+  const section = recomputeLyricsSlotsForSection(rawSection);
   // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
   const anchorsByLine = new Map<string, ChordAnchor[]>();
   section.lines.forEach((l) => anchorsByLine.set(l.id, []));

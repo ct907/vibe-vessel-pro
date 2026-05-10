@@ -61,6 +61,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     setTimeSignature,
     transposeSong,
     progression,
+    sections,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
     resetSong,
@@ -69,7 +70,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     canUndo,
     canRedo,
   } = useSongStore();
-  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -119,38 +119,55 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
     } catch { /* ignore */ }
-    // Pressing the Play button always starts from the first chord of the
-    // first section UNLESS the user explicitly chose "Play from here"
-    // (which sets startFromChordId). Without this gate, focusedPatternId —
-    // which gets implicitly set on any pattern interaction (chord tap,
-    // edit-mode toggle, etc.) — would silently change where playback
-    // begins, leaving Play feeling like it does nothing if the focused
-    // block happens to be empty or far down the song.
     const startFromChordId = usePlaybackStore.getState().startFromChordId;
-    let activeFocusedId = startFromChordId ? focusedPatternId : null;
-    if (activeFocusedId && !progression.some((p) => p.id === activeFocusedId)) {
-      usePlaybackStore.getState().setStartFromChord(null, null);
-      activeFocusedId = null;
-    }
-    const startIdx = activeFocusedId
-      ? Math.max(0, progression.findIndex((p) => p.id === activeFocusedId))
-      : 0;
-    const ordered =
-      startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
 
+    // Walk the SSOT (section.chords) directly instead of the legacy
+    // pattern.chords mirror. The mirror is rebuilt by
+    // deriveMirrorsFromSectionChords and can silently drop SectionChords
+    // whose progressionPlacement.patternId no longer matches any block in
+    // the section (orphaned placements, sections with no blocks, etc.).
+    // Reading the SSOT keeps playback immune to those derivation gaps so
+    // pressing Play always plays whatever chords actually exist.
     let cursorBeat = 0;
     const events: ScheduledChord[] = [];
     const meta2: Array<{ patternId: string; patternChordId: string; mirrorId?: string }> = [];
-    ordered.forEach((p) => {
-      const totalBeats = p.bars * p.beatsPerBar;
-      [...p.chords]
-        .sort((a, b) => a.startBeat - b.startBeat)
-        .forEach((c) => {
-          events.push({ chord: c.chord, startBeat: cursorBeat + c.startBeat, lengthBeats: c.lengthBeats });
-          meta2.push({ patternId: p.id, patternChordId: c.id, mirrorId: c.mirrorId });
+    for (const sec of sections) {
+      // Patterns belonging to this section, in progression array order.
+      const sectionPatterns = progression.filter(
+        (p) => (p.sectionId ?? p.id) === sec.id,
+      );
+      if (sectionPatterns.length === 0) continue;
+
+      // Cumulative beat offset of each pattern within this section.
+      const patternOffset = new Map<string, number>();
+      let accBeats = 0;
+      for (const p of sectionPatterns) {
+        patternOffset.set(p.id, accBeats);
+        accBeats += p.bars * p.beatsPerBar;
+      }
+
+      // Emit one event per SectionChord that has a progressionPlacement
+      // pointing at a block in THIS section, in SSOT array order.
+      for (const sc of sec.chords) {
+        const pp = sc.progressionPlacement;
+        if (!pp) continue;
+        const localOffset = patternOffset.get(pp.patternId);
+        if (localOffset == null) continue;
+        events.push({
+          chord: sc.chord,
+          startBeat: cursorBeat + localOffset + pp.startBeat,
+          lengthBeats: pp.lengthBeats,
         });
-      cursorBeat += totalBeats;
-    });
+        meta2.push({
+          patternId: pp.patternId,
+          patternChordId: sc.id,
+          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+        });
+      }
+
+      cursorBeat += accBeats;
+    }
+
     if (!events.length) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
@@ -210,8 +227,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     };
     window.addEventListener("lovable:request-play", onReq);
     return () => window.removeEventListener("lovable:request-play", onReq);
+    // handlePlay is recreated on every render but reads startFromChordId
+    // via getState(), so we only need to re-bind when the SSOT inputs
+    // (sections, progression, bpm) change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progression, focusedPatternId, meta.bpm]);
+  }, [sections, progression, meta.bpm]);
 
   const handleLoad = async (file?: File) => {
     if (!file) return;
