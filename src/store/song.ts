@@ -3135,21 +3135,59 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }
 
     if (parsed.version !== 2 && parsed.version !== 3) return;
+    // Re-validate every chord through parseChord. Any chord whose display
+    // can't be re-parsed is rejected — we replace the whole load with a
+    // fresh empty section rather than letting malformed strings into the DOM.
+    const validateChord = (c: unknown): ChordSymbol | null => {
+      if (!c || typeof c !== "object") return null;
+      const display = (c as { display?: unknown }).display;
+      if (typeof display !== "string") return null;
+      return parseChord(display);
+    };
+    let invalidCount = 0;
     const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];
-    // Migrate every line so each anchor has a unique slotIndex (derived from wordIndex / order).
-    // Also ensure `chords: []` exists (the wrapped set will recompute the SSOT projection).
     const sectionsLoaded: Section[] = sectionsRaw.map((sec) => ({
       ...sec,
-      lines: sec.lines.map((l) => ensureSlotsForLine(l)),
-      chords: sec.chords ?? [],
+      lines: sec.lines.map((l) => {
+        const ll = ensureSlotsForLine(l);
+        return {
+          ...ll,
+          chords: ll.chords
+            .map((a) => {
+              const v = validateChord(a.chord);
+              if (!v) { invalidCount++; return null; }
+              return { ...a, chord: v };
+            })
+            .filter((a): a is NonNullable<typeof a> => !!a),
+        };
+      }),
+      chords: (sec.chords ?? [])
+        .map((sc) => {
+          const v = validateChord(sc.chord);
+          if (!v) { invalidCount++; return null; }
+          return { ...sc, chord: v };
+        })
+        .filter((sc): sc is NonNullable<typeof sc> => !!sc),
     }));
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
-    // Migrate legacy patterns: if no sectionId, fall back to id (1:1 pairing).
     const migratedProgression = progressionLoaded.map((p) => ({
       ...p,
       sectionId: p.sectionId ?? p.id,
-      chords: repackChords(p.chords, p.bars * p.beatsPerBar),
+      chords: repackChords(
+        p.chords
+          .map((c: { chord: ChordSymbol }) => {
+            const v = validateChord(c.chord);
+            if (!v) { invalidCount++; return null; }
+            return { ...c, chord: v };
+          })
+          .filter((c: unknown): c is { chord: ChordSymbol } => !!c),
+        p.bars * p.beatsPerBar,
+      ),
     }));
+    if (invalidCount > 0 && typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.warn(`[song.load] dropped ${invalidCount} invalid chord(s) from imported file`);
+    }
     set({
       meta: { beatsPerBar: 4, beatUnit: 4, ...(parsed.meta ?? get().meta) },
       sections: sectionsLoaded,
