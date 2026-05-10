@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import { ChordSymbol, transposeChord, transposeKey, Mode } from "@/lib/music/chords";
+import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/lib/music/chords";
+import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
@@ -1165,6 +1166,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   })),
   removeSection: (id) => set((s) => {
     if (s.sections.length <= 1) return s;
+    // Cross-tab cleanup: if the deleted section owns the focused/start
+    // playback cursor, drop it so the play button starts from the top.
+    try {
+      const pb = usePlaybackStore.getState();
+      const removedPatternIds = new Set(s.progression.filter((p) => (p.sectionId ?? p.id) === id).map((p) => p.id));
+      if (pb.focusedPatternId && removedPatternIds.has(pb.focusedPatternId)) {
+        pb.setStartFromChord(null, null);
+      }
+    } catch { /* ignore */ }
     return {
       sections: s.sections.filter((sec) => sec.id !== id),
       progression: s.progression.filter((p) => p.sectionId !== id),
