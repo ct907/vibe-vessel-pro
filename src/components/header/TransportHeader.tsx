@@ -155,7 +155,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     let playMeta = meta2;
     if (startFromChordId) {
       const i = meta2.findIndex((m) => m.patternChordId === startFromChordId);
-      if (i > 0) {
+      if (i < 0) {
+        // Stale start cursor — chord no longer exists. Clear it and fall
+        // through to playing from the beginning.
+        usePlaybackStore.getState().setStartFromChord(null, null);
+      } else if (i > 0) {
         const offset = events[i].startBeat;
         const total = cursorBeat;
         playEvents = events.map((_, k) => {
