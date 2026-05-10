@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type {
-  SensorAPI,
-  PreDragActions,
-  FluidDragActions,
-} from "@hello-pangea/dnd";
+import type { SensorAPI, PreDragActions, FluidDragActions } from "@hello-pangea/dnd";
 
 /**
  * Custom touch sensor for @hello-pangea/dnd.
@@ -22,11 +18,11 @@ import type {
  * cleanly so the trailing click still fires for selection.
  */
 
-const MOVEMENT_THRESHOLD_PX = 6;
+const MOVEMENT_THRESHOLD_PX = 0;
 // Safety net: if the user holds without moving for this long we promote to a
 // drag anyway (matches the press-and-hold mental model). Larger than pangea's
 // 120ms default so quick taps reliably stay as taps.
-const HOLD_PROMOTION_MS = 250;
+const HOLD_PROMOTION_MS = 120;
 
 type Phase =
   | { type: "IDLE" }
@@ -85,10 +81,7 @@ export function useInstantTouchSensor(api: SensorAPI) {
       if (cur.type === "PENDING") {
         const dx = point.x - cur.start.x;
         const dy = point.y - cur.start.y;
-        if (
-          dx * dx + dy * dy <
-          MOVEMENT_THRESHOLD_PX * MOVEMENT_THRESHOLD_PX
-        ) {
+        if (dx * dx + dy * dy < MOVEMENT_THRESHOLD_PX * MOVEMENT_THRESHOLD_PX) {
           return;
         }
         e.preventDefault();
@@ -183,11 +176,7 @@ export function useInstantTouchSensor(api: SensorAPI) {
         window.removeEventListener("touchmove", onTouchMove, moveOpts);
         window.removeEventListener("touchend", onTouchEnd, endOpts);
         window.removeEventListener("touchcancel", onTouchCancel, endOpts);
-        window.removeEventListener(
-          "scroll",
-          onWindowScroll,
-          scrollOpts as EventListenerOptions,
-        );
+        window.removeEventListener("scroll", onWindowScroll, scrollOpts as EventListenerOptions);
       };
     },
     [api, forceStop, onTouchMove, onTouchEnd, onTouchCancel, onWindowScroll, promote],
@@ -203,17 +192,9 @@ export function useInstantTouchSensor(api: SensorAPI) {
   );
 
   useEffect(() => {
-    window.addEventListener(
-      startBinding.eventName,
-      startBinding.fn as EventListener,
-      startBinding.options,
-    );
+    window.addEventListener(startBinding.eventName, startBinding.fn as EventListener, startBinding.options);
     return () => {
-      window.removeEventListener(
-        startBinding.eventName,
-        startBinding.fn as EventListener,
-        startBinding.options,
-      );
+      window.removeEventListener(startBinding.eventName, startBinding.fn as EventListener, startBinding.options);
       // Make sure any in-flight drag is cleaned up if the context unmounts.
       forceStop();
     };
