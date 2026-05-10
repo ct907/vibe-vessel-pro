@@ -446,16 +446,28 @@ function PatternBlock({
                               if (dragSnapshot.isDragging) { justDraggedAtRef.current = Date.now(); }
                               const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
                               const colors = getChordColorClasses(c.chord);
+                              // Render as <div role="button"> instead of <button>:
+                              // @hello-pangea/dnd's sensor refuses to start a drag
+                              // when the pointerdown target is a native interactive
+                              // tag (button/input/select/...), so a real <button>
+                              // here would silently swallow every drag attempt.
                               return (
-                                <button
-                                  type="button"
+                                <div
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
+                                  data-pattern-chord={c.id}
                                   onContextMenu={(e) => e.preventDefault()}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleChordTap(c.id, e);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleChordTap(c.id);
+                                    }
                                   }}
                                   className={cn(
                                     "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90",
@@ -477,7 +489,7 @@ function PatternBlock({
                                   <span className="font-mono-chord text-[10px] opacity-70 leading-tight">
                                     {formatBeats(c.lengthBeats)}b
                                   </span>
-                                </button>
+                                </div>
                               );
                             }}
                           </Draggable>

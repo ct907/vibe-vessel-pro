@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import {
   Droppable,
   Draggable,
@@ -466,18 +465,48 @@ function LineRow({
                 type="chord"
                 isDropDisabled={false}
                 renderClone={(dragProvided, _snap, _rubric) => {
-                  // Pangea-native clone — follows the finger automatically.
                   if (!anchor) return <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps} />;
+                  // Pangea sometimes hands us a draggableProps.style missing
+                  // top/left on the first frame of a touch drag — the source
+                  // Draggable has already returned null via isUsingCloneFor,
+                  // so the slot has collapsed and pangea's measurement is
+                  // briefly unavailable. Without a fallback the clone snaps
+                  // to the portal's (0,0) until the next move arrives.
+                  // Seed top/left from the source rect so the clone always
+                  // starts under the user's pointer.
+                  const pangeaStyle = (dragProvided.draggableProps.style ?? {}) as React.CSSProperties;
+                  const hasPosition =
+                    pangeaStyle.position === "fixed" &&
+                    (pangeaStyle.top != null || pangeaStyle.left != null);
+                  let cloneStyle: React.CSSProperties = {
+                    touchAction: "none",
+                    ...pangeaStyle,
+                  };
+                  if (!hasPosition) {
+                    const srcEl = document.querySelector(
+                      `[data-chip-anchor="${anchor.id}"]`,
+                    ) as HTMLElement | null;
+                    if (srcEl) {
+                      const r = srcEl.getBoundingClientRect();
+                      cloneStyle = {
+                        ...cloneStyle,
+                        position: "fixed",
+                        top: r.top,
+                        left: r.left,
+                        width: r.width || undefined,
+                        height: r.height || undefined,
+                        pointerEvents: "none",
+                        zIndex: 9999,
+                      };
+                    }
+                  }
                   return (
                     <div
                       ref={dragProvided.innerRef}
                       {...dragProvided.draggableProps}
                       {...dragProvided.dragHandleProps}
                       className="h-9 flex items-center justify-center"
-                      style={{
-                        touchAction: "none",
-                        ...dragProvided.draggableProps.style,
-                      }}
+                      style={cloneStyle}
                     >
                       <div className="relative pointer-events-none">
                         <ChordChip

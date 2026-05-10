@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  useMouseSensor,
+  useKeyboardSensor,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import { useInstantTouchSensor } from "@/lib/dnd/instant-touch-sensor";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
 import { SongTitleHeader } from "@/components/song/SongTitleHeader";
@@ -142,7 +148,19 @@ const Index = () => {
       </div>
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
-      <DragDropContext onBeforeDragStart={onBeforeDragStart} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DragDropContext
+        onBeforeDragStart={onBeforeDragStart}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        // Replace pangea's bundled touch sensor (which forces a 120ms
+        // long-press before drag starts — see useTouchSensor in
+        // node_modules/@hello-pangea/dnd) with one that promotes a touch
+        // into a drag the moment the user moves past a small threshold.
+        // Quick taps still fire onClick (selection); finger-drag starts
+        // the drag instantly.
+        enableDefaultSensors={false}
+        sensors={[useMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
+      >
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
