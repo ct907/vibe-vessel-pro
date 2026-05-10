@@ -3021,6 +3021,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const sid = target.sectionId ?? target.id;
     const siblings = s.progression.filter((p) => (p.sectionId ?? p.id) === sid);
     if (siblings.length <= 1) return {}; // can't remove the only block
+    // Cross-tab: clear playback cursor if it pointed at this block.
+    try {
+      const pb = usePlaybackStore.getState();
+      if (pb.focusedPatternId === patternId) pb.setStartFromChord(null, null);
+    } catch { /* ignore */ }
     const nextSections = s.sections.map((sec) => {
       if (sec.id !== sid) return sec;
       const next: SectionChord[] = [];
