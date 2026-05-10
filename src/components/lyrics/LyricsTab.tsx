@@ -10,6 +10,7 @@ import {
   useSongStore,
   getSectionDisplayName,
   getLineChordsViaSSOT,
+  withHistoryGroup,
   CHORD_ROW_SLOTS,
   type LyricLine,
   type Section,
@@ -20,6 +21,7 @@ import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
+import { parseChordTextStrict, describeInvalidTokens } from "@/lib/music/chordClipboard";
 import { playChord } from "@/lib/music/audio";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -257,24 +259,44 @@ function LineRow({
     const ids = Array.from(selection.selected).filter((id) => lineChords.some((c) => c.id === id));
     chordClipboard = collectClip(ids);
     writeOSClipboard(chordClipboard);
-    if (ids.length) removeChordAnchorsBatch(sectionId, line.id, ids);
+    if (!ids.length) return;
+    // Group cut + reflow into one undo step.
+    withHistoryGroup(() => {
+      removeChordAnchorsBatch(sectionId, line.id, ids);
+    });
     selection.clear();
-    if (ids.length) {
-      window.setTimeout(() => autoLayoutSection(sectionId, window.innerWidth, 28), 0);
-    }
+    window.setTimeout(() => {
+      withHistoryGroup(() => autoLayoutSection(sectionId, window.innerWidth, 28));
+    }, 0);
   };
   const doPaste = async (atSlot?: number) => {
     const slot = atSlot ?? 0;
     let clip: ChordClip[] = [];
+    let osText: string | null = null;
     try {
-      const text = await navigator.clipboard?.readText();
-      if (text && text.trim()) clip = parseChordTextToClips(text);
+      osText = (await navigator.clipboard?.readText()) ?? null;
     } catch {
       /* ignore */
     }
+    if (osText && osText.trim()) {
+      const parsed = parseChordTextStrict(osText);
+      if (parsed.invalidTokens.length > 0 && parsed.clips.length === 0) {
+        toast.error(`Couldn't paste — no valid chords in clipboard (${describeInvalidTokens(parsed.invalidTokens)})`);
+        return;
+      }
+      if (parsed.invalidTokens.length > 0) {
+        toast.warning(`Skipped ${parsed.invalidTokens.length} invalid token(s): ${describeInvalidTokens(parsed.invalidTokens)}`);
+      }
+      clip = parsed.clips;
+    }
     if (!clip.length) clip = chordClipboard;
     if (!clip.length) return;
-    pasteChordsAt(sectionId, line.id, slot, clip);
+    withHistoryGroup(() => {
+      pasteChordsAt(sectionId, line.id, slot, clip);
+      window.setTimeout(() => {
+        withHistoryGroup(() => autoLayoutSection(sectionId, window.innerWidth, 28));
+      }, 0);
+    });
   };
 
   // ---- Selection helpers (range-select via shift) ----
