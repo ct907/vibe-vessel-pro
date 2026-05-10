@@ -83,6 +83,17 @@ import { useUIStore } from "@/store/ui";
 type ChordClip = { chord: ChordSymbol; relCol: number; widthCh: number };
 let chordClipboard: ChordClip[] = [];
 
+/** Prefix applied to lyric-tab chord Draggable IDs so they don't collide with
+ *  the same chord IDs registered by ProgressionsTab in pangea's flat
+ *  draggable registry (last-mounted wins, which leaves lyric drags pointing
+ *  at the wrong source droppable). */
+const LYRIC_DRAGGABLE_PREFIX = "lyric:";
+
+const stripLyricPrefix = (id: string): string =>
+  id.startsWith(LYRIC_DRAGGABLE_PREFIX)
+    ? id.slice(LYRIC_DRAGGABLE_PREFIX.length)
+    : id;
+
 // (Pangea handles pointer-following natively via renderClone.)
 
 function parseChordTextToClips(text: string): ChordClip[] {
@@ -106,32 +117,44 @@ const slotOf = (a: ChordAnchor): number =>
   a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
 
 /**
- * Build slot → chord map from a chord list, prioritizing SSOT array order.
- * Each chord's stored `slotIndex` is treated as a *preference*: it's used
- * when the slot is still free AND >= previous chord's placed slot + 1.
- * Otherwise the chord falls into the next free slot. This keeps reorders
- * from the Progressions tab visible here even when slotIndex values are
- * stale relative to the canonical Section.chords order.
+ * Build slot → chord map from a chord list. `slotIndex` is treated as the
+ * authoritative preference: every chord with a free preferred slot lands
+ * there, regardless of where it sits in the SSOT array. Chords whose
+ * preferred slot is already taken (or out of range) fall through to the
+ * next free slot in row order.
+ *
+ * Earlier this routine required slot preferences to be monotonically
+ * increasing along the SSOT array — that meant a basket drop, which
+ * appends the new SectionChord to the END of `section.chords`, would get
+ * pushed past every existing chord even when its slotIndex was the
+ * actual drop target. (Reproduces issue 4 in the bug report.)
  */
 function chordsBySlot(chords: ChordAnchor[]): (ChordAnchor | undefined)[] {
   const out: (ChordAnchor | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-  let lastPlaced = -1;
+  const overflow: ChordAnchor[] = [];
+  // Pass 1: place chords whose preferred slot is free.
   chords.forEach((c) => {
     const pref = c.slotIndex;
-    let target = -1;
-    if (pref != null && pref > lastPlaced && pref < CHORD_ROW_SLOTS && out[pref] === undefined) {
-      target = pref;
+    if (
+      pref != null &&
+      pref >= 0 &&
+      pref < CHORD_ROW_SLOTS &&
+      out[pref] === undefined
+    ) {
+      out[pref] = c;
     } else {
-      // Next free slot strictly after lastPlaced.
-      for (let i = Math.max(0, lastPlaced + 1); i < CHORD_ROW_SLOTS; i++) {
-        if (out[i] === undefined) { target = i; break; }
-      }
-    }
-    if (target >= 0) {
-      out[target] = c;
-      lastPlaced = target;
+      overflow.push(c);
     }
   });
+  // Pass 2: anything that didn't fit gets the next free slot in row order,
+  // preserving SSOT-array order among the displaced chords.
+  let cursor = 0;
+  for (const c of overflow) {
+    while (cursor < CHORD_ROW_SLOTS && out[cursor] !== undefined) cursor++;
+    if (cursor >= CHORD_ROW_SLOTS) break;
+    out[cursor] = c;
+    cursor++;
+  }
   return out;
 }
 
@@ -418,7 +441,7 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 overflow-hidden rounded-sm bg-muted-foreground/12 outline-none"
+          className="relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-hidden rounded-sm bg-muted-foreground/12 outline-none"
           style={{ minHeight: 36 }}
         >
           {lineChords.length === 0 && !isAnyDragging && (
@@ -501,7 +524,10 @@ function LineRow({
                     }
                     if (!r) {
                       const stashed = useDndStore.getState().sourceRect;
-                      if (stashed && stashed.draggableId === anchor.id) {
+                      // sourceRect.draggableId is the prefixed lyric:<id>; the
+                      // local anchor.id is the raw chord id, so compare via
+                      // the same prefix that the lyric Draggable uses.
+                      if (stashed && stripLyricPrefix(stashed.draggableId) === anchor.id) {
                         r = { top: stashed.top, left: stashed.left, width: stashed.width, height: stashed.height };
                       }
                     }
@@ -576,7 +602,15 @@ function LineRow({
                   >
                     {occupied && (
                       <Draggable
-                        draggableId={anchor!.id}
+                        // Prefix the chord ID so it never collides with the
+                        // SAME chord rendered as a Draggable in the (always-
+                        // mounted, but possibly hidden) ProgressionsTab —
+                        // pangea's draggable registry is a flat map keyed by
+                        // draggableId, so duplicate IDs across tabs cause the
+                        // last-mounted Draggable to silently win. See the
+                        // "[DnD] onDragEnd" log entries with source: pattern:…
+                        // when the user is on the lyrics tab.
+                        draggableId={`${LYRIC_DRAGGABLE_PREFIX}${anchor!.id}`}
                         index={0}
                         // Desktop: chip is always draggable (mouse drag has its
                         // own movement threshold so a click still auditions /
@@ -1559,11 +1593,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       setDraggingIds(new Set([start.draggableId]));
       return;
     }
-    if (selection.has(start.draggableId)) {
+    // draggingIds tracks RAW chord IDs (matches selection store + render
+    // checks like `draggingIds.has(anchor.id)`).
+    const rawId = stripLyricPrefix(start.draggableId);
+    if (selection.has(rawId)) {
       setDraggingIds(new Set(selection.selected));
     } else {
       selection.clear();
-      setDraggingIds(new Set([start.draggableId]));
+      setDraggingIds(new Set([rawId]));
     }
   };
 
@@ -1603,6 +1640,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     if (srcParts[0] !== "slot") return;
     const fromSectionId = srcParts[1];
     const fromLineId = srcParts[2];
+    const draggedChordId = stripLyricPrefix(draggableId);
 
     // Multi-drag: preserve relative spacing between selected chords.
     if (ids.length > 1) {
@@ -1613,7 +1651,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
         return;
       }
       // Anchor = the chord the user actually grabbed.
-      const draggedAnchor = fromLine.chords.find((c) => c.id === draggableId);
+      const draggedAnchor = fromLine.chords.find((c) => c.id === draggedChordId);
       const draggedSlot = draggedAnchor?.slotIndex ?? 0;
       // Build (id, originalSlot) pairs for selection, sorted by slot.
       const pairs = ids
@@ -1646,9 +1684,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     }
 
     if (fromSectionId === toSectionId && fromLineId === toLineId) {
-      moveChordToSlot(fromSectionId, fromLineId, draggableId, toSlot);
+      moveChordToSlot(fromSectionId, fromLineId, draggedChordId, toSlot);
     } else {
-      moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, [draggableId], toSlot);
+      moveChordsAcrossLines(fromSectionId, fromLineId, toSectionId, toLineId, [draggedChordId], toSlot);
     }
   };
 

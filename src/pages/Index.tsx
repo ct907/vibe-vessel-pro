@@ -108,7 +108,12 @@ const Index = () => {
     // pangea's draggableProps.style is briefly missing top/left on the very
     // first frame of a drag.
     try {
-      const lyricsId = start.draggableId; // chord anchor id in lyrics rows
+      // data-chip-anchor uses the RAW chord id; the lyrics tab prefixes its
+      // draggableIds with "lyric:" to disambiguate them from the same chord
+      // registered in ProgressionsTab, so strip that prefix when looking up.
+      const lyricsId = start.draggableId.startsWith("lyric:")
+        ? start.draggableId.slice("lyric:".length)
+        : start.draggableId;
       const sel = `[data-chip-anchor="${CSS.escape(lyricsId)}"]`;
       const el = document.querySelector(sel) as HTMLElement | null;
       if (el) {
@@ -145,7 +150,7 @@ const Index = () => {
       if (dstPrefix === "slot") {
         console.log("[DnD] -> lyrics handler");
         lyricsOnDragEnd?.(result);
-      } else if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
+      } else if (dstPrefix === "pattern") {
         console.log("[DnD] -> progressions handler");
         progressionsOnDragEnd?.(result);
       } else {

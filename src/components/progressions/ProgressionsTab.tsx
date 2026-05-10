@@ -4,7 +4,6 @@ import { useDndStore } from "@/store/dnd";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
-import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
@@ -27,7 +26,6 @@ import {
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
-  GripVertical,
 } from "lucide-react";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
@@ -87,10 +85,6 @@ interface PatternProps {
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
-  /** Drag-handle wiring from the surrounding Draggable (Item 3). Optional so
-   *  the component still works in non-DnD contexts. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  blockDragHandleProps?: any;
 }
 
 function formatBeats(n: number) {
@@ -105,21 +99,15 @@ function PatternBlock({
   onPickerOpen,
   onRequestDeleteBlock,
   onEditChordOpen,
-  blockDragHandleProps,
 }: PatternProps) {
   const {
     updatePattern,
-    basket,
-    addChordToPattern,
-    addChordToPatternSlot,
     setPatternChordLength,
     movePatternChord,
     removePatternChordsBatch,
     shiftPatternChords,
     movePatternChordsTo,
     resizePatternChordsWithOverflow,
-    movePatternChordToSlot,
-    movePatternChordsToSlot,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -294,16 +282,6 @@ function PatternBlock({
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        {blockDragHandleProps && (
-          <span
-            {...blockDragHandleProps}
-            className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing -ml-1 p-1 touch-none"
-            aria-label="Drag to reorder pattern block"
-            title="Drag to reorder"
-          >
-            <GripVertical className="h-4 w-4" />
-          </span>
-        )}
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
           Block {blockIndex + 1}
         </span>
@@ -760,21 +738,10 @@ function PatternBlock({
         );
       })()}
 
-      {basket.length > 0 && (
-        <div className="mt-3">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">From basket</p>
-          <div className="flex flex-wrap gap-1.5">
-            {basket.map((b) => (
-              <ChordChip
-                key={b.id}
-                chord={b.chord}
-                size="sm"
-                onClick={() => addChordToPattern(pattern.id, b.chord, usedBeats, 2)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Per-block "From basket" tap-to-add panel removed: when the basket
+          has chips the global BasketBar is visible and lets the user drag
+          chords directly onto any pattern slot, so duplicating that as a
+          tap-list inside every block was redundant noise. */}
 
       <SuggestionsPanel pattern={pattern} />
     </div>
@@ -930,57 +897,41 @@ function SectionGroup({
         )}
       </div>
 
-      {/* Pattern blocks within this section. Wrapped in a Droppable of
-          type="patternblock" so chord drags (type="chord") never land here. */}
+      {/* Pattern blocks within this section. Pattern-block reordering is
+          intentionally NOT exposed: the lyrics tab's chord row order is
+          driven by the same SSOT, and re-arranging blocks here would
+          desync the two surfaces. Blocks are now plain children. */}
       {!collapsed && (
-        <Droppable droppableId={`patternblock:${sectionId}`} type="patternblock">
-          {(dropProvided) => (
-            <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-3">
-              {blocks.map((p, i) => {
-                const otherAll = allPatterns
-                  .filter((q) => q.id !== p.id)
-                  .map((q) => {
-                    const sid = q.sectionId ?? q.id;
-                    const sameSectionBlocks = allPatterns.filter(
-                      (b) => (b.sectionId ?? b.id) === sid,
-                    );
-                    const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
-                    const sectionName = getSectionDisplayName(allSections, sid);
-                    return {
-                      id: q.id,
-                      label: `${sectionName}: Block ${blockNum}`,
-                    };
-                  });
-                return (
-                  <Draggable key={p.id} draggableId={`patternblock:${p.id}`} index={i}>
-                    {(dragProvided, dragSnapshot) => (
-                      <div
-                        ref={dragProvided.innerRef}
-                        {...dragProvided.draggableProps}
-                        className={cn(
-                          dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg rounded-lg",
-                        )}
-                        style={dragProvided.draggableProps.style}
-                      >
-                        <PatternBlock
-                          pattern={p}
-                          blockIndex={i}
-                          blocksInSection={blocks.length}
-                          otherPatterns={otherAll}
-                          onPickerOpen={onPickerOpen}
-                          onRequestDeleteBlock={onRequestDeleteBlock}
-                          onEditChordOpen={onEditChordOpen}
-                          blockDragHandleProps={dragProvided.dragHandleProps}
-                        />
-                      </div>
-                    )}
-                  </Draggable>
+        <div className="space-y-3">
+          {blocks.map((p, i) => {
+            const otherAll = allPatterns
+              .filter((q) => q.id !== p.id)
+              .map((q) => {
+                const sid = q.sectionId ?? q.id;
+                const sameSectionBlocks = allPatterns.filter(
+                  (b) => (b.sectionId ?? b.id) === sid,
                 );
-              })}
-              {dropProvided.placeholder}
-            </div>
-          )}
-        </Droppable>
+                const blockNum = sameSectionBlocks.findIndex((b) => b.id === q.id) + 1;
+                const sectionName = getSectionDisplayName(allSections, sid);
+                return {
+                  id: q.id,
+                  label: `${sectionName}: Block ${blockNum}`,
+                };
+              });
+            return (
+              <PatternBlock
+                key={p.id}
+                pattern={p}
+                blockIndex={i}
+                blocksInSection={blocks.length}
+                otherPatterns={otherAll}
+                onPickerOpen={onPickerOpen}
+                onRequestDeleteBlock={onRequestDeleteBlock}
+                onEditChordOpen={onEditChordOpen}
+              />
+            );
+          })}
+        </div>
       )}
 
       {!collapsed && (
@@ -1068,19 +1019,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     const { destination, source, draggableId } = result;
     if (!destination) return;
     const dst = destination.droppableId.split(":");
-
-    // Item 3 — pattern block reorder within a section.
-    if (dst[0] === "patternblock") {
-      const sectionId = dst[1];
-      const src = source.droppableId.split(":");
-      if (src[0] !== "patternblock" || src[1] !== sectionId) return;
-      useSongStore.getState().reorderPatternBlockInSection(
-        sectionId,
-        source.index,
-        destination.index,
-      );
-      return;
-    }
 
     if (dst[0] !== "pattern") return;
     let toId = dst[1];
