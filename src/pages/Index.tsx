@@ -108,13 +108,14 @@ const Index = () => {
     // pangea's draggableProps.style is briefly missing top/left on the very
     // first frame of a drag.
     try {
-      // data-chip-anchor uses the RAW chord id; the lyrics tab prefixes its
-      // draggableIds with "lyric:" to disambiguate them from the same chord
-      // registered in ProgressionsTab, so strip that prefix when looking up.
-      const lyricsId = start.draggableId.startsWith("lyric:")
-        ? start.draggableId.slice("lyric:".length)
-        : start.draggableId;
-      const sel = `[data-chip-anchor="${CSS.escape(lyricsId)}"]`;
+      // data-chip-anchor uses the RAW chord id; each tab tags its own
+      // Draggable with a namespace prefix ("L-" / "P-") so they don't
+      // collide in pangea's flat registry. Strip the prefix when looking
+      // up the source DOM node for the renderClone position fallback.
+      let rawId = start.draggableId;
+      if (rawId.startsWith("L-")) rawId = rawId.slice(2);
+      else if (rawId.startsWith("P-")) rawId = rawId.slice(2);
+      const sel = `[data-chip-anchor="${CSS.escape(rawId)}"]`;
       const el = document.querySelector(sel) as HTMLElement | null;
       if (el) {
         const r = el.getBoundingClientRect();
