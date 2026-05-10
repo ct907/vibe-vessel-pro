@@ -187,6 +187,17 @@ export function parseChord(input: string): ChordSymbol | null {
   return { root, quality, bass, display };
 }
 
+/**
+ * Canonical constructor for any user-supplied chord string. Routes raw input
+ * through `parseChord` and normalizes `display` to a canonical form. Returns
+ * null on invalid input. ALL paths that take user/clipboard text MUST use
+ * this helper instead of building ChordSymbol objects ad-hoc — it's the
+ * invariant that lets us trust `chord.display` for direct DOM rendering.
+ */
+export function makeChordFromInput(raw: string): ChordSymbol | null {
+  return parseChord(raw);
+}
+
 export function chordToMidi(chord: ChordSymbol, octave = 4): number[] {
   const rootPc = rootToPc(chord.root);
   const intervals = QUALITY_INTERVALS[chord.quality];
