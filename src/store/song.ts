@@ -1032,12 +1032,36 @@ function snapshot(s: { sections: Section[]; progression: PatternBlock[] }): Hist
   };
 }
 
+/** History grouping: while depth > 0, only the FIRST pushHistory in the
+ *  group actually snapshots. Compound actions (cut + autoLayout, paste +
+ *  reflow, drag move + reflow) wrap themselves in withHistoryGroup so the
+ *  user undoes the whole thing in one press. */
+let historyGroupDepth = 0;
+let historyGroupSnapshotted = false;
+
 /** Call BEFORE mutating sections/progression in a chord-row action. */
 function pushHistory(get: () => SongState) {
+  if (historyGroupDepth > 0) {
+    if (historyGroupSnapshotted) return;
+    historyGroupSnapshotted = true;
+  }
   const s = get();
   undoStack.push(snapshot(s));
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
   redoStack.length = 0;
+}
+
+/** Run `fn` so any nested pushHistory calls collapse into a single undo step. */
+export function withHistoryGroup<T>(fn: () => T): T {
+  const wasTop = historyGroupDepth === 0;
+  historyGroupDepth++;
+  if (wasTop) historyGroupSnapshotted = false;
+  try {
+    return fn();
+  } finally {
+    historyGroupDepth--;
+    if (historyGroupDepth === 0) historyGroupSnapshotted = false;
+  }
 }
 
 export const useSongStore = create<SongState>((rawSet, get) => {
