@@ -758,6 +758,48 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
 
 // ---------- SSOT inversion (Phase 4b) ----------
 /**
+ * Insert a fresh SectionChord into a section.chords array at the position
+ * that matches its lyricsPlacement (line index then slotIndex). Without
+ * this, callers like `placeChordInSlot` that just append the new chord
+ * would have it placed at the LAST occupied slot on the line — because
+ * `recomputeLyricsSlotsForSection` walks the SSOT array and pairs sorted-
+ * ascending slot indices with SSOT-array order. Tapping empty slot 3
+ * would land the chord at whatever the line's last-occupied slot was.
+ *
+ * Progression-only chords (no lyricsPlacement) are skipped during the
+ * walk so they don't influence ordering. A new chord with no
+ * lyricsPlacement is appended at the tail.
+ */
+function insertSectionChordAtSlot(
+  chords: SectionChord[],
+  newChord: SectionChord,
+  lines: LyricLine[],
+): SectionChord[] {
+  const lp = newChord.lyricsPlacement;
+  if (!lp) return [...chords, newChord];
+
+  const lineIdx = new Map<string, number>();
+  lines.forEach((l, i) => lineIdx.set(l.id, i));
+  const newLineIdx = lineIdx.get(lp.lineId) ?? Number.MAX_SAFE_INTEGER;
+
+  // Find the last index whose chord logically comes BEFORE the new one
+  // (earlier line, or same line with smaller slot). Insert right after.
+  let lastBeforeIdx = -1;
+  for (let i = 0; i < chords.length; i++) {
+    const lp2 = chords[i].lyricsPlacement;
+    if (!lp2) continue;
+    const otherLineIdx = lineIdx.get(lp2.lineId) ?? Number.MAX_SAFE_INTEGER;
+    if (otherLineIdx < newLineIdx) {
+      lastBeforeIdx = i;
+    } else if (otherLineIdx === newLineIdx && (lp2.slotIndex ?? 0) < lp.slotIndex) {
+      lastBeforeIdx = i;
+    }
+  }
+  const insertAt = lastBeforeIdx + 1;
+  return [...chords.slice(0, insertAt), newChord, ...chords.slice(insertAt)];
+}
+
+/**
  * Reassigns `lyricsPlacement.slotIndex` on every SectionChord so the lyric
  * row reflects the SSOT array order, while preserving the SET of occupied
  * slot positions per line.
@@ -1863,15 +1905,29 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // Phase 1.5: a single song-wide action that (1) snaps each lyric line's
     // chords onto word boundaries and (2) reflows for the current viewport.
     const w = typeof window !== "undefined" ? window.innerWidth : 800;
-    set((s) => ({
-      sections: s.sections.map((sec) => {
-        const snapped: Section = {
-          ...sec,
-          lines: sec.lines.map((l) => snapLineToWords(l)),
-        };
-        return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
-      }),
-    }));
+    // SSOT mode: formatChordsAndLyrics returns sections whose `lines[].chords`
+    // arrays are EMPTY by design (it only updates section.chords +
+    // lines[].id/text). Without the SSOT_MODE marker the wrapped setter
+    // would take the legacy "rebuild SSOT from mirrors" path
+    // (refreshAllSectionChords → recomputeSectionChordsFromMirrors), which
+    // reads line.chords[]; finding them empty it would drop every
+    // lyrics-anchored chord — the exact bug the user hit. Routing through
+    // SSOT mode rebuilds line.chords + pattern.chords from the formatter's
+    // section.chords output instead.
+    set((s) => {
+      const next = {
+        sections: s.sections.map((sec) => {
+          const snapped: Section = {
+            ...sec,
+            lines: sec.lines.map((l) => snapLineToWords(l)),
+          };
+          return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
+        }),
+        [SSOT_MODE]: true,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return next as any;
+    });
   },
 
   autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
@@ -1995,7 +2051,9 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         { lineId, slotIndex: placeSlot },
       );
       const nextSections = nextSectionsBase.map((x) =>
-        x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
+        x.id !== sectionId
+          ? x
+          : { ...x, chords: insertSectionChordAtSlot(x.chords, placement.sectionChord, x.lines) },
       );
       result = { id: newId, lineId, slotIndex: placeSlot };
       if (__dbg) {

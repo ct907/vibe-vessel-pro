@@ -86,4 +86,57 @@ describe("cross-tab SSOT sync", () => {
     expect(anchors.map((x) => x.chord.display)).toEqual(["A", "B"]);
     expect(anchors.map((x) => x.slotIndex)).toEqual([0, 3]);
   });
+
+  it("placeChordInSlot at an empty middle slot inserts between neighbors (not at the row end)", () => {
+    // Regression cover for "tap empty slot 3 → chord lands at the LAST
+    // occupied slot instead of slot 3". Bug was that placeChordInSlot
+    // appended to section.chords; recomputeLyricsSlotsForSection then
+    // paired sorted slots with SSOT-array order, so the new chord (last
+    // in array) got the last slot.
+    const store = useSongStore.getState();
+    const section = store.sections[0];
+    const line = section.lines[0];
+
+    const a = store.placeChordInSlot(section.id, line.id, 0, chord("A"));
+    const b = store.placeChordInSlot(section.id, line.id, 8, chord("B"));
+    expect(a && b).toBeTruthy();
+
+    // Tap the empty slot 3 between A (slot 0) and B (slot 8).
+    const inserted = store.placeChordInSlot(section.id, line.id, 3, chord("Em"));
+    expect(inserted).toBeTruthy();
+
+    const sec = useSongStore.getState().sections.find((s) => s.id === section.id)!;
+    const anchors = getLineChordsViaSSOT(sec, line.id);
+    expect(anchors.map((c) => c.chord.display)).toEqual(["A", "Em", "B"]);
+    // Slot footprint preserved: A still at 0, Em at the tapped slot 3,
+    // B still at 8 (no shift — the inserted chord didn't push past its
+    // preferred slot).
+    expect(anchors.map((c) => c.slotIndex)).toEqual([0, 3, 8]);
+  });
+
+  it("formatChordsInSong preserves all lyrics-anchored chords (regression: format-wipes-rows)", () => {
+    // Regression cover for "press Format Chords → chords disappear from
+    // the lyric row but survive in progressions". Bug was that
+    // formatChordsInSong skipped the [SSOT_MODE]: true marker, so the
+    // wrapped setter took the legacy mirror-rebuild path which read
+    // section.lines[].chords (empty after the formatter rebuild) and
+    // dropped every lyrics-anchored chord.
+    const store = useSongStore.getState();
+    const section = store.sections[0];
+    const line = section.lines[0];
+
+    const a = store.placeChordInSlot(section.id, line.id, 0, chord("C"));
+    const b = store.placeChordInSlot(section.id, line.id, 4, chord("F"));
+    const c = store.placeChordInSlot(section.id, line.id, 8, chord("G"));
+    expect(a && b && c).toBeTruthy();
+
+    useSongStore.getState().formatChordsInSong();
+
+    const sec = useSongStore.getState().sections.find((s) => s.id === section.id)!;
+    const anchors = getLineChordsViaSSOT(sec, line.id);
+    // The exact slot indices may shift if the formatter chose to repack
+    // (e.g. snap to word boundaries on an empty lyric line), so we only
+    // assert the chords survived in the same relative order.
+    expect(anchors.map((c) => c.chord.display)).toEqual(["C", "F", "G"]);
+  });
 });

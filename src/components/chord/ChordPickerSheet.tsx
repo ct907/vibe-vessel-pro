@@ -118,8 +118,15 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
   const SHEET_CHROME = isMobile ? 160 : 200;
-  const sheetMaxHeight = Math.max(220, vvHeight - TOP_RESERVED);
-  const gridMaxHeight = Math.max(80, vvHeight - TOP_RESERVED - SHEET_CHROME);
+  // Desktop: cap the sheet at 40% of viewport height so a short query like
+  // "G" doesn't flood the screen with a long scrolling list. Mobile keeps
+  // the previous behavior (use as much height as is available above the
+  // editing row) because there's much less screen real estate to work with
+  // and the keyboard already eats most of it.
+  const sheetMaxHeight = isMobile
+    ? Math.max(220, vvHeight - TOP_RESERVED)
+    : Math.max(220, Math.min(vvHeight * 0.4, vvHeight - TOP_RESERVED));
+  const gridMaxHeight = Math.max(80, sheetMaxHeight - SHEET_CHROME);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>

@@ -173,8 +173,8 @@ interface LineRowProps {
   onAddLineAfter: () => string | void;
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
-  /** Force-close the chord picker (used when entering Edit Mode). */
-  onPickerClose: () => void;
+  // onPickerClose used to live here for the per-row pencil button; that
+  // pencil is gone (lifted to SectionCard), so no per-row caller needs it.
   /** Selection state lives in the section card so cross-row drags work. */
   selection: ReturnType<typeof useDndSelection<string>>;
   /** Notify parent which row is "active" for picker purposes. */
@@ -183,6 +183,12 @@ interface LineRowProps {
   draggingIds: Set<string>;
   /** True while ANY pangea drag is in flight (used for slot outline visuals). */
   isAnyDragging: boolean;
+  /** Edit mode is now lifted to the SectionCard so one pencil controls
+   *  every row in the section at once. */
+  isEditMode: boolean;
+  /** Called when the user explicitly exits edit mode from this row's
+   *  toolbar (Done button, or "deleted last chord" auto-exit). */
+  onExitEditMode: () => void;
 }
 
 function LineRow({
@@ -193,11 +199,12 @@ function LineRow({
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
-  onPickerClose,
   selection,
   onChordFocus,
   draggingIds,
   isAnyDragging,
+  isEditMode,
+  onExitEditMode,
 }: LineRowProps) {
   const {
     setLineText,
@@ -225,18 +232,9 @@ function LineRow({
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  // Strict mode separation: Composition (default) vs Edit. Edit Mode disables
-  // all picker triggers and scroll-to-focus; clicks toggle chord selection only.
-  const [isEditMode, setIsEditMode] = useState(false);
-
-  // Auto-exit Edit Mode if this row loses "active" focus (user moved elsewhere).
-  useEffect(() => {
-    if (!active && isEditMode) {
-      setIsEditMode(false);
-      selection.clear();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  // Edit mode is now managed by SectionCard so a single per-section pencil
+  // toggles every row in the section. The per-row pencil that used to live
+  // here was lifted out — see the SectionCard header below.
 
   // Auto-resize lyric textarea.
   useLayoutEffect(() => {
@@ -669,46 +667,14 @@ function LineRow({
           })}
           </div>
 
-        {/* Edit pencil — toggles Edit Mode. Entering Edit Mode closes the
-            picker, blurs inputs, and pre-selects all chords so the context
-            toolbar appears. Exiting clears the selection. */}
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className={cn(
-            "h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-foreground",
-            isEditMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            onChordFocus(line.id);
-            setIsEditMode((prev) => {
-              const next = !prev;
-              if (next) {
-                // Entering Edit Mode: close picker + blur active input.
-                // Do NOT pre-select chords — user does the picking.
-                onPickerClose();
-                (document.activeElement as HTMLElement | null)?.blur?.();
-                selection.clear();
-              } else {
-                // Exiting Edit Mode: clear selection.
-                selection.clear();
-              }
-              return next;
-            });
-          }}
-          aria-label={isEditMode ? "Exit edit mode" : "Edit chords for this line"}
-          aria-pressed={isEditMode}
-          title={isEditMode ? "Exit edit mode" : "Edit chords"}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
       </div>
 
-      {/* SELECTION TOOLBAR — visible whenever Edit Mode is on. Closing requires
-          either tapping Done or the pencil icon again. */}
-      {isEditMode && (
+      {/* SELECTION TOOLBAR — only the row that's currently active shows it,
+          so when section edit mode is on for many rows the user only sees
+          one toolbar at a time (the one for the row they're touching).
+          Closing requires either tapping Done, the section pencil, or
+          deleting the last chord on this row. */}
+      {isEditMode && active && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-border bg-popover px-2 py-2 text-xs shadow max-w-[400px]">
           {/* Row 1: counter + close + select-all + copy/cut/paste + move arrows */}
           <div className="flex items-center gap-1 flex-wrap">
@@ -806,15 +772,16 @@ function LineRow({
                   0,
                 );
                 // If we just deleted every chord on this row, drop edit mode
-                // so the user isn't stuck in a stub toolbar.
+                // for the whole section so the user isn't stuck staring at
+                // an empty toolbar.
                 if (ids.length >= lineChords.length) {
-                  setIsEditMode(false);
+                  onExitEditMode();
                 }
               }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => { selection.clear(); setIsEditMode(false); }}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 ml-auto" onClick={() => { selection.clear(); onExitEditMode(); }}>
               Done
             </Button>
           </div>
@@ -974,6 +941,29 @@ function SectionCard({
   const [draftLabel, setDraftLabel] = useState(section.label);
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section.label);
+  // Edit mode is now per-section (one pencil header button toggles it for
+  // every line below). Used to live per-LineRow with a pencil button on
+  // each row; that pencil collided with longer chord chips on mobile.
+  const [editMode, setEditMode] = useState(false);
+  const exitEditMode = () => {
+    setEditMode(false);
+    selection.clear();
+  };
+  const toggleEditMode = () => {
+    setEditMode((prev) => {
+      const next = !prev;
+      if (next) {
+        // Entering edit mode closes the picker, blurs whatever input the
+        // user is typing into, and starts with an empty selection.
+        onPickerClose();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        selection.clear();
+      } else {
+        selection.clear();
+      }
+      return next;
+    });
+  };
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
@@ -1112,19 +1102,38 @@ function SectionCard({
             </Button>
           </div>
         ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel>Section</DropdownMenuLabel>
-              {section.type === "custom" && (
-                <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
-                  <Pencil className="h-4 w-4" /> Rename…
-                </DropdownMenuItem>
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-7 w-7 text-muted-foreground hover:text-foreground",
+                editMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
               )}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleEditMode();
+              }}
+              aria-label={editMode ? "Exit edit mode for this section" : "Edit chords in this section"}
+              aria-pressed={editMode}
+              title={editMode ? "Exit edit mode" : "Edit chords"}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-7 w-7">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel>Section</DropdownMenuLabel>
+                {section.type === "custom" && (
+                  <DropdownMenuItem onClick={() => setCustomRenameOpen(true)}>
+                    <Pencil className="h-4 w-4" /> Rename…
+                  </DropdownMenuItem>
+                )}
               {/* Phase 1.5: per-section "Format chords & lyrics" removed.
                   Use Song Settings → Format Chords for a song-wide reflow. */}
               <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
@@ -1177,6 +1186,7 @@ function SectionCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         )}
 
         {!sortMode && (
@@ -1205,13 +1215,14 @@ function SectionCard({
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onMergeUp={(kind) => handleMergeUp(line.id, kind)}
                 onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
-                onPickerClose={onPickerClose}
                 selection={selection}
                 onChordFocus={() => {
                   /* parent handles via picker */
                 }}
                 draggingIds={draggingIds}
                 isAnyDragging={isAnyDragging}
+                isEditMode={editMode}
+                onExitEditMode={exitEditMode}
               />
             ))}
           </div>
