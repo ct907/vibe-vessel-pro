@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -997,9 +998,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
+  const isMobile = useIsMobile();
+
   const openChordEditor = (patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
     if (!pat) return;
+    if (!isMobile) {
+      // Desktop: use ChordPickerSheet to replace the chord family in place,
+      // matching the picker UX used by empty slots.
+      const idx = pat.chords.findIndex((c) => c.id === chordId);
+      const atBeat = idx >= 0 ? idx : 0;
+      setPicker({ patternId, atBeat, replaceChordId: chordId });
+      return;
+    }
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 

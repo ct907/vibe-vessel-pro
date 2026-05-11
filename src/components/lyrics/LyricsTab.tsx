@@ -580,7 +580,8 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative shrink-0 h-9 flex items-center justify-start border border-solid border-transparent hover:border-muted-foreground/20",
+                      "relative shrink-0 h-9 flex items-center justify-start border border-solid border-transparent hover:border-muted-foreground/40",
+                      isEditMode && "border-muted-foreground/40",
                       occupied ? "w-10" : "w-7",
                       slotIdx > 0 && !isAnyDragging && "border-l-muted-foreground/12",
                       isAnyDragging &&
