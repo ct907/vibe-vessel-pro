@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
