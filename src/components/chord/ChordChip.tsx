@@ -127,7 +127,7 @@ export function ChordChip({
   };
 
   const sizeCls =
-    size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
+    size === "sm" ? "px-1 py-2 text-xs" : size === "lg" ? "px-1 py-2 text-base" : "px-1 py-2 text-sm";
   // Chord-tinted backgrounds for ink/card variants come from inline style
   // (oklch + oklch-interpolated gradients). The "filled" variant remains a
   // generic primary fill for non-chord uses (e.g. basket controls).
