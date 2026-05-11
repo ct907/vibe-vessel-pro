@@ -311,7 +311,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
               {/* Song Settings */}
               <div className="mt-6">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">
                   Song Settings
                 </h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
