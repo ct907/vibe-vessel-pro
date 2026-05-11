@@ -580,16 +580,16 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative shrink-0 h-9 flex items-center justify-start",
+                      "relative shrink-0 h-9 flex items-center justify-start border border-solid border-transparent hover:border-muted-foreground/20",
                       occupied ? "w-10" : "w-7",
-                      slotIdx > 0 && !isAnyDragging && "border-l border-muted-foreground/12",
+                      slotIdx > 0 && !isAnyDragging && "border-l-muted-foreground/12",
                       isAnyDragging &&
                         !occupied &&
                         !isInvalidDrop &&
-                        "border border-dashed border-muted-foreground/30 rounded-sm",
+                        "border border-solid border-muted-foreground/30 rounded-sm",
                       isAnyDragging &&
                         isInvalidDrop &&
-                        "border border-dashed border-destructive/40 rounded-sm",
+                        "border border-solid border-destructive/40 rounded-sm",
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
