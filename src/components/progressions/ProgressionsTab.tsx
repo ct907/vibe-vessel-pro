@@ -97,6 +97,15 @@ interface PatternProps {
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
+  /** Section-level edit mode (lifted from per-block to per-section). */
+  selectMode: boolean;
+  /** Called when the user shift/ctrl-clicks a chord (auto-enter section
+   *  edit mode) — parent toggles its single selectMode flag. */
+  onEnterSelectMode: () => void;
+  /** Called from this block's toolbar (Done, delete-last-chord, Esc, etc).
+   *  Parent sets section selectMode = false; each block's local selection
+   *  is cleared by the selectMode prop-change effect below. */
+  onExitSelectMode: () => void;
 }
 
 function formatBeats(n: number) {
@@ -111,6 +120,9 @@ function PatternBlock({
   onPickerOpen,
   onRequestDeleteBlock,
   onEditChordOpen,
+  selectMode,
+  onEnterSelectMode,
+  onExitSelectMode,
 }: PatternProps) {
   const {
     updatePattern,
@@ -131,7 +143,9 @@ function PatternBlock({
   const isFocused = focusedPatternId === pattern.id;
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
 
-  const [selectMode, setSelectMode] = useState(false);
+  // selectMode is now section-level (lifted to SectionGroup); this block
+  // only owns its local `selected` Set. When the section exits edit mode,
+  // wipe this block's selection too.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const lastSelectedRef = useRef<string | null>(null);
@@ -155,11 +169,19 @@ function PatternBlock({
   const selectedIds = Array.from(selected);
   const canDeleteThisBlock = totalBlocksInSong > 1;
 
+  // Exit edit mode: notify parent to flip section-level selectMode off;
+  // local selection is wiped by the prop-change effect below.
   const exitSelect = () => {
-    setSelectMode(false);
-    setSelected(new Set());
-    lastSelectedRef.current = null;
+    onExitSelectMode();
   };
+
+  // Mirror local cleanup whenever the section's selectMode goes false.
+  useEffect(() => {
+    if (!selectMode) {
+      setSelected(new Set());
+      lastSelectedRef.current = null;
+    }
+  }, [selectMode]);
 
   // Outside-tap closes the select-mode context menu.
   useEffect(() => {
@@ -237,7 +259,7 @@ function PatternBlock({
       const i1 = anchor ? ids.indexOf(anchor) : i2;
       const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
       const range = ids.slice(from, to + 1);
-      setSelectMode(true);
+      onEnterSelectMode();
       setSelected((prev) => {
         const next = new Set(prev);
         range.forEach((id) => next.add(id));
@@ -248,7 +270,7 @@ function PatternBlock({
     }
     // Ctrl/Cmd-click toggles selection.
     if (e && (e.metaKey || e.ctrlKey)) {
-      setSelectMode(true);
+      onEnterSelectMode();
       setSelected((prev) => {
         const next = new Set(prev);
         if (next.has(chordId)) next.delete(chordId);
@@ -311,32 +333,12 @@ function PatternBlock({
         <span className="text-[11px] text-muted-foreground">
           {formatBeats(usedBeats)} / {totalBeats} beats
         </span>
+        {/* Per-block pencil removed — section pencil in SectionGroup
+            header now toggles edit mode for every block in the section. */}
         <Button
           variant="ghost"
           size="icon"
-          className={cn(
-            "h-8 w-8 ml-auto text-muted-foreground hover:text-foreground",
-            selectMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (selectMode) {
-              exitSelect();
-            } else {
-              setSelectMode(true);
-              setSelected(new Set());
-            }
-          }}
-          aria-label={selectMode ? "Exit edit mode" : "Edit chords in this block"}
-          aria-pressed={selectMode}
-          title={selectMode ? "Exit edit mode" : "Edit chords"}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
+          className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
           onClick={(e) => {
             e.stopPropagation();
             onRequestDeleteBlock(pattern.id);
@@ -799,6 +801,11 @@ function SectionGroup({
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
+  // Section-level edit mode (replaces the per-block pencil that used to
+  // live on each PatternBlock header). One toggle here puts every block
+  // in this section into selectMode; per-block selection sets remain
+  // local to each block.
+  const [sectionSelectMode, setSectionSelectMode] = useState(false);
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
@@ -857,6 +864,23 @@ function SectionGroup({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 text-muted-foreground hover:text-foreground",
+                sectionSelectMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSectionSelectMode((prev) => !prev);
+              }}
+              aria-label={sectionSelectMode ? "Exit edit mode for this section" : "Edit chords in this section"}
+              aria-pressed={sectionSelectMode}
+              title={sectionSelectMode ? "Exit edit mode" : "Edit chords"}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
@@ -944,6 +968,9 @@ function SectionGroup({
                 onPickerOpen={onPickerOpen}
                 onRequestDeleteBlock={onRequestDeleteBlock}
                 onEditChordOpen={onEditChordOpen}
+                selectMode={sectionSelectMode}
+                onEnterSelectMode={() => setSectionSelectMode(true)}
+                onExitSelectMode={() => setSectionSelectMode(false)}
               />
             );
           })}
