@@ -38,7 +38,7 @@ import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
-import { sectionTintStyle } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, SectionColorPicker } from "@/components/section/SectionColorPicker";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -111,6 +111,7 @@ function PatternBlock({
     movePatternChord,
     removePatternChordsBatch,
     setPatternChordLength,
+    resizePatternChordsWithOverflow,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -138,6 +139,7 @@ function PatternBlock({
   const sortedChordsRef = useRef(sortedChords);
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
+  const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
@@ -169,6 +171,7 @@ function PatternBlock({
   sortedChordsRef.current = sortedChords;
   movePatternChordRef.current = movePatternChord;
   setPatternChordLengthRef.current = setPatternChordLength;
+  resizePatternChordsWithOverflowRef.current = resizePatternChordsWithOverflow;
 
   const toggleSelectChord = (id: string) =>
     setSelectedIds((prev) => {
@@ -198,8 +201,7 @@ function PatternBlock({
           movePatternChordRef.current(pattern.id, id, 1);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        const chord = activeChordInThisBlockRef.current;
-        setPatternChordLengthRef.current(pattern.id, id, chord.lengthBeats + LENGTH_STEP);
+        resizePatternChordsWithOverflowRef.current(pattern.id, [id], LENGTH_STEP);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         const chord = activeChordInThisBlockRef.current;
@@ -550,12 +552,12 @@ function PatternBlock({
       {/* Floating chord toolbar — reorder, bar-length, multi-select. */}
       {activeChordInThisBlock && (
         <div className="mt-2 flex justify-center">
-          <div className="flex items-center gap-0.5 rounded-lg border bg-popover shadow-md px-1 py-0.5 flex-wrap">
+          <div className="flex items-center gap-1 rounded-lg border bg-popover shadow-md px-1.5 py-1 flex-wrap">
             {/* ← → reorder */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               disabled={activeIdx <= 0}
               onClick={(e) => {
                 e.stopPropagation();
@@ -563,15 +565,15 @@ function PatternBlock({
               }}
               aria-label="Move chord earlier"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="px-1 text-xs font-mono-chord text-muted-foreground">
+            <span className="px-1 text-sm font-mono-chord text-muted-foreground">
               {activeChordInThisBlock.chord.display}
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               disabled={activeIdx >= sortedChords.length - 1}
               onClick={(e) => {
                 e.stopPropagation();
@@ -579,16 +581,16 @@ function PatternBlock({
               }}
               aria-label="Move chord later"
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
 
-            <div className="w-px h-4 bg-border mx-0.5" />
+            <div className="w-px h-5 bg-border mx-0.5" />
 
             {/* Bar-length −½ / display / +½ */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               disabled={activeChordInThisBlock.lengthBeats <= MIN_LEN}
               onClick={(e) => {
                 e.stopPropagation();
@@ -601,36 +603,36 @@ function PatternBlock({
               aria-label="Decrease bar length by half"
               title="-½ bar"
             >
-              <Minus className="h-3.5 w-3.5" />
+              <Minus className="h-4 w-4" />
             </Button>
-            <span className="px-0.5 text-[10px] font-mono-chord text-muted-foreground select-none">
+            <span className="px-0.5 text-xs font-mono-chord text-muted-foreground select-none">
               {formatBeats(activeChordInThisBlock.lengthBeats)}b
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               onClick={(e) => {
                 e.stopPropagation();
-                setPatternChordLength(
+                resizePatternChordsWithOverflow(
                   pattern.id,
-                  activeChordId!,
-                  activeChordInThisBlock.lengthBeats + LENGTH_STEP,
+                  selectedIds.size > 0 ? Array.from(selectedIds) : [activeChordId!],
+                  LENGTH_STEP,
                 );
               }}
               aria-label="Increase bar length by half"
               title="+½ bar"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
             </Button>
 
-            <div className="w-px h-4 bg-border mx-0.5" />
+            <div className="w-px h-5 bg-border mx-0.5" />
 
             {/* Multi-select toggle */}
             <Button
               size="icon"
               variant={selectedIds.has(activeChordId!) ? "secondary" : "ghost"}
-              className="h-6 w-6"
+              className="h-7 w-7"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleSelectChord(activeChordId!);
@@ -638,10 +640,10 @@ function PatternBlock({
               aria-label="Toggle multi-select"
               title="Multi-select"
             >
-              <CheckSquare className="h-3.5 w-3.5" />
+              <CheckSquare className="h-4 w-4" />
             </Button>
             {selectedIds.size > 0 && (
-              <span className="text-[10px] font-mono-chord text-muted-foreground px-0.5 select-none">
+              <span className="text-xs font-mono-chord text-muted-foreground px-0.5 select-none">
                 {selectedIds.size}
               </span>
             )}
@@ -650,7 +652,7 @@ function PatternBlock({
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               onClick={(e) => {
                 e.stopPropagation();
                 selectAllChords();
@@ -658,7 +660,7 @@ function PatternBlock({
               aria-label="Select all chords in block"
               title="Select all"
             >
-              <ListChecks className="h-3.5 w-3.5" />
+              <ListChecks className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -711,6 +713,7 @@ function SectionGroup({
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
   const duplicateSection = useSongStore((s) => s.duplicateSection);
+  const setSectionColor = useSongStore((s) => s.setSectionColor);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
@@ -771,6 +774,10 @@ function SectionGroup({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-1">
+            <SectionColorPicker
+              value={section?.color}
+              onChange={(c) => setSectionColor(sectionId, c)}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">

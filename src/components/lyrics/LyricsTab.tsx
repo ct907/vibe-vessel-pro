@@ -67,7 +67,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
-import { sectionTintStyle } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, SectionColorPicker } from "@/components/section/SectionColorPicker";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -309,7 +309,8 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative shrink-0 h-9 flex items-center justify-start border border-solid border-transparent hover:border-muted-foreground/40",
+                      "relative shrink-0 h-9 flex items-center justify-start border border-solid hover:border-muted-foreground/40",
+                      hasActiveChordInLine ? "border-muted-foreground/20" : "border-transparent",
                       occupied ? "w-10" : "w-7",
                       slotIdx > 0 && (hasActiveChordInLine ? "border-l-muted-foreground/35" : "border-l-muted-foreground/12"),
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
@@ -403,7 +404,7 @@ function LineRow({
         const currentSlot = activeAnchor.slotIndex ?? 0;
         return (
           <div
-            className="mt-1 mb-1 flex items-center gap-0.5 w-fit rounded-lg border bg-popover shadow-md px-1 py-0.5"
+            className="mt-1 mb-1 flex items-center gap-1 w-fit rounded-lg border bg-popover shadow-md px-1.5 py-1"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -411,26 +412,26 @@ function LineRow({
               type="button"
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               disabled={currentSlot <= 0}
               onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot - 1)}
               aria-label="Move chord left"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="px-1 text-xs font-semibold font-mono">
+            <span className="px-1 text-sm font-semibold font-mono">
               {activeAnchor.chord.display}
             </span>
             <Button
               type="button"
               size="icon"
               variant="ghost"
-              className="h-6 w-6"
+              className="h-7 w-7"
               disabled={currentSlot >= CHORD_ROW_SLOTS - 1}
               onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot + 1)}
               aria-label="Move chord right"
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         );
@@ -576,6 +577,7 @@ function SectionCard({
     upsertChordAt,
     basket,
     setSectionComment,
+    setSectionColor,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
   } = useSongStore();
@@ -722,6 +724,10 @@ function SectionCard({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-1">
+            <SectionColorPicker
+              value={section.color}
+              onChange={(c) => setSectionColor(section.id, c)}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="icon" variant="ghost" className="h-7 w-7">
