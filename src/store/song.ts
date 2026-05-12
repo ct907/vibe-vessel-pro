@@ -1290,7 +1290,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     } catch { /* ignore */ }
     return {
       sections: s.sections.filter((sec) => sec.id !== id),
-      progression: s.progression.filter((p) => p.sectionId !== id),
+      progression: s.progression.filter((p) => (p.sectionId ?? p.id) !== id),
     };
   }),
   duplicateSection: (id) => {

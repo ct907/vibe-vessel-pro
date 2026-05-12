@@ -33,7 +33,15 @@ interface ProgressionModeProps {
   onClose: () => void;
 }
 
-type Props = LyricsModeProps | ProgressionModeProps;
+interface ProgressionAddModeProps {
+  mode: "progression-add";
+  sectionId: string;
+  patternId: string;
+  atBeat: number;
+  onClose: () => void;
+}
+
+type Props = LyricsModeProps | ProgressionModeProps | ProgressionAddModeProps;
 
 const SLOT_PX = 28;
 
@@ -66,22 +74,24 @@ export function FocusedChordEditor(props: Props) {
   const placeChordInSlot = useSongStore((s) => s.placeChordInSlot);
   const upsertChordAt = useSongStore((s) => s.upsertChordAt);
   const updatePatternChord = useSongStore((s) => s.updatePatternChord);
+  const addChordToPatternSlot = useSongStore((s) => s.addChordToPatternSlot);
   const progression = useSongStore((s) => s.progression);
 
   const isProgression = props.mode === "progression";
+  const isProgressionAdd = props.mode === "progression-add";
   const section = sections.find((s) => s.id === props.sectionId);
   const sectionLabel = section ? getSectionDisplayName(sections, section.id) : "";
 
   // ---- Lyrics-mode state ----
-  const lyricsLineId = !isProgression ? props.lineId : "";
-  const lyricsInitialSlot = !isProgression ? props.initialSlot : 0;
-  const lyricsInitialAnchorId = !isProgression ? props.initialAnchorId : undefined;
-  const line: LyricLine | undefined = !isProgression
+  const lyricsLineId = !isProgression && !isProgressionAdd ? props.lineId : "";
+  const lyricsInitialSlot = !isProgression && !isProgressionAdd ? props.initialSlot : 0;
+  const lyricsInitialAnchorId = !isProgression && !isProgressionAdd ? props.initialAnchorId : undefined;
+  const line: LyricLine | undefined = !isProgression && !isProgressionAdd
     ? section?.lines.find((l) => l.id === lyricsLineId)
     : undefined;
 
   // ---- Progression-mode lookups ----
-  const progPattern = isProgression
+  const progPattern = (isProgression || isProgressionAdd)
     ? progression.find((p) => p.id === props.patternId)
     : undefined;
   const progChord = isProgression
@@ -107,7 +117,9 @@ export function FocusedChordEditor(props: Props) {
   }, [setEditorOpen]);
 
   useEffect(() => {
-    if (isProgression) {
+    if (isProgressionAdd) {
+      setQuery("");
+    } else if (isProgression) {
       setQuery(progChord?.chord.display ?? "");
     } else {
       const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
@@ -135,6 +147,11 @@ export function FocusedChordEditor(props: Props) {
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
   const handlePick = (chord: ChordSymbol) => {
+    if (isProgressionAdd) {
+      addChordToPatternSlot(props.patternId, chord, props.atBeat);
+      props.onClose();
+      return;
+    }
     if (isProgression) {
       // Replace the chord family of the tapped progression chord.
       updatePatternChord(props.patternId, props.chordId, { chord });
@@ -168,25 +185,30 @@ export function FocusedChordEditor(props: Props) {
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
-  if (!isProgression && !line) return null;
+  if (!isProgression && !isProgressionAdd && !line) return null;
   if (isProgression && (!progPattern || !progChord)) return null;
+  if (isProgressionAdd && !progPattern) return null;
 
   // Build preview slot map for lyrics mode.
-  const liveChords = !isProgression && section
+  const liveChords = !isProgression && !isProgressionAdd && section
     ? getLineChordsViaSSOT(section, lyricsLineId)
     : [];
   const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-  if (!isProgression) {
+  if (!isProgression && !isProgressionAdd) {
     liveChords.forEach((c) => {
       const s = c.slotIndex;
       if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
     });
   }
 
-  const headerEyebrow = isProgression
+  const headerEyebrow = isProgressionAdd
+    ? `Add chord to ${sectionLabel}`
+    : isProgression
     ? `Editing chord · ${progChord!.chord.display}`
     : `Slot ${slot + 1} of ${CHORD_ROW_SLOTS} ${anchorId ? "· editing" : "· adding"}`;
-  const headerTitle = isProgression
+  const headerTitle = isProgressionAdd
+    ? "Add Chord"
+    : isProgression
     ? `Edit Chord in ${sectionLabel}`
     : `Add Chords to ${sectionLabel}`;
 
@@ -240,7 +262,7 @@ export function FocusedChordEditor(props: Props) {
         </div>
 
         {/* PREVIEW */}
-        {!isProgression && (
+        {!isProgression && !isProgressionAdd && (
           <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
             <p
               className="mb-1"
@@ -318,7 +340,7 @@ export function FocusedChordEditor(props: Props) {
         )}
 
         {/* Reorder controls — operate on the chord currently being edited. */}
-        {(() => {
+        {!isProgressionAdd && (() => {
           const moveChordToSlot = useSongStore.getState().moveChordToSlot;
           const movePatternChord = useSongStore.getState().movePatternChord;
           const canReorder = isProgression
@@ -409,7 +431,7 @@ export function FocusedChordEditor(props: Props) {
           />
           <div className="flex flex-col items-center gap-1 shrink-0">
             <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--ink-soft)" }}>Oct</span>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-row gap-0.5">
               {[3, 4, 5].map((o) => (
                 <button
                   key={o}
