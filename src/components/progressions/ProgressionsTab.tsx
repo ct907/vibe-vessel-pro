@@ -135,9 +135,6 @@ function PatternBlock({
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const activeChordIdRef = useRef<string | null>(null);
   const activeIdxRef = useRef<number>(-1);
-  const sortedChordsRef = useRef(sortedChords);
-  const movePatternChordRef = useRef(movePatternChord);
-  const setPatternChordLengthRef = useRef(setPatternChordLength);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
@@ -151,6 +148,9 @@ function PatternBlock({
   const sortedChords = ownerSection
     ? getPatternChordsViaSSOT(ownerSection, pattern)
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
+  const sortedChordsRef = useRef(sortedChords);
+  const movePatternChordRef = useRef(movePatternChord);
+  const setPatternChordLengthRef = useRef(setPatternChordLength);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
   const canDeleteThisBlock = totalBlocksInSong > 1;
