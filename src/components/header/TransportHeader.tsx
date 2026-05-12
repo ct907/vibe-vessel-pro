@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
-import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
+import { downloadProjectJSON, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,89 @@ import {
 import { Music2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+async function convertToWebP(file: File, maxPx = 400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/webp", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load")); };
+    img.src = url;
+  });
+}
+
+function DraggablePhoto({
+  photo,
+  onMove,
+  onRemove,
+}: {
+  photo: InspirationPhoto;
+  onMove: (id: string, x: number, y: number) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [drag, setDrag] = useState<{ startX: number; startY: number; dx: number; dy: number } | null>(null);
+  const x = photo.x + (drag?.dx ?? 0);
+  const y = photo.y + (drag?.dy ?? 0);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        zIndex: drag ? 20 : 10,
+        touchAction: "none",
+        cursor: drag ? "grabbing" : "grab",
+        userSelect: "none",
+      }}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDrag({ startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 });
+      }}
+      onPointerMove={(e) => {
+        if (!drag) return;
+        setDrag((d) => d ? { ...d, dx: e.clientX - d.startX, dy: e.clientY - d.startY } : null);
+      }}
+      onPointerUp={() => {
+        if (drag) { onMove(photo.id, photo.x + drag.dx, photo.y + drag.dy); setDrag(null); }
+      }}
+      onPointerCancel={() => setDrag(null)}
+    >
+      <div style={{ position: "relative" }}>
+        <img
+          src={photo.dataUrl}
+          alt=""
+          draggable={false}
+          style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.22)", display: "block" }}
+        />
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onRemove(photo.id); }}
+          style={{
+            position: "absolute", top: -7, right: -7,
+            width: 20, height: 20, borderRadius: "50%",
+            background: "var(--destructive)", color: "white",
+            border: "2px solid white", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12, lineHeight: 1, fontWeight: 700,
+          }}
+          aria-label="Remove photo"
+        >×</button>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   isPlaying: boolean;
   setIsPlaying: (b: boolean) => void;
@@ -69,10 +153,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     redo,
     canUndo,
     canRedo,
+    inspirationPhotos,
+    addInspirationPhoto,
+    removeInspirationPhoto,
+    moveInspirationPhoto,
   } = useSongStore();
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
@@ -262,47 +351,87 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const remaining = 3 - inspirationPhotos.length;
+    const toProcess = files.slice(0, Math.max(0, remaining));
+    const vw = typeof window !== "undefined" ? window.innerWidth : 400;
+    const containerW = Math.min(vw - 32, 600);
+    for (let i = 0; i < toProcess.length; i++) {
+      try {
+        const dataUrl = await convertToWebP(toProcess[i]);
+        const currentCount = useSongStore.getState().inspirationPhotos.length;
+        const x = Math.round(containerW * (0.12 + currentCount * 0.32));
+        const y = 4 + (currentCount % 2) * 12;
+        addInspirationPhoto({ id: nanoid(), dataUrl, x, y });
+      } catch { /* ignore */ }
+    }
+  };
+
   return (
-    <header id="main-header" className="sticky top-2 z-40 mx-2 sm:mx-4 mt-2 rounded-xl bg-card/95 backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)" }}>
-      <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
-        {/* Row 1: Wordmark + Gallery placeholder + Menu */}
-        <div className="flex items-center gap-2">
-          <Bookmark className="h-7 w-7 shrink-0" style={{ color: "var(--cocoa-deep)" }} />
+    <div className="sticky top-0 z-40 mx-2 sm:mx-4 mt-2">
+      <div className="relative">
+        {/* Floating inspiration photos */}
+        {inspirationPhotos.map((photo) => (
+          <DraggablePhoto
+            key={photo.id}
+            photo={photo}
+            onMove={moveInspirationPhoto}
+            onRemove={removeInspirationPhoto}
+          />
+        ))}
 
-          <div className="flex-1" />
+        {/* Top bar: Bookmark (left) + Add photos btn (right) */}
+        <div className="flex items-center justify-between mb-1 px-1">
+          <Bookmark className="h-6 w-6 shrink-0" style={{ color: "var(--cocoa-deep)" }} />
+          <button
+            type="button"
+            onClick={() => inspirationPhotos.length < 3 && photoInputRef.current?.click()}
+            disabled={inspirationPhotos.length >= 3}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-50"
+            aria-label={inspirationPhotos.length >= 3 ? "Max 3 photos" : "Add inspiration photo"}
+            title={inspirationPhotos.length >= 3 ? "Remove a photo to add more" : "Add up to 3 inspiration photos"}
+          >
+            <ImageIcon className="h-4 w-4" />
+          </button>
+        </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
-              onClick={() => undo()}
-              disabled={!canUndo()}
-              aria-label="Undo"
-              title="Undo (⌘/Ctrl+Z)"
-            >
-              <Undo2 className="h-4 w-4" />
-            </button>
-            <button
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
-              onClick={() => redo()}
-              disabled={!canRedo()}
-              aria-label="Redo"
-              title="Redo (⌘/Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              disabled
-              aria-label="Add inspiration image (coming soon)"
-              title="Add up to 3 inspiration images — coming soon"
-              className="inline-flex items-center gap-1.5 h-9 px-2 rounded-md border border-dashed border-border text-xs text-muted-foreground/70 hover:bg-accent/40 disabled:opacity-60"
-            >
-              <ImageIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Add inspiration</span>
-            </button>
-          </div>
+        <header id="main-header" className="rounded-xl bg-card/95 backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)" }}>
+          <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
+            {/* Row 1: SongNote wordmark + undo/redo + menu */}
+            <div className="flex items-center gap-2">
+              <span
+                className="font-display shrink-0 leading-none select-none"
+                style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)" }}
+              >
+                SongNote
+              </span>
 
-          <Sheet open={navOpen} onOpenChange={setNavOpen}>
+              <div className="flex-1" />
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
+                  onClick={() => undo()}
+                  disabled={!canUndo()}
+                  aria-label="Undo"
+                  title="Undo (⌘/Ctrl+Z)"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
+                  onClick={() => redo()}
+                  disabled={!canRedo()}
+                  aria-label="Redo"
+                  title="Redo (⌘/Ctrl+Shift+Z)"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
               <button className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
@@ -637,6 +766,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </header>
+        </header>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePhotoUpload}
+        />
+      </div>
+    </div>
   );
 }
