@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Plus,
+  Minus,
   Trash2,
   ArrowUp,
   ArrowDown,
@@ -30,6 +31,8 @@ import {
   ChevronLeft,
   Copy,
   MoreVertical,
+  CheckSquare,
+  ListChecks,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -107,6 +110,7 @@ function PatternBlock({
     updatePattern,
     movePatternChord,
     removePatternChordsBatch,
+    setPatternChordLength,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -123,6 +127,17 @@ function PatternBlock({
   const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
+
+  // Multi-select state for this block.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Stable refs so the keyboard handler always reads the freshest values.
+  const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
+  const activeChordIdRef = useRef<string | null>(null);
+  const activeIdxRef = useRef<number>(-1);
+  const sortedChordsRef = useRef(sortedChords);
+  const movePatternChordRef = useRef(movePatternChord);
+  const setPatternChordLengthRef = useRef(setPatternChordLength);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
@@ -146,6 +161,58 @@ function PatternBlock({
   const activeIdx = activeChordInThisBlock
     ? sortedChords.findIndex((c) => c.id === activeChordId)
     : -1;
+
+  // Keep refs current on every render.
+  activeChordInThisBlockRef.current = activeChordInThisBlock;
+  activeChordIdRef.current = activeChordId;
+  activeIdxRef.current = activeIdx;
+  sortedChordsRef.current = sortedChords;
+  movePatternChordRef.current = movePatternChord;
+  setPatternChordLengthRef.current = setPatternChordLength;
+
+  const toggleSelectChord = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const selectAllChords = () =>
+    setSelectedIds(new Set(sortedChords.map((c) => c.id)));
+
+  // Tasks 3 & 4 (keyboard): while a chord in this block is active,
+  // ← / → reorders it; ↑ / ↓ changes bar length.
+  useEffect(() => {
+    if (!activeChordInThisBlock) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeChordInThisBlockRef.current) return;
+      const id = activeChordIdRef.current;
+      if (!id) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (activeIdxRef.current > 0) movePatternChordRef.current(pattern.id, id, -1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (activeIdxRef.current < sortedChordsRef.current.length - 1)
+          movePatternChordRef.current(pattern.id, id, 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const chord = activeChordInThisBlockRef.current;
+        setPatternChordLengthRef.current(pattern.id, id, chord.lengthBeats + LENGTH_STEP);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const chord = activeChordInThisBlockRef.current;
+        setPatternChordLengthRef.current(
+          pattern.id,
+          id,
+          Math.max(MIN_LEN, chord.lengthBeats - LENGTH_STEP),
+        );
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeChordInThisBlock?.id, pattern.id]);
 
   return (
     <div
@@ -276,8 +343,9 @@ function PatternBlock({
                           const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
                           const colors = getChordColorClasses(c.chord);
                           const isActive = activeChordId === c.id;
+                          const isSelected = selectedIds.has(c.id);
                           return (
-                            <div className="relative">
+                            <div className="relative flex items-stretch">
                               <div
                                 data-pattern-chord={c.id}
                                 role="button"
@@ -350,9 +418,10 @@ function PatternBlock({
                                   }
                                 }}
                                 className={cn(
-                                  "my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer",
+                                  "ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer",
                                   colors.className,
-                                  isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
+                                  isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.02]",
+                                  isSelected && !isActive && "ring-2 ring-secondary ring-offset-1 ring-offset-card",
                                 )}
                                 style={{
                                   ...colors.style,
@@ -374,7 +443,17 @@ function PatternBlock({
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    removePatternChordsBatch(pattern.id, [c.id]);
+                                    if (selectedIds.size > 1 && selectedIds.has(c.id)) {
+                                      removePatternChordsBatch(pattern.id, Array.from(selectedIds));
+                                      setSelectedIds(new Set());
+                                    } else {
+                                      removePatternChordsBatch(pattern.id, [c.id]);
+                                      setSelectedIds((prev) => {
+                                        const n = new Set(prev);
+                                        n.delete(c.id);
+                                        return n;
+                                      });
+                                    }
                                     onSetActiveChordId(null);
                                   }}
                                   aria-label="Delete chord"
@@ -468,10 +547,11 @@ function PatternBlock({
           })()}
       </div>
 
-      {/* Floating ← → chord movement menu — appears when a chord in this block is active. */}
+      {/* Floating chord toolbar — reorder, bar-length, multi-select. */}
       {activeChordInThisBlock && (
         <div className="mt-2 flex justify-center">
-          <div className="flex items-center gap-0.5 rounded-lg border bg-popover shadow-md px-1 py-0.5">
+          <div className="flex items-center gap-0.5 rounded-lg border bg-popover shadow-md px-1 py-0.5 flex-wrap">
+            {/* ← → reorder */}
             <Button
               size="icon"
               variant="ghost"
@@ -500,6 +580,85 @@ function PatternBlock({
               aria-label="Move chord later"
             >
               <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+
+            <div className="w-px h-4 bg-border mx-0.5" />
+
+            {/* Bar-length −½ / display / +½ */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              disabled={activeChordInThisBlock.lengthBeats <= MIN_LEN}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPatternChordLength(
+                  pattern.id,
+                  activeChordId!,
+                  Math.max(MIN_LEN, activeChordInThisBlock.lengthBeats - LENGTH_STEP),
+                );
+              }}
+              aria-label="Decrease bar length by half"
+              title="-½ bar"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <span className="px-0.5 text-[10px] font-mono-chord text-muted-foreground select-none">
+              {formatBeats(activeChordInThisBlock.lengthBeats)}b
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPatternChordLength(
+                  pattern.id,
+                  activeChordId!,
+                  activeChordInThisBlock.lengthBeats + LENGTH_STEP,
+                );
+              }}
+              aria-label="Increase bar length by half"
+              title="+½ bar"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+
+            <div className="w-px h-4 bg-border mx-0.5" />
+
+            {/* Multi-select toggle */}
+            <Button
+              size="icon"
+              variant={selectedIds.has(activeChordId!) ? "secondary" : "ghost"}
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSelectChord(activeChordId!);
+              }}
+              aria-label="Toggle multi-select"
+              title="Multi-select"
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+            </Button>
+            {selectedIds.size > 0 && (
+              <span className="text-[10px] font-mono-chord text-muted-foreground px-0.5 select-none">
+                {selectedIds.size}
+              </span>
+            )}
+
+            {/* Select all in this block */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                selectAllChords();
+              }}
+              aria-label="Select all chords in block"
+              title="Select all"
+            >
+              <ListChecks className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
