@@ -64,9 +64,12 @@ export default function Landing() {
           </p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" asChild>
-            <Link to="/app">Open editor</Link>
-          </Button>
+          <Link
+            to="/app"
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 px-4 text-sm font-semibold"
+          >
+            Open editor
+          </Link>
         </div>
       </header>
 
@@ -95,9 +98,12 @@ export default function Landing() {
                       />
                       Default
                     </label>
-                    <Button size="sm" onClick={() => goTo(key)}>
+                    <button
+                      onClick={() => goTo(key)}
+                      className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold"
+                    >
                       Open {title}
-                    </Button>
+                    </button>
                   </div>
                 </article>
               );

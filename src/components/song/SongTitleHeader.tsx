@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
 import { useSongStore } from "@/store/song";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,14 +47,13 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 mt-1 shrink-0"
+            <button
+              type="button"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 mt-1 shrink-0"
               aria-label="Song actions"
             >
               <MoreVertical className="h-5 w-5" />
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem

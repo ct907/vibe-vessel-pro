@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -114,14 +113,13 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
             · Filter Chord Root
           </h2>
           {numeralFilter.size > 0 && (
-            <Button
-              size="sm"
-              className="bg-indigo-500/40 h-6"
-              variant="secondary"
+            <button
+              type="button"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-6 px-2 text-xs font-semibold"
               onClick={() => setNumeralFilter(new Set())}
             >
               Clear filter
-            </Button>
+            </button>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -132,12 +130,18 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                 key={d.numeral}
                 type="button"
                 onClick={() => toggleNumeral(d.numeral)}
-                className={cn(
-                  "rounded-md p-1 text-center transition-colors",
-                  active ? "border-primary bg-accent ring-1 ring-primary" : "bg-muted/50 hover:bg-accent/60",
-                )}
+                style={{
+                  borderRadius: 8,
+                  padding: 4,
+                  textAlign: "center",
+                  background: active ? "var(--cocoa)" : "var(--paper-shade)",
+                  boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
+                  border: "none",
+                  transition: "background 120ms ease, box-shadow 120ms ease",
+                  cursor: "pointer",
+                }}
               >
-                <div className="font-mono-chord text-xs text-muted-foreground mb-1">{d.numeral}</div>
+                <div className="font-mono-chord text-xs mb-1" style={{ color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)", opacity: active ? 0.8 : 1 }}>{d.numeral}</div>
                 <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} />
               </button>
             );
@@ -222,22 +226,21 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
 
       {!basketActive && selectedCount > 0 && (
         <div className="sticky bottom-10 flex justify-end gap-2">
-          <Button
+          <button
+            type="button"
             onClick={sendSelected}
-            size="default"
-            className="h-12 bg-zinc-800 text-zinc-50 hover:bg-zinc-700 shadow-lg text-base px-6 py-6"
+            className="btn-sculpt-cocoa inline-flex items-center gap-2 justify-center rounded-lg h-12 px-6 text-base font-semibold"
           >
             <Plus className="h-5 w-5" /> Add {selectedCount} to basket
-          </Button>
-          <Button
+          </button>
+          <button
+            type="button"
             onClick={clearSelection}
-            size="default"
-            variant="outline"
-            className="h-12 shadow-lg text-base px-6 py-6"
+            className="btn-sculpt-cream inline-flex items-center gap-2 justify-center rounded-lg h-12 px-6 text-base font-semibold"
             aria-label="Cancel selection"
           >
             <X className="h-5 w-5" /> Cancel
-          </Button>
+          </button>
         </div>
       )}
 

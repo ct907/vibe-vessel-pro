@@ -221,9 +221,15 @@ function PatternBlock({
       ref={blockRef}
       data-pattern-block={pattern.id}
       className={cn(
-        "rounded-lg border shadow-primary/40 p-3 transition-shadow",
-        isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
+        "rounded-lg p-3 transition-shadow",
+        isFocused ? "ring-2" : "",
       )}
+      style={{
+        background: "var(--paper-card)",
+        boxShadow: isFocused
+          ? "var(--shadow-sculpt-cream-rest), 0 0 0 2px var(--primary-strong)"
+          : "var(--shadow-card)",
+      }}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
@@ -291,23 +297,26 @@ function PatternBlock({
             items.push({ kind: "empty", basis: 1, slotIdx: i });
           }
           return (
-            <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
+            <div
+              className="relative h-20 rounded-md overflow-hidden flex items-stretch w-full"
+              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", padding: 4, gap: 3 }}
+            >
               {/* Bar separators */}
               {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
                 <div
                   key={`bar-${i}`}
-                  className="absolute top-0 bottom-0 border-l border-border/70 pointer-events-none z-0"
-                  style={{ left: `${(i / pattern.bars) * 100}%` }}
+                  className="absolute top-0 bottom-0 pointer-events-none z-0"
+                  style={{ left: `${(i / pattern.bars) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}
                 />
               ))}
-              {/* Beat dividers (subdivide each bar by beatsPerBar) */}
+              {/* Beat dividers */}
               {Array.from({ length: pattern.bars * pattern.beatsPerBar }).map((_, i) => {
                 if (i % pattern.beatsPerBar === 0) return null;
                 return (
                   <div
                     key={`beat-${i}`}
-                    className="absolute top-2 bottom-2 border-l border-muted-foreground/20 pointer-events-none z-0"
-                    style={{ left: `${(i / (pattern.bars * pattern.beatsPerBar)) * 100}%` }}
+                    className="absolute top-2 bottom-2 pointer-events-none z-0"
+                    style={{ left: `${(i / (pattern.bars * pattern.beatsPerBar)) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 8%, transparent)" }}
                   />
                 );
               })}
@@ -748,7 +757,22 @@ function SectionGroup({
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         )}
-        <span className="font-display text-lg ink-chord font-semibold">{displayName}</span>
+        <span
+          style={{
+            padding: "5px 12px",
+            borderRadius: "var(--pill-radius, 8px)",
+            background: "var(--pill-rest-bg)",
+            color: "var(--pill-rest-fg)",
+            fontFamily: "'Nunito', system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            display: "inline-block",
+          }}
+        >
+          {displayName}
+        </span>
         {!sortMode && (
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             {blocks.length} block{blocks.length === 1 ? "" : "s"}
@@ -1043,28 +1067,39 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         />
       ))}
 
-      <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
-        <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+      <div
+        className="flex flex-col gap-3 pt-4 mt-2"
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+      >
+        <span
+          className="text-center"
+          style={{
+            fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
+            fontWeight: 700,
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--ink-soft)",
+          }}
+        >
+          Add Section
+        </span>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
-            <Button
+            <button
               key={t}
-              size="sm"
-              variant="outline"
               onClick={() => addSection(t)}
-              className="capitalize border border-muted-foreground/40"
+              className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
             >
               <Plus className="h-3.5 w-3.5" /> {t}
-            </Button>
+            </button>
           ))}
-          <Button
-            size="sm"
-            variant="outline"
+          <button
             onClick={() => addSection("custom")}
-            className="border border-muted-foreground/40"
+            className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
           >
             <Plus className="h-3.5 w-3.5" /> Custom…
-          </Button>
+          </button>
         </div>
       </div>
 

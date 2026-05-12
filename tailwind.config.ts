@@ -54,8 +54,19 @@ export default {
         paper: {
           DEFAULT: "var(--paper)",
           shade: "var(--paper-shade)",
+          "shade-soft": "var(--paper-shade-soft)",
+          card: "var(--paper-card)",
         },
-        rule: "var(--rule)",
+        cocoa: {
+          DEFAULT: "var(--cocoa)",
+          deep: "var(--cocoa-deep)",
+          soft: "var(--cocoa-soft)",
+          foreground: "var(--cocoa-foreground)",
+        },
+        ink: {
+          DEFAULT: "var(--ink)",
+          soft: "var(--ink-soft)",
+        },
         "ink-soft": "var(--ink-soft)",
         "chord-ink": "var(--chord-ink)",
         "chord-chip": {

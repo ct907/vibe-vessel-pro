@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Play,
   Square,
@@ -253,11 +252,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
   return (
-    <header id="main-header" className="sticky top-2 z-40 mx-2 sm:mx-4 mt-2 rounded-xl bg-card/95 backdrop-blur border border-border/60 shadow-[0_8px_24px_-8px_color-mix(in_oklch,var(--primary)_45%,transparent),0_2px_8px_-2px_color-mix(in_oklch,var(--primary)_25%,transparent)]">
+    <header id="main-header" className="sticky top-2 z-40 mx-2 sm:mx-4 mt-2 rounded-xl bg-card/95 backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)" }}>
       <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
-        {/* Row 1: Bookmark icon + Gallery placeholder + Menu */}
+        {/* Row 1: Wordmark + Gallery placeholder + Menu */}
         <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 ink-chord shrink-0" />
+          <span
+            className="font-display shrink-0 leading-none select-none"
+            style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)" }}
+          >
+            SongNote
+          </span>
 
           {/* Gallery placeholder (deferred) */}
           <div className="flex-1 flex items-center gap-1.5">
@@ -273,36 +277,32 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </button>
           </div>
 
-          <div className="flex items-center gap-0.5 shrink-0">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
               onClick={() => undo()}
               disabled={!canUndo()}
               aria-label="Undo"
               title="Undo (⌘/Ctrl+Z)"
             >
               <Undo2 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
+            </button>
+            <button
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
               onClick={() => redo()}
               disabled={!canRedo()}
               aria-label="Redo"
               title="Redo (⌘/Ctrl+Shift+Z)"
             >
               <Redo2 className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
 
           <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open menu">
+              <button className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
-              </Button>
+              </button>
             </SheetTrigger>
             <SheetContent side="right" className="w-80 overflow-y-auto">
               <SheetHeader>
@@ -537,26 +537,65 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         </div>
 
         {/* Row 2: Play + Tabs */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {!isPlaying ? (
-            <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play shrink-0">
-              <Play className="h-4 w-4" />
-              {!isMobile && "Play"}
-            </Button>
+            <button
+              onClick={handlePlay}
+              className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm"
+              aria-label="Play"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              {!isMobile && <span>Play</span>}
+            </button>
           ) : (
-            <Button size="sm" variant="secondary" onClick={handleStop} className="shrink-0">
+            <button
+              onClick={handleStop}
+              className="btn-sculpt-cocoa shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm"
+              aria-label="Stop"
+            >
               <Square className="h-4 w-4" />
-              {!isMobile && "Stop"}
-            </Button>
+              {!isMobile && <span>Stop</span>}
+            </button>
           )}
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 flex justify-center">
-            <TabsList className="bg-paper-shade/70 gap-1.5 p-1.5">
-              <TabsTrigger value="lyrics" className="px-3 sm:px-4">Lyrics</TabsTrigger>
-              <TabsTrigger value="chords" className="px-3 sm:px-4">Chords</TabsTrigger>
-              <TabsTrigger value="progressions" className="px-3 sm:px-4">Progressions</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {/* Tabs bar — recessed well with cocoa active pill */}
+          <div
+            className="inline-flex items-center gap-1"
+            style={{
+              padding: "5px 5px 7px",
+              background: "var(--paper-shade)",
+              borderRadius: 10,
+              boxShadow: "var(--shadow-recess)",
+            }}
+          >
+            {(["lyrics", "chords", "progressions"] as const).map((t) => {
+              const active = tab === t;
+              const label = t.charAt(0).toUpperCase() + t.slice(1);
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    padding: "7px 14px",
+                    border: 0,
+                    borderRadius: 7.6,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-body, 'Nunito', sans-serif)",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    background: active ? "var(--cocoa)" : "transparent",
+                    color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)",
+                    boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
+                    marginTop: active ? -2 : 0,
+                    marginBottom: active ? 2 : 0,
+                    transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
       <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />

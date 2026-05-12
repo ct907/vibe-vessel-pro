@@ -674,7 +674,20 @@ function SectionCard({
           }}
           disabled={sortMode}
         >
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-sm font-display font-semibold ink-chord capitalize ml-6">
+          <SelectTrigger
+            className="h-auto w-auto min-w-[120px] ml-2 border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
+            style={{
+              padding: "5px 12px",
+              borderRadius: "var(--pill-radius, 8px)",
+              background: "var(--pill-rest-bg)",
+              color: "var(--pill-rest-fg)",
+              fontFamily: "'Nunito', system-ui, sans-serif",
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -1244,28 +1257,39 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       ))}
 
 
-      <div className="flex flex-col gap-2 pt-4 border-t border-muted-foreground/40">
-        <span className="text-sm font-bold text-center text-muted-foreground">Add Section</span>
+      <div
+        className="flex flex-col gap-3 pt-4 mt-2"
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+      >
+        <span
+          className="text-center"
+          style={{
+            fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
+            fontWeight: 700,
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--ink-soft)",
+          }}
+        >
+          Add Section
+        </span>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {(["verse", "chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-            <Button
+            <button
               key={t}
-              size="sm"
-              variant="outline"
               onClick={() => addSection(t)}
-              className="capitalize border border-muted-foreground/40"
+              className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
             >
               <Plus className="h-3.5 w-3.5" /> {t}
-            </Button>
+            </button>
           ))}
-          <Button
-            size="sm"
-            variant="outline"
+          <button
             onClick={() => addSection("custom")}
-            className="border border-muted-foreground/40"
+            className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
           >
             <Plus className="h-3.5 w-3.5" /> Custom…
-          </Button>
+          </button>
         </div>
       </div>
 

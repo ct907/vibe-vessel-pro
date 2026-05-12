@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ChordSymbol, suggestChords, parseChord } from "@/lib/music/chords";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -200,39 +198,59 @@ export function FocusedChordEditor(props: Props) {
         className="absolute inset-0 bg-black/60"
       />
 
-      <div className="relative m-4 flex flex-1 flex-col rounded-lg border border-border bg-background shadow-xl overflow-hidden">
+      <div
+        className="relative m-4 flex flex-1 flex-col rounded-lg overflow-hidden"
+        style={{ background: "var(--ink-soft)", boxShadow: "var(--shadow-paper)" }}
+      >
         {/* HEADER */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
-          <Button
-            size="sm"
-            variant="ghost"
+        <div
+          className="flex items-center gap-2 px-3 py-2 shrink-0"
+          style={{ background: "var(--paper-shade)" }}
+        >
+          <button
+            type="button"
             onClick={props.onClose}
-            className="h-9 px-2 text-muted-foreground"
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 shrink-0"
             aria-label="Close chord editor"
           >
             <X className="h-4 w-4" />
-          </Button>
+          </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+            <p
+              className="truncate"
+              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
+            >
               {headerEyebrow}
             </p>
-            <h2 className="text-xl font-bold text-foreground truncate">{headerTitle}</h2>
+            <h2
+              className="truncate"
+              style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
+            >
+              {headerTitle}
+            </h2>
           </div>
-          <Button size="sm" variant="default" onClick={props.onClose} className="h-9 px-3">
+          <button
+            type="button"
+            onClick={props.onClose}
+            className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold shrink-0"
+          >
             Done
-          </Button>
+          </button>
         </div>
 
         {/* PREVIEW */}
         {!isProgression && (
-          <div className="px-3 py-2 border-b border-border shrink-0 bg-muted/30">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+          <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
+            <p
+              className="mb-1"
+              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
+            >
               Preview · scroll horizontally to see full row
             </p>
             <div
               ref={scrollerRef}
-              className="overflow-x-auto rounded-sm bg-muted-foreground/10"
-              style={{ minHeight: 32 }}
+              className="overflow-x-auto rounded-sm"
+              style={{ minHeight: 32, background: "var(--paper-shade)" }}
             >
               <div
                 className="flex items-stretch"
@@ -244,13 +262,17 @@ export function FocusedChordEditor(props: Props) {
                     className={cn(
                       "shrink-0 h-8 flex items-center justify-center px-0.5",
                       "w-7",
-                      i > 0 && "border-l border-muted-foreground/15",
-                      i === slot && "bg-primary/15 ring-1 ring-primary/40 rounded-sm",
                     )}
-                    style={{ width: SLOT_PX }}
+                    style={{
+                      width: SLOT_PX,
+                      borderLeft: i > 0 ? "1px solid color-mix(in oklch, var(--ink) 8%, transparent)" : undefined,
+                      background: i === slot ? "color-mix(in oklch, var(--primary) 18%, transparent)" : undefined,
+                      boxShadow: i === slot ? "inset 0 0 0 1px var(--primary-strong)" : undefined,
+                      borderRadius: i === slot ? 2 : undefined,
+                    }}
                   >
                     {c && (
-                      <span className="font-mono-chord text-[11px] font-semibold text-chord-chip-foreground truncate">
+                      <span className="font-mono-chord text-[11px] font-semibold truncate" style={{ color: "var(--chord-text, oklch(0.25 0.02 260))" }}>
                         {c.chord.display}
                       </span>
                     )}
@@ -258,22 +280,36 @@ export function FocusedChordEditor(props: Props) {
                 ))}
               </div>
             </div>
-            <p className="mt-1 font-display text-base leading-tight text-foreground/90 truncate">
+            <p
+              className="mt-1 truncate"
+              style={{
+                fontFamily: "var(--font-display,'Zain',serif)",
+                fontSize: 16,
+                color: "var(--ink)",
+                background: "var(--paper-shade-soft)",
+                padding: "6px 10px",
+                borderRadius: 6,
+                marginTop: 6,
+              }}
+            >
               {line!.text || (
-                <span className="italic text-muted-foreground/70">(empty lyric line)</span>
+                <span style={{ fontStyle: "italic", opacity: 0.6 }}>(empty lyric line)</span>
               )}
             </p>
           </div>
         )}
 
         {isProgression && progChord && (
-          <div className="px-3 py-3 border-b border-border shrink-0 bg-muted/30">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+          <div className="px-3 py-3 shrink-0" style={{ background: "var(--paper-shade)" }}>
+            <p
+              className="mb-1"
+              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
+            >
               Current chord
             </p>
             <span
-              className="inline-flex items-center rounded-md border border-black/10 px-3 py-1.5 font-mono-chord font-semibold text-base"
-              style={getChordColorClasses(progChord.chord).style}
+              className="inline-flex items-center rounded-md px-3 py-1.5 font-mono-chord font-semibold text-base"
+              style={{ ...getChordColorClasses(progChord.chord).style, border: "2px solid transparent" }}
             >
               {progChord.chord.display}
             </span>
@@ -303,42 +339,52 @@ export function FocusedChordEditor(props: Props) {
           };
           return (
             <div className="flex items-center justify-between gap-2 px-3 pt-2">
-              <span className="text-[11px] text-muted-foreground">Reorder this chord</span>
+              <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontSize: 11, color: "var(--cocoa-foreground)", opacity: 0.7 }}>Reorder this chord</span>
               <div className="flex items-center gap-1">
-                <Button
+                <button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-2"
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 disabled:opacity-30"
                   disabled={!canReorder}
                   onClick={() => onMove(-1)}
                   aria-label="Move chord left"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-2"
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 disabled:opacity-30"
                   disabled={!canReorder}
                   onClick={() => onMove(1)}
                   aria-label="Move chord right"
                 >
                   <ArrowRight className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             </div>
           );
         })()}
 
-        <div className="px-3 py-3 border-b border-border shrink-0">
-          <Input
+        <div className="px-3 py-3 shrink-0" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+          <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a chord… e.g. Bbm9, Fmaj7"
-            className="font-mono-chord text-base"
+            style={{
+              width: "100%",
+              background: "var(--paper-card)",
+              boxShadow: "var(--shadow-sculpt-cream-rest)",
+              border: 0,
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 600,
+              fontSize: 15,
+              color: "var(--ink)",
+              outline: "none",
+            }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && exact) {
                 e.preventDefault();
@@ -361,7 +407,7 @@ export function FocusedChordEditor(props: Props) {
           />
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
           {!query.trim() && (
             <p className="text-sm text-muted-foreground mb-3">
               Type a root letter (A–G) for variations, or a full chord like{" "}
