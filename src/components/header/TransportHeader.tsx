@@ -68,64 +68,108 @@ async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   });
 }
 
-function DraggablePhoto({
-  photo,
-  onMove,
+const PHOTO_SLOTS = [
+  { left: "28%", top: 2, rotate: -7 },
+  { left: "46%", top: -8, rotate: 5 },
+  { left: "63%", top: 3, rotate: -3 },
+] as const;
+
+function InspirationLightbox({
+  photos,
+  initialIndex,
+  onClose,
   onRemove,
+  onRemoveAll,
 }: {
-  photo: InspirationPhoto;
-  onMove: (id: string, x: number, y: number) => void;
+  photos: InspirationPhoto[];
+  initialIndex: number;
+  onClose: () => void;
   onRemove: (id: string) => void;
+  onRemoveAll: () => void;
 }) {
-  const [drag, setDrag] = useState<{ startX: number; startY: number; dx: number; dy: number } | null>(null);
-  const x = photo.x + (drag?.dx ?? 0);
-  const y = photo.y + (drag?.dy ?? 0);
+  const [idx, setIdx] = useState(initialIndex);
+  const current = photos[idx] ?? photos[0];
+  if (!current) return null;
+  const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
+  const next = () => setIdx((i) => (i + 1) % photos.length);
   return (
     <div
       style={{
-        position: "absolute",
-        left: x,
-        top: y,
-        zIndex: drag ? 20 : 10,
-        touchAction: "none",
-        cursor: drag ? "grabbing" : "grab",
-        userSelect: "none",
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.88)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 16,
       }}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        setDrag({ startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 });
-      }}
-      onPointerMove={(e) => {
-        if (!drag) return;
-        setDrag((d) => d ? { ...d, dx: e.clientX - d.startX, dy: e.clientY - d.startY } : null);
-      }}
-      onPointerUp={() => {
-        if (drag) { onMove(photo.id, photo.x + drag.dx, photo.y + drag.dy); setDrag(null); }
-      }}
-      onPointerCancel={() => setDrag(null)}
+      onClick={onClose}
     >
-      <div style={{ position: "relative" }}>
+      {/* Photo */}
+      <div
+        style={{ position: "relative", maxWidth: "min(90vw, 480px)", maxHeight: "60vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <img
-          src={photo.dataUrl}
-          alt=""
+          src={current.dataUrl}
+          alt={`Inspiration photo ${idx + 1}`}
           draggable={false}
-          style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.22)", display: "block" }}
+          style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", display: "block" }}
         />
+        {/* Prev / Next arrows */}
+        {photos.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={prev}
+              style={{
+                position: "absolute", left: -44, top: "50%", transform: "translateY(-50%)",
+                width: 36, height: 36, borderRadius: "50%",
+                background: "rgba(255,255,255,0.15)", color: "white",
+                border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+              }}
+              aria-label="Previous photo"
+            >‹</button>
+            <button
+              type="button"
+              onClick={next}
+              style={{
+                position: "absolute", right: -44, top: "50%", transform: "translateY(-50%)",
+                width: 36, height: 36, borderRadius: "50%",
+                background: "rgba(255,255,255,0.15)", color: "white",
+                border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+              }}
+              aria-label="Next photo"
+            >›</button>
+          </>
+        )}
+      </div>
+      {/* Counter */}
+      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+        {idx + 1} / {photos.length}
+      </span>
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onRemove(photo.id); }}
+          onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
           style={{
-            position: "absolute", top: -7, right: -7,
-            width: 20, height: 20, borderRadius: "50%",
-            background: "var(--destructive)", color: "white",
-            border: "2px solid white", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, lineHeight: 1, fontWeight: 700,
+            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(255,255,255,0.12)", color: "white",
+            border: "1px solid rgba(255,255,255,0.25)", fontSize: 13,
           }}
-          aria-label="Remove photo"
-        >×</button>
+        >Remove this photo</button>
+        <button
+          type="button"
+          onClick={() => { onRemoveAll(); onClose(); }}
+          style={{
+            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(220,50,50,0.75)", color: "white",
+            border: "1px solid rgba(255,255,255,0.2)", fontSize: 13,
+          }}
+        >Remove all photos</button>
       </div>
+      {/* Close hint */}
+      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, marginTop: 4 }}>Tap outside to close</span>
     </div>
   );
 }
@@ -156,12 +200,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     inspirationPhotos,
     addInspirationPhoto,
     removeInspirationPhoto,
-    moveInspirationPhoto,
   } = useSongStore();
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const [fileInputKey, setFileInputKey] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
@@ -372,26 +417,62 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   return (
     <div className="sticky top-0 z-40 mx-2 sm:mx-4 mt-2">
       <div className="relative">
-        {/* Floating inspiration photos */}
-        {inspirationPhotos.map((photo) => (
-          <DraggablePhoto
-            key={photo.id}
-            photo={photo}
-            onMove={moveInspirationPhoto}
-            onRemove={removeInspirationPhoto}
+        {/* Static inspiration photos — positioned behind header card */}
+        {inspirationPhotos.map((photo, i) => {
+          const slot = PHOTO_SLOTS[i] ?? PHOTO_SLOTS[0];
+          return (
+            <img
+              key={photo.id}
+              src={photo.dataUrl}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute",
+                left: slot.left,
+                top: slot.top,
+                width: 90, height: 90,
+                objectFit: "cover",
+                borderRadius: 10,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+                transform: `rotate(${slot.rotate}deg)`,
+                zIndex: 0,
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            />
+          );
+        })}
+
+        {/* Lightbox portal */}
+        {lightboxOpen && inspirationPhotos.length > 0 && (
+          <InspirationLightbox
+            photos={inspirationPhotos}
+            initialIndex={lightboxIndex}
+            onClose={() => setLightboxOpen(false)}
+            onRemove={(id) => { removeInspirationPhoto(id); if (inspirationPhotos.length <= 1) setLightboxOpen(false); }}
+            onRemoveAll={() => { inspirationPhotos.forEach((p) => removeInspirationPhoto(p.id)); setLightboxOpen(false); }}
           />
-        ))}
+        )}
 
         {/* Top bar: Bookmark (left) + Add photos btn (right) */}
-        <div className="flex items-center justify-between mb-1 px-1">
-          <Bookmark className="h-6 w-6 shrink-0" style={{ color: "var(--cocoa-deep)" }} />
+        <div className="flex items-center justify-between mb-2 px-1">
+          <Bookmark
+            className="h-6 w-6 shrink-0"
+            style={{ color: "var(--cocoa-deep)", fill: "var(--border)" }}
+          />
           <button
             type="button"
-            onClick={() => inspirationPhotos.length < 3 && photoInputRef.current?.click()}
-            disabled={inspirationPhotos.length >= 3}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-50"
-            aria-label={inspirationPhotos.length >= 3 ? "Max 3 photos" : "Add inspiration photo"}
-            title={inspirationPhotos.length >= 3 ? "Remove a photo to add more" : "Add up to 3 inspiration photos"}
+            onClick={() => {
+              if (inspirationPhotos.length > 0) {
+                setLightboxIndex(0);
+                setLightboxOpen(true);
+              } else {
+                photoInputRef.current?.click();
+              }
+            }}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
+            aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
+            title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
           >
             <ImageIcon className="h-4 w-4" />
           </button>
