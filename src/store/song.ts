@@ -121,6 +121,13 @@ export interface BasketItem {
   chord: ChordSymbol;
 }
 
+export interface InspirationPhoto {
+  id: string;
+  dataUrl: string;
+  x: number;
+  y: number;
+}
+
 export interface SongState {
   meta: {
     title: string;
@@ -138,6 +145,10 @@ export interface SongState {
   /** When true, cross-tab delete confirmation dialogs are suppressed. */
   suppressCrossTabDeleteWarning: boolean;
   setSuppressCrossTabDeleteWarning: (v: boolean) => void;
+  inspirationPhotos: InspirationPhoto[];
+  addInspirationPhoto: (photo: InspirationPhoto) => void;
+  removeInspirationPhoto: (id: string) => void;
+  moveInspirationPhoto: (id: string, x: number, y: number) => void;
 
   // ---- meta ----
   setTitle: (t: string) => void;
@@ -260,6 +271,7 @@ export interface SerializedSong {
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
+  inspirationPhotos?: InspirationPhoto[];
   /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
   layoutMeta?: {
     lastEditedScreenWidth: number;
@@ -1217,6 +1229,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   progression: [seed.pattern],
   suppressCrossTabDeleteWarning: false,
   setSuppressCrossTabDeleteWarning: (v) => set({ suppressCrossTabDeleteWarning: v }),
+  inspirationPhotos: [],
+  addInspirationPhoto: (photo) => set((s) => ({ inspirationPhotos: [...s.inspirationPhotos, photo] })),
+  removeInspirationPhoto: (id) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.filter((p) => p.id !== id) })),
+  moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
   setKey: (keyRoot, keyMode) => set((s) => ({ meta: { ...s.meta, keyRoot, keyMode } })),
@@ -3323,6 +3339,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       progression: migratedProgression,
       basket: [],
       suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
+      inspirationPhotos: Array.isArray(parsed.inspirationPhotos) ? parsed.inspirationPhotos : [],
     });
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
@@ -3351,6 +3368,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sections: cleanedSections,
       progression: s.progression,
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+      inspirationPhotos: s.inspirationPhotos.length > 0 ? s.inspirationPhotos : undefined,
       sound: useSoundStore.getState().toJSON(),
       layoutMeta: width > 0 ? {
         lastEditedScreenWidth: width,
