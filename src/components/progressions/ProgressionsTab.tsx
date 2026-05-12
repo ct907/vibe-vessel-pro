@@ -264,30 +264,31 @@ function PatternBlock({
 
       <div className="relative">
         {(() => {
-          // One slot per beat — slot count is bars * beatsPerBar.
           const slotCount = Math.max(1, pattern.bars * pattern.beatsPerBar);
-          const beatsPerSlot = 1;
-          // Walk left-to-right. Each chord visually occupies its lengthBeats (in slot units),
-          // anchoring at integer slot positions. Sub-slot lengths shrink the chord chip.
-          type Cell =
-            | { kind: "start"; chord: typeof sortedChords[number]; span: number; visualSpan: number; slotIdx: number }
-            | { kind: "tail" }
-            | { kind: "empty" };
-          const cells: Cell[] = Array.from({ length: slotCount }, () => ({ kind: "empty" }));
+          // Build a flush flex track: chord items take basis = lengthBeats,
+          // followed by 1-beat empty droppable slots filling the remaining
+          // beats. A fractional spacer keeps empty slots aligned to beat lines.
+          type Item =
+            | { kind: "chord"; chord: typeof sortedChords[number]; basis: number; slotIdx: number }
+            | { kind: "spacer"; basis: number }
+            | { kind: "empty"; basis: number; slotIdx: number };
+          const items: Item[] = [];
           let cursor = 0;
           for (const c of sortedChords) {
-            if (cursor >= slotCount) break;
-            const slotsConsumed = Math.max(1, Math.ceil(c.lengthBeats / beatsPerSlot));
-            const fitSpan = Math.min(slotsConsumed, slotCount - cursor);
-            cells[cursor] = {
-              kind: "start",
-              chord: c,
-              span: fitSpan,
-              visualSpan: Math.min(c.lengthBeats, fitSpan),
-              slotIdx: cursor,
-            };
-            for (let k = 1; k < fitSpan; k++) cells[cursor + k] = { kind: "tail" };
-            cursor += fitSpan;
+            const remaining = slotCount - cursor;
+            if (remaining <= 0) break;
+            const basis = Math.min(c.lengthBeats, remaining);
+            items.push({ kind: "chord", chord: c, basis, slotIdx: Math.floor(cursor) });
+            cursor += basis;
+          }
+          // Align next empty slot to integer beat boundary.
+          const nextBeat = Math.ceil(cursor - 1e-6);
+          if (nextBeat > cursor + 1e-6) {
+            items.push({ kind: "spacer", basis: nextBeat - cursor });
+            cursor = nextBeat;
+          }
+          for (let i = nextBeat; i < slotCount; i++) {
+            items.push({ kind: "empty", basis: 1, slotIdx: i });
           }
           return (
             <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
@@ -311,15 +312,23 @@ function PatternBlock({
                 );
               })}
 
-              {cells.map((cell, slotIdx) => {
-                if (cell.kind === "tail") return null;
-                const occupied = cell.kind === "start";
-                const c = occupied ? cell.chord : undefined;
-                const span = occupied ? cell.span : 1;
-                const visualSpan = occupied ? cell.visualSpan : 1;
+              {items.map((item, itemIdx) => {
+                if (item.kind === "spacer") {
+                  return (
+                    <div
+                      key={`spacer-${itemIdx}`}
+                      className="pointer-events-none"
+                      style={{ flex: `${item.basis} ${item.basis} 0%` }}
+                    />
+                  );
+                }
+                const occupied = item.kind === "chord";
+                const c = occupied ? item.chord : undefined;
+                const slotIdx = item.slotIdx;
+                const basis = item.basis;
                 return (
                   <Droppable
-                    key={`pslot-${slotIdx}`}
+                    key={`pslot-${itemIdx}`}
                     droppableId={`pattern:${pattern.id}:${slotIdx}`}
                     direction="horizontal"
                     type="chord"
@@ -333,7 +342,7 @@ function PatternBlock({
                           !occupied && "border border-dashed border-transparent justify-center",
                           dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
-                        style={{ flex: `${span} ${span} 0%` }}
+                        style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
                           if (occupied) return;
                           e.stopPropagation();
@@ -342,12 +351,11 @@ function PatternBlock({
                         data-pattern-slot={slotIdx}
                       >
                         {occupied && c && (() => {
-                          const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
                           const colors = getChordColorClasses(c.chord);
                           const isActive = activeChordId === c.id;
                           const isSelected = selectedIds.has(c.id);
                           return (
-                            <div className="relative flex items-stretch">
+                            <div className="relative flex items-stretch w-full">
                               <div
                                 data-pattern-chord={c.id}
                                 role="button"
@@ -420,14 +428,13 @@ function PatternBlock({
                                   }
                                 }}
                                 className={cn(
-                                  "ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer",
+                                  "rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer w-full",
                                   colors.className,
                                   isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.02]",
                                   isSelected && !isActive && "ring-2 ring-secondary ring-offset-1 ring-offset-card",
                                 )}
                                 style={{
                                   ...colors.style,
-                                  width: `calc(${widthPct}% - 4px)`,
                                   touchAction: "none",
                                 }}
                               >
