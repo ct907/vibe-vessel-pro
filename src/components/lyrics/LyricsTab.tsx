@@ -177,6 +177,32 @@ function LineRow({
   const lyricInputRef = useRef<HTMLTextAreaElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
+  // Stable refs so the keydown handler always reads the freshest values.
+  const lineChordsRef = useRef(lineChords);
+  lineChordsRef.current = lineChords;
+  const moveChordToSlotRef = useRef(moveChordToSlot);
+  moveChordToSlotRef.current = moveChordToSlot;
+
+  // Task 1: while the chord context menu is showing, arrow keys reorder the chord.
+  useEffect(() => {
+    if (!activeChordId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const anchor = lineChordsRef.current.find((c) => c.id === activeChordId);
+      if (!anchor) return; // this chord is not in this line
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const slot = anchor.slotIndex ?? 0;
+        if (slot > 0) moveChordToSlotRef.current(sectionId, line.id, activeChordId, slot - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const slot = anchor.slotIndex ?? 0;
+        if (slot < CHORD_ROW_SLOTS - 1) moveChordToSlotRef.current(sectionId, line.id, activeChordId, slot + 1);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeChordId, sectionId, line.id]);
+
   // Edit mode is now managed by SectionCard so a single per-section pencil
   // toggles every row in the section. The per-row pencil that used to live
   // here was lifted out — see the SectionCard header below.
@@ -210,6 +236,8 @@ function LineRow({
     }
   };
 
+  // Task 5: borders become visible when a chord in this line is selected.
+  const hasActiveChordInLine = lineChords.some((c) => c.id === activeChordId);
   const slots = chordsBySlot(lineChords);
 
   return (
@@ -244,7 +272,10 @@ function LineRow({
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
           }}
-          className="relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-hidden rounded-sm bg-muted-foreground/12 outline-none"
+          className={cn(
+            "relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-hidden rounded-sm bg-muted-foreground/12 outline-none border border-solid transition-colors",
+            hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent",
+          )}
           style={{ minHeight: 36 }}
         >
           {lineChords.length === 0 && (
@@ -280,7 +311,7 @@ function LineRow({
                     className={cn(
                       "relative shrink-0 h-9 flex items-center justify-start border border-solid border-transparent hover:border-muted-foreground/40",
                       occupied ? "w-10" : "w-7",
-                      slotIdx > 0 && "border-l-muted-foreground/12",
+                      slotIdx > 0 && (hasActiveChordInLine ? "border-l-muted-foreground/35" : "border-l-muted-foreground/12"),
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
