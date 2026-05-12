@@ -151,6 +151,8 @@ function PatternBlock({
   const sortedChordsRef = useRef(sortedChords);
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
+  const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
+  const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
   const canDeleteThisBlock = totalBlocksInSong > 1;
