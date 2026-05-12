@@ -1438,6 +1438,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sections: [fresh.section],
       progression: [fresh.pattern],
       basket: [],
+      inspirationPhotos: [],
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
     }));
   },
