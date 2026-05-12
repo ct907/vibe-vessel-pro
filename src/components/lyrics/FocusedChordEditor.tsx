@@ -429,34 +429,51 @@ export function FocusedChordEditor(props: Props) {
               }
             }}
           />
-          <div className="flex flex-col items-center gap-1 shrink-0">
-            <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--ink-soft)" }}>Oct</span>
-            <div className="flex flex-row gap-0.5">
-              {[3, 4, 5].map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  onClick={() => setOctave(o)}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 6,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontWeight: 600,
-                    fontSize: 12,
-                    background: octave === o ? "var(--ink-soft)" : "var(--paper-card)",
-                    color: octave === o ? "var(--paper-card)" : "var(--ink-soft)",
-                    boxShadow: octave === o ? "var(--shadow-sculpt-cream-press)" : "var(--shadow-sculpt-cream-rest)",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                  aria-label={`Octave ${o}`}
-                  aria-pressed={octave === o}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setOctave((o) => Math.max(1, o - 1))}
+              aria-label="Decrease octave"
+              style={{
+                padding: "10px 10px",
+                borderRadius: 8,
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                fontSize: 15,
+                background: "var(--paper-card)",
+                color: "var(--ink-soft)",
+                boxShadow: "var(--shadow-sculpt-cream-rest)",
+                border: "none",
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >−</button>
+            <span style={{
+              minWidth: 28,
+              textAlign: "center" as const,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 700,
+              fontSize: 15,
+              color: "var(--ink)",
+            }}>{octave}</span>
+            <button
+              type="button"
+              onClick={() => setOctave((o) => Math.min(7, o + 1))}
+              aria-label="Increase octave"
+              style={{
+                padding: "10px 10px",
+                borderRadius: 8,
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                fontSize: 15,
+                background: "var(--paper-card)",
+                color: "var(--ink-soft)",
+                boxShadow: "var(--shadow-sculpt-cream-rest)",
+                border: "none",
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >+</button>
           </div>
         </div>
 

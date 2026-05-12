@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
@@ -20,6 +20,7 @@ import {
   FileText,
   FilePlus,
   Image as ImageIcon,
+  Bookmark,
 } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
@@ -81,6 +82,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const isMobile = useIsMobile();
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
+  const stopRequestedRef = useRef(false);
+  const handlePlayRef = useRef<() => Promise<void>>(async () => {});
 
   // Drive the metronome from playback + meta. Starts/stops with isPlaying;
   // updates rate/time-signature live without needing a restart. The actual
@@ -111,6 +114,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   };
 
   const handlePlay = async () => {
+    stopRequestedRef.current = false;
     await ensureAudio();
     // Defensive: AudioContext may be suspended after autoplay-policy
     // restrictions (Safari, mobile). resume() is idempotent.
@@ -207,13 +211,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       });
     }
     await playProgression(playEvents, meta.bpm, {
-      loopBeats: cursorBeat,
       onChordStart: (idx) => setCurrent(playMeta[idx] ?? null),
+      onEnd: () => {
+        if (!stopRequestedRef.current) {
+          setCurrent(null);
+          void handlePlayRef.current();
+        }
+      },
       startAt,
     });
   };
+  handlePlayRef.current = handlePlay;
 
   const handleStop = () => {
+    stopRequestedRef.current = true;
     stopProgression();
     setIsPlaying(false);
     setPlayingStore(false);
@@ -256,26 +267,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
         {/* Row 1: Wordmark + Gallery placeholder + Menu */}
         <div className="flex items-center gap-2">
-          <span
-            className="font-display shrink-0 leading-none select-none"
-            style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)" }}
-          >
-            SongNote
-          </span>
+          <Bookmark className="h-7 w-7 shrink-0" style={{ color: "var(--cocoa-deep)" }} />
 
-          {/* Gallery placeholder (deferred) */}
-          <div className="flex-1 flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled
-              aria-label="Add inspiration image (coming soon)"
-              title="Add up to 3 inspiration images — coming soon"
-              className="inline-flex items-center gap-1.5 h-8 px-2 rounded-md border border-dashed border-border text-xs text-muted-foreground/70 hover:bg-accent/40 disabled:opacity-60"
-            >
-              <ImageIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Add inspiration</span>
-            </button>
-          </div>
+          <div className="flex-1" />
 
           <div className="flex items-center gap-1.5 shrink-0">
             <button
@@ -295,6 +289,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
               title="Redo (⌘/Ctrl+Shift+Z)"
             >
               <Redo2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              disabled
+              aria-label="Add inspiration image (coming soon)"
+              title="Add up to 3 inspiration images — coming soon"
+              className="inline-flex items-center gap-1.5 h-9 px-2 rounded-md border border-dashed border-border text-xs text-muted-foreground/70 hover:bg-accent/40 disabled:opacity-60"
+            >
+              <ImageIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Add inspiration</span>
             </button>
           </div>
 

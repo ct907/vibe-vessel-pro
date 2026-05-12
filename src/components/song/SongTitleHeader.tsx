@@ -43,7 +43,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
           placeholder="Untitled song"
           rows={1}
-          className="flex-1 min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-3xl sm:text-4xl leading-tight text-foreground placeholder:text-muted-foreground/50 px-0 py-1 break-words"
+          className="flex-1 min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-2xl leading-tight text-foreground placeholder:text-muted-foreground/50 px-0 py-1 break-words"
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -131,6 +131,7 @@ function PatternBlock({
 
   // Multi-select state for this block.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
 
   // Stable refs so the keyboard handler always reads the freshest values.
   const activeChordIdRef = useRef<string | null>(null);
@@ -184,14 +185,21 @@ function PatternBlock({
   const selectAllChords = () =>
     setSelectedIds(new Set(sortedChords.map((c) => c.id)));
 
-  // Tasks 3 & 4 (keyboard): while a chord in this block is active,
-  // ← / → reorders it; ↑ / ↓ changes bar length.
+  // Keyboard: while a chord in this block is active, ← / → reorders;
+  // ↑ / ↓ changes bar length; Esc closes the context menu.
   useEffect(() => {
     if (!activeChordInThisBlock) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeChordInThisBlockRef.current) return;
       const id = activeChordIdRef.current;
       if (!id) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onSetActiveChordId(null);
+        setSelectedIds(new Set());
+        setMultiSelectMode(false);
+        return;
+      }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (activeIdxRef.current > 0) movePatternChordRef.current(pattern.id, id, -1);
@@ -215,6 +223,14 @@ function PatternBlock({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeChordInThisBlock?.id, pattern.id]);
+
+  // Reset multi-select state when the context menu closes.
+  useEffect(() => {
+    if (!activeChordInThisBlock) {
+      setSelectedIds(new Set());
+      setMultiSelectMode(false);
+    }
+  }, [!!activeChordInThisBlock]);
 
   return (
     <div
@@ -425,7 +441,11 @@ function PatternBlock({
                                     singleClickTimerRef.current = null;
                                     setFocusedPattern(pattern.id);
                                     void playChord(c.chord);
-                                    onSetActiveChordId(activeChordId === c.id ? null : c.id);
+                                    if (multiSelectMode) {
+                                      toggleSelectChord(c.id);
+                                    } else {
+                                      onSetActiveChordId(activeChordId === c.id ? null : c.id);
+                                    }
                                   }, 250);
                                 }}
                                 onKeyDown={(e) => {
@@ -607,13 +627,12 @@ function PatternBlock({
               size="icon"
               variant="ghost"
               className="h-9 w-9"
-              disabled={activeChordInThisBlock.lengthBeats <= MIN_LEN}
               onClick={(e) => {
                 e.stopPropagation();
-                setPatternChordLength(
+                resizePatternChordsWithOverflow(
                   pattern.id,
-                  activeChordId!,
-                  Math.max(MIN_LEN, activeChordInThisBlock.lengthBeats - LENGTH_STEP),
+                  selectedIds.size > 0 ? Array.from(selectedIds) : [activeChordId!],
+                  -LENGTH_STEP,
                 );
               }}
               aria-label="Decrease bar length by half"
@@ -650,11 +669,14 @@ function PatternBlock({
               variant="ghost"
               className={cn(
                 "h-9 w-9",
-                selectedIds.has(activeChordId!) && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+                multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                toggleSelectChord(activeChordId!);
+                const entering = !multiSelectMode;
+                setMultiSelectMode(entering);
+                if (entering) toggleSelectChord(activeChordId!);
+                else setSelectedIds(new Set());
               }}
               aria-label="Toggle multi-select"
               title="Multi-select"
@@ -674,6 +696,8 @@ function PatternBlock({
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedIds(new Set());
+                  setMultiSelectMode(false);
+                  onSetActiveChordId(null);
                 }}
                 aria-label="Clear selection"
                 title="Clear selection"
@@ -1095,8 +1119,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       ))}
 
       <div
-        className="flex flex-col gap-3 pt-4 mt-2"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+        className="flex flex-col gap-3 p-4 mt-2 rounded-xl"
+        style={{
+          background: "var(--paper-shade)",
+          borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
+        }}
       >
         <span
           className="text-center"
