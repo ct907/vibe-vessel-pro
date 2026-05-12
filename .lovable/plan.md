@@ -1,84 +1,55 @@
-# Bug Fixes — Cross-tab Sync, Playback, Paste, Format, Undo, Move + Drag/Autosave/Validation Hardening + Desktop Drag Restore
+# Plan
 
-## Conflict check
+## 1. Lyrics chord-row slot border on selection + hover
 
-None of the new items conflict with prior usability fixes. Item 7 (desktop drag restore) **partially reverts** the earlier "pencil-gates-drag" change, but only on desktop viewports. Mobile keeps the pencil-gated behavior because that's where the gesture conflict with ChordChip's own touch handlers exists.
+In `LyricsTab.tsx` (chord row, lines ~262-319), the slot border currently lights up only when `hasActiveChordInLine` is true. Make it visible whenever:
 
----
+- a chord in this line is selected (already covered by `hasActiveChordInLine`),
+- OR the user is hovering the chord row (use a `group` / `group-hover:` pair).
 
-## Original items 1–6 (recap)
+Changes:
+- Add `group` to the row container (line 277).
+- In each slot's `className` (line 313-316), keep the active-chord border state, and add `group-hover:border-muted-foreground/40` plus `group-hover:border-l-muted-foreground/35` for `slotIdx > 0`.
+- Remove the per-slot `hover:border-muted-foreground/40` (it only fires on the slot under the cursor; the row-level hover gives the user the full slot grid).
+- Border becomes hidden again automatically when the chord is deselected and the cursor leaves.
 
-**1. Section delete syncs across tabs** — clear stale `focusedPatternId`/`startFromChordId`, dead local `selected` IDs, and close `chordEditor` if its target is gone, via an effect watching `sections`/`progression` in both tabs.
+## 2. Pattern-block chords sit flush, even at 0.5-bar lengths
 
-**2. Play button plays nothing by default** — guard top of `handlePlay`: drop stale cursors; `await ensureAudio()` then `getAudioContext().resume()`; toast if no `onChordStart` fires within 500ms; add `clearStartCursor()` called from delete reducers.
+`ProgressionsTab.tsx` `PatternBlock` (lines ~268-320) currently builds `slotCount = bars * beatsPerBar` cells of equal width. A chord whose `lengthBeats < 1` still occupies one full slot but renders at `widthPct = lengthBeats/1 * 100`, leaving an empty gap before the next chord.
 
-**3. Multi-chord paste must overflow** — rewrite `pasteChordsAt` to place greedily L→R, allocate a fresh `LyricLine { _isChordOverflow: true }` (or new pattern block in progressions) on overflow; never silently drop. Run `autoLayoutSection` after.
+Refactor the layout so chord widths are proportional to `lengthBeats` and chips sit flush left, with no leading gaps:
 
-**4. Format Chords drops chords from non-first lines** — rewrite `formatChordsInSong` to operate on `section.chords` (SSOT) directly: snap each `SectionChord.lyricsPlacement.slotIndex` to nearest word boundary, return with `[SSOT_MODE]: true`, then run `formatChordsAndLyrics`.
+- Replace the per-beat slot-cell `flex` model with two layered passes inside the existing `relative h-20 ... flex w-full` container:
+  - **Bar/beat dividers**: keep the absolutely-positioned bar separators and beat dividers (lines ~298-315) as-is — they are already percentage-positioned over `totalBeats`.
+  - **Chord track**: render a single `flex` row of chord chips, each with `style={{ flex: \`${c.lengthBeats} ${c.lengthBeats} 0%\` }}`. Chips render in SSOT order with no spacers between them, so a 0.5b chord sits flush against the next chord. Drop the per-chip `width: calc(${widthPct}% - 4px)` style — the flex basis now drives width.
+  - **Free-space tail**: after the last chord, render one droppable that takes `flex: ${freeBeats} ${freeBeats} 0%`. This is the single "empty area" target for picker-open clicks and drops. (We lose per-beat empty droppables; compensate by giving the tail a `data-pattern-slot="${usedBeats}"` and computing the drop slot from pointer X within the tail when needed. If keeping per-beat empty drop targets is required, render `Math.floor(freeBeats / beatsPerSlot)` empty droppables sized `flex: 1 1 0%` after the chord track.)
+- Keep the existing edge-left / edge-right droppables for cross-block transfers.
+- Keep the `Droppable` per-chord wrapper for re-ordering inside the block; just place each `Droppable` inside the new flex track instead of inside per-beat slot cells.
 
-**5. Undo after cut requires two presses** — add `withHistoryGroup(get, fn)` that snapshots once and suppresses nested `pushHistory`. Wrap cut+reflow, paste+reflow, and similar compound actions.
+Result: a 0.5-bar chord renders at exactly half a beat's width, the next chord starts immediately to its right, and the free-space drop zone fills the remainder.
 
-**6. "Move to {section}" silently no-ops cross-section** — pre-check available beats; auto-`addPatternToSection` for overflow OR toast "Target has no room"; add Cut/Paste buttons to progressions row-2 toolbar sharing the new clipboard helper.
+## 3. Resizing a chord reflows neighbours to the right
 
----
+Falls out of step 2: because chord widths come from `flex-basis = lengthBeats`, calling `setPatternChordLength` (or `resizePatternChordsWithOverflow`) updates `c.lengthBeats` in the store, which re-renders the flex track and the right-side neighbours shift automatically. No additional store changes needed; verify visually in the toolbar's `+` / `-` buttons (lines 593-630) and the keyboard ↑/↓ handler (lines 205-216).
 
-## New items 7–11
+If the store still snaps `startBeat` to integers and that causes visual jumps when a 0.5-bar chord grows to 1.0, switch the chord-track render to compute positions purely from accumulated `lengthBeats` (already true under SSOT — `getPatternChordsViaSSOT` returns chords in order; `startBeat` is only used for the playback cursor, which is already percentage-of-total-beats).
 
-### 7. Desktop: restore click-and-hold direct drag on chord chips
-The earlier change made all chord-row drags require tapping pencil → "Drag" mode. That fixed the mobile gesture conflict but **regressed desktop**, where click-and-hold drag was working perfectly.
+## 4. Chord context menu +20% bigger
 
-**Fix — viewport-gated behavior:**
-- Use existing `useIsMobile()` (≥768px = desktop).
-- **Desktop:** chord chips in lyrics rows and pattern blocks are wrapped in pangea `<Draggable>` directly; `dragHandleProps` on the chip; the chip's own `onMouseDown` audition stays (mouse drag has a movement threshold so a click still auditions, a press-and-pull drags). Pencil icon goes back to opening the editor immediately.
-- **Mobile:** keep the new pencil → action menu (`Edit` / `Drag`) and the per-chip "armed drag mode" added previously. ChordChip's touch handlers stay disabled only while armed.
-- Use pangea's native `renderClone` in BOTH paths (desktop and armed-mobile) — no custom portal, no `pointerPosRef`. The earlier removal of that machinery stays.
-- Apply identically to `LyricsTab.tsx` and `ProgressionsTab.tsx` (pattern blocks).
+Assumption: "chord context menu" = the floating chord toolbar in `ProgressionsTab.tsx` (lines 555-670) that appears under an active chord with reorder, ±½-bar, multi-select, select-all controls. (The right-click / long-press also opens `FocusedChordEditor`, which is a full-screen sheet — out of scope unless you say otherwise.)
 
-**Files:** `src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`. Touch `ChordChip` only if needed to gate audition while armed (already conditional via `audition` prop).
+Scale the toolbar and its buttons by ~1.2×:
+- Container (line 558): `px-1.5 py-1` → `px-2 py-1.5`, `gap-1` → `gap-1.5`.
+- Every `Button size="icon"` inside (lines 561, 577, 594, 615, 636, 656): `h-7 w-7` → `h-9 w-9`.
+- Every `Lucide` icon inside those buttons: `h-4 w-4` → `h-5 w-5`.
+- Chord-name span (line 573): `text-sm` → `text-base`; bar-length span (line 611) `text-xs` → `text-sm`; counter (line 649) `text-xs` → `text-sm`.
+- Vertical dividers (lines 590, 632): `h-5` → `h-6`.
 
-### 8. Drag-clone reads basket selection without subscribing → stale "+N" badge
-`BasketBar.renderClone` calls `useBasketSelectionStore.getState().selected` — a one-shot read at clone-mount time.
+If you confirm the target is actually `FocusedChordEditor` (or the section-header `DropdownMenu`), I'll re-scope to that surface instead.
 
-**Fix:** extract `<DragCloneBadge id={item.id}/>` that subscribes via `useBasketSelectionStore(s => s.selected)`. Only the badge re-renders.
-**File:** `src/components/basket/BasketBar.tsx`.
+## Files touched
 
-### 9. `resolveDragIds` race on stale Set reference
-Both `useBasketSelectionStore.resolveDragIds` and `useDndSelection` capture `selected` once; a `clear()` between snapshot and `.has`/`.size` checks yields stale results.
+- `src/components/lyrics/LyricsTab.tsx` — chord-row slot hover/select border.
+- `src/components/progressions/ProgressionsTab.tsx` — flush sub-beat chord layout (#2/#3) and toolbar sizing (#4).
 
-**Fix:** freeze the drag scope at drag-start. In the global `DragDropContext.onBeforeDragStart`, snapshot `selected` into `useDndStore.draggingIds` once; all consumers (drop handlers, clone badge fallback) read THAT during the drag; clear in `onDragEnd`. Same contract for `useDndSelection`: expose `freezeForDrag(id)` returning a frozen array; mid-drag callers must use it instead of `resolveDragIds`.
-**Files:** `src/hooks/use-dnd-selection.ts`, `src/store/basket-selection.ts`, `src/store/dnd.ts`, `src/pages/Index.tsx`.
-
-### 10. Autosave races during rapid multi-chord drags → on-disk divergence
-Each per-chord move dispatches a separate update; debounced autosave can persist intermediate state.
-
-**Fix:** add counter-based `beginInteraction()`/`endInteraction()` on the song store; while count > 0 autosave is paused. Wire from `Index.tsx`: `onBeforeDragStart` → begin; `onDragEnd` (after per-tab handler) → end (autosave fires once with final state). Combine with `withHistoryGroup` (#5) so the whole drag is one undo step.
-**Files:** `src/store/song.ts`, `src/pages/Index.tsx`.
-
-### 11. Paste validates per-token, not whole input
-`parseChordTextToClips` filters invalid tokens individually → silent partial pastes.
-
-**Fix:** validate the whole input first; if any token fails `parseChord`, do not mutate — toast "Couldn't paste — N of M tokens aren't valid chords" listing bad tokens (truncated), with a "Paste valid only" secondary action. Apply at both call sites; extract helper to `src/lib/music/chordClipboard.ts` for reuse with #3 / #6.
-
-### 12. User-typed chords reach DOM without `parseChord` enforcement
-`chord.display` is rendered directly. Invariant ("every `ChordSymbol` is parser-validated") is currently informal.
-
-**Fix:** add canonical constructor `makeChordFromInput(raw): ChordSymbol | null` in `src/lib/music/chords.ts` that runs `parseChord`, normalizes `display` to canonical form, rejects on null. Audit all construction sites: `FocusedChordEditor`, `ChordPickerSheet`, the new clipboard helper, and the JSON load path in `song.ts` (re-validate every chord on import; reject the file with a toast on failure). Add a unit test that round-trips every persisted chord through `parseChord` to the same `display`.
-**Files:** `src/lib/music/chords.ts`, `src/components/lyrics/FocusedChordEditor.tsx`, `src/components/chord/ChordPickerSheet.tsx`, `src/store/song.ts`, new test in `src/test/`.
-
----
-
-## Files to edit (consolidated)
-
-- `src/store/song.ts` — paste/format/move overflow & validation, `withHistoryGroup`, `beginInteraction/endInteraction`, load-time chord validation, `removeSection` cleanup hooks.
-- `src/store/playback.ts` — `clearStartCursor`.
-- `src/store/basket-selection.ts`, `src/store/dnd.ts`, `src/hooks/use-dnd-selection.ts` — frozen drag-snapshot semantics.
-- `src/lib/music/chords.ts` — `makeChordFromInput`.
-- `src/lib/music/chordLayout.ts` — SSOT-aware snap helper.
-- `src/lib/music/chordClipboard.ts` (new) — whole-input validating paste.
-- `src/components/header/TransportHeader.tsx` — playback guards + audio resume.
-- `src/components/lyrics/LyricsTab.tsx` — desktop direct-drag, mobile armed-drag, cut wrapping, clipboard helper, stale-ID cleanup.
-- `src/components/progressions/ProgressionsTab.tsx` — same drag split, Cut/Paste toolbar, move-to toast, stale-ID cleanup.
-- `src/components/basket/BasketBar.tsx` — reactive `<DragCloneBadge>`.
-- `src/components/lyrics/FocusedChordEditor.tsx`, `src/components/chord/ChordPickerSheet.tsx` — route through `makeChordFromInput`.
-- `src/pages/Index.tsx` — global DnD `onBeforeDragStart`/`onDragEnd` for interaction window + frozen drag IDs.
-- `src/test/` — chord-invariant test.
+No store, schema, or test changes are required; existing `chordLayout` and SSOT helpers are untouched.

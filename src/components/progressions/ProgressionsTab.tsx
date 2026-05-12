@@ -133,13 +133,8 @@ function PatternBlock({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Stable refs so the keyboard handler always reads the freshest values.
-  const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const activeChordIdRef = useRef<string | null>(null);
   const activeIdxRef = useRef<number>(-1);
-  const sortedChordsRef = useRef(sortedChords);
-  const movePatternChordRef = useRef(movePatternChord);
-  const setPatternChordLengthRef = useRef(setPatternChordLength);
-  const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
@@ -156,6 +151,8 @@ function PatternBlock({
   const sortedChordsRef = useRef(sortedChords);
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
+  const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
+  const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
   const canDeleteThisBlock = totalBlocksInSong > 1;
@@ -267,30 +264,31 @@ function PatternBlock({
 
       <div className="relative">
         {(() => {
-          // One slot per beat — slot count is bars * beatsPerBar.
           const slotCount = Math.max(1, pattern.bars * pattern.beatsPerBar);
-          const beatsPerSlot = 1;
-          // Walk left-to-right. Each chord visually occupies its lengthBeats (in slot units),
-          // anchoring at integer slot positions. Sub-slot lengths shrink the chord chip.
-          type Cell =
-            | { kind: "start"; chord: typeof sortedChords[number]; span: number; visualSpan: number; slotIdx: number }
-            | { kind: "tail" }
-            | { kind: "empty" };
-          const cells: Cell[] = Array.from({ length: slotCount }, () => ({ kind: "empty" }));
+          // Build a flush flex track: chord items take basis = lengthBeats,
+          // followed by 1-beat empty droppable slots filling the remaining
+          // beats. A fractional spacer keeps empty slots aligned to beat lines.
+          type Item =
+            | { kind: "chord"; chord: typeof sortedChords[number]; basis: number; slotIdx: number }
+            | { kind: "spacer"; basis: number }
+            | { kind: "empty"; basis: number; slotIdx: number };
+          const items: Item[] = [];
           let cursor = 0;
           for (const c of sortedChords) {
-            if (cursor >= slotCount) break;
-            const slotsConsumed = Math.max(1, Math.ceil(c.lengthBeats / beatsPerSlot));
-            const fitSpan = Math.min(slotsConsumed, slotCount - cursor);
-            cells[cursor] = {
-              kind: "start",
-              chord: c,
-              span: fitSpan,
-              visualSpan: Math.min(c.lengthBeats, fitSpan),
-              slotIdx: cursor,
-            };
-            for (let k = 1; k < fitSpan; k++) cells[cursor + k] = { kind: "tail" };
-            cursor += fitSpan;
+            const remaining = slotCount - cursor;
+            if (remaining <= 0) break;
+            const basis = Math.min(c.lengthBeats, remaining);
+            items.push({ kind: "chord", chord: c, basis, slotIdx: Math.floor(cursor) });
+            cursor += basis;
+          }
+          // Align next empty slot to integer beat boundary.
+          const nextBeat = Math.ceil(cursor - 1e-6);
+          if (nextBeat > cursor + 1e-6) {
+            items.push({ kind: "spacer", basis: nextBeat - cursor });
+            cursor = nextBeat;
+          }
+          for (let i = nextBeat; i < slotCount; i++) {
+            items.push({ kind: "empty", basis: 1, slotIdx: i });
           }
           return (
             <div className="relative h-20 rounded-md border border-border bg-muted/30 overflow-hidden flex items-stretch w-full">
@@ -314,15 +312,23 @@ function PatternBlock({
                 );
               })}
 
-              {cells.map((cell, slotIdx) => {
-                if (cell.kind === "tail") return null;
-                const occupied = cell.kind === "start";
-                const c = occupied ? cell.chord : undefined;
-                const span = occupied ? cell.span : 1;
-                const visualSpan = occupied ? cell.visualSpan : 1;
+              {items.map((item, itemIdx) => {
+                if (item.kind === "spacer") {
+                  return (
+                    <div
+                      key={`spacer-${itemIdx}`}
+                      className="pointer-events-none"
+                      style={{ flex: `${item.basis} ${item.basis} 0%` }}
+                    />
+                  );
+                }
+                const occupied = item.kind === "chord";
+                const c = occupied ? item.chord : undefined;
+                const slotIdx = item.slotIdx;
+                const basis = item.basis;
                 return (
                   <Droppable
-                    key={`pslot-${slotIdx}`}
+                    key={`pslot-${itemIdx}`}
                     droppableId={`pattern:${pattern.id}:${slotIdx}`}
                     direction="horizontal"
                     type="chord"
@@ -336,7 +342,7 @@ function PatternBlock({
                           !occupied && "border border-dashed border-transparent justify-center",
                           dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
-                        style={{ flex: `${span} ${span} 0%` }}
+                        style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
                           if (occupied) return;
                           e.stopPropagation();
@@ -345,12 +351,11 @@ function PatternBlock({
                         data-pattern-slot={slotIdx}
                       >
                         {occupied && c && (() => {
-                          const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
                           const colors = getChordColorClasses(c.chord);
                           const isActive = activeChordId === c.id;
                           const isSelected = selectedIds.has(c.id);
                           return (
-                            <div className="relative flex items-stretch">
+                            <div className="relative flex items-stretch w-full">
                               <div
                                 data-pattern-chord={c.id}
                                 role="button"
@@ -423,14 +428,13 @@ function PatternBlock({
                                   }
                                 }}
                                 className={cn(
-                                  "ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer",
+                                  "rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer w-full",
                                   colors.className,
                                   isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.02]",
                                   isSelected && !isActive && "ring-2 ring-secondary ring-offset-1 ring-offset-card",
                                 )}
                                 style={{
                                   ...colors.style,
-                                  width: `calc(${widthPct}% - 4px)`,
                                   touchAction: "none",
                                 }}
                               >
@@ -555,12 +559,12 @@ function PatternBlock({
       {/* Floating chord toolbar — reorder, bar-length, multi-select. */}
       {activeChordInThisBlock && (
         <div className="mt-2 flex justify-center">
-          <div className="flex items-center gap-1 rounded-lg border bg-popover shadow-md px-1.5 py-1 flex-wrap">
+          <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-2 py-1.5 flex-wrap">
             {/* ← → reorder */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeIdx <= 0}
               onClick={(e) => {
                 e.stopPropagation();
@@ -568,15 +572,15 @@ function PatternBlock({
               }}
               aria-label="Move chord earlier"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="px-1 text-sm font-mono-chord text-muted-foreground">
+            <span className="px-1 text-base font-mono-chord text-muted-foreground">
               {activeChordInThisBlock.chord.display}
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeIdx >= sortedChords.length - 1}
               onClick={(e) => {
                 e.stopPropagation();
@@ -584,16 +588,16 @@ function PatternBlock({
               }}
               aria-label="Move chord later"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </Button>
 
-            <div className="w-px h-5 bg-border mx-0.5" />
+            <div className="w-px h-6 bg-border mx-0.5" />
 
             {/* Bar-length −½ / display / +½ */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeChordInThisBlock.lengthBeats <= MIN_LEN}
               onClick={(e) => {
                 e.stopPropagation();
@@ -606,15 +610,15 @@ function PatternBlock({
               aria-label="Decrease bar length by half"
               title="-½ bar"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-5 w-5" />
             </Button>
-            <span className="px-0.5 text-xs font-mono-chord text-muted-foreground select-none">
+            <span className="px-0.5 text-sm font-mono-chord text-muted-foreground select-none">
               {formatBeats(activeChordInThisBlock.lengthBeats)}b
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 resizePatternChordsWithOverflow(
@@ -626,16 +630,16 @@ function PatternBlock({
               aria-label="Increase bar length by half"
               title="+½ bar"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
             </Button>
 
-            <div className="w-px h-5 bg-border mx-0.5" />
+            <div className="w-px h-6 bg-border mx-0.5" />
 
             {/* Multi-select toggle */}
             <Button
               size="icon"
               variant={selectedIds.has(activeChordId!) ? "secondary" : "ghost"}
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleSelectChord(activeChordId!);
@@ -643,10 +647,10 @@ function PatternBlock({
               aria-label="Toggle multi-select"
               title="Multi-select"
             >
-              <CheckSquare className="h-4 w-4" />
+              <CheckSquare className="h-5 w-5" />
             </Button>
             {selectedIds.size > 0 && (
-              <span className="text-xs font-mono-chord text-muted-foreground px-0.5 select-none">
+              <span className="text-sm font-mono-chord text-muted-foreground px-0.5 select-none">
                 {selectedIds.size}
               </span>
             )}
@@ -655,7 +659,7 @@ function PatternBlock({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 selectAllChords();
@@ -663,7 +667,7 @@ function PatternBlock({
               aria-label="Select all chords in block"
               title="Select all"
             >
-              <ListChecks className="h-4 w-4" />
+              <ListChecks className="h-5 w-5" />
             </Button>
           </div>
         </div>
