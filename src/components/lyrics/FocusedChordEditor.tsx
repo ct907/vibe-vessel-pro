@@ -91,6 +91,7 @@ export function FocusedChordEditor(props: Props) {
   const [slot, setSlot] = useState(lyricsInitialSlot);
   const [anchorId, setAnchorId] = useState<string | undefined>(lyricsInitialAnchorId);
   const [query, setQuery] = useState("");
+  const [octave, setOctave] = useState(4);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -364,14 +365,15 @@ export function FocusedChordEditor(props: Props) {
           );
         })()}
 
-        <div className="px-3 py-3 shrink-0" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+        <div className="px-3 py-3 shrink-0 flex items-center gap-2" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a chord… e.g. Bbm9, Fmaj7"
             style={{
-              width: "100%",
+              flex: "1 1 0%",
+              minWidth: 0,
               background: "var(--paper-card)",
               boxShadow: "var(--shadow-sculpt-cream-rest)",
               border: 0,
@@ -405,6 +407,35 @@ export function FocusedChordEditor(props: Props) {
               }
             }}
           />
+          <div className="flex flex-col items-center gap-1 shrink-0">
+            <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--ink-soft)" }}>Oct</span>
+            <div className="flex flex-col gap-0.5">
+              {[3, 4, 5].map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => setOctave(o)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    background: octave === o ? "var(--ink-soft)" : "var(--paper-card)",
+                    color: octave === o ? "var(--paper-card)" : "var(--ink-soft)",
+                    boxShadow: octave === o ? "var(--shadow-sculpt-cream-press)" : "var(--shadow-sculpt-cream-rest)",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                  aria-label={`Octave ${o}`}
+                  aria-pressed={octave === o}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
@@ -437,7 +468,7 @@ export function FocusedChordEditor(props: Props) {
                     aria-label={`Preview ${s.symbol.display}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      void playChord(s.symbol);
+                      void playChord(s.symbol, undefined, octave);
                     }}
                     className="rounded-full p-2 bg-black/10 hover:bg-black/20"
                   >
