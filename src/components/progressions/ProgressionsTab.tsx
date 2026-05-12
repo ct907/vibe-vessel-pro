@@ -935,6 +935,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
+  const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
@@ -968,6 +969,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
   const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
     if (basket.length > 0) return;
+    if (isMobile && !replaceChordId) {
+      const pat = progression.find((p) => p.id === patternId);
+      if (pat) {
+        setPatternAddSlot({ patternId, atBeat, sectionId: pat.sectionId ?? pat.id });
+        return;
+      }
+    }
     setPicker({ patternId, atBeat, replaceChordId });
   };
 
@@ -1032,7 +1040,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     if (suppressCrossTabDeleteWarning) {
       removeSection(sectionId);
     } else {
-      setConfirmDeleteSection(sectionId);
+      // Defer so the DropdownMenu's close event doesn't immediately dismiss the AlertDialog.
+      setTimeout(() => setConfirmDeleteSection(sectionId), 0);
     }
   };
 
@@ -1130,6 +1139,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           patternId={chordEditor.patternId}
           chordId={chordEditor.chordId}
           onClose={() => setChordEditor(null)}
+        />
+      )}
+
+      {patternAddSlot && (
+        <FocusedChordEditor
+          mode="progression-add"
+          sectionId={patternAddSlot.sectionId}
+          patternId={patternAddSlot.patternId}
+          atBeat={patternAddSlot.atBeat}
+          onClose={() => setPatternAddSlot(null)}
         />
       )}
 
