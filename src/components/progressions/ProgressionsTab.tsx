@@ -133,13 +133,8 @@ function PatternBlock({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Stable refs so the keyboard handler always reads the freshest values.
-  const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const activeChordIdRef = useRef<string | null>(null);
   const activeIdxRef = useRef<number>(-1);
-  const sortedChordsRef = useRef(sortedChords);
-  const movePatternChordRef = useRef(movePatternChord);
-  const setPatternChordLengthRef = useRef(setPatternChordLength);
-  const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
