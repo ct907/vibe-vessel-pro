@@ -107,11 +107,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-paper text-foreground flex flex-col">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-3">
-        <h1 className="font-display leading-none" style={{ fontSize: "28px" }}>
-          SongNote
-        </h1>
-      </div>
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
       <DragDropContext

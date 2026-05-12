@@ -1119,10 +1119,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       ))}
 
       <div
-        className="flex flex-col gap-3 p-4 mt-2 rounded-xl"
+        className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl"
         style={{
           background: "var(--paper-shade)",
           borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
+          paddingBottom: "60rem",
         }}
       >
         <span

@@ -274,7 +274,7 @@ function LineRow({
             onPickerOpen(line.id, 0);
           }}
           className={cn(
-            "group relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-x-auto rounded-sm bg-muted-foreground/12 outline-none border border-solid transition-colors",
+            "group relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-x-hidden rounded-sm bg-muted-foreground/12 outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
           style={{ minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
