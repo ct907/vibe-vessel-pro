@@ -559,12 +559,12 @@ function PatternBlock({
       {/* Floating chord toolbar — reorder, bar-length, multi-select. */}
       {activeChordInThisBlock && (
         <div className="mt-2 flex justify-center">
-          <div className="flex items-center gap-1 rounded-lg border bg-popover shadow-md px-1.5 py-1 flex-wrap">
+          <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-2 py-1.5 flex-wrap">
             {/* ← → reorder */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeIdx <= 0}
               onClick={(e) => {
                 e.stopPropagation();
@@ -572,15 +572,15 @@ function PatternBlock({
               }}
               aria-label="Move chord earlier"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="px-1 text-sm font-mono-chord text-muted-foreground">
+            <span className="px-1 text-base font-mono-chord text-muted-foreground">
               {activeChordInThisBlock.chord.display}
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeIdx >= sortedChords.length - 1}
               onClick={(e) => {
                 e.stopPropagation();
@@ -588,16 +588,16 @@ function PatternBlock({
               }}
               aria-label="Move chord later"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </Button>
 
-            <div className="w-px h-5 bg-border mx-0.5" />
+            <div className="w-px h-6 bg-border mx-0.5" />
 
             {/* Bar-length −½ / display / +½ */}
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               disabled={activeChordInThisBlock.lengthBeats <= MIN_LEN}
               onClick={(e) => {
                 e.stopPropagation();
@@ -610,15 +610,15 @@ function PatternBlock({
               aria-label="Decrease bar length by half"
               title="-½ bar"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-5 w-5" />
             </Button>
-            <span className="px-0.5 text-xs font-mono-chord text-muted-foreground select-none">
+            <span className="px-0.5 text-sm font-mono-chord text-muted-foreground select-none">
               {formatBeats(activeChordInThisBlock.lengthBeats)}b
             </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 resizePatternChordsWithOverflow(
@@ -630,16 +630,16 @@ function PatternBlock({
               aria-label="Increase bar length by half"
               title="+½ bar"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
             </Button>
 
-            <div className="w-px h-5 bg-border mx-0.5" />
+            <div className="w-px h-6 bg-border mx-0.5" />
 
             {/* Multi-select toggle */}
             <Button
               size="icon"
               variant={selectedIds.has(activeChordId!) ? "secondary" : "ghost"}
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleSelectChord(activeChordId!);
@@ -647,10 +647,10 @@ function PatternBlock({
               aria-label="Toggle multi-select"
               title="Multi-select"
             >
-              <CheckSquare className="h-4 w-4" />
+              <CheckSquare className="h-5 w-5" />
             </Button>
             {selectedIds.size > 0 && (
-              <span className="text-xs font-mono-chord text-muted-foreground px-0.5 select-none">
+              <span className="text-sm font-mono-chord text-muted-foreground px-0.5 select-none">
                 {selectedIds.size}
               </span>
             )}
@@ -659,7 +659,7 @@ function PatternBlock({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation();
                 selectAllChords();
@@ -667,7 +667,7 @@ function PatternBlock({
               aria-label="Select all chords in block"
               title="Select all"
             >
-              <ListChecks className="h-4 w-4" />
+              <ListChecks className="h-5 w-5" />
             </Button>
           </div>
         </div>
