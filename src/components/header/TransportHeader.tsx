@@ -113,40 +113,39 @@ function InspirationLightbox({
           draggable={false}
           style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", display: "block" }}
         />
-        {/* Prev / Next arrows */}
+      </div>
+      {/* Inline nav: [‹] 1/3 [›] */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
         {photos.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={prev}
-              style={{
-                position: "absolute", left: -44, top: "50%", transform: "translateY(-50%)",
-                width: 36, height: 36, borderRadius: "50%",
-                background: "rgba(255,255,255,0.15)", color: "white",
-                border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-              }}
-              aria-label="Previous photo"
-            >‹</button>
-            <button
-              type="button"
-              onClick={next}
-              style={{
-                position: "absolute", right: -44, top: "50%", transform: "translateY(-50%)",
-                width: 36, height: 36, borderRadius: "50%",
-                background: "rgba(255,255,255,0.15)", color: "white",
-                border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-              }}
-              aria-label="Next photo"
-            >›</button>
-          </>
+          <button
+            type="button"
+            onClick={prev}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)", color: "white",
+              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}
+            aria-label="Previous photo"
+          >‹</button>
+        )}
+        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "'JetBrains Mono', monospace", minWidth: 36, textAlign: "center" }}>
+          {idx + 1}/{photos.length}
+        </span>
+        {photos.length > 1 && (
+          <button
+            type="button"
+            onClick={next}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)", color: "white",
+              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}
+            aria-label="Next photo"
+          >›</button>
         )}
       </div>
-      {/* Counter */}
-      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
-        {idx + 1} / {photos.length}
-      </span>
       {/* Actions */}
       <div style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}>
         <button
@@ -415,7 +414,30 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   };
 
   return (
-    <div className="sticky top-0 z-40 mx-2 sm:mx-4 mt-2">
+    <>
+      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
+        <Bookmark
+          className="h-6 w-6 shrink-0"
+          style={{ color: "var(--cocoa-deep)", fill: "var(--border)" }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (inspirationPhotos.length > 0) {
+              setLightboxIndex(0);
+              setLightboxOpen(true);
+            } else {
+              photoInputRef.current?.click();
+            }
+          }}
+          className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
+          aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
+          title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
+        >
+          <ImageIcon className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="sticky top-0 z-40 mx-2 sm:mx-4">
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
@@ -430,9 +452,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 position: "absolute",
                 left: slot.left,
                 top: slot.top,
-                width: 90, height: 90,
-                objectFit: "cover",
-                borderRadius: 10,
+                maxWidth: 50,
+                maxHeight: 50,
+                display: "block",
+                borderRadius: 8,
                 boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
                 transform: `rotate(${slot.rotate}deg)`,
                 zIndex: 0,
@@ -453,30 +476,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             onRemoveAll={() => { inspirationPhotos.forEach((p) => removeInspirationPhoto(p.id)); setLightboxOpen(false); }}
           />
         )}
-
-        {/* Top bar: Bookmark (left) + Add photos btn (right) */}
-        <div className="flex items-center justify-between mb-2 px-1">
-          <Bookmark
-            className="h-6 w-6 shrink-0"
-            style={{ color: "var(--cocoa-deep)", fill: "var(--border)" }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              if (inspirationPhotos.length > 0) {
-                setLightboxIndex(0);
-                setLightboxOpen(true);
-              } else {
-                photoInputRef.current?.click();
-              }
-            }}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
-            aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
-            title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
-          >
-            <ImageIcon className="h-4 w-4" />
-          </button>
-        </div>
 
         <header id="main-header" className="rounded-xl bg-card/95 backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
@@ -812,41 +811,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           </div>
         </div>
       </div>
-      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
-      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
-      <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Start a new song?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will clear all lyrics, chords, and progressions in the current song. Make sure
-              you've saved your work first — unsaved changes can't be recovered.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
-              }
-            >
-              <Save className="h-4 w-4" /> Save first
-            </Button>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                resetSong();
-                setTransposeOffset(0);
-                setConfirmNewSong(false);
-                toast({ title: "New song started" });
-              }}
-            >
-              Start new song
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
         </header>
         <input
           ref={photoInputRef}
@@ -858,5 +822,41 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         />
       </div>
     </div>
+    <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
+    <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
+    <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Start a new song?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will clear all lyrics, chords, and progressions in the current song. Make sure
+            you've saved your work first — unsaved changes can't be recovered.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button
+            variant="outline"
+            onClick={() =>
+              downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
+            }
+          >
+            <Save className="h-4 w-4" /> Save first
+          </Button>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              resetSong();
+              setTransposeOffset(0);
+              setConfirmNewSong(false);
+              toast({ title: "New song started" });
+            }}
+          >
+            Start new song
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
