@@ -274,8 +274,8 @@ function LineRow({
             onPickerOpen(line.id, 0);
           }}
           className={cn(
-            "relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-hidden rounded-sm bg-muted-foreground/12 outline-none border border-solid transition-colors",
-            hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent",
+            "group relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-hidden rounded-sm bg-muted-foreground/12 outline-none border border-solid transition-colors",
+            hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
           style={{ minHeight: 36 }}
         >
@@ -310,10 +310,14 @@ function LineRow({
                     {...dropProvided.droppableProps}
                     data-slot-index={slotIdx}
                     className={cn(
-                      "relative shrink-0 h-9 flex items-center justify-start border border-solid hover:border-muted-foreground/40",
-                      hasActiveChordInLine ? "border-muted-foreground/20" : "border-transparent",
+                      "relative shrink-0 h-9 flex items-center justify-start border border-solid transition-colors",
+                      hasActiveChordInLine
+                        ? "border-muted-foreground/20"
+                        : "border-transparent group-hover:border-muted-foreground/40",
                       occupied ? "w-10" : "w-7",
-                      slotIdx > 0 && (hasActiveChordInLine ? "border-l-muted-foreground/35" : "border-l-muted-foreground/12"),
+                      slotIdx > 0 && (hasActiveChordInLine
+                        ? "border-l-muted-foreground/35"
+                        : "border-l-muted-foreground/12 group-hover:border-l-muted-foreground/35"),
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
