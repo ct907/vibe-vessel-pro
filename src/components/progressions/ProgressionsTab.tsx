@@ -298,8 +298,8 @@ function PatternBlock({
           }
           return (
             <div
-              className="relative h-20 rounded-md overflow-hidden flex items-stretch w-full"
-              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", padding: 4, gap: 3 }}
+              className="relative rounded-md flex items-stretch w-full"
+              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", minHeight: 80, paddingTop: 8, paddingBottom: 8, paddingLeft: 4, paddingRight: 4, gap: 3 }}
             >
               {/* Bar separators */}
               {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
@@ -440,7 +440,7 @@ function PatternBlock({
                                   "rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer w-full",
                                   colors.className,
                                   isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.02]",
-                                  isSelected && !isActive && "ring-2 ring-secondary ring-offset-1 ring-offset-card",
+                                  isSelected && !isActive && "ring-2 ring-[var(--primary-strong)] ring-offset-1 ring-offset-card",
                                 )}
                                 style={{
                                   ...colors.style,
@@ -647,8 +647,11 @@ function PatternBlock({
             {/* Multi-select toggle */}
             <Button
               size="icon"
-              variant={selectedIds.has(activeChordId!) ? "secondary" : "ghost"}
-              className="h-9 w-9"
+              variant="ghost"
+              className={cn(
+                "h-9 w-9",
+                selectedIds.has(activeChordId!) && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+              )}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleSelectChord(activeChordId!);
@@ -662,6 +665,21 @@ function PatternBlock({
               <span className="text-sm font-mono-chord text-muted-foreground px-0.5 select-none">
                 {selectedIds.size}
               </span>
+            )}
+            {selectedIds.size > 0 && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedIds(new Set());
+                }}
+                aria-label="Clear selection"
+                title="Clear selection"
+              >
+                <X className="h-5 w-5" />
+              </Button>
             )}
 
             {/* Select all in this block */}
