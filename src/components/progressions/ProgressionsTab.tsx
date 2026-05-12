@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType } from "@/store/song";
@@ -10,51 +10,37 @@ import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Plus,
-  Minus,
   Trash2,
-  ArrowLeft,
-  ArrowRight,
   ArrowUp,
   ArrowDown,
-  Play,
-  Pencil,
   X,
   ChevronsDownUp,
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  Copy,
+  MoreVertical,
 } from "lucide-react";
-import { ensureAudio, playChord } from "@/lib/music/audio";
-import { ChordSymbol } from "@/lib/music/chords";
 import { getChordColorClasses } from "@/lib/music/chordColor";
+import { playChord } from "@/lib/music/audio";
+import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
-import { SECTION_COLOR_KEYS, sectionTintStyle } from "@/components/section/SectionColorPicker";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
+import { sectionTintStyle } from "@/components/section/SectionColorPicker";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
-
-/** Prefix applied to progressions-tab chord Draggable IDs. Pairs with
- *  LyricsTab's L- prefix so each tab has its own namespace inside pangea's
- *  flat draggable registry (last-mounted wins, so without prefixes the
- *  same SSOT chord id would collide across tabs). */
-const PATTERN_DRAGGABLE_PREFIX = "P-";
-
-const stripPatternPrefix = (id: string): string =>
-  id.startsWith(PATTERN_DRAGGABLE_PREFIX)
-    ? id.slice(PATTERN_DRAGGABLE_PREFIX.length)
-    : id;
 
 /** Bars number input that allows the field to be temporarily empty while typing. */
 function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
@@ -97,15 +83,9 @@ interface PatternProps {
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
-  /** Section-level edit mode (lifted from per-block to per-section). */
-  selectMode: boolean;
-  /** Called when the user shift/ctrl-clicks a chord (auto-enter section
-   *  edit mode) — parent toggles its single selectMode flag. */
-  onEnterSelectMode: () => void;
-  /** Called from this block's toolbar (Done, delete-last-chord, Esc, etc).
-   *  Parent sets section selectMode = false; each block's local selection
-   *  is cleared by the selectMode prop-change effect below. */
-  onExitSelectMode: () => void;
+  /** Tab-level active chord id — shared across all blocks. */
+  activeChordId: string | null;
+  onSetActiveChordId: (id: string | null) => void;
 }
 
 function formatBeats(n: number) {
@@ -120,18 +100,13 @@ function PatternBlock({
   onPickerOpen,
   onRequestDeleteBlock,
   onEditChordOpen,
-  selectMode,
-  onEnterSelectMode,
-  onExitSelectMode,
+  activeChordId,
+  onSetActiveChordId,
 }: PatternProps) {
   const {
     updatePattern,
-    setPatternChordLength,
     movePatternChord,
     removePatternChordsBatch,
-    shiftPatternChords,
-    movePatternChordsTo,
-    resizePatternChordsWithOverflow,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -143,14 +118,11 @@ function PatternBlock({
   const isFocused = focusedPatternId === pattern.id;
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
 
-  // selectMode is now section-level (lifted to SectionGroup); this block
-  // only owns its local `selected` Set. When the section exits edit mode,
-  // wipe this block's selection too.
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  const lastSelectedRef = useRef<string | null>(null);
   const blockRef = useRef<HTMLDivElement>(null);
   const justDraggedAtRef = useRef<number>(0);
+  const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressDidFireRef = useRef(false);
 
   const totalBeats = pattern.bars * pattern.beatsPerBar;
   // Phase 3 SSOT: order this pattern's chords via the section's SectionChord projection.
@@ -166,144 +138,14 @@ function PatternBlock({
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const freeBeats = Math.max(0, totalBeats - usedBeats);
-  const selectedIds = Array.from(selected);
   const canDeleteThisBlock = totalBlocksInSong > 1;
 
-  // Exit edit mode: notify parent to flip section-level selectMode off;
-  // local selection is wiped by the prop-change effect below.
-  const exitSelect = () => {
-    onExitSelectMode();
-  };
-
-  // Mirror local cleanup whenever the section's selectMode goes false.
-  useEffect(() => {
-    if (!selectMode) {
-      setSelected(new Set());
-      lastSelectedRef.current = null;
-    }
-  }, [selectMode]);
-
-  // Outside-tap closes the select-mode context menu.
-  useEffect(() => {
-    if (!selectMode) return;
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest('[data-basket-chip],[data-droppable-id="basket-source"]')) return;
-      if (blockRef.current && blockRef.current.contains(t)) return;
-      if (t.closest("[data-radix-dialog-content]")) return;
-      if (t.closest("[data-progression-ctx]")) return;
-      exitSelect();
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [selectMode]);
-
-  // Keyboard shortcuts while in select mode.
-  useEffect(() => {
-    if (!selectMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          const willEmptyBlock = selectedIds.length >= sortedChords.length;
-          removePatternChordsBatch(pattern.id, selectedIds);
-          setSelected(new Set());
-          if (willEmptyBlock) exitSelect();
-          return;
-        }
-      }
-      if (selectedIds.length === 1) {
-        const c = sortedChords.find((x) => x.id === selectedIds[0]);
-        if (!c) return;
-        const otherSum = sortedChords.reduce((s, x) => s + (x.id === c.id ? 0 : x.lengthBeats), 0);
-        const maxLen = totalBeats - otherSum;
-        if (e.key === "+" || e.key === "=") {
-          e.preventDefault();
-          if (c.lengthBeats + LENGTH_STEP <= maxLen + 1e-9) {
-            setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
-          }
-        } else if (e.key === "-" || e.key === "_") {
-          e.preventDefault();
-          if (c.lengthBeats > MIN_LEN) {
-            setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
-          }
-        }
-      }
-      if (e.key === "Escape") {
-        exitSelect();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [
-    selectMode,
-    selectedIds,
-    sortedChords,
-    totalBeats,
-    pattern.id,
-    setPatternChordLength,
-    removePatternChordsBatch,
-  ]);
-
-  const handleChordTap = (chordId: string, e?: React.MouseEvent) => {
-    if (Date.now() - justDraggedAtRef.current < 350) return;
-    setFocusedPattern(pattern.id);
-    // Shift-click: range select.
-    if (e && e.shiftKey) {
-      const ids = sortedChords.map((c) => c.id);
-      const i2 = ids.indexOf(chordId);
-      const anchor = lastSelectedRef.current;
-      const i1 = anchor ? ids.indexOf(anchor) : i2;
-      const [from, to] = i1 <= i2 ? [i1, i2] : [i2, i1];
-      const range = ids.slice(from, to + 1);
-      onEnterSelectMode();
-      setSelected((prev) => {
-        const next = new Set(prev);
-        range.forEach((id) => next.add(id));
-        return next;
-      });
-      lastSelectedRef.current = chordId;
-      return;
-    }
-    // Ctrl/Cmd-click toggles selection.
-    if (e && (e.metaKey || e.ctrlKey)) {
-      onEnterSelectMode();
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(chordId)) next.delete(chordId);
-        else next.add(chordId);
-        return next;
-      });
-      lastSelectedRef.current = chordId;
-      return;
-    }
-    // Edit Mode (pencil): tap toggles selection only — no audition, no editor.
-    if (selectMode) {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(chordId)) next.delete(chordId);
-        else next.add(chordId);
-        return next;
-      });
-      lastSelectedRef.current = chordId;
-      return;
-    }
-    // Composition mode: audition + open FocusedChordEditor (mirrors Lyrics tab).
-    const c = sortedChords.find((x) => x.id === chordId);
-    if (c) void playChord(c.chord);
-    onEditChordOpen(pattern.id, chordId);
-  };
-
-  // The "active" chord is the single-selection case. Multi-selection hides
-  // per-chord controls and uses batch operations instead.
-  const active = selectedIds.length === 1
-    ? (sortedChords.find((c) => c.id === selectedIds[0]) ?? null)
+  const activeChordInThisBlock = activeChordId
+    ? sortedChords.find((c) => c.id === activeChordId) ?? null
     : null;
-  const activeMaxLen = active ? totalBeats - (usedBeats - active.lengthBeats) : 0;
-  const activeIdx = active ? sortedChords.findIndex((c) => c.id === active.id) : -1;
+  const activeIdx = activeChordInThisBlock
+    ? sortedChords.findIndex((c) => c.id === activeChordId)
+    : -1;
 
   return (
     <div
@@ -312,7 +154,6 @@ function PatternBlock({
       className={cn(
         "rounded-lg border shadow-primary/40 p-3 transition-shadow",
         isFocused ? "border-primary ring-2 ring-primary/40" : "border-border",
-        selectMode && !isFocused && "ring-2 ring-primary/40",
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -407,7 +248,6 @@ function PatternBlock({
                 const c = occupied ? cell.chord : undefined;
                 const span = occupied ? cell.span : 1;
                 const visualSpan = occupied ? cell.visualSpan : 1;
-                const isSel = c ? selected.has(c.id) : false;
                 return (
                   <Droppable
                     key={`pslot-${slotIdx}`}
@@ -432,64 +272,119 @@ function PatternBlock({
                         }}
                         data-pattern-slot={slotIdx}
                       >
-                        {occupied && c && (
-                          <Draggable
-                            draggableId={`${PATTERN_DRAGGABLE_PREFIX}${c.id}`}
-                            index={0}
-                            isDragDisabled={selectMode}
-                          >
-                            {(dragProvided, dragSnapshot) => {
-                              if (dragSnapshot.isDragging) { justDraggedAtRef.current = Date.now(); }
-                              const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
-                              const colors = getChordColorClasses(c.chord);
-                              // Render as <div role="button"> instead of <button>:
-                              // @hello-pangea/dnd's sensor refuses to start a drag
-                              // when the pointerdown target is a native interactive
-                              // tag (button/input/select/...), so a real <button>
-                              // here would silently swallow every drag attempt.
-                              return (
-                                <div
-                                  ref={dragProvided.innerRef}
-                                  {...dragProvided.draggableProps}
-                                  {...dragProvided.dragHandleProps}
-                                  data-pattern-chord={c.id}
-                                  onContextMenu={(e) => e.preventDefault()}
+                        {occupied && c && (() => {
+                          const widthPct = Math.max(0, Math.min(1, visualSpan / span)) * 100;
+                          const colors = getChordColorClasses(c.chord);
+                          const isActive = activeChordId === c.id;
+                          return (
+                            <div className="relative">
+                              <div
+                                data-pattern-chord={c.id}
+                                role="button"
+                                tabIndex={0}
+                                onPointerDown={(e) => {
+                                  if (Date.now() - justDraggedAtRef.current < 350) return;
+                                  longPressDidFireRef.current = false;
+                                  if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+                                  longPressTimerRef.current = setTimeout(() => {
+                                    longPressTimerRef.current = null;
+                                    longPressDidFireRef.current = true;
+                                    if (singleClickTimerRef.current) {
+                                      clearTimeout(singleClickTimerRef.current);
+                                      singleClickTimerRef.current = null;
+                                    }
+                                    onSetActiveChordId(null);
+                                    onEditChordOpen(pattern.id, c.id);
+                                  }, 500);
+                                }}
+                                onPointerUp={() => {
+                                  if (longPressTimerRef.current) {
+                                    clearTimeout(longPressTimerRef.current);
+                                    longPressTimerRef.current = null;
+                                  }
+                                }}
+                                onPointerLeave={() => {
+                                  if (longPressTimerRef.current) {
+                                    clearTimeout(longPressTimerRef.current);
+                                    longPressTimerRef.current = null;
+                                  }
+                                }}
+                                onPointerCancel={() => {
+                                  if (longPressTimerRef.current) {
+                                    clearTimeout(longPressTimerRef.current);
+                                    longPressTimerRef.current = null;
+                                  }
+                                }}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
+                                  if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                                  onSetActiveChordId(null);
+                                  onEditChordOpen(pattern.id, c.id);
+                                }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
+                                  if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                                  onSetActiveChordId(null);
+                                  onEditChordOpen(pattern.id, c.id);
+                                }}
+                                onClick={(e) => {
+                                  if (Date.now() - justDraggedAtRef.current < 350) return;
+                                  if (longPressDidFireRef.current) { longPressDidFireRef.current = false; return; }
+                                  e.stopPropagation();
+                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
+                                  singleClickTimerRef.current = setTimeout(() => {
+                                    singleClickTimerRef.current = null;
+                                    setFocusedPattern(pattern.id);
+                                    void playChord(c.chord);
+                                    onSetActiveChordId(activeChordId === c.id ? null : c.id);
+                                  }, 250);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    void playChord(c.chord);
+                                    onSetActiveChordId(c.id);
+                                  }
+                                }}
+                                className={cn(
+                                  "my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer",
+                                  colors.className,
+                                  isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
+                                )}
+                                style={{
+                                  ...colors.style,
+                                  width: `calc(${widthPct}% - 4px)`,
+                                  touchAction: "none",
+                                }}
+                              >
+                                <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
+                                  {c.chord.display}
+                                </span>
+                                <span className="font-mono-chord text-[10px] opacity-70 leading-tight">
+                                  {formatBeats(c.lengthBeats)}b
+                                </span>
+                              </div>
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  className="absolute -top-1.5 -right-1.5 z-20 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                                  onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleChordTap(c.id, e);
+                                    removePatternChordsBatch(pattern.id, [c.id]);
+                                    onSetActiveChordId(null);
                                   }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleChordTap(c.id);
-                                    }
-                                  }}
-                                  className={cn(
-                                    "relative my-1 ml-0.5 rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90",
-                                    colors.className,
-                                    selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
-                                    isSel && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.04]",
-                                    dragSnapshot.isDragging && "ring-2 ring-primary shadow-lg",
-                                  )}
-                                  style={{
-                                    ...colors.style,
-                                    width: dragSnapshot.isDragging ? undefined : `calc(${widthPct}% - 4px)`,
-                                    touchAction: "none",
-                                    ...dragProvided.draggableProps.style,
-                                  }}
+                                  aria-label="Delete chord"
                                 >
-                                  <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                                    {c.chord.display}
-                                  </span>
-                                  <span className="font-mono-chord text-[10px] opacity-70 leading-tight">
-                                    {formatBeats(c.lengthBeats)}b
-                                  </span>
-                                </div>
-                              );
-                            }}
-                          </Draggable>
-                        )}
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {dropProvided.placeholder}
                       </div>
                     )}
@@ -573,188 +468,42 @@ function PatternBlock({
           })()}
       </div>
 
-      {/* Unified chord context menu — appears below the pattern block (#7).
-          Shown either when chords are multi-selected OR when a single chord is
-          tapped (active). Multi-select reveals shift/length/move/delete; single
-          chord adds Play-from-here and per-chord length controls. */}
-      {(() => {
-        // Unified menu: visible whenever Edit / Select Mode is on. The
-        // controls adapt to selection size (0, 1, or many).
-        if (!selectMode) return null;
-        const showSingle = selectedIds.length === 1 && !!active && activeIdx >= 0;
-        const showMulti = selectedIds.length > 1;
-        const hasSel = selectedIds.length > 0;
-        const c = active;
-        const canDecrease = c ? c.lengthBeats > MIN_LEN : false;
-        const canIncrease = c ? c.lengthBeats + LENGTH_STEP <= activeMaxLen + 1e-9 : false;
-        return (
-          <div
-            data-progression-ctx
-            className="mb-2 mt-2 flex flex-col gap-3 rounded-md border border-primary/40 bg-card px-3 py-2 shadow-sm text-xs max-w-[400px]"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-           {/* Row 1: label + Play from here + Move-to (multi) */}
-           <div className="flex items-center gap-2 flex-wrap">
-            {showSingle ? (
-              <span className="font-medium font-mono-chord">{c?.chord.display}</span>
-            ) : (
-              <span className="font-medium">{selectedIds.length} selected</span>
-            )}
-
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              onClick={() => {
-                setSelected(new Set(sortedChords.map((x) => x.id)));
-              }}
-              disabled={sortedChords.length === 0 || selectedIds.length === sortedChords.length}
-            >
-              Select all
-            </Button>
-
-            <Button
-              size="sm"
-              variant="default"
-              className="h-7 px-2 text-xs"
-              disabled={!hasSel}
-              onClick={async () => {
-                await ensureAudio();
-                const chordId = selectedIds[0];
-                if (!chordId) return;
-                setStartFromChord(pattern.id, chordId);
-                setIsPlayingStore(false);
-                setCurrent(null);
-                window.dispatchEvent(new Event("lovable:request-play"));
-              }}
-              aria-label="Play from here"
-              title="Play from here"
-            >
-              <Play className="h-3.5 w-3.5" /> Play from here
-            </Button>
-
-            {hasSel && otherPatterns.length > 0 && (
-              <Select
-                value=""
-                onValueChange={(toId) => {
-                  movePatternChordsTo(pattern.id, toId, selectedIds);
-                  exitSelect();
-                }}
-              >
-                <SelectTrigger className="h-7 w-[140px] text-xs">
-                  <SelectValue placeholder="Move to…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {otherPatterns.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-           </div>
-
-           {/* Row 2: Length controls + Delete */}
-           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] text-muted-foreground">Length</span>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              disabled={!hasSel || (showSingle && !canDecrease)}
-              onClick={() => {
-                if (showSingle && c) {
-                  if (canDecrease) setPatternChordLength(pattern.id, c.id, c.lengthBeats - LENGTH_STEP);
-                } else {
-                  resizePatternChordsWithOverflow(pattern.id, selectedIds, -LENGTH_STEP);
-                }
-              }}
-              aria-label="Decrease length"
-              title="Decrease length"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              disabled={!hasSel}
-              onClick={() => {
-                if (showSingle && c) {
-                  setPatternChordLength(pattern.id, c.id, c.lengthBeats + LENGTH_STEP);
-                } else {
-                  resizePatternChordsWithOverflow(pattern.id, selectedIds, LENGTH_STEP);
-                }
-              }}
-              aria-label="Increase length"
-              title="Increase · overflows to next block"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-
+      {/* Floating ← → chord movement menu — appears when a chord in this block is active. */}
+      {activeChordInThisBlock && (
+        <div className="mt-2 flex justify-center">
+          <div className="flex items-center gap-0.5 rounded-lg border bg-popover shadow-md px-1 py-0.5">
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-destructive ml-auto"
-              disabled={!hasSel}
-              onClick={() => {
-                if (selectedIds.length === 0) return;
-                const willEmptyBlock = selectedIds.length >= sortedChords.length;
-                removePatternChordsBatch(pattern.id, selectedIds);
-                setSelected(new Set());
-                if (willEmptyBlock) exitSelect();
+              className="h-6 w-6"
+              disabled={activeIdx <= 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                movePatternChord(pattern.id, activeChordId!, -1);
               }}
-              aria-label="Delete"
-              title="Delete (Del)"
+              aria-label="Move chord earlier"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-           </div>
-
-           {/* Row 3: move arrows + Done */}
-           <div className="flex items-center gap-2">
+            <span className="px-1 text-xs font-mono-chord text-muted-foreground">
+              {activeChordInThisBlock.chord.display}
+            </span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
-              disabled={!hasSel}
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, -1);
-                else shiftPatternChords(pattern.id, selectedIds, -1);
+              className="h-6 w-6"
+              disabled={activeIdx >= sortedChords.length - 1}
+              onClick={(e) => {
+                e.stopPropagation();
+                movePatternChord(pattern.id, activeChordId!, 1);
               }}
-              aria-label="Move earlier"
-              title="Move earlier"
+              aria-label="Move chord later"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={!hasSel}
-              onClick={() => {
-                if (showSingle) movePatternChord(pattern.id, active!.id, 1);
-                else shiftPatternChords(pattern.id, selectedIds, 1);
-              }}
-              aria-label="Move later"
-              title="Move later"
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 ml-auto"
-              onClick={exitSelect}
-            >
-              Done
-            </Button>
-           </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* Per-block "From basket" tap-to-add panel removed: when the basket
           has chips the global BasketBar is visible and lets the user drag
@@ -780,6 +529,8 @@ interface SectionGroupProps {
   /** When true: hide block counter & delete; show up/down reorder arrows. */
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
+  activeChordId: string | null;
+  onSetActiveChordId: (id: string | null) => void;
 }
 
 function SectionGroup({
@@ -795,17 +546,14 @@ function SectionGroup({
   onEditChordOpen,
   sortMode,
   onMoveSection,
+  activeChordId,
+  onSetActiveChordId,
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
-  const setSectionColor = useSongStore((s) => s.setSectionColor);
+  const duplicateSection = useSongStore((s) => s.duplicateSection);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
-  // Section-level edit mode (replaces the per-block pencil that used to
-  // live on each PatternBlock header). One toggle here puts every block
-  // in this section into selectMode; per-block selection sets remain
-  // local to each block.
-  const [sectionSelectMode, setSectionSelectMode] = useState(false);
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
@@ -864,75 +612,26 @@ function SectionGroup({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-8 w-8 text-muted-foreground hover:text-foreground",
-                sectionSelectMode && "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary",
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSectionSelectMode((prev) => !prev);
-              }}
-              aria-label={sectionSelectMode ? "Exit edit mode for this section" : "Edit chords in this section"}
-              aria-pressed={sectionSelectMode}
-              title={sectionSelectMode ? "Exit edit mode" : "Edit chords"}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
-                  Color
-                </DropdownMenuLabel>
-                <div className="px-2 pb-2">
-                  <div className="grid grid-cols-8 gap-1">
-                    {SECTION_COLOR_KEYS.map((c) => {
-                      const isActive = section?.color === c;
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setSectionColor(sectionId, isActive ? null : c)}
-                          aria-label={`Section color ${c}`}
-                          title={c}
-                          className={cn(
-                            "h-7 w-7 rounded border border-border transition-transform",
-                            isActive && "ring-2 ring-primary scale-110",
-                          )}
-                          style={{ backgroundColor: `color-mix(in oklch, var(--section-tint-${c}) 50%, transparent)` }}
-                        />
-                      );
-                    })}
-                  </div>
-                  {section?.color && (
-                    <button
-                      type="button"
-                      onClick={() => setSectionColor(sectionId, null)}
-                      className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
-                    >
-                      Clear color
-                    </button>
-                  )}
-                </div>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
+                  <Copy className="h-4 w-4" /> Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onRequestDeleteSection(sectionId)}
+                  disabled={!canDeleteSection}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete section
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
-              onClick={() => onRequestDeleteSection(sectionId)}
-              disabled={!canDeleteSection}
-              title="Delete entire section (affects Lyrics tab too)"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         )}
       </div>
@@ -968,9 +667,8 @@ function SectionGroup({
                 onPickerOpen={onPickerOpen}
                 onRequestDeleteBlock={onRequestDeleteBlock}
                 onEditChordOpen={onEditChordOpen}
-                selectMode={sectionSelectMode}
-                onEnterSelectMode={() => setSectionSelectMode(true)}
-                onExitSelectMode={() => setSectionSelectMode(false)}
+                activeChordId={activeChordId}
+                onSetActiveChordId={onSetActiveChordId}
               />
             );
           })}
@@ -1011,7 +709,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     addSection,
     updatePatternChord,
     basket,
-    movePatternChordToPatternAt,
     moveSection,
     removeSection,
     removePatternBlock,
@@ -1020,6 +717,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     setAllSectionsCollapsed,
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
+  const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
@@ -1096,12 +794,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
     if (!toId || Number.isNaN(toSlot)) return;
 
-    const toPattern = state.progression.find((p) => p.id === toId);
-    if (!toPattern) return;
-    const toCap = toPattern.bars * toPattern.beatsPerBar;
-    const toUsed = toPattern.chords.reduce((s, c) => s + c.lengthBeats, 0);
-    const toFree = Math.max(0, toCap - toUsed);
-
     // Basket → pattern block: COPY chord(s) at the target slot. Original
     // chips stay in basket so the user can drop the same chord multiple
     // times. If the dragged chip is part of a multi-selection, every
@@ -1119,39 +811,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       return;
     }
 
-    const src = source.droppableId.split(":");
-    if (src[0] !== "pattern") return;
-    const fromId = src[1];
-    if (!fromId) return;
-    // Strip the P- namespace before talking to the store — the store keys
-    // chords by their raw SSOT id, not the per-tab Draggable id.
-    const draggedChordId = stripPatternPrefix(draggableId);
-    if (fromId === toId) {
-      state.movePatternChordToSlot(toId, draggedChordId, toSlot);
-      return;
-    }
-
-    // Cross-block (and possibly cross-section): validate capacity for the
-    // chord(s) being moved. movePatternChordToPatternAt now handles both
-    // intra- and cross-section moves.
-    const fromPattern = state.progression.find((p) => p.id === fromId);
-    if (!fromPattern) return;
-    const movingIds = [draggedChordId];
-    const movingLen = fromPattern.chords
-      .filter((c) => movingIds.includes(c.id))
-      .reduce((s, c) => s + c.lengthBeats, 0);
-    if (movingLen > toFree + 1e-9) {
-      toast({
-        title: movingIds.length > 1 ? "Not enough space" : "Chord doesn't fit",
-        description:
-          movingIds.length > 1
-            ? "The selected chords don't fit in the target pattern block."
-            : "This chord is too long for the target pattern block's free space.",
-        variant: "destructive",
-      });
-      return;
-    }
-    state.movePatternChordToPatternAt(fromId, toId, draggedChordId, toSlot);
   };
 
   const requestDeleteSection = (sectionId: string) => {
@@ -1167,7 +826,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onClick={() => setActiveChordId(null)}>
       <div className="flex items-center gap-2">
         <p className="text-xs text-muted-foreground flex-1">
           Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in
@@ -1206,6 +865,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onEditChordOpen={openChordEditor}
           sortMode={sortMode}
           onMoveSection={(id, direction) => moveSection(id, direction)}
+          activeChordId={activeChordId}
+          onSetActiveChordId={setActiveChordId}
         />
       ))}
 

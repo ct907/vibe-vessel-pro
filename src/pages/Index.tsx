@@ -16,7 +16,6 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
-import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
 
@@ -86,84 +85,21 @@ const Index = () => {
     return () => { unsub(); unsubRecents(); };
   }, []);
 
-  // Single global DragDropContext routes drops to whichever tab owns the
-  // destination droppable. Basket-source drags work cross-tab because the
-  // BasketBar is a sibling of <main> inside this same context.
-  // Freeze the basket selection at drag-start (immune to mid-drag clear()
-  // races) and pause autosave so per-chord intermediate writes don't get
-  // persisted during multi-chord drags.
-  const onBeforeDragStart = (start: { draggableId: string }) => {
+  // Single global DragDropContext. Only basket chips are draggable; chord
+  // chips in Lyrics and Progressions are no longer draggable.
+  const onBeforeDragStart = () => {
     beginInteraction();
-    if (start.draggableId.startsWith("basket:")) {
-      const id = start.draggableId.slice("basket:".length);
-      const { selected } = useBasketSelectionStore.getState();
-      const frozen = selected.has(id) && selected.size > 1
-        ? new Set(selected)
-        : new Set([id]);
-      useDndStore.getState().setDraggingIds(frozen);
-    }
-    // Snapshot the source element's bounding rect WHILE it's still mounted
-    // (pangea unmounts the source as soon as renderClone takes over). The
-    // renderClone reads this from the dnd store as a position fallback when
-    // pangea's draggableProps.style is briefly missing top/left on the very
-    // first frame of a drag.
-    try {
-      // data-chip-anchor uses the RAW chord id; each tab tags its own
-      // Draggable with a namespace prefix ("L-" / "P-") so they don't
-      // collide in pangea's flat registry. Strip the prefix when looking
-      // up the source DOM node for the renderClone position fallback.
-      let rawId = start.draggableId;
-      if (rawId.startsWith("L-")) rawId = rawId.slice(2);
-      else if (rawId.startsWith("P-")) rawId = rawId.slice(2);
-      const sel = `[data-chip-anchor="${CSS.escape(rawId)}"]`;
-      const el = document.querySelector(sel) as HTMLElement | null;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
-          useDndStore.getState().setSourceRect({
-            draggableId: start.draggableId,
-            top: r.top,
-            left: r.left,
-            width: r.width,
-            height: r.height,
-          });
-        }
-      }
-    } catch {
-      /* ignore — fallback is best-effort */
-    }
-  };
-  const onDragStart = (start: { draggableId: string }) => {
-    const { lyricsOnDragStart } = useDndStore.getState();
-    lyricsOnDragStart?.(start);
   };
   const onDragEnd = (result: DropResult) => {
     try {
       const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
       const dstPrefix = result.destination?.droppableId.split(":")[0];
-      // eslint-disable-next-line no-console
-      console.log("[DnD] onDragEnd", {
-        result,
-        destination: result.destination?.droppableId,
-        source: result.source?.droppableId,
-        dstPrefix,
-      });
       if (dstPrefix === "slot") {
-        console.log("[DnD] -> lyrics handler");
         lyricsOnDragEnd?.(result);
       } else if (dstPrefix === "pattern") {
-        console.log("[DnD] -> progressions handler");
-        progressionsOnDragEnd?.(result);
-      } else {
-        // No destination (drop cancelled) — still notify both so per-tab
-        // draggingIds state clears (handlers return early when destination is
-        // null).
-        lyricsOnDragEnd?.(result);
         progressionsOnDragEnd?.(result);
       }
     } finally {
-      // Always release: clears both the frozen drag set and the autosave
-      // gate, even if a handler throws.
       useDndStore.getState().clear();
       endInteraction();
     }
@@ -180,17 +116,7 @@ const Index = () => {
 
       <DragDropContext
         onBeforeDragStart={onBeforeDragStart}
-        onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        // Custom sensor stack:
-        //  - useInstantMouseSensor: like pangea's mouse sensor, but skips the
-        //    synthetic mousedown iOS/Android dispatch after a real touchend
-        //    and only preventDefaults once movement crosses a drag threshold —
-        //    so plain taps still fire onClick on touch devices.
-        //  - useKeyboardSensor: pangea's stock keyboard sensor for a11y.
-        //  - useInstantTouchSensor: promotes touch into a drag on the first
-        //    movement past a small threshold (no 120ms long-press required),
-        //    while quick taps still fire onClick for selection.
         enableDefaultSensors={false}
         sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
       >
