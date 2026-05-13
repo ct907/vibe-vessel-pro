@@ -434,31 +434,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           style={{ width: 48, height: 48, fill: "var(--border)" }}
         />
         <div className="flex items-center">
-          {/* Desktop: photos inline next to image button */}
-          {inspirationPhotos.length > 0 && (
-            <div className="hidden md:flex items-center" style={{ marginRight: 24 }}>
-              {[...inspirationPhotos].reverse().map((photo, ri) => (
-                <img
-                  key={photo.id}
-                  src={photo.dataUrl}
-                  alt=""
-                  draggable={false}
-                  onClick={() => { setLightboxIndex(inspirationPhotos.length - 1 - ri); setLightboxOpen(true); }}
-                  style={{
-                    maxWidth: 120,
-                    maxHeight: 120,
-                    display: "block",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
-                    marginLeft: ri > 0 ? -10 : 0,
-                    cursor: "pointer",
-                    position: "relative",
-                    zIndex: inspirationPhotos.length - ri,
-                  }}
-                />
-              ))}
-            </div>
-          )}
           <button
             type="button"
             onClick={() => {

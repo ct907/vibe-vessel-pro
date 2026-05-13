@@ -477,7 +477,7 @@ function PatternBlock({
                               {isActive && (
                                 <button
                                   type="button"
-                                  className="absolute -top-1.5 -right-1.5 z-20 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                                  className="absolute -top-1.5 -right-1.5 z-20 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -496,7 +496,7 @@ function PatternBlock({
                                   }}
                                   aria-label="Delete chord"
                                 >
-                                  <X className="h-2.5 w-2.5" />
+                                  <X className="h-3 w-3" />
                                 </button>
                               )}
                             </div>
