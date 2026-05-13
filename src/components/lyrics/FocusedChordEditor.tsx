@@ -136,8 +136,15 @@ export function FocusedChordEditor(props: Props) {
   const octaveInitRef = useRef(true);
   useEffect(() => {
     if (octaveInitRef.current) { octaveInitRef.current = false; return; }
-    if (props.mode !== "progression" || !progChord) return;
-    updatePatternChord(props.patternId, props.chordId, { chord: { ...progChord.chord, octave } });
+    if (props.mode === "progression") {
+      if (!progChord) return;
+      updatePatternChord(props.patternId, props.chordId, { chord: { ...progChord.chord, octave } });
+    } else if (props.mode !== "progression-add" && anchorId && section) {
+      const live = getLineChordsViaSSOT(section, lyricsLineId);
+      const cur = live.find((c) => c.id === anchorId);
+      if (!cur || cur.slotIndex == null) return;
+      upsertChordAt(props.sectionId, lyricsLineId, cur.slotIndex, { ...cur.chord, octave }, anchorId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [octave]);
 
