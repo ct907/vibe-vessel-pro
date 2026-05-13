@@ -65,12 +65,14 @@ import {
   Wand2,
   Sparkles,
   Pencil,
+  WholeWord,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker } from "@/components/section/SectionColorPicker";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
+import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 
@@ -140,6 +142,10 @@ interface LineRowProps {
   /** The chord id that currently shows its X chip (tab-level, one at a time). */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
+  isFocused?: boolean;
+  onTextFocus: () => void;
+  onTextBlur: () => void;
+  onRhymeOpen: () => void;
 }
 
 function LineRow({
@@ -153,6 +159,10 @@ function LineRow({
   onChordFocus,
   activeChordId,
   onSetActiveChordId,
+  isFocused,
+  onTextFocus,
+  onTextBlur,
+  onRhymeOpen,
 }: LineRowProps) {
   const {
     setLineText,
@@ -446,11 +456,24 @@ function LineRow({
       {/* LYRIC INPUT */}
       <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)", marginTop: 4 }} />
       <div className="relative rounded-sm bg-[var(--paper-card)]">
+        {isFocused && (
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onRhymeOpen}
+            className="absolute right-1 top-1/2 -translate-y-1/2 btn-sculpt-cream h-6 w-6 flex items-center justify-center rounded z-10"
+            tabIndex={-1}
+            aria-label="Find rhymes"
+          >
+            <WholeWord className="h-3.5 w-3.5" />
+          </button>
+        )}
         <textarea
           ref={lyricInputRef}
           data-lyric-input={line.id}
           value={line.text}
           rows={1}
+          onFocus={onTextFocus}
+          onBlur={onTextBlur}
           onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
           onBeforeInput={(e: React.FormEvent<HTMLTextAreaElement> & { data?: string }) => {
             // Mobile soft keyboards often fire keydown with key="" / "Unidentified".
@@ -494,7 +517,10 @@ function LineRow({
             }
           }}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
+          className={cn(
+            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
+            isFocused && "pr-8",
+          )}
         />
       </div>
 
@@ -559,6 +585,10 @@ interface SectionCardProps {
   /** Tab-level active chord for X chip (one across all sections). */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
+  focusedLineId?: string;
+  onLineTextFocus: (lineId: string) => void;
+  onLineTextBlur: () => void;
+  onRhymeOpen: (lineId: string) => void;
 }
 
 function SectionCard({
@@ -573,6 +603,10 @@ function SectionCard({
   onMoveSection,
   activeChordId,
   onSetActiveChordId,
+  focusedLineId,
+  onLineTextFocus,
+  onLineTextBlur,
+  onRhymeOpen,
 }: SectionCardProps) {
   const {
     addLine,
@@ -804,6 +838,10 @@ function SectionCard({
                 onChordFocus={() => {}}
                 activeChordId={activeChordId}
                 onSetActiveChordId={onSetActiveChordId}
+                isFocused={focusedLineId === line.id}
+                onTextFocus={() => onLineTextFocus(line.id)}
+                onTextBlur={onLineTextBlur}
+                onRhymeOpen={() => onRhymeOpen(line.id)}
               />
             ))}
           </div>
@@ -929,7 +967,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     moveSection,
     basket,
     moveChordToSlot,
-
+    setLineText,
     placeChordInSlot,
     autoLayoutSection,
   } = useSongStore();
@@ -945,6 +983,17 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   const isMobile = useIsMobile();
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
+  const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
+  const [rhymeOpen, setRhymeOpen] = useState(false);
+
+  const handleLineTextFocus = (sectionId: string, lineId: string) =>
+    setFocusedLineInfo({ sectionId, lineId });
+  const handleLineTextBlur = () =>
+    setFocusedLineInfo(null);
+  const handleRhymeOpen = (sectionId: string, lineId: string) => {
+    setFocusedLineInfo({ sectionId, lineId });
+    setRhymeOpen(true);
+  };
 
   // Suppress the picker-open click that fires after dropping a chord.
   const justDraggedAtRef = useRef<number>(0);
@@ -1220,6 +1269,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             onSetActiveChordId={setActiveChordId}
             sortMode={sortMode}
             onMoveSection={(id, direction) => moveSection(id, direction)}
+            focusedLineId={focusedLineInfo?.sectionId === sec.id ? focusedLineInfo.lineId : undefined}
+            onLineTextFocus={(lineId) => handleLineTextFocus(sec.id, lineId)}
+            onLineTextBlur={handleLineTextBlur}
+            onRhymeOpen={(lineId) => handleRhymeOpen(sec.id, lineId)}
           />
           {overflowToastFor[sec.id] ? (
             <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
@@ -1328,6 +1381,27 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           }}
         />
       )}
+
+      {(() => {
+        const rhymeSec = focusedLineInfo
+          ? sections.find((s) => s.id === focusedLineInfo.sectionId)
+          : undefined;
+        const nonOverflowLines = rhymeSec?.lines.filter((l) => !l._isChordOverflow) ?? [];
+        const activeIdx = nonOverflowLines.findIndex((l) => l.id === focusedLineInfo?.lineId);
+        return (
+          <FocusedRhymeEditor
+            isOpen={rhymeOpen}
+            onClose={() => setRhymeOpen(false)}
+            activeLineIndex={activeIdx >= 0 ? activeIdx : 0}
+            lines={nonOverflowLines.map((l) => l.text)}
+            onReplaceLine={(idx, newText) => {
+              if (!rhymeSec) return;
+              const target = nonOverflowLines[idx];
+              if (target) setLineText(rhymeSec.id, target.id, newText);
+            }}
+          />
+        );
+      })()}
 
       <Dialog open={orientationOpen} onOpenChange={setOrientationOpen}>
         <DialogContent>
