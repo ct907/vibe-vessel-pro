@@ -33,6 +33,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMetronomeStore } from "@/store/metronome";
 import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
+import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
   AlertDialog,
@@ -215,6 +216,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   } = useSongStore();
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
+  const { preset, setPreset } = useSoundStore();
   const [fileInputKey, setFileInputKey] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -481,6 +483,37 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             />
           );
         })}
+        {inspirationPhotos.map((photo, i) => {
+          const desktopSlots = [
+            { left: "calc(30% + 240px)", top: -48, rotate: -7 },
+            { left: "calc(30% + 390px)", top: -58, rotate: 5 },
+            { left: "calc(30% + 540px)", top: -47, rotate: -3 },
+          ] as const;
+          const slot = desktopSlots[desktopSlots.length - 1 - i] ?? desktopSlots[0];
+          return (
+            <img
+              key={`d-${photo.id}`}
+              src={photo.dataUrl}
+              alt=""
+              draggable={false}
+              className="hidden md:block"
+              style={{
+                position: "absolute",
+                left: slot.left,
+                top: slot.top,
+                maxWidth: 90,
+                maxHeight: 90,
+                display: "block",
+                borderRadius: 8,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+                transform: `rotate(${slot.rotate}deg)`,
+                zIndex: 0,
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            />
+          );
+        })}
 
         {/* Lightbox portal */}
         {lightboxOpen && inspirationPhotos.length > 0 && (
@@ -534,16 +567,36 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80 overflow-y-auto">
+            <SheetContent side="right" className="w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
               <SheetHeader>
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
 
+              {/* Sound */}
+              <div className="mt-6 flex flex-col gap-2">
+                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Sound</h3>
+                <Select value={preset} onValueChange={(v) => setPreset(v as SoundPreset)}>
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOUND_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => { setSoundOpen(true); setNavOpen(false); }}
+                >
+                  <Music2 className="h-4 w-4" /> Sound
+                </Button>
+              </div>
+
               {/* Song Settings */}
               <div className="mt-6">
-                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">
-                  Song Settings
-                </h3>
+                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Song Settings</h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs uppercase tracking-wide text-muted-foreground">Key</span>
@@ -554,9 +607,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         </SelectTrigger>
                         <SelectContent>
                           {ALL_ROOTS.map((r) => (
-                            <SelectItem key={r} value={r} className="font-mono-chord">
-                              {r}
-                            </SelectItem>
+                            <SelectItem key={r} value={r} className="font-mono-chord">{r}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -566,9 +617,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         </SelectTrigger>
                         <SelectContent>
                           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {MODE_LABEL[m]}
-                            </SelectItem>
+                            <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -626,9 +675,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Time Signature
-                    </span>
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Time Signature</span>
                     <Select
                       value={`${meta.beatsPerBar}/${meta.beatUnit}`}
                       onValueChange={(v) => {
@@ -641,126 +688,87 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       </SelectTrigger>
                       <SelectContent>
                         {["2/4", "3/4", "4/4", "5/4", "6/4", "6/8", "7/8", "9/8", "12/8"].map((ts) => (
-                          <SelectItem key={ts} value={ts} className="font-mono-chord">
-                            {ts}
-                          </SelectItem>
+                          <SelectItem key={ts} value={ts} className="font-mono-chord">{ts}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Transpose
-                    </span>
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Transpose</span>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => stepTranspose(-1)}
-                        aria-label="Transpose down semitone"
-                      >
-                        <span aria-hidden className="text-base leading-none">
-                          −
-                        </span>
+                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(-1)} aria-label="Transpose down semitone">
+                        <span aria-hidden className="text-base leading-none">−</span>
                       </Button>
                       <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center">
                         {fmtOffset(transposeOffset)}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => stepTranspose(1)}
-                        aria-label="Transpose up semitone"
-                      >
-                        <span aria-hidden className="text-base leading-none">
-                          +
-                        </span>
+                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(1)} aria-label="Transpose up semitone">
+                        <span aria-hidden className="text-base leading-none">+</span>
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Other actions */}
-              <div className="mt-6 flex flex-col gap-2">
-                <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                    Dark mode
+              {/* Project Settings */}
+              <div className="mt-6">
+                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Project Settings</h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border border-border"
+                      onClick={() => { downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json"); setNavOpen(false); }}
+                    >
+                      <Save className="h-4 w-4" /> Save
+                    </Button>
+                    <label className="flex-1 inline-flex">
+                      <input
+                        key={fileInputKey}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
+                      />
+                      <span className="inline-flex w-full h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent">
+                        <Upload className="h-4 w-4" /> Load
+                      </span>
+                    </label>
                   </div>
-                  <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border border-border"
+                      onClick={() => { setConfirmNewSong(true); setNavOpen(false); }}
+                    >
+                      <FilePlus className="h-4 w-4" /> New Song
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border border-border"
+                      onClick={() => { setExportOpen(true); setNavOpen(false); }}
+                    >
+                      <FileText className="h-4 w-4" /> Export Lyrics
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                      Dark mode
+                    </div>
+                    <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                  </div>
+                  {suppressCrossTabDeleteWarning && (
+                    <Button
+                      variant="outline"
+                      className="justify-start border border-border"
+                      onClick={() => { setSuppressCrossTabDeleteWarning(false); toast({ title: "Delete warnings re-enabled" }); setNavOpen(false); }}
+                    >
+                      Reset delete warnings
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setSoundOpen(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <Music2 className="h-4 w-4" /> Sound
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setExportOpen(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <FileText className="h-4 w-4" /> Export Lyrics
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json");
-                    setNavOpen(false);
-                  }}
-                >
-                  <Save className="h-4 w-4" /> Save
-                </Button>
-                <label className="inline-flex">
-                  <input
-                    key={fileInputKey}
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      handleLoad(e.target.files?.[0]);
-                      setNavOpen(false);
-                    }}
-                  />
-                  <span className="inline-flex w-full h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent">
-                    <Upload className="h-4 w-4" /> Load
-                  </span>
-                </label>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setConfirmNewSong(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <FilePlus className="h-4 w-4" /> New song
-                </Button>
-                {suppressCrossTabDeleteWarning && (
-                  <Button
-                    variant="outline"
-                    className="justify-start border border-border"
-                    onClick={() => {
-                      setSuppressCrossTabDeleteWarning(false);
-                      toast({ title: "Delete warnings re-enabled" });
-                      setNavOpen(false);
-                    }}
-                  >
-                    Reset delete warnings
-                  </Button>
-                )}
               </div>
             </SheetContent>
           </Sheet>

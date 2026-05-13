@@ -459,7 +459,8 @@ function LineRow({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={onRhymeOpen}
-            className="absolute right-1 top-1/2 -translate-y-1/2 btn-sculpt-cream h-6 w-6 flex items-center justify-center rounded z-10"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded z-10"
+            style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", color: "var(--cocoa)" }}
             tabIndex={-1}
             aria-label="Find rhymes"
           >
@@ -985,7 +986,13 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
-  const [rhymeTarget, setRhymeTarget] = useState<{ sectionId: string; lineId: string } | null>(null);
+  const [rhymeTarget, setRhymeTarget] = useState<{
+    sectionId: string;
+    lineId: string;
+    lines: string[];
+    lineIds: string[];
+    activeIdx: number;
+  } | null>(null);
 
   const handleLineTextFocus = (sectionId: string, lineId: string) =>
     setFocusedLineInfo({ sectionId, lineId });
@@ -993,7 +1000,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     setFocusedLineInfo(null);
   const handleRhymeOpen = (sectionId: string, lineId: string) => {
     setFocusedLineInfo({ sectionId, lineId });
-    setRhymeTarget({ sectionId, lineId });
+    const section = sections.find((s) => s.id === sectionId);
+    const nonOverflowLines = section?.lines.filter((l) => !l._isChordOverflow) ?? [];
+    const activeIdx = Math.max(0, nonOverflowLines.findIndex((l) => l.id === lineId));
+    setRhymeTarget({
+      sectionId,
+      lineId,
+      lines: nonOverflowLines.map((l) => l.text),
+      lineIds: nonOverflowLines.map((l) => l.id),
+      activeIdx,
+    });
     setRhymeOpen(true);
   };
   const handleRhymeClose = () => {
@@ -1392,26 +1408,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
         />
       )}
 
-      {(() => {
-        const rhymeSec = rhymeTarget
-          ? sections.find((s) => s.id === rhymeTarget.sectionId)
-          : undefined;
-        const nonOverflowLines = rhymeSec?.lines.filter((l) => !l._isChordOverflow) ?? [];
-        const activeIdx = nonOverflowLines.findIndex((l) => l.id === rhymeTarget?.lineId);
-        return (
-          <FocusedRhymeEditor
-            isOpen={rhymeOpen}
-            onClose={handleRhymeClose}
-            activeLineIndex={activeIdx >= 0 ? activeIdx : 0}
-            lines={nonOverflowLines.map((l) => l.text)}
-            onReplaceLine={(idx, newText) => {
-              if (!rhymeSec) return;
-              const target = nonOverflowLines[idx];
-              if (target) setLineText(rhymeSec.id, target.id, newText);
-            }}
-          />
-        );
-      })()}
+      <FocusedRhymeEditor
+        isOpen={rhymeOpen}
+        onClose={handleRhymeClose}
+        activeLineIndex={rhymeTarget?.activeIdx ?? 0}
+        lines={rhymeTarget?.lines ?? []}
+        onReplaceLine={(idx, newText) => {
+          const targetId = rhymeTarget?.lineIds[idx];
+          if (targetId && rhymeTarget) setLineText(rhymeTarget.sectionId, targetId, newText);
+        }}
+      />
 
       <Dialog open={orientationOpen} onOpenChange={setOrientationOpen}>
         <DialogContent>
