@@ -1,55 +1,37 @@
-# Plan
+# Extend natural octave-save behaviour to ChordPickerSheet (desktop)
 
-## 1. Lyrics chord-row slot border on selection + hover
+## Problem
 
-In `LyricsTab.tsx` (chord row, lines ~262-319), the slot border currently lights up only when `hasActiveChordInLine` is true. Make it visible whenever:
+On desktop, both Lyrics and Progressions use `ChordPickerSheet` instead of `FocusedChordEditor`. Today the sheet has its own local `octave` state but:
 
-- a chord in this line is selected (already covered by `hasActiveChordInLine`),
-- OR the user is hovering the chord row (use a `group` / `group-hover:` pair).
+1. **Picked chord doesn't carry the octave.** `handlePick(chord)` calls `onPick(chord)` without merging the selected octave. Both consumers (`LyricsTab.handlePick`, `ProgressionsTab.handlePick`) write that chord straight into the store via `upsertChordAt` / `placeChordInSlot` / `updatePatternChord` / `addChordToPatternSlot`, so the saved chord ends up with no `octave` field — playback and audition then fall back to 4.
+2. **Octave doesn't seed from the chord being edited.** Opening the sheet on an existing chord always starts at octave 4, even if the chord was previously saved at 3 or 5.
+3. **Octave-only edits aren't saved.** If a user opens an existing chord, changes the dropdown to octave 5, and closes the sheet without re-picking from the suggestion grid, the change is lost (no live persistence).
 
-Changes:
-- Add `group` to the row container (line 277).
-- In each slot's `className` (line 313-316), keep the active-chord border state, and add `group-hover:border-muted-foreground/40` plus `group-hover:border-l-muted-foreground/35` for `slotIdx > 0`.
-- Remove the per-slot `hover:border-muted-foreground/40` (it only fires on the slot under the cursor; the row-level hover gives the user the full slot grid).
-- Border becomes hidden again automatically when the chord is deselected and the cursor leaves.
+This is the desktop analogue of the lyrics-mode bug we just fixed in `FocusedChordEditor`.
 
-## 2. Pattern-block chords sit flush, even at 0.5-bar lengths
+## Fix
 
-`ProgressionsTab.tsx` `PatternBlock` (lines ~268-320) currently builds `slotCount = bars * beatsPerBar` cells of equal width. A chord whose `lengthBeats < 1` still occupies one full slot but renders at `widthPct = lengthBeats/1 * 100`, leaving an empty gap before the next chord.
+### 1. `src/components/chord/ChordPickerSheet.tsx`
+- Seed `octave` from `initialChord?.octave ?? 4` in the existing "open" effect (alongside the query seed). Apply both when uncontrolled and when `initialChord` changes while open.
+- In `handlePick`, attach the current octave: `onPick({ ...chord, octave })`.
+- Add an optional prop `onOctaveChange?: (octave: number) => void`. Wire the existing octave `<Select>` to call it after `setOctave`. This is the "natural save" hook for octave-only edits.
 
-Refactor the layout so chord widths are proportional to `lengthBeats` and chips sit flush left, with no leading gaps:
+No UI changes; the dropdown stays where it is.
 
-- Replace the per-beat slot-cell `flex` model with two layered passes inside the existing `relative h-20 ... flex w-full` container:
-  - **Bar/beat dividers**: keep the absolutely-positioned bar separators and beat dividers (lines ~298-315) as-is — they are already percentage-positioned over `totalBeats`.
-  - **Chord track**: render a single `flex` row of chord chips, each with `style={{ flex: \`${c.lengthBeats} ${c.lengthBeats} 0%\` }}`. Chips render in SSOT order with no spacers between them, so a 0.5b chord sits flush against the next chord. Drop the per-chip `width: calc(${widthPct}% - 4px)` style — the flex basis now drives width.
-  - **Free-space tail**: after the last chord, render one droppable that takes `flex: ${freeBeats} ${freeBeats} 0%`. This is the single "empty area" target for picker-open clicks and drops. (We lose per-beat empty droppables; compensate by giving the tail a `data-pattern-slot="${usedBeats}"` and computing the drop slot from pointer X within the tail when needed. If keeping per-beat empty drop targets is required, render `Math.floor(freeBeats / beatsPerSlot)` empty droppables sized `flex: 1 1 0%` after the chord track.)
-- Keep the existing edge-left / edge-right droppables for cross-block transfers.
-- Keep the `Droppable` per-chord wrapper for re-ordering inside the block; just place each `Droppable` inside the new flex track instead of inside per-beat slot cells.
+### 2. `src/components/lyrics/LyricsTab.tsx`
+- Pass `onOctaveChange={(oct) => { ... }}` to `ChordPickerSheet`. When `picker.anchorId` is set, look up the live chord (`activeLine.chords.find(c => c.id === picker.anchorId)?.chord`) and call `upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, { ...currentChord, octave: oct }, picker.anchorId)`. When no anchor (still placing a new chord), do nothing — the octave will ride along with `onPick`.
+- `handlePick` needs no change: the chord arg now already includes `octave`, so the store writes it through.
 
-Result: a 0.5-bar chord renders at exactly half a beat's width, the next chord starts immediately to its right, and the free-space drop zone fills the remainder.
+### 3. `src/components/progressions/ProgressionsTab.tsx`
+- Pass `onOctaveChange` to `ChordPickerSheet`. When `picker.replaceChordId` is set, find the current pattern chord and call `updatePatternChord(picker.patternId, picker.replaceChordId, { chord: { ...current.chord, octave: oct } })`. When adding a new chord (no `replaceChordId`), do nothing.
+- `handlePick` keeps its current shape; the incoming `chord` already carries the octave for both `updatePatternChord` and `addChordToPatternSlot`.
 
-## 3. Resizing a chord reflows neighbours to the right
+## Result
 
-Falls out of step 2: because chord widths come from `flex-basis = lengthBeats`, calling `setPatternChordLength` (or `resizePatternChordsWithOverflow`) updates `c.lengthBeats` in the store, which re-renders the flex track and the right-side neighbours shift automatically. No additional store changes needed; verify visually in the toolbar's `+` / `-` buttons (lines 593-630) and the keyboard ↑/↓ handler (lines 205-216).
-
-If the store still snaps `startBeat` to integers and that causes visual jumps when a 0.5-bar chord grows to 1.0, switch the chord-track render to compute positions purely from accumulated `lengthBeats` (already true under SSOT — `getPatternChordsViaSSOT` returns chords in order; `startBeat` is only used for the playback cursor, which is already percentage-of-total-beats).
-
-## 4. Chord context menu +20% bigger
-
-Assumption: "chord context menu" = the floating chord toolbar in `ProgressionsTab.tsx` (lines 555-670) that appears under an active chord with reorder, ±½-bar, multi-select, select-all controls. (The right-click / long-press also opens `FocusedChordEditor`, which is a full-screen sheet — out of scope unless you say otherwise.)
-
-Scale the toolbar and its buttons by ~1.2×:
-- Container (line 558): `px-1.5 py-1` → `px-2 py-1.5`, `gap-1` → `gap-1.5`.
-- Every `Button size="icon"` inside (lines 561, 577, 594, 615, 636, 656): `h-7 w-7` → `h-9 w-9`.
-- Every `Lucide` icon inside those buttons: `h-4 w-4` → `h-5 w-5`.
-- Chord-name span (line 573): `text-sm` → `text-base`; bar-length span (line 611) `text-xs` → `text-sm`; counter (line 649) `text-xs` → `text-sm`.
-- Vertical dividers (lines 590, 632): `h-5` → `h-6`.
-
-If you confirm the target is actually `FocusedChordEditor` (or the section-header `DropdownMenu`), I'll re-scope to that surface instead.
+Desktop matches mobile: octave selected in `ChordPickerSheet` is persisted on the chord automatically — both when picking and when changing only the octave on an existing chord. Tap-to-audition (already reads `chord.octave`) and Transport playback (per-chord octave from earlier fix) then play the saved octave.
 
 ## Files touched
-
-- `src/components/lyrics/LyricsTab.tsx` — chord-row slot hover/select border.
-- `src/components/progressions/ProgressionsTab.tsx` — flush sub-beat chord layout (#2/#3) and toolbar sizing (#4).
-
-No store, schema, or test changes are required; existing `chordLayout` and SSOT helpers are untouched.
+- `src/components/chord/ChordPickerSheet.tsx` — seed octave from initial chord, attach octave to picked chord, expose `onOctaveChange`.
+- `src/components/lyrics/LyricsTab.tsx` — wire `onOctaveChange` to `upsertChordAt` for the edited anchor.
+- `src/components/progressions/ProgressionsTab.tsx` — wire `onOctaveChange` to `updatePatternChord` for the replaced chord.

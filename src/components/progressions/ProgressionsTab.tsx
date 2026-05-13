@@ -1158,7 +1158,23 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         </div>
       </div>
 
-      <ChordPickerSheet open={!!picker} onOpenChange={(o) => !o && setPicker(null)} onPick={handlePick} />
+      <ChordPickerSheet
+        open={!!picker}
+        onOpenChange={(o) => !o && setPicker(null)}
+        onPick={handlePick}
+        initialChord={(() => {
+          if (!picker?.replaceChordId) return undefined;
+          const pat = progression.find((p) => p.id === picker.patternId);
+          return pat?.chords.find((c) => c.id === picker.replaceChordId)?.chord;
+        })()}
+        onOctaveChange={(oct) => {
+          if (!picker?.replaceChordId) return;
+          const pat = progression.find((p) => p.id === picker.patternId);
+          const cur = pat?.chords.find((c) => c.id === picker.replaceChordId)?.chord;
+          if (!cur) return;
+          updatePatternChord(picker.patternId, picker.replaceChordId, { chord: { ...cur, octave: oct } });
+        }}
+      />
 
       {chordEditor && (
         <FocusedChordEditor

@@ -24,9 +24,11 @@ interface Props {
   /** Optional controlled query (kept in sync with the active chord row). */
   query?: string;
   onQueryChange?: (q: string) => void;
+  /** Live-save hook for octave-only edits (no chord re-pick). */
+  onOctaveChange?: (octave: number) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -38,9 +40,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
 
   useEffect(() => {
     if (open) {
-      // When uncontrolled, seed with the existing chord display. When parent
-      // controls the query, leave it alone (parent owns sync with chord row).
       if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
+      setOctave(initialChord?.octave ?? 4);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord, queryProp]);
@@ -108,7 +109,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   // Close manually via the X button. Pressing Enter or double-tapping a suggestion
   // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
-    onPick(chord);
+    onPick({ ...chord, octave });
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
@@ -189,7 +190,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
-            <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+            <Select value={String(octave)} onValueChange={(v) => { const o = Number(v); setOctave(o); onOctaveChange?.(o); }}>
               <SelectTrigger
                 className="h-10 w-[64px] px-2 text-xs font-mono-chord border-0"
                 style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}

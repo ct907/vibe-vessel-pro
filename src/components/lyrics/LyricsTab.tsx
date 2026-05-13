@@ -1316,6 +1316,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
           onQueryChange={setPickerQuery}
+          onOctaveChange={(oct) => {
+            if (!picker?.anchorId) return;
+            const sec = sections.find((s) => s.id === picker.sectionId);
+            const line = sec?.lines.find((l) => l.id === picker.lineId);
+            const cur = line?.chords.find((c) => c.id === picker.anchorId)?.chord;
+            if (!cur) return;
+            upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, { ...cur, octave: oct }, picker.anchorId);
+          }}
         />
       )}
 
