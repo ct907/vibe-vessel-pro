@@ -348,6 +348,7 @@ function LineRow({
                           variant="ink"
                           size="sm"
                           audition={true}
+                          octave={anchor!.chord.octave ?? 4}
                           selected={activeChordId === anchor!.id}
                           onClick={() => {
                             if (singleClickTimerRef.current) {
