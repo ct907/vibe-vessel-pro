@@ -69,9 +69,9 @@ async function convertToWebP(file: File, maxPx = 400): Promise<string> {
 }
 
 const PHOTO_SLOTS = [
-  { left: "30%", top: -38, rotate: -7 },
-  { left: "46%", top: -48, rotate: 5 },
-  { left: "61%", top: -37, rotate: -3 },
+  { left: "30%", top: -48, rotate: -7 },
+  { left: "46%", top: -58, rotate: 5 },
+  { left: "61%", top: -47, rotate: -3 },
 ] as const;
 
 function InspirationLightbox({
@@ -80,12 +80,14 @@ function InspirationLightbox({
   onClose,
   onRemove,
   onRemoveAll,
+  onAddPhotos,
 }: {
   photos: InspirationPhoto[];
   initialIndex: number;
   onClose: () => void;
   onRemove: (id: string) => void;
   onRemoveAll: () => void;
+  onAddPhotos: () => void;
 }) {
   const [idx, setIdx] = useState(initialIndex);
   const current = photos[idx] ?? photos[0];
@@ -148,6 +150,17 @@ function InspirationLightbox({
       </div>
       {/* Actions */}
       <div style={{ display: "flex", gap: 10, marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
+        {photos.length < 3 && (
+          <button
+            type="button"
+            onClick={onAddPhotos}
+            style={{
+              padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+              background: "rgba(255,255,255,0.18)", color: "white",
+              border: "1px solid rgba(255,255,255,0.35)", fontSize: 13,
+            }}
+          >Add photos</button>
+        )}
         <button
           type="button"
           onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
@@ -441,7 +454,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
-          const slot = PHOTO_SLOTS[i] ?? PHOTO_SLOTS[0];
+          const slot = PHOTO_SLOTS[PHOTO_SLOTS.length - 1 - i] ?? PHOTO_SLOTS[0];
           return (
             <img
               key={photo.id}
@@ -474,6 +487,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             onClose={() => setLightboxOpen(false)}
             onRemove={(id) => { removeInspirationPhoto(id); if (inspirationPhotos.length <= 1) setLightboxOpen(false); }}
             onRemoveAll={() => { inspirationPhotos.forEach((p) => removeInspirationPhoto(p.id)); setLightboxOpen(false); }}
+            onAddPhotos={() => photoInputRef.current?.click()}
           />
         )}
 
