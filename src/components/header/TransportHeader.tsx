@@ -69,9 +69,9 @@ async function convertToWebP(file: File, maxPx = 400): Promise<string> {
 }
 
 const PHOTO_SLOTS = [
-  { left: "30%", top: -58, rotate: -7 },
-  { left: "46%", top: -68, rotate: 5 },
-  { left: "61%", top: -57, rotate: -3 },
+  { left: "30%", top: -38, rotate: -7 },
+  { left: "46%", top: -48, rotate: 5 },
+  { left: "61%", top: -37, rotate: -3 },
 ] as const;
 
 function InspirationLightbox({
@@ -415,11 +415,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   return (
     <>
-      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
-        <Bookmark
-          className="h-6 w-6 shrink-0"
-          style={{ color: "var(--cocoa-deep)", fill: "var(--border)" }}
-        />
+      {/* Bookmark — fixed, flows from above viewport top edge */}
+      <Bookmark
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 12,
+          zIndex: 60,
+          width: 48,
+          height: 48,
+          color: "var(--cocoa-deep)",
+          fill: "var(--border)",
+        }}
+      />
+      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-end px-1">
         <button
           type="button"
           onClick={() => {
@@ -452,8 +461,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 position: "absolute",
                 left: slot.left,
                 top: slot.top,
-                maxWidth: 50,
-                maxHeight: 50,
+                maxWidth: 90,
+                maxHeight: 90,
                 display: "block",
                 borderRadius: 8,
                 boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
@@ -477,7 +486,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="rounded-xl bg-card/95 backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)" }}>
+        <header id="main-header" className="rounded-xl backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--paper-shade) 15%, var(--card))" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center gap-2">

@@ -18,6 +18,7 @@ export interface ChordSymbol {
   quality: Quality;
   bass?: string;
   display: string;       // pretty form, e.g. "Fmaj7"
+  octave?: number;
 }
 
 // QUALITY_MAP ordering rule (Phase 1.5):

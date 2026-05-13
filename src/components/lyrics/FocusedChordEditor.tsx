@@ -121,10 +121,12 @@ export function FocusedChordEditor(props: Props) {
       setQuery("");
     } else if (isProgression) {
       setQuery(progChord?.chord.display ?? "");
+      setOctave(progChord?.chord.octave ?? 4);
     } else {
       const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
       const initialChord = lineChords.find((c) => c.id === lyricsInitialAnchorId)?.chord;
       setQuery(initialChord?.display ?? "");
+      setOctave(initialChord?.octave ?? 4);
     }
     setTimeout(() => inputRef.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,21 +149,22 @@ export function FocusedChordEditor(props: Props) {
   const exact = useMemo(() => parseChord(query.trim()), [query]);
 
   const handlePick = (chord: ChordSymbol) => {
+    const chordWithOctave = { ...chord, octave };
     if (isProgressionAdd) {
-      addChordToPatternSlot(props.patternId, chord, props.atBeat);
+      addChordToPatternSlot(props.patternId, chordWithOctave, props.atBeat);
       props.onClose();
       return;
     }
     if (isProgression) {
       // Replace the chord family of the tapped progression chord.
-      updatePatternChord(props.patternId, props.chordId, { chord });
+      updatePatternChord(props.patternId, props.chordId, { chord: chordWithOctave });
       props.onClose();
       return;
     }
 
     if (!line) return;
     if (anchorId) {
-      upsertChordAt(props.sectionId, lyricsLineId, slot, chord, anchorId);
+      upsertChordAt(props.sectionId, lyricsLineId, slot, chordWithOctave, anchorId);
       setAnchorId(undefined);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
@@ -169,7 +172,7 @@ export function FocusedChordEditor(props: Props) {
     }
 
     const requestedSlot = slot;
-    const placed = placeChordInSlot(props.sectionId, lyricsLineId, requestedSlot, chord);
+    const placed = placeChordInSlot(props.sectionId, lyricsLineId, requestedSlot, chordWithOctave);
     const placedSlot = placed?.slotIndex ?? requestedSlot;
     const w = chordSlotWidth(chord.display);
     const next = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + w + 1);
