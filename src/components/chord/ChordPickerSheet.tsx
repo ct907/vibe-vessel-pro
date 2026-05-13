@@ -40,9 +40,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
 
   useEffect(() => {
     if (open) {
-      // When uncontrolled, seed with the existing chord display. When parent
-      // controls the query, leave it alone (parent owns sync with chord row).
       if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
+      setOctave(initialChord?.octave ?? 4);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord, queryProp]);
