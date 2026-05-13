@@ -109,7 +109,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   // Close manually via the X button. Pressing Enter or double-tapping a suggestion
   // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
-    onPick(chord);
+    onPick({ ...chord, octave });
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
