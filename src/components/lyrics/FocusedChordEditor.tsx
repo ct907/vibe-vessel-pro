@@ -473,7 +473,7 @@ export function FocusedChordEditor(props: Props) {
               fontFamily: "'JetBrains Mono', monospace",
               fontWeight: 700,
               fontSize: 15,
-              color: "var(--ink)",
+              color: "var(--paper-card)",
             }}>{octave}</span>
             <button
               type="button"

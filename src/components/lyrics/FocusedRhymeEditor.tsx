@@ -45,6 +45,7 @@ function useRhymeSearch(isOpen: boolean) {
   const [error, setError] = useState(false);
   const [lastReplacement, setLastReplacement] = useState<{ lineIndex: number; oldText: string } | null>(null);
   const [showReplaced, setShowReplaced] = useState(false);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const replacedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -57,6 +58,7 @@ function useRhymeSearch(isOpen: boolean) {
       setError(false);
       setLastReplacement(null);
       setShowReplaced(false);
+      setSelectedWord(null);
     }
   }, [isOpen]);
 
@@ -104,9 +106,19 @@ function useRhymeSearch(isOpen: boolean) {
     activeLineIndex: number,
     onReplaceLine: FocusedRhymeEditorProps["onReplaceLine"],
   ) => {
+    if (selectedWord === word) {
+      if (lastReplacement) {
+        onReplaceLine(lastReplacement.lineIndex, lastReplacement.oldText);
+        setLastReplacement(null);
+      }
+      setSelectedWord(null);
+      setShowReplaced(false);
+      return;
+    }
     const activeLine = lines[activeLineIndex] ?? "";
     setLastReplacement({ lineIndex: activeLineIndex, oldText: activeLine });
     onReplaceLine(activeLineIndex, replaceLastWord(activeLine, word));
+    setSelectedWord(word);
     setShowReplaced(true);
     if (replacedTimerRef.current) clearTimeout(replacedTimerRef.current);
     replacedTimerRef.current = setTimeout(() => setShowReplaced(false), 1500);
@@ -122,7 +134,7 @@ function useRhymeSearch(isOpen: boolean) {
   return {
     query, setQuery, triggerSearch, fetchRhymes,
     perfectRhymes, nearRhymes, loading, error,
-    lastReplacement, showReplaced,
+    lastReplacement, showReplaced, selectedWord,
     handleSelect, handleUndo,
   };
 }
@@ -143,6 +155,7 @@ interface ContentProps extends FocusedRhymeEditorProps {
   error: boolean;
   lastReplacement: { lineIndex: number; oldText: string } | null;
   showReplaced: boolean;
+  selectedWord: string | null;
   handleSelect: (w: string, lines: string[], idx: number, cb: FocusedRhymeEditorProps["onReplaceLine"]) => void;
   handleUndo: (cb: FocusedRhymeEditorProps["onReplaceLine"]) => void;
   resultsMaxHeight?: number;
@@ -152,7 +165,7 @@ function RhymeEditorContent({
   onClose, activeLineIndex, lines, onReplaceLine,
   inputRef, query, setQuery, triggerSearch, fetchRhymes,
   perfectRhymes, nearRhymes, loading, error,
-  lastReplacement, showReplaced, handleSelect, handleUndo,
+  lastReplacement, showReplaced, selectedWord, handleSelect, handleUndo,
   resultsMaxHeight,
 }: ContentProps) {
   const hasResults = perfectRhymes.length > 0 || nearRhymes.length > 0;
@@ -297,7 +310,7 @@ function RhymeEditorContent({
                 <button
                   key={r.word}
                   onClick={() => handleSelect(r.word, lines, activeLineIndex, onReplaceLine)}
-                  className="bg-accent text-accent-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"
+                  className={r.word === selectedWord ? "btn-sculpt-cocoa flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium border-none" : "bg-accent text-accent-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"}
                 >
                   <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 15, lineHeight: 1.2 }}>{r.word}</span>
                   {r.numSyllables != null && (
@@ -317,7 +330,7 @@ function RhymeEditorContent({
                 <button
                   key={r.word}
                   onClick={() => handleSelect(r.word, lines, activeLineIndex, onReplaceLine)}
-                  className="bg-muted text-muted-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"
+                  className={r.word === selectedWord ? "btn-sculpt-cocoa flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium border-none" : "bg-muted text-muted-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"}
                 >
                   <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 15, lineHeight: 1.2 }}>{r.word}</span>
                   {r.numSyllables != null && (
@@ -411,7 +424,8 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
     <Sheet open={props.isOpen} onOpenChange={(o) => { if (!o) props.onClose(); }} modal={false}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col p-0 [&>button[data-radix-dialog-close]]:hidden"
+        hideClose
+        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col p-0 gap-0 data-[state=closed]:duration-0"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
