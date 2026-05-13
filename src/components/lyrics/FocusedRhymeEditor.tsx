@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { X, RotateCcw, RefreshCw, Check } from "lucide-react";
+import { RotateCcw, RefreshCw, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 
 interface FocusedRhymeEditorProps {
   isOpen: boolean;
@@ -35,129 +34,7 @@ function getLastWord(line: string): string | null {
 }
 
 // =============================================================================
-// Shared inner content (results list + status)
-// =============================================================================
-
-interface ResultsProps {
-  loading: boolean;
-  error: boolean;
-  query: string;
-  perfectRhymes: RhymeWord[];
-  nearRhymes: RhymeWord[];
-  lastReplacement: { lineIndex: number; oldText: string } | null;
-  showReplaced: boolean;
-  onRetry: () => void;
-  onSelect: (word: string) => void;
-  onUndo: () => void;
-}
-
-function RhymeResults({
-  loading, error, query, perfectRhymes, nearRhymes,
-  lastReplacement, showReplaced, onRetry, onSelect, onUndo,
-}: ResultsProps) {
-  const hasResults = perfectRhymes.length > 0 || nearRhymes.length > 0;
-
-  return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
-      {(showReplaced || lastReplacement) && (
-        <div className="flex items-center gap-3 mb-3">
-          {showReplaced && (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-              <Check className="h-3.5 w-3.5" /> Replaced!
-            </span>
-          )}
-          {lastReplacement && (
-            <button
-              onClick={onUndo}
-              className="flex items-center gap-1 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] underline underline-offset-2"
-            >
-              <RotateCcw className="h-3 w-3" /> Undo
-            </button>
-          )}
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex items-center justify-center py-10 text-[var(--ink-soft)]">
-          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-          <span className="text-sm">Loading…</span>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="flex flex-col items-center gap-2 py-8 text-sm text-[var(--ink-soft)]">
-          <span>Network error.</span>
-          <button
-            onClick={onRetry}
-            className="btn-sculpt-cream px-3 py-1 rounded text-xs"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && query.trim() && !hasResults && (
-        <p className="py-8 text-center text-sm text-[var(--ink-soft)]">No rhymes found.</p>
-      )}
-
-      {!loading && !error && !query.trim() && (
-        <p className="text-sm" style={{ color: "var(--ink-soft)", opacity: 0.8 }}>
-          Tap a line chip or type a word to find rhymes.
-        </p>
-      )}
-
-      {!loading && !error && perfectRhymes.length > 0 && (
-        <div className="flex flex-col gap-1 mb-4">
-          <p
-            className="mb-1"
-            style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-          >
-            Perfect Rhymes
-          </p>
-          {perfectRhymes.map((r) => (
-            <RhymeRow key={r.word} rhyme={r} onSelect={onSelect} />
-          ))}
-        </div>
-      )}
-
-      {!loading && !error && nearRhymes.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <p
-            className="mb-1"
-            style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-          >
-            Near Rhymes
-          </p>
-          {nearRhymes.map((r) => (
-            <RhymeRow key={r.word} rhyme={r} onSelect={onSelect} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RhymeRow({ rhyme, onSelect }: { rhyme: RhymeWord; onSelect: (w: string) => void }) {
-  return (
-    <button
-      onClick={() => onSelect(rhyme.word)}
-      className="flex items-center justify-between w-full rounded-md px-3 py-2 text-sm text-left transition-colors"
-      style={{ color: "var(--ink)" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "color-mix(in oklch, var(--paper-shade) 60%, transparent)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
-    >
-      <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 17 }}>{rhyme.word}</span>
-      {rhyme.numSyllables != null && (
-        <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontSize: 11, color: "var(--ink-soft)" }}>
-          {rhyme.numSyllables} syl
-        </span>
-      )}
-    </button>
-  );
-}
-
-// =============================================================================
-// Hook: shared search state
+// Search state hook
 // =============================================================================
 
 function useRhymeSearch(isOpen: boolean) {
@@ -184,11 +61,7 @@ function useRhymeSearch(isOpen: boolean) {
   }, [isOpen]);
 
   const fetchRhymes = async (word: string) => {
-    if (!word.trim()) {
-      setPerfectRhymes([]);
-      setNearRhymes([]);
-      return;
-    }
+    if (!word.trim()) { setPerfectRhymes([]); setNearRhymes([]); return; }
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     const { signal } = abortRef.current;
@@ -225,11 +98,15 @@ function useRhymeSearch(isOpen: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  const handleSelect = (word: string, lines: string[], activeLineIndex: number, onReplaceLine: FocusedRhymeEditorProps["onReplaceLine"]) => {
+  const handleSelect = (
+    word: string,
+    lines: string[],
+    activeLineIndex: number,
+    onReplaceLine: FocusedRhymeEditorProps["onReplaceLine"],
+  ) => {
     const activeLine = lines[activeLineIndex] ?? "";
-    const newText = replaceLastWord(activeLine, word);
     setLastReplacement({ lineIndex: activeLineIndex, oldText: activeLine });
-    onReplaceLine(activeLineIndex, newText);
+    onReplaceLine(activeLineIndex, replaceLastWord(activeLine, word));
     setShowReplaced(true);
     if (replacedTimerRef.current) clearTimeout(replacedTimerRef.current);
     replacedTimerRef.current = setTimeout(() => setShowReplaced(false), 1500);
@@ -251,62 +128,208 @@ function useRhymeSearch(isOpen: boolean) {
 }
 
 // =============================================================================
-// Input + chips row (shared)
+// Shared 4-row inner layout
 // =============================================================================
 
-interface InputRowProps {
-  query: string;
-  onQueryChange: (q: string) => void;
+interface ContentProps extends FocusedRhymeEditorProps {
   inputRef: React.RefObject<HTMLInputElement | null>;
-  lines: string[];
-  activeLineIndex: number;
-  onChipTap: (word: string) => void;
+  query: string;
+  setQuery: (q: string) => void;
+  triggerSearch: (w: string) => void;
+  fetchRhymes: (w: string) => void;
+  perfectRhymes: RhymeWord[];
+  nearRhymes: RhymeWord[];
+  loading: boolean;
+  error: boolean;
+  lastReplacement: { lineIndex: number; oldText: string } | null;
+  showReplaced: boolean;
+  handleSelect: (w: string, lines: string[], idx: number, cb: FocusedRhymeEditorProps["onReplaceLine"]) => void;
+  handleUndo: (cb: FocusedRhymeEditorProps["onReplaceLine"]) => void;
+  resultsMaxHeight?: number;
 }
 
-function InputAndChips({ query, onQueryChange, inputRef, lines, activeLineIndex, onChipTap }: InputRowProps) {
+function RhymeEditorContent({
+  onClose, activeLineIndex, lines, onReplaceLine,
+  inputRef, query, setQuery, triggerSearch, fetchRhymes,
+  perfectRhymes, nearRhymes, loading, error,
+  lastReplacement, showReplaced, handleSelect, handleUndo,
+  resultsMaxHeight,
+}: ContentProps) {
+  const hasResults = perfectRhymes.length > 0 || nearRhymes.length > 0;
+
+  const sectionLabelStyle: React.CSSProperties = {
+    fontFamily: "var(--font-ui,'Nunito',sans-serif)",
+    fontWeight: 600,
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: "var(--paper-card)",
+  };
+
   return (
-    <div className="flex items-center gap-2 overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}>
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-        placeholder="Type a word…"
-        style={{
-          flexShrink: 0,
-          width: 140,
-          background: "var(--paper-card)",
-          boxShadow: "var(--shadow-sculpt-cream-rest)",
-          border: 0,
-          borderRadius: 8,
-          padding: "10px 14px",
-          fontFamily: "var(--font-display,'Zain',serif)",
-          fontWeight: 500,
-          fontSize: 15,
-          color: "var(--ink)",
-          outline: "none",
-        }}
-        onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
-        onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
-      />
-      {lines.map((line, idx) => {
-        const lastWord = getLastWord(line);
-        if (!lastWord) return null;
-        const isActive = idx === activeLineIndex;
-        return (
-          <button
-            key={idx}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onChipTap(lastWord)}
-            className={cn(
-              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0",
-              isActive ? "btn-sculpt-amber" : "btn-sculpt-cream",
+    <>
+      {/* Row 1 — Header */}
+      <div
+        className="flex items-center justify-between px-3 py-2 shrink-0"
+        style={{ background: "var(--paper-shade)" }}
+      >
+        <h2
+          style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
+        >
+          Find a Rhyme
+        </h2>
+        {(showReplaced || lastReplacement) && (
+          <div className="flex items-center gap-2 mx-3">
+            {showReplaced && (
+              <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                <Check className="h-3.5 w-3.5" /> Replaced!
+              </span>
             )}
-          >
-            L{idx + 1}: {lastWord}
-          </button>
-        );
-      })}
-    </div>
+            {lastReplacement && (
+              <button
+                onClick={() => handleUndo(onReplaceLine)}
+                className="flex items-center gap-1 text-xs underline underline-offset-2"
+                style={{ color: "var(--ink-soft)" }}
+              >
+                <RotateCcw className="h-3 w-3" /> Undo
+              </button>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold shrink-0"
+        >
+          Done
+        </button>
+      </div>
+
+      {/* Row 2 — Line word chips (horizontal scroll) */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 shrink-0 overflow-x-auto"
+        style={{ background: "var(--paper-shade)", borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 12%, transparent)" }}
+      >
+        {lines.map((line, idx) => {
+          const lastWord = getLastWord(line);
+          if (!lastWord) return null;
+          const isActive = idx === activeLineIndex;
+          return (
+            <button
+              key={idx}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => triggerSearch(lastWord)}
+              className={isActive ? "btn-sculpt-amber inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0" : "btn-sculpt-cream inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0"}
+            >
+              L{idx + 1}: {lastWord}
+            </button>
+          );
+        })}
+        {lines.every((l) => !getLastWord(l)) && (
+          <span className="text-xs" style={{ color: "var(--ink-soft)", opacity: 0.7 }}>No words in stanza yet</span>
+        )}
+      </div>
+
+      {/* Row 3 — Search input */}
+      <div
+        className="px-3 py-2 shrink-0"
+        style={{ background: "var(--paper-shade)", borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}
+      >
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Type a word to search for rhymes…"
+          style={{
+            width: "100%",
+            background: "var(--paper-card)",
+            boxShadow: "var(--shadow-sculpt-cream-rest)",
+            border: 0,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontFamily: "var(--font-display,'Zain',serif)",
+            fontWeight: 500,
+            fontSize: 15,
+            color: "var(--ink)",
+            outline: "none",
+          }}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
+        />
+      </div>
+
+      {/* Row 4 — Rhyme word chips grid */}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-3"
+        style={{ background: "var(--ink-soft)", ...(resultsMaxHeight ? { maxHeight: resultsMaxHeight } : {}) }}
+      >
+        {loading && (
+          <div className="flex items-center justify-center py-10" style={{ color: "var(--ink-soft)" }}>
+            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            <span className="text-sm">Loading…</span>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="flex flex-col items-center gap-2 py-8 text-sm" style={{ color: "var(--ink-soft)" }}>
+            <span>Network error.</span>
+            <button onClick={() => void fetchRhymes(query)} className="btn-sculpt-cream px-3 py-1 rounded text-xs">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && query.trim() && !hasResults && (
+          <p className="py-8 text-center text-sm" style={{ color: "var(--ink-soft)" }}>No rhymes found.</p>
+        )}
+
+        {!loading && !error && !query.trim() && (
+          <p className="text-sm" style={{ color: "var(--ink-soft)", opacity: 0.7 }}>
+            Tap a line chip or type a word above.
+          </p>
+        )}
+
+        {!loading && !error && perfectRhymes.length > 0 && (
+          <div className="mb-5">
+            <p className="mb-2" style={sectionLabelStyle}>Perfect Rhymes</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
+              {perfectRhymes.map((r) => (
+                <button
+                  key={r.word}
+                  onClick={() => handleSelect(r.word, lines, activeLineIndex, onReplaceLine)}
+                  className="bg-accent text-accent-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"
+                >
+                  <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 15, lineHeight: 1.2 }}>{r.word}</span>
+                  {r.numSyllables != null && (
+                    <span className="text-[10px] opacity-70 mt-0.5">{r.numSyllables} syl</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && nearRhymes.length > 0 && (
+          <div>
+            <p className="mb-2" style={sectionLabelStyle}>Near Rhymes</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
+              {nearRhymes.map((r) => (
+                <button
+                  key={r.word}
+                  onClick={() => handleSelect(r.word, lines, activeLineIndex, onReplaceLine)}
+                  className="bg-muted text-muted-foreground flex flex-col items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-opacity hover:opacity-80 border-none"
+                >
+                  <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 15, lineHeight: 1.2 }}>{r.word}</span>
+                  {r.numSyllables != null && (
+                    <span className="text-[10px] opacity-70 mt-0.5">{r.numSyllables} syl</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -314,87 +337,25 @@ function InputAndChips({ query, onQueryChange, inputRef, lines, activeLineIndex,
 // Mobile: full-screen overlay (FocusedChordEditor style)
 // =============================================================================
 
-function MobileRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplaceLine }: FocusedRhymeEditorProps) {
+function MobileRhymeEditor(props: FocusedRhymeEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const {
-    query, setQuery, triggerSearch, fetchRhymes,
-    perfectRhymes, nearRhymes, loading, error,
-    lastReplacement, showReplaced,
-    handleSelect, handleUndo,
-  } = useRhymeSearch(isOpen);
+  const search = useRhymeSearch(props.isOpen);
 
-  if (!isOpen) return null;
+  if (!props.isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
       <button
         type="button"
         aria-label="Close rhyme editor"
-        onClick={onClose}
+        onClick={props.onClose}
         className="absolute inset-0 bg-black/60"
       />
       <div
         className="relative m-4 flex flex-1 flex-col rounded-lg overflow-hidden"
         style={{ background: "var(--ink-soft)", boxShadow: "var(--shadow-paper)" }}
       >
-        {/* HEADER */}
-        <div
-          className="flex items-center gap-2 px-3 py-2 shrink-0"
-          style={{ background: "var(--paper-shade)" }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 shrink-0"
-            aria-label="Close rhyme editor"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h2
-              className="truncate"
-              style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
-            >
-              Find a Rhyme
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold shrink-0"
-          >
-            Done
-          </button>
-        </div>
-
-        {/* INPUT + CHIPS */}
-        <div
-          className="px-3 py-3 shrink-0"
-          style={{ background: "var(--paper-shade)", borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}
-        >
-          <InputAndChips
-            query={query}
-            onQueryChange={setQuery}
-            inputRef={inputRef}
-            lines={lines}
-            activeLineIndex={activeLineIndex}
-            onChipTap={triggerSearch}
-          />
-        </div>
-
-        {/* RESULTS */}
-        <RhymeResults
-          loading={loading}
-          error={error}
-          query={query}
-          perfectRhymes={perfectRhymes}
-          nearRhymes={nearRhymes}
-          lastReplacement={lastReplacement}
-          showReplaced={showReplaced}
-          onRetry={() => void fetchRhymes(query)}
-          onSelect={(w) => handleSelect(w, lines, activeLineIndex, onReplaceLine)}
-          onUndo={() => handleUndo(onReplaceLine)}
-        />
+        <RhymeEditorContent {...props} {...search} inputRef={inputRef} />
       </div>
     </div>
   );
@@ -404,24 +365,18 @@ function MobileRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplaceL
 // Desktop: bottom sheet (ChordPickerSheet style)
 // =============================================================================
 
-function DesktopRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplaceLine }: FocusedRhymeEditorProps) {
+function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
-
-  const {
-    query, setQuery, triggerSearch, fetchRhymes,
-    perfectRhymes, nearRhymes, loading, error,
-    lastReplacement, showReplaced,
-    handleSelect, handleUndo,
-  } = useRhymeSearch(isOpen);
+  const search = useRhymeSearch(props.isOpen);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
-  }, [isOpen]);
+    if (props.isOpen) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [props.isOpen]);
 
   useEffect(() => {
-    if (!isOpen || typeof window === "undefined") return;
+    if (!props.isOpen || typeof window === "undefined") return;
     const vv = window.visualViewport;
     const update = () => {
       if (vv) {
@@ -440,18 +395,19 @@ function DesktopRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplace
       window.removeEventListener("resize", update);
       setKeyboardOffset(0);
     };
-  }, [isOpen]);
+  }, [props.isOpen]);
 
   const TOP_RESERVED = 140;
-  const SHEET_CHROME = 200;
-  const sheetMaxHeight = Math.max(220, Math.min(vvHeight * 0.45, vvHeight - TOP_RESERVED));
-  const gridMaxHeight = Math.max(80, sheetMaxHeight - SHEET_CHROME);
+  // header(~48) + chips(~44) + input(~52) + padding = ~180 chrome
+  const SHEET_CHROME = 180;
+  const sheetMaxHeight = Math.max(300, Math.min(vvHeight * 0.55, vvHeight - TOP_RESERVED));
+  const resultsMaxHeight = Math.max(80, sheetMaxHeight - SHEET_CHROME);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(o) => { if (!o) onClose(); }} modal={false}>
+    <Sheet open={props.isOpen} onOpenChange={(o) => { if (!o) props.onClose(); }} modal={false}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
+        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col p-0 [&>button[data-radix-dialog-close]]:hidden"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
@@ -460,7 +416,7 @@ function DesktopRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplace
         onCloseAutoFocus={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => {
           const t = e.target as HTMLElement | null;
-          if (t && t.closest("[data-lyric-input]")) onClose();
+          if (t && t.closest("[data-lyric-input]")) props.onClose();
           else if (t && (t.closest("[data-chord-row]") || t.closest("[data-section-id]"))) e.preventDefault();
         }}
         onInteractOutside={(e) => {
@@ -468,107 +424,9 @@ function DesktopRhymeEditor({ isOpen, onClose, activeLineIndex, lines, onReplace
           if (t && (t.closest("[data-chord-row]") || t.closest("[data-section-id]"))) e.preventDefault();
         }}
       >
-        <div className="space-y-3 flex-1 min-h-0 flex flex-col">
-          {/* INPUT + CHIPS */}
-          <InputAndChips
-            query={query}
-            onQueryChange={setQuery}
-            inputRef={inputRef}
-            lines={lines}
-            activeLineIndex={activeLineIndex}
-            onChipTap={triggerSearch}
-          />
-
-          {/* STATUS */}
-          {(showReplaced || lastReplacement) && (
-            <div className="flex items-center gap-3">
-              {showReplaced && (
-                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <Check className="h-3.5 w-3.5" /> Replaced!
-                </span>
-              )}
-              {lastReplacement && (
-                <button
-                  onClick={() => handleUndo(onReplaceLine)}
-                  className="flex items-center gap-1 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] underline underline-offset-2"
-                >
-                  <RotateCcw className="h-3 w-3" /> Undo
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* RESULTS */}
-          <div className="overflow-y-auto -mx-1 px-1 flex-1 min-h-0" style={{ maxHeight: `${gridMaxHeight}px` }}>
-            {loading && (
-              <div className="flex items-center justify-center py-8 text-[var(--ink-soft)]">
-                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                <span className="text-sm">Loading…</span>
-              </div>
-            )}
-            {error && !loading && (
-              <div className="flex flex-col items-center gap-2 py-6 text-sm text-[var(--ink-soft)]">
-                <span>Network error.</span>
-                <button onClick={() => void fetchRhymes(query)} className="btn-sculpt-cream px-3 py-1 rounded text-xs">Retry</button>
-              </div>
-            )}
-            {!loading && !error && query.trim() && perfectRhymes.length === 0 && nearRhymes.length === 0 && (
-              <p className="py-6 text-center text-sm text-[var(--ink-soft)]">No rhymes found.</p>
-            )}
-            {!loading && !error && !query.trim() && (
-              <p className="text-sm" style={{ color: "var(--ink-soft)", opacity: 0.8 }}>
-                Tap a line chip or type a word to find rhymes.
-              </p>
-            )}
-            {!loading && !error && perfectRhymes.length > 0 && (
-              <div className="mb-4">
-                <p
-                  className="mb-1"
-                  style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-                >
-                  Perfect Rhymes
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                  {perfectRhymes.map((r) => <DesktopRhymeRow key={r.word} rhyme={r} onSelect={(w) => handleSelect(w, lines, activeLineIndex, onReplaceLine)} />)}
-                </div>
-              </div>
-            )}
-            {!loading && !error && nearRhymes.length > 0 && (
-              <div>
-                <p
-                  className="mb-1"
-                  style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-                >
-                  Near Rhymes
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                  {nearRhymes.map((r) => <DesktopRhymeRow key={r.word} rhyme={r} onSelect={(w) => handleSelect(w, lines, activeLineIndex, onReplaceLine)} />)}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <RhymeEditorContent {...props} {...search} inputRef={inputRef} resultsMaxHeight={resultsMaxHeight} />
       </SheetContent>
     </Sheet>
-  );
-}
-
-function DesktopRhymeRow({ rhyme, onSelect }: { rhyme: RhymeWord; onSelect: (w: string) => void }) {
-  return (
-    <button
-      onClick={() => onSelect(rhyme.word)}
-      className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-left transition-colors border-none"
-      style={{ color: "var(--ink)", background: "color-mix(in oklch, var(--paper-card) 40%, transparent)" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "color-mix(in oklch, var(--paper-shade) 70%, transparent)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "color-mix(in oklch, var(--paper-card) 40%, transparent)"; }}
-    >
-      <span style={{ fontFamily: "var(--font-display,'Zain',serif)", fontSize: 16 }}>{rhyme.word}</span>
-      {rhyme.numSyllables != null && (
-        <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontSize: 10, color: "var(--ink-soft)" }}>
-          {rhyme.numSyllables} syl
-        </span>
-      )}
-    </button>
   );
 }
 
@@ -578,7 +436,5 @@ function DesktopRhymeRow({ rhyme, onSelect }: { rhyme: RhymeWord; onSelect: (w: 
 
 export function FocusedRhymeEditor(props: FocusedRhymeEditorProps) {
   const isMobile = useIsMobile();
-  return isMobile
-    ? <MobileRhymeEditor {...props} />
-    : <DesktopRhymeEditor {...props} />;
+  return isMobile ? <MobileRhymeEditor {...props} /> : <DesktopRhymeEditor {...props} />;
 }
