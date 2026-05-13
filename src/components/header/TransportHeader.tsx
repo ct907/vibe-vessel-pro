@@ -415,20 +415,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   return (
     <>
-      {/* Bookmark — fixed, flows from above viewport top edge */}
-      <Bookmark
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 12,
-          zIndex: 60,
-          width: 48,
-          height: 48,
-          color: "var(--cocoa-deep)",
-          fill: "var(--border)",
-        }}
-      />
-      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-end px-1">
+      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
+        <Bookmark
+          strokeWidth={0}
+          style={{ width: 48, height: 48, fill: "var(--border)" }}
+        />
         <button
           type="button"
           onClick={() => {

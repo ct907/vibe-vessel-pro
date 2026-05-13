@@ -132,6 +132,15 @@ export function FocusedChordEditor(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live-update the chord's octave in the store as the user changes it.
+  const octaveInitRef = useRef(true);
+  useEffect(() => {
+    if (octaveInitRef.current) { octaveInitRef.current = false; return; }
+    if (props.mode !== "progression" || !progChord) return;
+    updatePatternChord(props.patternId, props.chordId, { chord: { ...progChord.chord, octave } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [octave]);
+
   // Auto-scroll the slot row so the active slot stays visible (lyrics only).
   useEffect(() => {
     if (isProgression) return;
