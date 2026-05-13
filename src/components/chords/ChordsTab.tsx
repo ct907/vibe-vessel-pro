@@ -179,24 +179,9 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
         )}
         {visibleGrid.map((row) => (
           <div key={row.numeral} className="rounded-xl p-3" style={{ background: "var(--paper-shade)" }}>
-            <div className="flex items-baseline gap-3 mb-2">
-              <span className="font-mono-chord text-xs text-muted-foreground w-10">{row.numeral}</span>
-              <span
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: "var(--pill-radius, 8px)",
-                  background: "var(--primary)",
-                  color: "var(--pill-rest-fg)",
-                  fontFamily: "'Nunito', system-ui, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase" as const,
-                  display: "inline-block",
-                }}
-              >
-                {row.root}
-              </span>
+            <div className="mb-2" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 12px", borderRadius: "var(--pill-radius, 8px)", background: "var(--primary)", color: "var(--paper-card)" }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 12 }}>{row.numeral}</span>
+              <span style={{ fontFamily: "'Nunito', system-ui, sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{row.root}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => {

@@ -216,6 +216,7 @@ export async function playProgression(
   stopProgression();
 
   const transport = Tone.getTransport();
+  transport.position = 0;
   // Optional smooth BPM ramp.
   const ramp = useSoundStore.getState().bpmRamp;
   if (ramp && lastBpm !== null && Math.abs(transport.bpm.value - bpm) > 0.5) {
