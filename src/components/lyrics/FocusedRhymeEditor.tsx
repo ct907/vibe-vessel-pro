@@ -219,7 +219,7 @@ function RhymeEditorContent({
               key={idx}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => triggerSearch(lastWord)}
-              className={isActive ? "btn-sculpt-amber inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0" : "btn-sculpt-cream inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0"}
+              className={isActive ? "btn-sculpt-cocoa inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0" : "btn-sculpt-cream inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium shrink-0"}
             >
               L{idx + 1}: {lastWord}
             </button>
@@ -340,6 +340,10 @@ function RhymeEditorContent({
 function MobileRhymeEditor(props: FocusedRhymeEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const search = useRhymeSearch(props.isOpen);
+
+  useEffect(() => {
+    if (props.isOpen) setTimeout(() => inputRef.current?.focus(), 60);
+  }, [props.isOpen]);
 
   if (!props.isOpen) return null;
 
