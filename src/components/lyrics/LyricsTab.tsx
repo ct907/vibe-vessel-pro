@@ -269,7 +269,7 @@ function LineRow({
       {/* CHORD ROW + edit pencil. Each slot is its own Droppable so pangea's
           contiguous-index requirement is naturally satisfied (each slot holds
           at most one Draggable at index 0). */}
-      <div className="flex items-stretch gap-1">
+      <div className="flex items-stretch gap-1" style={{ paddingBottom: 4 }}>
         <div
           data-chord-row={line.id}
           tabIndex={0}
@@ -287,7 +287,7 @@ function LineRow({
             "group relative flex items-stretch flex-1 min-w-0 rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
-          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2, overflowX: "clip" }}
+          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2, overflowX: "clip", paddingLeft: 8 }}
         >
           {lineChords.length === 0 && (
             <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
@@ -693,7 +693,7 @@ function SectionCard({
       className={cn("rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
+      <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>
         <Select
           value={section.type}
           onValueChange={(v) => {
@@ -1323,8 +1323,8 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
 
       <div
-        className="flex flex-col gap-3 pt-4 mt-2"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+        className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl"
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "var(--paper-shade)" }}
       >
         <span
           className="text-center"
