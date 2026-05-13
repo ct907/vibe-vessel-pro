@@ -24,9 +24,11 @@ interface Props {
   /** Optional controlled query (kept in sync with the active chord row). */
   query?: string;
   onQueryChange?: (q: string) => void;
+  /** Live-save hook for octave-only edits (no chord re-pick). */
+  onOctaveChange?: (octave: number) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
