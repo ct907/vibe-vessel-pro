@@ -443,7 +443,8 @@ function LineRow({
       })()}
 
       {/* LYRIC INPUT */}
-      <div className="relative rounded-sm bg-[var(--paper-card)]" style={{ marginTop: 4, borderBottom: "1px solid var(--cocoa)" }}>
+      <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)", marginTop: 4 }} />
+      <div className="relative rounded-sm bg-[var(--paper-card)]">
         <textarea
           ref={lyricInputRef}
           data-lyric-input={line.id}
