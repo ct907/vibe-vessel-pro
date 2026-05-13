@@ -433,24 +433,51 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           strokeWidth={0}
           style={{ width: 48, height: 48, fill: "var(--border)" }}
         />
-        <button
-          type="button"
-          onClick={() => {
-            if (inspirationPhotos.length > 0) {
-              setLightboxIndex(0);
-              setLightboxOpen(true);
-            } else {
-              photoInputRef.current?.click();
-            }
-          }}
-          className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
-          aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
-          title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
-        >
-          <ImageIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center">
+          {/* Desktop: photos inline next to image button */}
+          {inspirationPhotos.length > 0 && (
+            <div className="hidden md:flex items-center" style={{ marginRight: 24 }}>
+              {[...inspirationPhotos].reverse().map((photo, ri) => (
+                <img
+                  key={photo.id}
+                  src={photo.dataUrl}
+                  alt=""
+                  draggable={false}
+                  onClick={() => { setLightboxIndex(inspirationPhotos.length - 1 - ri); setLightboxOpen(true); }}
+                  style={{
+                    maxWidth: 120,
+                    maxHeight: 120,
+                    display: "block",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+                    marginLeft: ri > 0 ? -10 : 0,
+                    cursor: "pointer",
+                    position: "relative",
+                    zIndex: inspirationPhotos.length - ri,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (inspirationPhotos.length > 0) {
+                setLightboxIndex(0);
+                setLightboxOpen(true);
+              } else {
+                photoInputRef.current?.click();
+              }
+            }}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
+            aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
+            title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
+          >
+            <ImageIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="sticky top-0 z-40 mx-2 sm:mx-4">
+      <div className="sticky top-2 z-40 mx-2 sm:mx-4 mb-2">
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
@@ -461,6 +488,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
               src={photo.dataUrl}
               alt=""
               draggable={false}
+              className="md:hidden"
               style={{
                 position: "absolute",
                 left: slot.left,
@@ -491,7 +519,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="rounded-xl backdrop-blur border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--paper-shade) 15%, var(--card))" }}>
+        <header id="main-header" className="rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center gap-2">

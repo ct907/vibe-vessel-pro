@@ -277,7 +277,7 @@ function LineRow({
             "group relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-x-hidden rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
-          style={{ minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
+          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2 }}
         >
           {lineChords.length === 0 && (
             <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
@@ -444,7 +444,7 @@ function LineRow({
       })()}
 
       {/* LYRIC INPUT */}
-      <div className="relative rounded-sm bg-[var(--paper-card)]">
+      <div className="relative rounded-sm bg-[var(--paper-card)]" style={{ marginTop: 4, borderBottom: "1px solid var(--cocoa)" }}>
         <textarea
           ref={lyricInputRef}
           data-lyric-input={line.id}
