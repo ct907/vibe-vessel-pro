@@ -69,9 +69,9 @@ async function convertToWebP(file: File, maxPx = 400): Promise<string> {
 }
 
 const PHOTO_SLOTS = [
-  { left: "28%", top: 2, rotate: -7 },
-  { left: "46%", top: -8, rotate: 5 },
-  { left: "63%", top: 3, rotate: -3 },
+  { left: "30%", top: -58, rotate: -7 },
+  { left: "46%", top: -68, rotate: 5 },
+  { left: "61%", top: -57, rotate: -3 },
 ] as const;
 
 function InspirationLightbox({
@@ -147,7 +147,7 @@ function InspirationLightbox({
         )}
       </div>
       {/* Actions */}
-      <div style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
