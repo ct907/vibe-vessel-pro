@@ -237,7 +237,7 @@ export async function playProgression(
     // `time` is in the shared AudioContext clock (Tone uses our raw AC).
     const startAtT = time;
     const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
-    spawnChord(value.chord, startAtT, startAtT + durSec, octave);
+    spawnChord(value.chord, startAtT, startAtT + durSec, value.chord.octave ?? octave);
     if (onChordStart) {
       Tone.getDraw().schedule(() => onChordStart(value.__index), time);
     }
