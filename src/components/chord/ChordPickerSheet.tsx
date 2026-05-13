@@ -190,7 +190,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
-            <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
+            <Select value={String(octave)} onValueChange={(v) => { const o = Number(v); setOctave(o); onOctaveChange?.(o); }}>
               <SelectTrigger
                 className="h-10 w-[64px] px-2 text-xs font-mono-chord border-0"
                 style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
