@@ -255,7 +255,7 @@ function LineRow({
     <div
       ref={rowRef}
       className={cn(
-        "group py-1 transition-colors scroll-mt-24",
+        "group pt-1 transition-colors scroll-mt-24",
         // On mobile, the FocusedChordEditor renders a clone of this row,
         // so the underlying row should NOT be visually elevated. On desktop
         // we keep the focus highlight so the user can see which row the
@@ -284,10 +284,10 @@ function LineRow({
             onPickerOpen(line.id, 0);
           }}
           className={cn(
-            "group relative flex items-stretch flex-1 min-w-0 max-w-[75vw] md:max-w-none overflow-x-hidden rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
+            "group relative flex items-stretch flex-1 min-w-0 rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
-          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2 }}
+          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2, overflowX: "clip" }}
         >
           {lineChords.length === 0 && (
             <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
@@ -454,7 +454,6 @@ function LineRow({
       })()}
 
       {/* LYRIC INPUT */}
-      <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)", marginTop: 4 }} />
       <div className="relative rounded-sm bg-[var(--paper-card)]">
         {isFocused && (
           <button
@@ -523,6 +522,7 @@ function LineRow({
           )}
         />
       </div>
+      <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)" }} />
 
       {/* Item 5 — "/" → new section dialog */}
       <Dialog open={slashDialog} onOpenChange={setSlashDialog}>
@@ -985,6 +985,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
+  const [rhymeTarget, setRhymeTarget] = useState<{ sectionId: string; lineId: string } | null>(null);
 
   const handleLineTextFocus = (sectionId: string, lineId: string) =>
     setFocusedLineInfo({ sectionId, lineId });
@@ -992,7 +993,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     setFocusedLineInfo(null);
   const handleRhymeOpen = (sectionId: string, lineId: string) => {
     setFocusedLineInfo({ sectionId, lineId });
+    setRhymeTarget({ sectionId, lineId });
     setRhymeOpen(true);
+  };
+  const handleRhymeClose = () => {
+    setRhymeOpen(false);
+    const lineId = rhymeTarget?.lineId;
+    setRhymeTarget(null);
+    if (lineId) setTimeout(() =>
+      document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${lineId}"]`)?.focus()
+    , 50);
   };
 
   // Suppress the picker-open click that fires after dropping a chord.
@@ -1383,15 +1393,15 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       )}
 
       {(() => {
-        const rhymeSec = focusedLineInfo
-          ? sections.find((s) => s.id === focusedLineInfo.sectionId)
+        const rhymeSec = rhymeTarget
+          ? sections.find((s) => s.id === rhymeTarget.sectionId)
           : undefined;
         const nonOverflowLines = rhymeSec?.lines.filter((l) => !l._isChordOverflow) ?? [];
-        const activeIdx = nonOverflowLines.findIndex((l) => l.id === focusedLineInfo?.lineId);
+        const activeIdx = nonOverflowLines.findIndex((l) => l.id === rhymeTarget?.lineId);
         return (
           <FocusedRhymeEditor
             isOpen={rhymeOpen}
-            onClose={() => setRhymeOpen(false)}
+            onClose={handleRhymeClose}
             activeLineIndex={activeIdx >= 0 ? activeIdx : 0}
             lines={nonOverflowLines.map((l) => l.text)}
             onReplaceLine={(idx, newText) => {
