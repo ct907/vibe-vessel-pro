@@ -178,14 +178,14 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           </div>
         )}
         {visibleGrid.map((row) => (
-          <div key={row.numeral} className="rounded-xl bg-card p-3">
+          <div key={row.numeral} className="rounded-xl p-3" style={{ background: "var(--paper-shade)" }}>
             <div className="flex items-baseline gap-3 mb-2">
               <span className="font-mono-chord text-xs text-muted-foreground w-10">{row.numeral}</span>
               <span
                 style={{
                   padding: "5px 12px",
                   borderRadius: "var(--pill-radius, 8px)",
-                  background: "var(--pill-rest-bg)",
+                  background: "var(--primary)",
                   color: "var(--pill-rest-fg)",
                   fontFamily: "'Nunito', system-ui, sans-serif",
                   fontWeight: 700,
