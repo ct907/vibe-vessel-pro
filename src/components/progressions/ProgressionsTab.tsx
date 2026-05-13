@@ -594,7 +594,7 @@ function PatternBlock({
               size="icon"
               variant="ghost"
               className="h-9 w-9"
-              disabled={activeIdx <= 0}
+              disabled={activeIdx <= 0 || selectedIds.size > 1}
               onClick={(e) => {
                 e.stopPropagation();
                 movePatternChord(pattern.id, activeChordId!, -1);
@@ -610,7 +610,7 @@ function PatternBlock({
               size="icon"
               variant="ghost"
               className="h-9 w-9"
-              disabled={activeIdx >= sortedChords.length - 1}
+              disabled={activeIdx >= sortedChords.length - 1 || selectedIds.size > 1}
               onClick={(e) => {
                 e.stopPropagation();
                 movePatternChord(pattern.id, activeChordId!, 1);

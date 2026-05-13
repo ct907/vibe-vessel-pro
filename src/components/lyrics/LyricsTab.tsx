@@ -677,7 +677,7 @@ function SectionCard({
           <SelectTrigger
             className="h-auto w-auto min-w-[120px] ml-2 border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
             style={{
-              padding: "5px 12px",
+              padding: "7px 16px",
               borderRadius: "var(--pill-radius, 8px)",
               background: "var(--pill-rest-bg)",
               color: "var(--pill-rest-fg)",
