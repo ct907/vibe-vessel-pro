@@ -440,7 +440,7 @@ function PatternBlock({
                                   singleClickTimerRef.current = setTimeout(() => {
                                     singleClickTimerRef.current = null;
                                     setFocusedPattern(pattern.id);
-                                    void playChord(c.chord);
+                                    void playChord(c.chord, undefined, c.chord.octave ?? 4);
                                     if (multiSelectMode) {
                                       toggleSelectChord(c.id);
                                     } else {
@@ -452,7 +452,7 @@ function PatternBlock({
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    void playChord(c.chord);
+                                    void playChord(c.chord, undefined, c.chord.octave ?? 4);
                                     onSetActiveChordId(c.id);
                                   }
                                 }}
@@ -1121,7 +1121,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       <div
         className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl"
         style={{
-          background: "var(--paper-shade)",
+          background: "var(--ink-soft)",
           borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
           paddingBottom: "60rem",
         }}

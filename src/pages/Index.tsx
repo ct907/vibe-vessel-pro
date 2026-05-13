@@ -115,7 +115,7 @@ const Index = () => {
         enableDefaultSensors={false}
         sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
       >
-        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
+        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[368px]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
           <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
