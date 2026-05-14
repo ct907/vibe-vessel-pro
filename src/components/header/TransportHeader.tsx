@@ -77,6 +77,12 @@ const PHOTO_SLOTS = [
   { left: "61%", top: -47, rotate: -3 },
 ] as const;
 
+const DESKTOP_PHOTO_SLOTS = [
+  { left: "calc(30% + 240px)", top: -48, rotate: -7 },
+  { left: "calc(30% + 390px)", top: -58, rotate: 5 },
+  { left: "calc(30% + 540px)", top: -47, rotate: -3 },
+] as const;
+
 function InspirationLightbox({
   photos,
   initialIndex,
@@ -233,14 +239,14 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
   const stopRequestedRef = useRef(false);
-  const handlePlayRef = useRef<() => Promise<void>>(async () => {});
 
-  // Drive the metronome from playback + meta. Starts/stops with isPlaying;
-  // updates rate/time-signature live without needing a restart. The actual
-  // start moment is set in handlePlay so it lines up with the first chord.
+  // Stop the metronome only on unmount. Don't return a cleanup keyed to
+  // [isPlaying] — React would run it on the false→true transition AFTER
+  // handlePlay scheduled the first tick, killing the metronome moments
+  // before its first downbeat. handleStop drives the stop side directly.
+  useEffect(() => () => stopMetronome(), []);
   useEffect(() => {
     if (!isPlaying) stopMetronome();
-    return () => stopMetronome();
   }, [isPlaying]);
 
   useEffect(() => {
@@ -351,7 +357,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     setPlayingStore(true);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
-    const startAt = getAudioContext().currentTime + 0.12;
+    const startAt = getAudioContext().currentTime + 0.04;
     if (metronome.enabled) {
       startMetronome({
         bpm: meta.bpm,
@@ -361,24 +367,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       });
     }
     await playProgression(playEvents, meta.bpm, {
-      onChordStart: (idx) => setCurrent(playMeta[idx] ?? null),
-      onEnd: () => {
-        if (!stopRequestedRef.current) {
-          setCurrent(null);
-          void handlePlayRef.current();
-        }
-      },
+      onChordStart: (idx) => setCurrent(playMeta[idx % playMeta.length] ?? null),
+      loopBeats: cursorBeat,
       startAt,
     });
   };
-  handlePlayRef.current = handlePlay;
 
   const handleStop = () => {
     stopRequestedRef.current = true;
     stopProgression();
+    stopMetronome();
     setIsPlaying(false);
     setPlayingStore(false);
     setCurrent(null);
+    usePlaybackStore.getState().setStartFromChord(null, null);
   };
 
   useEffect(() => {
@@ -460,52 +462,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
-          const slot = PHOTO_SLOTS[PHOTO_SLOTS.length - 1 - i] ?? PHOTO_SLOTS[0];
+          const slots = isMobile ? PHOTO_SLOTS : DESKTOP_PHOTO_SLOTS;
+          const slot = slots[slots.length - 1 - i] ?? slots[0];
           return (
             <img
               key={photo.id}
               src={photo.dataUrl}
               alt=""
               draggable={false}
-              className="md:hidden"
               style={{
                 position: "absolute",
                 left: slot.left,
                 top: slot.top,
                 maxWidth: 90,
                 maxHeight: 90,
-                display: "block",
-                borderRadius: 8,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
-                transform: `rotate(${slot.rotate}deg)`,
-                zIndex: 0,
-                pointerEvents: "none",
-                userSelect: "none",
-              }}
-            />
-          );
-        })}
-        {inspirationPhotos.map((photo, i) => {
-          const desktopSlots = [
-            { left: "calc(30% + 240px)", top: -48, rotate: -7 },
-            { left: "calc(30% + 390px)", top: -58, rotate: 5 },
-            { left: "calc(30% + 540px)", top: -47, rotate: -3 },
-          ] as const;
-          const slot = desktopSlots[desktopSlots.length - 1 - i] ?? desktopSlots[0];
-          return (
-            <img
-              key={`d-${photo.id}`}
-              src={photo.dataUrl}
-              alt=""
-              draggable={false}
-              className="hidden md:block"
-              style={{
-                position: "absolute",
-                left: slot.left,
-                top: slot.top,
-                maxWidth: 90,
-                maxHeight: 90,
-                display: "block",
                 borderRadius: 8,
                 boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
                 transform: `rotate(${slot.rotate}deg)`,
