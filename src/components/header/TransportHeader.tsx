@@ -680,7 +680,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(-1)} aria-label="Transpose down semitone">
                         <span aria-hidden className="text-base leading-none">−</span>
                       </Button>
-                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center">
+                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center text-[var(--paper-card)]">
                         {fmtOffset(transposeOffset)}
                       </span>
                       <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(1)} aria-label="Transpose up semitone">
@@ -736,8 +736,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
                       />
                       <span
-                        className="inline-flex w-full h-9 cursor-pointer items-center justify-between rounded-md border-0 px-3 text-sm font-medium"
-                        style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2 flex-1 justify-between border-0"
                       >
                         <Upload className="h-4 w-4" /> Load
                       </span>
@@ -795,7 +794,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           {!isPlaying ? (
             <button
               onClick={handlePlay}
-              className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm"
+              className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm mb-1"
               aria-label="Play"
             >
               <Play className="h-4 w-4 fill-current" />
@@ -816,7 +815,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           <div
             className="inline-flex items-center gap-1"
             style={{
-              padding: "5px 5px 7px",
+              padding: "7px 5px 7px",
               background: "var(--paper-shade)",
               borderRadius: 10,
               boxShadow: "var(--shadow-recess)",
