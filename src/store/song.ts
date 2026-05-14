@@ -3,6 +3,8 @@ import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/lib/music/chords";
 import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
+import { useAppTintStore } from "@/store/appTint";
+import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/SectionColorPicker";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 
@@ -272,6 +274,8 @@ export interface SerializedSong {
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
   inspirationPhotos?: InspirationPhoto[];
+  /** Background tint key (matches SECTION_COLOR_KEYS), or null/undefined for no tint. */
+  appTint?: SectionColor | null;
   /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
   layoutMeta?: {
     lastEditedScreenWidth: number;
@@ -3344,6 +3348,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
+    // App background tint also travels with the project.
+    const rawTint = parsed.appTint;
+    useAppTintStore.getState().setTint(
+      typeof rawTint === "string" && (SECTION_COLOR_KEYS as readonly string[]).includes(rawTint)
+        ? (rawTint as SectionColor)
+        : null,
+    );
     // Surface layout metadata so the UI can offer a friendly auto-format
     // toast when the device width has changed since last save.
     if (parsed.layoutMeta && typeof window !== "undefined") {
@@ -3371,6 +3382,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
       inspirationPhotos: s.inspirationPhotos.length > 0 ? s.inspirationPhotos : undefined,
       sound: useSoundStore.getState().toJSON(),
+      appTint: useAppTintStore.getState().tint,
       layoutMeta: width > 0 ? {
         lastEditedScreenWidth: width,
         lastEditedDevice: getDeviceTypeForWidth(width),

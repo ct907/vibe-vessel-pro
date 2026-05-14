@@ -694,7 +694,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border border-border"
+                      className="flex-1 justify-between border-0"
+                      style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
                       onClick={() => { downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json"); setNavOpen(false); }}
                     >
                       <Save className="h-4 w-4" /> Save
@@ -707,7 +708,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         className="hidden"
                         onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
                       />
-                      <span className="inline-flex w-full h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent">
+                      <span
+                        className="inline-flex w-full h-9 cursor-pointer items-center justify-between rounded-md border-0 px-3 text-sm font-medium"
+                        style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
                         <Upload className="h-4 w-4" /> Load
                       </span>
                     </label>
@@ -715,14 +719,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border border-border"
+                      className="flex-1 justify-start border-0"
+                      style={{ background: "var(--primary-inset)", color: "var(--primary-foreground)" }}
                       onClick={() => { setConfirmNewSong(true); setNavOpen(false); }}
                     >
-                      <FilePlus className="h-4 w-4" /> New Song
+                      <FilePlus className="h-4 w-4" /> New
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border border-border"
+                      className="flex-1 justify-start border-0"
+                      style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
                       onClick={() => { setExportOpen(true); setNavOpen(false); }}
                     >
                       <FileText className="h-4 w-4" /> Export Lyrics
