@@ -270,11 +270,15 @@ export function stopProgression() {
   const transport = Tone.getTransport();
   transport.stop();
   transport.cancel();
+  transport.position = 0;
   if (activePart) {
     activePart.stop();
     activePart.dispose();
     activePart = null;
   }
+  // Force the next playProgression to set BPM immediately rather than ramp —
+  // a 0.4 s ramp can drift the first chord relative to the metronome.
+  lastBpm = null;
   // Release any sustained voices.
   const t = getAudioContext().currentTime;
   for (const v of liveVoices) { try { v.release(t); } catch { /* noop */ } }
