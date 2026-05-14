@@ -23,7 +23,9 @@ import {
   Image as ImageIcon,
   Bookmark,
   Palette,
+  HelpCircle,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { getAudioContext } from "@/lib/audio/context";
@@ -726,6 +728,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       <FileText className="h-4 w-4" /> Export Lyrics
                     </Button>
                   </div>
+                  <Link
+                    to="/help"
+                    onClick={() => setNavOpen(false)}
+                    className="inline-flex items-center gap-2 h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
+                  >
+                    <HelpCircle className="h-4 w-4" /> Help & User Manual
+                  </Link>
                   <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
