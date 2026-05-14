@@ -290,7 +290,7 @@ function LineRow({
           style={{ minHeight: 22, paddingTop: 2, paddingBottom: 2, overflowX: "clip", paddingLeft: 8 }}
         >
           {lineChords.length === 0 && (
-            <span className="absolute inset-0 flex items-center w-full italic bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words pointer-events-none select-none">
+            <span className="absolute inset-0 flex items-center w-full italic bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-muted-foreground/60 px-1 ml-1 break-words pointer-events-none select-none">
               add your chords here
             </span>
           )}

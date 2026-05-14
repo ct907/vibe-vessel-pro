@@ -54,7 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Music2 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -87,6 +87,12 @@ const DESKTOP_PHOTO_SLOTS = [
   { left: "calc(30% + 240px)", top: -48, rotate: -7 },
   { left: "calc(30% + 390px)", top: -58, rotate: 5 },
   { left: "calc(30% + 540px)", top: -47, rotate: -3 },
+] as const;
+
+const TABLET_PHOTO_SLOTS = [
+  { left: "calc(30% + 100px)", top: -48, rotate: -7 },
+  { left: "calc(30% + 220px)", top: -58, rotate: 5 },
+  { left: "calc(30% + 340px)", top: -47, rotate: -3 },
 ] as const;
 
 function InspirationLightbox({
@@ -242,6 +248,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [confirmNewSong, setConfirmNewSong] = useState(false);
   const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
   const appTint = useAppTintStore();
@@ -445,7 +452,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
         <Bookmark
           strokeWidth={0}
-          style={{ width: 48, height: 48, fill: "var(--border)" }}
+          style={{ width: 48, height: 48, fill: "var(--cocoa-deep)" }}
         />
         <div className="flex items-center">
           <button
@@ -470,7 +477,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
-          const slots = isMobile ? PHOTO_SLOTS : DESKTOP_PHOTO_SLOTS;
+          const slots = isMobile ? PHOTO_SLOTS : isDesktop ? DESKTOP_PHOTO_SLOTS : TABLET_PHOTO_SLOTS;
           const slot = slots[slots.length - 1 - i] ?? slots[0];
           return (
             <img
@@ -513,7 +520,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             <div className="flex items-center gap-2">
               <span
                 className="font-display shrink-0 leading-none select-none"
-                style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)" }}
+                style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)", marginTop: 6 }}
               >
                 SongNote
               </span>

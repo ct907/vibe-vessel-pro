@@ -33,6 +33,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const canFormat = sections.some((s) => s.lines.some((l) => l.chords.length > 0));
   const showSort = activeTab === "lyrics" || activeTab === "progressions";
+  const modeLabel = meta.keyMode === "maj" ? "Major" : "Minor";
 
   return (
     <div className="mx-auto w-full max-w-6xl pr-4 pt-4">
@@ -83,6 +84,9 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <p className="text-sm font-normal text-[var(--ink-soft)] text-center mt-0.5">
+        {meta.keyRoot} {modeLabel} | {meta.beatsPerBar}/{meta.beatUnit} | {meta.bpm} bpm
+      </p>
     </div>
   );
 }
