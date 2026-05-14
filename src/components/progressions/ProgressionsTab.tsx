@@ -880,7 +880,7 @@ function SectionGroup({
           driven by the same SSOT, and re-arranging blocks here would
           desync the two surfaces. Blocks are now plain children. */}
       {!collapsed && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {blocks.map((p, i) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
