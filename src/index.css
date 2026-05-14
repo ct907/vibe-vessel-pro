@@ -297,7 +297,6 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
-    background-image: linear-gradient(var(--app-tint, transparent), var(--app-tint, transparent));
   }
 
   h1,

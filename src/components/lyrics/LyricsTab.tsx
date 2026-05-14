@@ -287,7 +287,7 @@ function LineRow({
             "group relative flex items-stretch flex-1 min-w-0 rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
           )}
-          style={{ minHeight: 28, paddingTop: 2, paddingBottom: 2, overflowX: "clip", paddingLeft: 8 }}
+          style={{ minHeight: 22, paddingTop: 2, paddingBottom: 2, overflowX: "clip", paddingLeft: 8 }}
         >
           {lineChords.length === 0 && (
             <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
@@ -518,7 +518,7 @@ function LineRow({
           }}
           placeholder="Write your lyric line…"
           className={cn(
-            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
+            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
             isFocused && "pr-8",
           )}
         />
