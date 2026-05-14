@@ -1,37 +1,92 @@
-# Extend natural octave-save behaviour to ChordPickerSheet (desktop)
+# In-App User Manual ("Help" Page)
 
-## Problem
+A beginner-focused Help page built into the app, accessible from the header, with captured screenshots and concise step-by-step instructions.
 
-On desktop, both Lyrics and Progressions use `ChordPickerSheet` instead of `FocusedChordEditor`. Today the sheet has its own local `octave` state but:
+## Structure
 
-1. **Picked chord doesn't carry the octave.** `handlePick(chord)` calls `onPick(chord)` without merging the selected octave. Both consumers (`LyricsTab.handlePick`, `ProgressionsTab.handlePick`) write that chord straight into the store via `upsertChordAt` / `placeChordInSlot` / `updatePatternChord` / `addChordToPatternSlot`, so the saved chord ends up with no `octave` field — playback and audition then fall back to 4.
-2. **Octave doesn't seed from the chord being edited.** Opening the sheet on an existing chord always starts at octave 4, even if the chord was previously saved at 3 or 5.
-3. **Octave-only edits aren't saved.** If a user opens an existing chord, changes the dropdown to octave 5, and closes the sheet without re-picking from the suggestion grid, the change is lost (no live persistence).
+A new route `/help` rendered as a single scrollable page with a sticky left-side table of contents (collapses to a top dropdown on mobile). Reuses existing design tokens (`paper-card`, `ink`, `font-display`, `font-mono-chord`) so it feels native to the app.
 
-This is the desktop analogue of the lyrics-mode bug we just fixed in `FocusedChordEditor`.
+### Entry points
+- Add a "Help" item to the menu in `TransportHeader` (existing `Menu` icon dropdown) → links to `/help`.
+- Also link from the Landing page footer.
 
-## Fix
+## Sections
 
-### 1. `src/components/chord/ChordPickerSheet.tsx`
-- Seed `octave` from `initialChord?.octave ?? 4` in the existing "open" effect (alongside the query seed). Apply both when uncontrolled and when `initialChord` changes while open.
-- In `handlePick`, attach the current octave: `onPick({ ...chord, octave })`.
-- Add an optional prop `onOctaveChange?: (octave: number) => void`. Wire the existing octave `<Select>` to call it after `setOctave`. This is the "natural save" hook for octave-only edits.
+Each section: short intro → numbered steps → screenshot with callout → "Tip" callout where helpful.
 
-No UI changes; the dropdown stays where it is.
+1. **Welcome & Overview of the Three Tabs**
+   - What Lyrics, Chords, and Progressions tabs are for, and how they work together (chords picked in the Chord tab flow into the basket; the basket feeds Lyrics and Progressions).
 
-### 2. `src/components/lyrics/LyricsTab.tsx`
-- Pass `onOctaveChange={(oct) => { ... }}` to `ChordPickerSheet`. When `picker.anchorId` is set, look up the live chord (`activeLine.chords.find(c => c.id === picker.anchorId)?.chord`) and call `upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, { ...currentChord, octave: oct }, picker.anchorId)`. When no anchor (still placing a new chord), do nothing — the octave will ride along with `onPick`.
-- `handlePick` needs no change: the chord arg now already includes `octave`, so the store writes it through.
+2. **Adding a Chord in the Lyrics Tab**
+   - Tap a word → ChordPickerSheet (mobile) / FocusedChordEditor opens → pick root, quality, octave → Close to save.
+   - Mention drag-from-basket alternative.
 
-### 3. `src/components/progressions/ProgressionsTab.tsx`
-- Pass `onOctaveChange` to `ChordPickerSheet`. When `picker.replaceChordId` is set, find the current pattern chord and call `updatePatternChord(picker.patternId, picker.replaceChordId, { chord: { ...current.chord, octave: oct } })`. When adding a new chord (no `replaceChordId`), do nothing.
-- `handlePick` keeps its current shape; the incoming `chord` already carries the octave for both `updatePatternChord` and `addChordToPatternSlot`.
+3. **Writing Lyrics & Creating New Lines**
+   - Type into the lyric line field; press Enter/Return to create a new line below; Backspace on empty line removes it.
 
-## Result
+4. **Browsing Chords & the Basket Bar**
+   - Filter by Nashville numeral; tap to audition; checkbox to multi-select; "Add to basket".
+   - The Basket Bar (bottom): drag chips into Lyrics or Progressions, or use "Send to" buttons.
 
-Desktop matches mobile: octave selected in `ChordPickerSheet` is persisted on the chord automatically — both when picking and when changing only the octave on an existing chord. Tap-to-audition (already reads `chord.octave`) and Transport playback (per-chord octave from earlier fix) then play the saved octave.
+5. **Adding a Chord in the Progressions Tab**
+   - Tap an empty slot in a pattern block → picker opens → pick chord and octave → Close.
+   - Drag from basket as alternative.
 
-## Files touched
-- `src/components/chord/ChordPickerSheet.tsx` — seed octave from initial chord, attach octave to picked chord, expose `onOctaveChange`.
-- `src/components/lyrics/LyricsTab.tsx` — wire `onOctaveChange` to `upsertChordAt` for the edited anchor.
-- `src/components/progressions/ProgressionsTab.tsx` — wire `onOctaveChange` to `updatePatternChord` for the replaced chord.
+6. **How Pattern Blocks Work**
+   - A pattern block = a repeating chord progression with N bars. Add multiple blocks per section. Patterns drive playback and bar count.
+
+7. **Adjusting the Bar Length of a Chord**
+   - Each chord chip in a pattern shows a duration handle; drag to extend/shorten across bars.
+
+8. **Adjusting Pattern Block Length**
+   - Use the bar-count control on the pattern header (+/− or stepper) to change total bars.
+
+9. **Adjusting Sounds**
+   - Open Sound Panel from TransportHeader → choose preset (Rhodes, DX Keys, Juno, …) → tweak Timbre, ADSR, EQ, FX. Volume in header.
+
+10. **Saving Your Progress**
+    - Autosave is on by default (saves to your browser).
+    - "Save" button in the header menu → downloads a `.json` project file.
+    - "Open" lets you reload a `.json` file.
+
+### Brief one-liner mentions (per user request)
+- Exporting lyrics (ExportLyricsSheet)
+- Changing key/mode (header dropdown)
+- Sort/reorder mode for sections
+- Sound presets quick reference
+
+## Technical Details
+
+**New files**
+- `src/pages/Help.tsx` — main page
+- `src/components/help/HelpSection.tsx` — section wrapper (heading + body + screenshot slot)
+- `src/components/help/HelpToc.tsx` — sticky TOC / mobile dropdown
+- `src/assets/help/*.png` — screenshots (captured from live preview at `/index`)
+
+**Modified files**
+- `src/App.tsx` — register `/help` route
+- `src/components/header/TransportHeader.tsx` — add "Help" link in menu
+- `src/pages/Landing.tsx` — add Help link in footer (small)
+
+**Screenshot pipeline** (during build only, not runtime):
+- Use browser tool to navigate the preview at relevant states (lyrics tab with a picker open, chords tab with basket, progressions tab with a pattern block, sound panel open).
+- Save to `src/assets/help/` and import as ES6 modules.
+- Add red-circle/arrow callouts via simple absolute-positioned overlay divs in `HelpSection` (no image editing needed).
+
+**Styling**
+- Page uses `bg-paper`, `font-display` for h1/h2, `font-nunito` for body.
+- Screenshots in rounded `paper-card` containers with `shadow-card`.
+- Numbered steps as `<ol>` with custom marker styling matching the app's amber accent.
+
+**Accessibility/SEO**
+- Single H1 ("Help & User Manual"), H2 per section, anchor IDs for TOC links.
+- `<title>` and `<meta description>` set via `<Helmet>` if available, else direct `document.title` effect.
+- Alt text on every screenshot describing what it shows.
+
+## Out of scope
+- No video tutorials.
+- No backend storage of help-read state.
+- No i18n (English only for v1).
+
+## Open question
+Confirm the menu placement for the Help link — top of the header dropdown, or under a new "?" icon button next to the menu? I'll default to the dropdown unless you prefer the icon.
