@@ -106,10 +106,7 @@ const Index = () => {
   };
 
   return (
-    <div
-      className="min-h-screen bg-paper text-foreground flex flex-col"
-      style={{ backgroundImage: "linear-gradient(var(--app-tint, transparent), var(--app-tint, transparent))" }}
-    >
+    <div className="min-h-screen bg-paper text-foreground flex flex-col">
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
       <DragDropContext

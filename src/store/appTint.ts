@@ -34,14 +34,10 @@ export const useAppTintStore = create<State>((set) => ({
 function applyTint(tint: SectionColor | null) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  // 25%: half of the 50% opacity used by section tints (see sectionTintStyle).
   if (tint) {
-    root.style.setProperty(
-      "--app-tint",
-      `color-mix(in oklch, var(--section-tint-${tint}) 25%, transparent)`,
-    );
+    root.style.setProperty("--app-tint-raw", `var(--section-tint-${tint})`);
   } else {
-    root.style.removeProperty("--app-tint");
+    root.style.removeProperty("--app-tint-raw");
   }
 }
 
