@@ -4,6 +4,7 @@ import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/l
 import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
 import { useAppTintStore } from "@/store/appTint";
+import { useAppBackgroundStore, PATTERN_KEYS, MASK_KEYS, type BackgroundPattern, type MaskStyle } from "@/store/appBackground";
 import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/SectionColorPicker";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
@@ -276,6 +277,8 @@ export interface SerializedSong {
   inspirationPhotos?: InspirationPhoto[];
   /** Background tint key (matches SECTION_COLOR_KEYS), or null/undefined for no tint. */
   appTint?: SectionColor | null;
+  /** Background pattern and mask settings. */
+  appBackground?: { pattern: BackgroundPattern; mask: MaskStyle } | null;
   /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
   layoutMeta?: {
     lastEditedScreenWidth: number;
@@ -3355,6 +3358,18 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         ? (rawTint as SectionColor)
         : null,
     );
+    const rawBg = parsed.appBackground;
+    if (rawBg && typeof rawBg === "object") {
+      useAppBackgroundStore.getState().setPattern(
+        (PATTERN_KEYS as string[]).includes(rawBg.pattern) ? rawBg.pattern as BackgroundPattern : "none",
+      );
+      useAppBackgroundStore.getState().setMask(
+        (MASK_KEYS as string[]).includes(rawBg.mask) ? rawBg.mask as MaskStyle : "none",
+      );
+    } else {
+      useAppBackgroundStore.getState().setPattern("none");
+      useAppBackgroundStore.getState().setMask("none");
+    }
     // Surface layout metadata so the UI can offer a friendly auto-format
     // toast when the device width has changed since last save.
     if (parsed.layoutMeta && typeof window !== "undefined") {
@@ -3383,6 +3398,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       inspirationPhotos: s.inspirationPhotos.length > 0 ? s.inspirationPhotos : undefined,
       sound: useSoundStore.getState().toJSON(),
       appTint: useAppTintStore.getState().tint,
+      appBackground: {
+        pattern: useAppBackgroundStore.getState().pattern,
+        mask: useAppBackgroundStore.getState().mask,
+      },
       layoutMeta: width > 0 ? {
         lastEditedScreenWidth: width,
         lastEditedDevice: getDeviceTypeForWidth(width),

@@ -18,8 +18,10 @@ import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endI
 import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
+import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 
 const Index = () => {
+  const bg = useAppBackgroundStore();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const initialTab = ((): "lyrics" | "chords" | "progressions" => {
@@ -106,7 +108,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-paper text-foreground flex flex-col">
+    <div className="min-h-screen bg-paper text-foreground flex flex-col isolate">
+      {bg.pattern !== "none" && (
+        <div
+          className="fixed inset-0 pointer-events-none"
+          style={{ zIndex: -1, opacity: 0.8, ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
+        />
+      )}
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
       <DragDropContext
