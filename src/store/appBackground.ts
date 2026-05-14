@@ -54,7 +54,7 @@ export function getPatternStyle(pattern: BackgroundPattern): React.CSSProperties
     case "wavy":
       return {
         backgroundImage: [
-          "repeating-radial-gradient(circle at 0 0, transparent 0, var(--paper) 15px)",
+          "repeating-radial-gradient(circle at 0 0, transparent 0, var(--paper) 22.5px)",
           `repeating-linear-gradient(color-mix(in oklch,${T} 33%,transparent),${T})`,
         ].join(","),
       };
@@ -72,8 +72,8 @@ export function getPatternStyle(pattern: BackgroundPattern): React.CSSProperties
       };
     case "dot":
       return {
-        backgroundImage: `radial-gradient(${T} 0.75px,transparent 0.75px)`,
-        backgroundSize: "15px 15px",
+        backgroundImage: `radial-gradient(${T} 1.125px,transparent 1.125px)`,
+        backgroundSize: "22.5px 22.5px",
       };
     case "lined":
       return {
