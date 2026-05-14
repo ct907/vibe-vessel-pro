@@ -21,10 +21,14 @@
     color-scheme: light;
 
     /* ─── Paper & ink ─────────────────────────────────────────── */
-    --paper:              oklch(0.9613 0.0142 89.20);
-    --paper-shade:        oklch(0.8830 0.0270 89.30);
-    --paper-shade-soft:   oklch(0.9234 0.0240 90.10);
-    --paper-card:         oklch(0.9740 0.0080 84.50);
+    --paper-b:              oklch(0.9613 0.0142 89.20);
+    --paper-shade-b:        oklch(0.8830 0.0270 89.30);
+    --paper-shade-soft-b:   oklch(0.9234 0.0240 90.10);
+    --paper-card-b:         oklch(0.9740 0.0080 84.50);
+    --paper:              color-mix(in oklch, var(--paper-b)            90%, var(--app-tint-raw, var(--paper-b))            10%);
+    --paper-shade:        color-mix(in oklch, var(--paper-shade-b)      90%, var(--app-tint-raw, var(--paper-shade-b))      10%);
+    --paper-shade-soft:   color-mix(in oklch, var(--paper-shade-soft-b) 90%, var(--app-tint-raw, var(--paper-shade-soft-b)) 10%);
+    --paper-card:         color-mix(in oklch, var(--paper-card-b)       90%, var(--app-tint-raw, var(--paper-card-b))       10%);
 
     /* shadcn semantic aliases */
     --background:         var(--paper);
@@ -33,7 +37,8 @@
     --card:               var(--paper-card);
     --card-foreground:    oklch(0.2257 0.0204 261.40);
 
-    --popover:            oklch(0.9803 0.0062 75.41);
+    --popover-b:            oklch(0.9803 0.0062 75.41);
+    --popover:            color-mix(in oklch, var(--popover-b)          90%, var(--app-tint-raw, var(--popover-b))          10%);
     --popover-foreground: oklch(0.2257 0.0204 261.40);
 
     /* ─── Amber accent ────────────────────────────────────────── */
@@ -47,17 +52,20 @@
     --secondary:            var(--paper-shade);
     --secondary-foreground: oklch(0.2257 0.0204 261.40);
 
-    --muted:                oklch(0.9150 0.0138 78.26);
+    --muted-b:              oklch(0.9150 0.0138 78.26);
+    --muted:              color-mix(in oklch, var(--muted-b)            90%, var(--app-tint-raw, var(--muted-b))            10%);
     --muted-foreground:     oklch(0.4660 0.0240 70.00);
 
-    --accent:               oklch(0.9287 0.0264 61.99);
+    --accent-b:             oklch(0.9287 0.0264 61.99);
+    --accent:             color-mix(in oklch, var(--accent-b)           90%, var(--app-tint-raw, var(--accent-b))           10%);
     --accent-foreground:    oklch(0.2257 0.0204 261.40);
 
     --destructive:          oklch(0.5326 0.1808 26.80);
     --destructive-foreground: oklch(0.9823 0.0069 88.64);
 
-    --border:               oklch(0.8190 0.0260 78.80);
-    --input:                oklch(0.8190 0.0260 78.80);
+    --border-b:             oklch(0.8190 0.0260 78.80);
+    --border:             color-mix(in oklch, var(--border-b)           90%, var(--app-tint-raw, var(--border-b))           10%);
+    --input:              var(--border);
     --ring:                 var(--primary-strong);
 
     --radius: 0.6rem;
@@ -178,16 +186,21 @@
   .dark {
     color-scheme: dark;
 
-    --paper:              oklch(0.2179 0.0110 60.85);
-    --paper-shade:        oklch(0.1750 0.0110 60.85);
-    --paper-shade-soft:   oklch(0.2499 0.0142 57.56);
-    --paper-card:         oklch(0.2499 0.0142 57.56);
+    --paper-b:              oklch(0.2179 0.0110 60.85);
+    --paper-shade-b:        oklch(0.1750 0.0110 60.85);
+    --paper-shade-soft-b:   oklch(0.2499 0.0142 57.56);
+    --paper-card-b:         oklch(0.2499 0.0142 57.56);
+    --paper:              color-mix(in oklch, var(--paper-b)            80%, var(--app-tint-raw, var(--paper-b))            20%);
+    --paper-shade:        color-mix(in oklch, var(--paper-shade-b)      80%, var(--app-tint-raw, var(--paper-shade-b))      20%);
+    --paper-shade-soft:   color-mix(in oklch, var(--paper-shade-soft-b) 80%, var(--app-tint-raw, var(--paper-shade-soft-b)) 20%);
+    --paper-card:         color-mix(in oklch, var(--paper-card-b)       80%, var(--app-tint-raw, var(--paper-card-b))       20%);
 
     --background:         var(--paper);
     --foreground:         oklch(0.9327 0.0161 82.79);
     --card:               var(--paper-card);
     --card-foreground:    oklch(0.9327 0.0161 82.79);
-    --popover:            oklch(0.2499 0.0142 57.56);
+    --popover-b:            oklch(0.2499 0.0142 57.56);
+    --popover:            color-mix(in oklch, var(--popover-b)          80%, var(--app-tint-raw, var(--popover-b))          20%);
     --popover-foreground: oklch(0.9327 0.0161 82.79);
 
     --primary:            oklch(0.7262 0.1414 58.64);
@@ -196,16 +209,20 @@
     --primary-inset:      oklch(0.6020 0.0700 70.00);
     --primary-halo:       oklch(0.7262 0.1414 58.64 / 0.40);
 
-    --secondary:          oklch(0.3229 0.0133 57.79);
+    --secondary-b:          oklch(0.3229 0.0133 57.79);
+    --secondary:          color-mix(in oklch, var(--secondary-b)        80%, var(--app-tint-raw, var(--secondary-b))        20%);
     --secondary-foreground: oklch(0.9327 0.0161 82.79);
-    --muted:              oklch(0.3019 0.0124 62.15);
+    --muted-b:              oklch(0.3019 0.0124 62.15);
+    --muted:              color-mix(in oklch, var(--muted-b)            80%, var(--app-tint-raw, var(--muted-b))            20%);
     --muted-foreground:   oklch(0.7323 0.0249 69.49);
-    --accent:             oklch(0.3589 0.0476 61.59);
+    --accent-b:             oklch(0.3589 0.0476 61.59);
+    --accent:             color-mix(in oklch, var(--accent-b)           80%, var(--app-tint-raw, var(--accent-b))           20%);
     --accent-foreground:  oklch(0.8519 0.0763 62.62);
     --destructive:        oklch(0.5189 0.1750 25.76);
     --destructive-foreground: oklch(0.9327 0.0161 82.79);
-    --border:             oklch(0.3432 0.0153 59.11);
-    --input:              oklch(0.3432 0.0153 59.11);
+    --border-b:             oklch(0.3432 0.0153 59.11);
+    --border:             color-mix(in oklch, var(--border-b)           80%, var(--app-tint-raw, var(--border-b))           20%);
+    --input:              var(--border);
     --ring:               oklch(0.7262 0.1414 58.64);
 
     --ink:                oklch(0.9327 0.0161 82.79);
@@ -256,7 +273,8 @@
 
     --pill-rest-bg:   var(--paper-card);
     --pill-rest-fg:   var(--ink);
-    --pill-hover-bg:  oklch(0.30 0.014 58);
+    --pill-hover-bg-b: oklch(0.30 0.014 58);
+    --pill-hover-bg:  color-mix(in oklch, var(--pill-hover-bg-b)        80%, var(--app-tint-raw, var(--pill-hover-bg-b))        20%);
     --pill-active-bg: var(--ink);
     --pill-active-fg: var(--paper);
 
