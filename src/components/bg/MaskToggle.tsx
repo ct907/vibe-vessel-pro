@@ -2,9 +2,9 @@ import { type MaskStyle } from "@/store/appBackground";
 import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: MaskStyle; label: string }[] = [
-  { value: "none",   label: "None"   },
-  { value: "top",    label: "Top"    },
-  { value: "bottom", label: "Bottom" },
+  { value: "none",   label: "None"       },
+  { value: "top",    label: "Top Mask"   },
+  { value: "bottom", label: "Bottom Mask"},
 ];
 
 interface Props {

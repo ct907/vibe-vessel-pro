@@ -696,17 +696,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Backgrounds</h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
                   <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
-                    <span className="text-sm font-medium text-[var(--paper-card)]">Pattern</span>
                     <PatternPicker value={appBg.pattern} onChange={appBg.setPattern} />
                   </div>
                   <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
-                    <span className="text-sm font-medium text-[var(--paper-card)]">Mask</span>
                     <MaskToggle value={appBg.mask} onChange={appBg.setMask} />
                   </div>
                   <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
-                    <div className="flex items-center gap-2 text-sm font-medium text-[var(--paper-card)]">
+                    <div className="flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
                       <Palette className="h-4 w-4" />
-                      Tint
+                      Background Tint
                     </div>
                     <SectionColorPicker
                       value={appTint.tint}
