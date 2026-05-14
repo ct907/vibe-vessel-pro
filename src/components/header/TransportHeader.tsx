@@ -38,7 +38,10 @@ import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
 import { useAppTintStore } from "@/store/appTint";
+import { useAppBackgroundStore } from "@/store/appBackground";
 import { SectionColorPicker, type SectionColor } from "@/components/section/SectionColorPicker";
+import { PatternPicker } from "@/components/bg/PatternPicker";
+import { MaskToggle } from "@/components/bg/MaskToggle";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
   AlertDialog,
@@ -242,6 +245,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
   const appTint = useAppTintStore();
+  const appBg = useAppBackgroundStore();
   const stopRequestedRef = useRef(false);
 
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
@@ -687,6 +691,31 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 </div>
               </div>
 
+              {/* Backgrounds */}
+              <div className="mt-6">
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Backgrounds</h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                    <span className="text-sm font-medium text-[var(--paper-card)]">Pattern</span>
+                    <PatternPicker value={appBg.pattern} onChange={appBg.setPattern} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <span className="text-sm font-medium text-[var(--paper-card)]">Mask</span>
+                    <MaskToggle value={appBg.mask} onChange={appBg.setMask} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <div className="flex items-center gap-2 text-sm font-medium text-[var(--paper-card)]">
+                      <Palette className="h-4 w-4" />
+                      Tint
+                    </div>
+                    <SectionColorPicker
+                      value={appTint.tint}
+                      onChange={(c) => appTint.setTint(c as SectionColor | null)}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Project Settings */}
               <div className="mt-6">
                 <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Project Settings</h3>
@@ -747,16 +776,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       Dark mode
                     </div>
                     <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
-                  </div>
-                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Palette className="h-4 w-4" />
-                      Background tint
-                    </div>
-                    <SectionColorPicker
-                      value={appTint.tint}
-                      onChange={(c) => appTint.setTint(c as SectionColor | null)}
-                    />
                   </div>
                   {suppressCrossTabDeleteWarning && (
                     <Button
