@@ -22,6 +22,7 @@ import {
   FilePlus,
   Image as ImageIcon,
   Bookmark,
+  Palette,
 } from "lucide-react";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
@@ -34,6 +35,8 @@ import { useMetronomeStore } from "@/store/metronome";
 import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
+import { useAppTintStore } from "@/store/appTint";
+import { SectionColorPicker, type SectionColor } from "@/components/section/SectionColorPicker";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
   AlertDialog,
@@ -236,6 +239,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const isMobile = useIsMobile();
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
+  const appTint = useAppTintStore();
   const stopRequestedRef = useRef(false);
 
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
@@ -539,12 +543,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             </SheetTrigger>
             <SheetContent side="right" className="w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
               <SheetHeader>
-                <SheetTitle>Menu</SheetTitle>
+                <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>
 
               {/* Sound */}
               <div className="mt-6 flex flex-col gap-2">
-                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Sound</h3>
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Sound</h3>
                 <Select value={preset} onValueChange={(v) => setPreset(v as SoundPreset)}>
                   <SelectTrigger className="h-9 w-full">
                     <SelectValue />
@@ -566,10 +570,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
               {/* Song Settings */}
               <div className="mt-6">
-                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Song Settings</h3>
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Song Settings</h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Key</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Key</span>
                     <div className="flex items-center gap-1">
                       <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
                         <SelectTrigger className="h-9 w-auto min-w-0 px-2 gap-1 font-mono-chord">
@@ -596,7 +600,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
                   <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">Metronome</span>
+                      <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Metronome</span>
                       <Switch
                         checked={metronome.enabled}
                         onCheckedChange={(b) => {
@@ -608,7 +612,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                     </div>
                     {metronome.enabled && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vol</span>
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--paper-card)]">Vol</span>
                         <Slider
                           value={[Math.round(metronome.volume * 100)]}
                           min={0}
@@ -617,7 +621,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                           onValueChange={(v) => metronome.setVolume((v[0] ?? 0) / 100)}
                           className="flex-1"
                         />
-                        <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground">
+                        <span className="text-[10px] tabular-nums w-8 text-right text-[var(--paper-card)]">
                           {Math.round(metronome.volume * 100)}%
                         </span>
                       </div>
@@ -625,7 +629,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">BPM</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">BPM</span>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -645,7 +649,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Time Signature</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Time Signature</span>
                     <Select
                       value={`${meta.beatsPerBar}/${meta.beatUnit}`}
                       onValueChange={(v) => {
@@ -665,7 +669,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Transpose</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Transpose</span>
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(-1)} aria-label="Transpose down semitone">
                         <span aria-hidden className="text-base leading-none">−</span>
@@ -683,7 +687,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
               {/* Project Settings */}
               <div className="mt-6">
-                <h3 className="uppercase tracking-wide text-muted-foreground mb-2 font-light font-mono text-sm">Project Settings</h3>
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Project Settings</h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
                   <div className="flex gap-2">
                     <Button
@@ -728,6 +732,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       Dark mode
                     </div>
                     <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Palette className="h-4 w-4" />
+                      Background tint
+                    </div>
+                    <SectionColorPicker
+                      value={appTint.tint}
+                      onChange={(c) => appTint.setTint(c as SectionColor | null)}
+                    />
                   </div>
                   {suppressCrossTabDeleteWarning && (
                     <Button
