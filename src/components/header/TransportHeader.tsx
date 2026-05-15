@@ -520,7 +520,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
+        <header id="main-header" className="noise-texture rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center justify-between gap-2 sm:[display:contents]">
@@ -570,7 +570,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
+            <SheetContent side="right" className="noise-texture w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
               <SheetHeader>
                 <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>
