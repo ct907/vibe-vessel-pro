@@ -565,9 +565,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 >
                   <Redo2 className="h-4 w-4" />
                 </button>
-              </div>
 
-              <Sheet open={navOpen} onOpenChange={setNavOpen}>
+                <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
               <button className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
