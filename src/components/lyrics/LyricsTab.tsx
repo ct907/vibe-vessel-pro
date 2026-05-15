@@ -690,8 +690,8 @@ function SectionCard({
   return (
     <div
       data-section-id={section.id}
-      style={sectionTintStyle(section.color)}
-      className={cn("noise-texture rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
+      style={sectionTintStyle(section.color, 0.35)}
+      className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>

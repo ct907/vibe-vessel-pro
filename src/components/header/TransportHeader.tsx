@@ -570,7 +570,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
+            <SheetContent side="right" className="noise-texture-nav w-80 overflow-y-auto" style={{ background: "color-mix(in oklch, var(--ink-soft) 60%, transparent)" }}>
               <SheetHeader>
                 <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>
