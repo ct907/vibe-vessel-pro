@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: MaskStyle; label: string }[] = [
   { value: "none",   label: "None"       },
-  { value: "top",    label: "Top Mask"   },
-  { value: "bottom", label: "Bottom Mask"},
+  { value: "top",    label: "Bottom Mask" },
+  { value: "bottom", label: "Top Mask"   },
 ];
 
 interface Props {

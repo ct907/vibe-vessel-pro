@@ -1124,6 +1124,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           background: "var(--ink-soft)",
           borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
           paddingBottom: "60rem",
+          opacity: 0.4,
         }}
       >
         <span

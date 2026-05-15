@@ -1340,7 +1340,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
       <div
         className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl pb-[60rem]"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "var(--ink-soft)" }}
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "var(--ink-soft)", opacity: 0.4 }}
       >
         <span
           className="text-center"
