@@ -350,7 +350,7 @@ export function FocusedChordEditor(props: Props) {
               Current chord
             </p>
             <span
-              className="inline-flex items-center rounded-md px-3 py-1.5 font-mono-chord font-semibold text-base"
+              className="noise-texture-chip inline-flex items-center rounded-md px-3 py-1.5 font-mono-chord font-semibold text-base"
               style={{ ...getChordColorClasses(progChord.chord).style, border: "2px solid transparent" }}
             >
               {progChord.chord.display}
@@ -514,7 +514,7 @@ export function FocusedChordEditor(props: Props) {
                   style={colors.style}
                   className={cn(
                     colors.className,
-                    "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left",
+                    "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left",
                   )}
                 >
                   <div className="min-w-0">

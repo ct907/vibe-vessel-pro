@@ -455,7 +455,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
             </span>
-            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -2 }}>
+            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
               elt.
             </span>
           </div>
@@ -570,7 +570,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="noise-texture w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
+            <SheetContent side="right" className="noise-bg-nav w-80 overflow-y-auto" style={{ backgroundColor: "color-mix(in oklch, var(--ink-soft) 60%, transparent)" }}>
               <SheetHeader>
                 <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>

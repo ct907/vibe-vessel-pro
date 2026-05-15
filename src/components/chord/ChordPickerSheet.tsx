@@ -228,7 +228,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
                       style={colors.style}
                       className={cn(
                         colors.className,
-                        "group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
+                        "noise-texture-chip group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
                       )}
                       onClick={() => handlePick(s.symbol)}
                     >
@@ -260,7 +260,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
                       style={colors.style}
                       className={cn(
                         colors.className,
-                        "group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
+                        "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
                       )}
                       onClick={() => handlePick(s.symbol)}
                     >
