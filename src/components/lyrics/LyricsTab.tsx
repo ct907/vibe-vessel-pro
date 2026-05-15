@@ -690,7 +690,11 @@ function SectionCard({
   return (
     <div
       data-section-id={section.id}
-      style={sectionTintStyle(section.color, 0.35)}
+      style={{
+        ...sectionTintStyle(section.color, 0.35),
+        backdropFilter: "blur(2px) saturate(200%)",
+        WebkitBackdropFilter: "blur(2px) saturate(200%)",
+      }}
       className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >
       {/* Section header */}
@@ -1279,8 +1283,33 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     return () => setLyricsOnDragEnd(null);
   }, [setLyricsOnDragEnd]);
 
+  useEffect(() => {
+    if (!activeChordId || isMobile) return;
+
+    const activeRow = document
+      .querySelector(`[data-chip-anchor="${activeChordId}"]`)
+      ?.closest("[data-chord-row]");
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveChordId(null);
+    };
+    const handlePointer = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (activeRow && activeRow.contains(target)) return;
+      setActiveChordId(null);
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("pointerdown", handlePointer);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("pointerdown", handlePointer);
+    };
+  }, [activeChordId, isMobile]);
+
   return (
-    <div className="space-y-4" onClick={() => setActiveChordId(null)}>
+    <div className="space-y-4">
       {sections.map((sec, i) => (
         <div key={sec.id} className="space-y-2">
           <SectionCard
