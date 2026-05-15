@@ -526,13 +526,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center gap-2">
-              <span
-                className="font-display shrink-0 leading-none select-none text-xl"
-                style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)", marginTop: 6 }}
-              >
-                SongNote
-              </span>
-
               <div className="flex-1" />
 
               <div className="flex items-center gap-1.5 shrink-0">
