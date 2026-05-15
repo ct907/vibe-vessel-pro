@@ -154,3 +154,19 @@ export function getChordColorClasses(chord: ChordSymbol): ChordColorClasses {
 export function getChordStrokeColor(chord: ChordSymbol): string {
   return strokeFor(chord.quality);
 }
+
+/** Every distinct chip background — every solid + gradient combination across chord families. */
+export const ALL_CHIP_STYLES: CSSProperties[] = [
+  solid(SOFT_PEACH),
+  solid(POWDER_BLUE),
+  solid(PALE_BUTTER),
+  solid(ICE_BLUE),
+  grad(WARM_SAND, ROSE),
+  grad(SKY_BLUE, LAVENDER),
+  grad(APRICOT, PERIWINKLE),
+  grad(MINT, MUTED_BLUSH),
+  grad(DUSTY_BLUE, LILAC),
+  grad(SOFT_THISTLE, PALE_GOLD),
+  solid(COTTON_CANDY),
+  grad(PALE_LEMON, BABY_BLUE),
+];
