@@ -37,7 +37,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-6xl pr-4 pt-4">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 relative">
         <textarea
           ref={taRef}
           value={meta.title}
@@ -50,7 +50,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 mt-1 shrink-0"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute right-0 top-1.5 z-10"
               aria-label="Song actions"
             >
               <MoreVertical className="h-5 w-5" />
