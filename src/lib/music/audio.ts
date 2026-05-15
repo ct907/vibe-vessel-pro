@@ -236,6 +236,7 @@ export async function playProgression(
 
   const part = new Tone.Part((time, value: Payload) => {
     // `time` is in the shared AudioContext clock (Tone uses our raw AC).
+    console.log("[part] chord", value.__index, value.chord.display ?? value.chord.root, "at ac-time", time.toFixed(3), "transport.seconds", Tone.getTransport().seconds.toFixed(3));
     const startAtT = time;
     const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
     spawnChord(value.chord, startAtT, startAtT + durSec, value.chord.octave ?? octave);
@@ -257,10 +258,12 @@ export async function playProgression(
   activePart = part;
 
   if (startAt != null) {
-    // Convert AudioContext time to Tone seconds (Tone shares the same clock).
-    transport.start(startAt);
+    // Second arg (0) locks the transport offset to beat 0 so Part events
+    // scheduled at position 0 fire at exactly startAt in AC time, rather than
+    // wherever the transport cursor happened to be left after a prior stop.
+    transport.start(startAt, 0);
   } else {
-    transport.start();
+    transport.start(undefined, 0);
   }
 
   return { stop: () => stopProgression() };
@@ -270,7 +273,10 @@ export function stopProgression() {
   const transport = Tone.getTransport();
   transport.stop();
   transport.cancel();
-  transport.position = 0;
+  transport.position = "0:0:0";
+  // Clear any queued draw callbacks from the previous session so they don't
+  // fire on the wrong chord index when the Part restarts.
+  try { Tone.getDraw().cancel(0); } catch { /* noop */ }
   if (activePart) {
     activePart.stop();
     activePart.dispose();
