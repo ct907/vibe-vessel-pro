@@ -812,6 +812,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
               </div>
             </SheetContent>
           </Sheet>
+              </div>
         </div>
 
         {/* Row 2: Play + Tabs */}
