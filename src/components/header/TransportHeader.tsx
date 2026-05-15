@@ -342,6 +342,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       cursorBeat += accBeats;
     }
 
+    console.log("[playback] events:", events.length, "cursorBeat:", cursorBeat, "first.startBeat:", events[0]?.startBeat);
+
     if (!events.length) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
@@ -370,6 +372,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
     setIsPlaying(true);
     setPlayingStore(true);
+    // Seed the playhead to the first chord immediately so the visual indicator
+    // appears even if the first Tone.Draw callback is delayed or dropped.
+    setCurrent(playMeta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     const startAt = getAudioContext().currentTime + 0.04;
