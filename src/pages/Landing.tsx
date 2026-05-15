@@ -83,8 +83,9 @@ function ChipScatterBackground() {
       {particles.map((p) => (
         <span
           key={p.id}
-          className="noise-texture-chip absolute inline-flex items-center rounded-md font-mono-chord font-semibold"
+          className="noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold"
           style={{
+            position: "absolute",
             top: `${p.top}%`,
             left: `${p.left}%`,
             fontSize: `${p.size}px`,
