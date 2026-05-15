@@ -453,11 +453,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         <div className="flex items-center gap-2">
           <Bookmark
             strokeWidth={0}
-            style={{ width: 20, height: 20, fill: "var(--cocoa-deep)" }}
+            style={{ width: 28, height: 28, fill: "var(--cocoa-deep)" }}
           />
           <span
             className="font-display shrink-0 leading-none select-none"
-            style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)" }}
+            style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)", marginTop: 4 }}
           >
             SongNote
           </span>
@@ -816,7 +816,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         </div>
 
         {/* Row 2: Tabs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3">
 
           {/* Tabs bar — recessed well with cocoa active pill */}
           <div

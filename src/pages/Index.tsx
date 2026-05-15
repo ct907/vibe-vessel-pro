@@ -112,7 +112,7 @@ const Index = () => {
       {bg.pattern !== "none" && (
         <div
           className="fixed inset-0 pointer-events-none"
-          style={{ zIndex: -1, opacity: 0.8, ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
+          style={{ zIndex: -1, opacity: bg.pattern === "dot" ? 0.8 : 0.3, ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
         />
       )}
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
