@@ -449,7 +449,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   return (
     <>
-      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
+      <div className="mx-auto mt-2 mb-2 flex w-full max-w-[1600px] items-center justify-between px-3 sm:px-5">
         <div className="flex items-center gap-2">
           <Link
             to="/"
