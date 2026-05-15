@@ -1,129 +1,184 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Play, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSongStore } from "@/store/song";
-import { useDefaultsStore } from "@/store/defaults";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
-import { BookOpen, Music, ListMusic, FileText, Trash2 } from "lucide-react";
+import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 
-type TabKey = "lyrics" | "chords" | "progressions";
+const TAGLINE_TEXT: CSSProperties = { color: "oklch(0.25 0.02 260)" };
+const LYRICS_STYLE: CSSProperties = { background: "oklch(0.8460 0.0483 311.68)" };
+const CHORDS_STYLE: CSSProperties = {
+  background:
+    "linear-gradient(to right in oklch, oklch(0.9272 0.0651 83.56), oklch(0.8689 0.0539 11.07))",
+};
+const PROGRESSIONS_STYLE: CSSProperties = { background: "oklch(0.9265 0.0286 238.25)" };
 
-const TAB_INFO: Array<{ key: TabKey; title: string; description: string; Icon: typeof BookOpen }> = [
-  {
-    key: "lyrics",
-    title: "Lyrics",
-    description:
-      "Write lyrics line by line. Drop chords directly above the words and organize the song into sections.",
-    Icon: FileText,
-  },
-  {
-    key: "chords",
-    title: "Chords",
-    description:
-      "Build a palette of chords for the song. Audition voicings and add favourites to the basket for quick reuse.",
-    Icon: Music,
-  },
-  {
-    key: "progressions",
-    title: "Progressions",
-    description:
-      "Arrange chord pattern blocks per section. Press play to hear the full progression in your chosen sound.",
-    Icon: ListMusic,
-  },
-];
+function TaglineChip({ label, style }: { label: string; style: CSSProperties }) {
+  return (
+    <span
+      className="noise-texture-chip inline-flex items-center rounded-md px-1.5 py-0.5 font-semibold"
+      style={{ ...style, ...TAGLINE_TEXT }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ChipScatterBackground() {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 40 }).map((_, i) => ({
+        id: i,
+        top: Math.random() * 100,
+        left: Math.random() * 100,
+        size: Math.random() * 15 + 5,
+        rotation: Math.random() * 360,
+        style: ALL_CHIP_STYLES[Math.floor(Math.random() * ALL_CHIP_STYLES.length)],
+      })),
+    [],
+  );
+
+  const maskStyle: CSSProperties = {
+    WebkitMaskImage:
+      "radial-gradient(ellipse 25% 25% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+    maskImage:
+      "radial-gradient(ellipse 25% 25% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+  };
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 overflow-hidden"
+      style={{ zIndex: 0, ...maskStyle }}
+    >
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className="noise-texture-chip absolute inline-flex items-center rounded-md font-mono-chord font-semibold"
+          style={{
+            top: `${p.top}%`,
+            left: `${p.left}%`,
+            fontSize: `${p.size}px`,
+            padding: "0.2em 0.5em",
+            transform: `translate(-50%, -50%) rotate(${p.rotation}deg)`,
+            color: "transparent",
+            opacity: 0.5,
+            ...p.style,
+          }}
+        >
+          Am7
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function Landing() {
   const navigate = useNavigate();
-  const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
-  const setDefaultLandingTab = useDefaultsStore((s) => s.setDefaultLandingTab);
   const loadFromJSON = useSongStore((s) => s.loadFromJSON);
+  const resetSong = useSongStore((s) => s.resetSong);
   const [recents, setRecents] = useState<RecentProject[]>([]);
 
   useEffect(() => {
     setRecents(listRecent());
   }, []);
 
-  const goTo = (tab: TabKey) => navigate(`/app?tab=${tab}`);
-
   const openRecent = (r: RecentProject) => {
     loadFromJSON(r.snapshot);
     navigate("/app");
   };
-
-  const headingId = useMemo(() => "landing-heading", []);
+  const removeOne = (id: string) => {
+    removeRecent(id);
+    setRecents(listRecent());
+  };
+  const startWriting = () => {
+    if (recents.length === 0) {
+      resetSong();
+      navigate("/app");
+    } else {
+      openRecent(recents[0]);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-paper text-foreground">
-      <header className="mx-auto max-w-5xl px-4 pt-8 pb-4 flex items-center gap-3">
-        <BookOpen className="h-7 w-7 ink-chord" />
-        <div>
-          <h1 id={headingId} className="font-display text-3xl leading-none">SongNote</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            A songwriter's notebook for lyrics, chords, and progressions.
-          </p>
-        </div>
-        <div className="ml-auto">
-          <Link
-            to="/app"
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 px-4 text-sm font-semibold"
+    <div className="min-h-screen bg-paper text-foreground relative overflow-hidden">
+      <ChipScatterBackground />
+      <main className="relative mx-auto max-w-2xl px-4 pt-10 pb-24 flex flex-col items-center text-center">
+        <Link
+          to="/app"
+          aria-label="Open editor"
+          className="btn-sculpt-amber inline-flex items-center justify-center rounded-full h-12 w-12"
+        >
+          <Play className="h-5 w-5 fill-current" />
+        </Link>
+
+        <div className="mt-24 flex items-center justify-center">
+          <span
+            style={{
+              color: "rgb(47, 39, 30)",
+              fontFamily: '"Noto Music"',
+              fontSize: 144,
+              lineHeight: "120px",
+              marginTop: 12,
+            }}
           >
-            Open editor
-          </Link>
+            𝆑
+          </span>
+          <span
+            style={{
+              color: "#2F271E",
+              fontFamily: '"Noto Music"',
+              fontSize: 96,
+              fontStyle: "italic",
+              lineHeight: "120px",
+              marginLeft: -24,
+            }}
+          >
+            elt.
+          </span>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-5xl px-4 pb-24" aria-labelledby={headingId}>
-        <section aria-label="Tabs">
-          <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">Start where you want</h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            {TAB_INFO.map(({ key, title, description, Icon }) => {
-              const isDefault = defaultLandingTab === key;
-              return (
-                <article
-                  key={key}
-                  className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3 shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 ink-chord" />
-                    <h3 className="font-display text-lg">{title}</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground flex-1">{description}</p>
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Switch
-                        checked={isDefault}
-                        onCheckedChange={(b) => setDefaultLandingTab(b ? key : null)}
-                        aria-label={`Set ${title} as default tab`}
-                      />
-                      Default
-                    </label>
-                    <button
-                      onClick={() => goTo(key)}
-                      className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold"
-                    >
-                      Open {title}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+        <p className="mt-6 text-xl text-foreground/80">
+          The songwriter's notebook. Free to use. Use offline.
+        </p>
 
-        <section className="mt-10" aria-label="Recent projects">
-          <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">Recent projects</h2>
-          {recents.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">
-              No recent projects yet. Open the editor and your saved songs will appear here.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-              {recents.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+        <p className="mt-3 text-lg text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
+          <span>Write</span>
+          <TaglineChip label="Lyrics." style={LYRICS_STYLE} />
+          <span>Find</span>
+          <TaglineChip label="Chords." style={CHORDS_STYLE} />
+          <span>Play</span>
+          <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
+        </p>
+
+        <button
+          type="button"
+          onClick={startWriting}
+          className="btn-sculpt-amber mt-24 inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+        >
+          Start Writing
+        </button>
+
+        <section className="mt-8 w-full max-w-md" aria-label="Recent projects">
+          <h2 className="text-center font-semibold mb-3">Recent Projects</h2>
+          <div className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] divide-y divide-border/50">
+            {recents.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">
+                No recent projects yet.
+              </p>
+            ) : (
+              recents.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-2">
                   <button
                     type="button"
-                    className="flex-1 text-left hover:underline"
+                    className="flex-1 text-left"
                     onClick={() => openRecent(r)}
                   >
                     <div className="font-medium">{r.name}</div>
@@ -131,22 +186,27 @@ export default function Landing() {
                       {new Date(r.savedAt).toLocaleString()}
                     </div>
                   </button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      removeRecent(r.id);
-                      setRecents(listRecent());
-                    }}
-                    aria-label={`Remove ${r.name} from recents`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label={`More actions for ${r.name}`}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => removeOne(r.id)}>
+                        Remove from recents
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))
+            )}
+          </div>
         </section>
       </main>
     </div>
