@@ -178,7 +178,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           </div>
         )}
         {visibleGrid.map((row) => (
-          <div key={row.numeral} className="noise-texture rounded-xl p-3" style={{ background: "var(--paper-shade)" }}>
+          <div key={row.numeral} className="noise-texture-surface rounded-xl p-3" style={{ background: "color-mix(in oklch, var(--paper-shade) 70%, transparent)" }}>
             <div className="mb-2" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 12px", borderRadius: "var(--pill-radius, 8px)", background: "var(--primary)", color: "var(--paper-card)" }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 12 }}>{row.numeral}</span>
               <span style={{ fontFamily: "'Nunito', system-ui, sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{row.root}</span>
