@@ -37,7 +37,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-6xl pr-4 pt-4">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 relative">
         <textarea
           ref={taRef}
           value={meta.title}
