@@ -455,7 +455,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
             </span>
-            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -2 }}>
+            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
               elt.
             </span>
           </div>
@@ -520,7 +520,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
+        <header id="main-header" className="noise-texture rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center justify-between gap-2 sm:[display:contents]">
