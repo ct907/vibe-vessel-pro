@@ -423,7 +423,7 @@ function LineRow({
           style={{ minHeight: 36 }}
         >
           {lineChords.length === 0 && !isAnyDragging && (
-            <span className="absolute left-3 top-0 text-xs italic text-muted-foreground/60 leading-9 pointer-events-none select-none">
+            <span className="absolute left-3 top-0 text-base italic text-muted-foreground/60 leading-9 pointer-events-none select-none" style={{ opacity: 0.4 }}>
               add your chords here
             </span>
           )}
@@ -797,7 +797,7 @@ function LineRow({
             }
           }}
           placeholder="Write your lyric line…"
-          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
+          className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-9 text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words"
         />
       </div>
 
@@ -964,7 +964,7 @@ function SectionCard({
     <div
       data-section-id={section.id}
       style={sectionTintStyle(section.color)}
-      className={cn("rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
+      className={cn("noise-texture rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]">
