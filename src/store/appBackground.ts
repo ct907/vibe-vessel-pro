@@ -1,10 +1,10 @@
 import React from "react";
 import { create } from "zustand";
 
-export type BackgroundPattern = "none" | "wavy" | "checkerboard" | "dot" | "lined" | "quarters";
+export type BackgroundPattern = "none" | "checkerboard" | "dot" | "lined" | "quarters";
 export type MaskStyle = "none" | "top" | "bottom";
 
-export const PATTERN_KEYS: BackgroundPattern[] = ["none", "wavy", "checkerboard", "dot", "lined", "quarters"];
+export const PATTERN_KEYS: BackgroundPattern[] = ["none", "checkerboard", "dot", "lined", "quarters"];
 export const MASK_KEYS: MaskStyle[] = ["none", "top", "bottom"];
 
 interface Persist {
@@ -51,13 +51,6 @@ const T = "var(--app-tint-raw, var(--primary-soft))";
 
 export function getPatternStyle(pattern: BackgroundPattern): React.CSSProperties {
   switch (pattern) {
-    case "wavy":
-      return {
-        backgroundImage: [
-          "repeating-radial-gradient(circle at 0 0, transparent 0, var(--paper) 22.5px)",
-          `repeating-linear-gradient(color-mix(in oklch,${T} 33%,transparent),${T})`,
-        ].join(","),
-      };
     case "checkerboard":
       return {
         backgroundImage: [
