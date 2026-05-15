@@ -50,7 +50,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute right-0 top-1.5 z-10"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute -right-4 top-1.5 z-10"
               aria-label="Song actions"
             >
               <MoreVertical className="h-5 w-5" />
