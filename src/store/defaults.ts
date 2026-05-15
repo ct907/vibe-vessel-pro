@@ -14,7 +14,7 @@ export interface Defaults {
 }
 
 export const DEFAULTS_FALLBACK: Defaults = {
-  defaultChordLengthBeats: 2,
+  defaultChordLengthBeats: 4,
   defaultPatternBars: 4,
   defaultOctave: 4,
   defaultLandingTab: null,
