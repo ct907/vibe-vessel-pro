@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  useKeyboardSensor,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import { useInstantTouchSensor } from "@/lib/dnd/instant-touch-sensor";
+import { useInstantMouseSensor } from "@/lib/dnd/instant-mouse-sensor";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
 import { SongTitleHeader } from "@/components/song/SongTitleHeader";
@@ -10,11 +16,12 @@ import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
 import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
-import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
+import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 
 const Index = () => {
+  const bg = useAppBackgroundStore();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const initialTab = ((): "lyrics" | "chords" | "progressions" => {
@@ -80,70 +87,43 @@ const Index = () => {
     return () => { unsub(); unsubRecents(); };
   }, []);
 
-  // Single global DragDropContext routes drops to whichever tab owns the
-  // destination droppable. Basket-source drags work cross-tab because the
-  // BasketBar is a sibling of <main> inside this same context.
-  // Freeze the basket selection at drag-start (immune to mid-drag clear()
-  // races) and pause autosave so per-chord intermediate writes don't get
-  // persisted during multi-chord drags.
-  const onBeforeDragStart = (start: { draggableId: string }) => {
+  // Single global DragDropContext. Only basket chips are draggable; chord
+  // chips in Lyrics and Progressions are no longer draggable.
+  const onBeforeDragStart = () => {
     beginInteraction();
-    if (start.draggableId.startsWith("basket:")) {
-      const id = start.draggableId.slice("basket:".length);
-      const { selected } = useBasketSelectionStore.getState();
-      const frozen = selected.has(id) && selected.size > 1
-        ? new Set(selected)
-        : new Set([id]);
-      useDndStore.getState().setDraggingIds(frozen);
-    }
-  };
-  const onDragStart = (start: { draggableId: string }) => {
-    const { lyricsOnDragStart } = useDndStore.getState();
-    lyricsOnDragStart?.(start);
   };
   const onDragEnd = (result: DropResult) => {
     try {
       const { lyricsOnDragEnd, progressionsOnDragEnd } = useDndStore.getState();
       const dstPrefix = result.destination?.droppableId.split(":")[0];
-      // eslint-disable-next-line no-console
-      console.log("[DnD] onDragEnd", {
-        result,
-        destination: result.destination?.droppableId,
-        source: result.source?.droppableId,
-        dstPrefix,
-      });
       if (dstPrefix === "slot") {
-        console.log("[DnD] -> lyrics handler");
         lyricsOnDragEnd?.(result);
-      } else if (dstPrefix === "pattern" || dstPrefix === "patternblock") {
-        console.log("[DnD] -> progressions handler");
-        progressionsOnDragEnd?.(result);
-      } else {
-        // No destination (drop cancelled) — still notify both so per-tab
-        // draggingIds state clears (handlers return early when destination is
-        // null).
-        lyricsOnDragEnd?.(result);
+      } else if (dstPrefix === "pattern") {
         progressionsOnDragEnd?.(result);
       }
     } finally {
-      // Always release: clears both the frozen drag set and the autosave
-      // gate, even if a handler throws.
       useDndStore.getState().clear();
       endInteraction();
     }
   };
 
   return (
-    <div className="min-h-screen bg-paper text-foreground flex flex-col">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-3">
-        <h1 className="font-display leading-none" style={{ fontSize: "28px" }}>
-          SongNote
-        </h1>
-      </div>
+    <div className="min-h-screen bg-paper text-foreground flex flex-col isolate">
+      {bg.pattern !== "none" && (
+        <div
+          className="fixed inset-0 pointer-events-none"
+          style={{ zIndex: -1, opacity: bg.pattern === "dot" ? 0.8 : 0.3, ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
+        />
+      )}
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />
 
-      <DragDropContext onBeforeDragStart={onBeforeDragStart} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[48rem]">
+      <DragDropContext
+        onBeforeDragStart={onBeforeDragStart}
+        onDragEnd={onDragEnd}
+        enableDefaultSensors={false}
+        sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
+      >
+        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[368px]">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
           <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />

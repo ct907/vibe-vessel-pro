@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChordSymbol } from "@/lib/music/chords";
-import { getChordColorClasses } from "@/lib/music/chordColor";
+import { getChordColorClasses, getChordStrokeColor } from "@/lib/music/chordColor";
 import { holdChord, playChord } from "@/lib/music/audio";
 import { cn } from "@/lib/utils";
 
@@ -127,15 +127,24 @@ export function ChordChip({
   };
 
   const sizeCls =
-    size === "sm" ? "px-2 py-0.5 text-xs" : size === "lg" ? "px-3 py-1.5 text-base" : "px-2.5 py-1 text-sm";
+    size === "sm" ? "px-1 py-1 text-xs" : size === "lg" ? "px-1 py-1 text-base" : "px-1 py-1 text-sm";
   // Chord-tinted backgrounds for ink/card variants come from inline style
   // (oklch + oklch-interpolated gradients). The "filled" variant remains a
   // generic primary fill for non-chord uses (e.g. basket controls).
   const colors = getChordColorClasses(chord);
+  const strokeColor = getChordStrokeColor(chord);
   const isFilled = variant === "filled";
   const variantCls = isFilled
     ? "bg-primary/50 text-primary-foreground hover:bg-primary/60"
     : colors.className;
+
+  const chipStyle: React.CSSProperties = isFilled
+    ? {}
+    : {
+        ...colors.style,
+        border: selected ? `2px solid ${strokeColor}` : "2px solid transparent",
+        transition: "border-color 120ms ease",
+      };
 
   return (
     <button
@@ -154,12 +163,12 @@ export function ChordChip({
         releaseHold();
         onLongPress?.();
       }}
-      style={isFilled ? undefined : colors.style}
+      style={chipStyle}
       className={cn(
-        "inline-flex items-center rounded-md font-mono-chord font-semibold transition-colors select-none",
+        "inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
         sizeCls,
         variantCls,
-        selected && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.04]",
+        selected && "scale-[1.04]",
         className,
       )}
     >

@@ -216,6 +216,7 @@ export async function playProgression(
   stopProgression();
 
   const transport = Tone.getTransport();
+  transport.position = 0;
   // Optional smooth BPM ramp.
   const ramp = useSoundStore.getState().bpmRamp;
   if (ramp && lastBpm !== null && Math.abs(transport.bpm.value - bpm) > 0.5) {
@@ -237,7 +238,7 @@ export async function playProgression(
     // `time` is in the shared AudioContext clock (Tone uses our raw AC).
     const startAtT = time;
     const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
-    spawnChord(value.chord, startAtT, startAtT + durSec, octave);
+    spawnChord(value.chord, startAtT, startAtT + durSec, value.chord.octave ?? octave);
     if (onChordStart) {
       Tone.getDraw().schedule(() => onChordStart(value.__index), time);
     }
@@ -269,11 +270,15 @@ export function stopProgression() {
   const transport = Tone.getTransport();
   transport.stop();
   transport.cancel();
+  transport.position = 0;
   if (activePart) {
     activePart.stop();
     activePart.dispose();
     activePart = null;
   }
+  // Force the next playProgression to set BPM immediately rather than ramp —
+  // a 0.4 s ramp can drift the first chord relative to the metronome.
+  lastBpm = null;
   // Release any sustained voices.
   const t = getAudioContext().currentTime;
   for (const v of liveVoices) { try { v.release(t); } catch { /* noop */ } }

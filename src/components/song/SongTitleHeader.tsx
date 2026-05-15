@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
 import { useSongStore } from "@/store/song";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,28 +33,28 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const canFormat = sections.some((s) => s.lines.some((l) => l.chords.length > 0));
   const showSort = activeTab === "lyrics" || activeTab === "progressions";
+  const modeLabel = meta.keyMode === "maj" ? "Major" : "Minor";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pt-4">
-      <div className="flex items-start gap-2">
+    <div className="mx-auto w-full max-w-6xl pr-4 pt-4">
+      <div className="flex items-start gap-2 relative">
         <textarea
           ref={taRef}
           value={meta.title}
           onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
           placeholder="Untitled song"
           rows={1}
-          className="flex-1 min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-3xl sm:text-4xl leading-tight text-foreground placeholder:text-muted-foreground/50 px-0 py-1 break-words"
+          className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-2xl leading-tight text-foreground placeholder:text-muted-foreground/50 px-0 py-1 break-words text-center font-bold mt-1.5"
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 mt-1 shrink-0"
+            <button
+              type="button"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute -right-4 top-1.5 z-10"
               aria-label="Song actions"
             >
               <MoreVertical className="h-5 w-5" />
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem
@@ -85,6 +84,9 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <p className="text-sm font-normal text-[var(--ink-soft)] text-center mt-0.5">
+        {meta.keyRoot} {modeLabel} | {meta.beatsPerBar}/{meta.beatUnit} | {meta.bpm} bpm
+      </p>
     </div>
   );
 }

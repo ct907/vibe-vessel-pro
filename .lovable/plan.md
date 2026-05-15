@@ -1,84 +1,92 @@
-# Bug Fixes — Cross-tab Sync, Playback, Paste, Format, Undo, Move + Drag/Autosave/Validation Hardening + Desktop Drag Restore
+# In-App User Manual ("Help" Page)
 
-## Conflict check
+A beginner-focused Help page built into the app, accessible from the header, with captured screenshots and concise step-by-step instructions.
 
-None of the new items conflict with prior usability fixes. Item 7 (desktop drag restore) **partially reverts** the earlier "pencil-gates-drag" change, but only on desktop viewports. Mobile keeps the pencil-gated behavior because that's where the gesture conflict with ChordChip's own touch handlers exists.
+## Structure
 
----
+A new route `/help` rendered as a single scrollable page with a sticky left-side table of contents (collapses to a top dropdown on mobile). Reuses existing design tokens (`paper-card`, `ink`, `font-display`, `font-mono-chord`) so it feels native to the app.
 
-## Original items 1–6 (recap)
+### Entry points
+- Add a "Help" item to the menu in `TransportHeader` (existing `Menu` icon dropdown) → links to `/help`.
+- Also link from the Landing page footer.
 
-**1. Section delete syncs across tabs** — clear stale `focusedPatternId`/`startFromChordId`, dead local `selected` IDs, and close `chordEditor` if its target is gone, via an effect watching `sections`/`progression` in both tabs.
+## Sections
 
-**2. Play button plays nothing by default** — guard top of `handlePlay`: drop stale cursors; `await ensureAudio()` then `getAudioContext().resume()`; toast if no `onChordStart` fires within 500ms; add `clearStartCursor()` called from delete reducers.
+Each section: short intro → numbered steps → screenshot with callout → "Tip" callout where helpful.
 
-**3. Multi-chord paste must overflow** — rewrite `pasteChordsAt` to place greedily L→R, allocate a fresh `LyricLine { _isChordOverflow: true }` (or new pattern block in progressions) on overflow; never silently drop. Run `autoLayoutSection` after.
+1. **Welcome & Overview of the Three Tabs**
+   - What Lyrics, Chords, and Progressions tabs are for, and how they work together (chords picked in the Chord tab flow into the basket; the basket feeds Lyrics and Progressions).
 
-**4. Format Chords drops chords from non-first lines** — rewrite `formatChordsInSong` to operate on `section.chords` (SSOT) directly: snap each `SectionChord.lyricsPlacement.slotIndex` to nearest word boundary, return with `[SSOT_MODE]: true`, then run `formatChordsAndLyrics`.
+2. **Adding a Chord in the Lyrics Tab**
+   - Tap a word → ChordPickerSheet (mobile) / FocusedChordEditor opens → pick root, quality, octave → Close to save.
+   - Mention drag-from-basket alternative.
 
-**5. Undo after cut requires two presses** — add `withHistoryGroup(get, fn)` that snapshots once and suppresses nested `pushHistory`. Wrap cut+reflow, paste+reflow, and similar compound actions.
+3. **Writing Lyrics & Creating New Lines**
+   - Type into the lyric line field; press Enter/Return to create a new line below; Backspace on empty line removes it.
 
-**6. "Move to {section}" silently no-ops cross-section** — pre-check available beats; auto-`addPatternToSection` for overflow OR toast "Target has no room"; add Cut/Paste buttons to progressions row-2 toolbar sharing the new clipboard helper.
+4. **Browsing Chords & the Basket Bar**
+   - Filter by Nashville numeral; tap to audition; checkbox to multi-select; "Add to basket".
+   - The Basket Bar (bottom): drag chips into Lyrics or Progressions, or use "Send to" buttons.
 
----
+5. **Adding a Chord in the Progressions Tab**
+   - Tap an empty slot in a pattern block → picker opens → pick chord and octave → Close.
+   - Drag from basket as alternative.
 
-## New items 7–11
+6. **How Pattern Blocks Work**
+   - A pattern block = a repeating chord progression with N bars. Add multiple blocks per section. Patterns drive playback and bar count.
 
-### 7. Desktop: restore click-and-hold direct drag on chord chips
-The earlier change made all chord-row drags require tapping pencil → "Drag" mode. That fixed the mobile gesture conflict but **regressed desktop**, where click-and-hold drag was working perfectly.
+7. **Adjusting the Bar Length of a Chord**
+   - Each chord chip in a pattern shows a duration handle; drag to extend/shorten across bars.
 
-**Fix — viewport-gated behavior:**
-- Use existing `useIsMobile()` (≥768px = desktop).
-- **Desktop:** chord chips in lyrics rows and pattern blocks are wrapped in pangea `<Draggable>` directly; `dragHandleProps` on the chip; the chip's own `onMouseDown` audition stays (mouse drag has a movement threshold so a click still auditions, a press-and-pull drags). Pencil icon goes back to opening the editor immediately.
-- **Mobile:** keep the new pencil → action menu (`Edit` / `Drag`) and the per-chip "armed drag mode" added previously. ChordChip's touch handlers stay disabled only while armed.
-- Use pangea's native `renderClone` in BOTH paths (desktop and armed-mobile) — no custom portal, no `pointerPosRef`. The earlier removal of that machinery stays.
-- Apply identically to `LyricsTab.tsx` and `ProgressionsTab.tsx` (pattern blocks).
+8. **Adjusting Pattern Block Length**
+   - Use the bar-count control on the pattern header (+/− or stepper) to change total bars.
 
-**Files:** `src/components/lyrics/LyricsTab.tsx`, `src/components/progressions/ProgressionsTab.tsx`. Touch `ChordChip` only if needed to gate audition while armed (already conditional via `audition` prop).
+9. **Adjusting Sounds**
+   - Open Sound Panel from TransportHeader → choose preset (Rhodes, DX Keys, Juno, …) → tweak Timbre, ADSR, EQ, FX. Volume in header.
 
-### 8. Drag-clone reads basket selection without subscribing → stale "+N" badge
-`BasketBar.renderClone` calls `useBasketSelectionStore.getState().selected` — a one-shot read at clone-mount time.
+10. **Saving Your Progress**
+    - Autosave is on by default (saves to your browser).
+    - "Save" button in the header menu → downloads a `.json` project file.
+    - "Open" lets you reload a `.json` file.
 
-**Fix:** extract `<DragCloneBadge id={item.id}/>` that subscribes via `useBasketSelectionStore(s => s.selected)`. Only the badge re-renders.
-**File:** `src/components/basket/BasketBar.tsx`.
+### Brief one-liner mentions (per user request)
+- Exporting lyrics (ExportLyricsSheet)
+- Changing key/mode (header dropdown)
+- Sort/reorder mode for sections
+- Sound presets quick reference
 
-### 9. `resolveDragIds` race on stale Set reference
-Both `useBasketSelectionStore.resolveDragIds` and `useDndSelection` capture `selected` once; a `clear()` between snapshot and `.has`/`.size` checks yields stale results.
+## Technical Details
 
-**Fix:** freeze the drag scope at drag-start. In the global `DragDropContext.onBeforeDragStart`, snapshot `selected` into `useDndStore.draggingIds` once; all consumers (drop handlers, clone badge fallback) read THAT during the drag; clear in `onDragEnd`. Same contract for `useDndSelection`: expose `freezeForDrag(id)` returning a frozen array; mid-drag callers must use it instead of `resolveDragIds`.
-**Files:** `src/hooks/use-dnd-selection.ts`, `src/store/basket-selection.ts`, `src/store/dnd.ts`, `src/pages/Index.tsx`.
+**New files**
+- `src/pages/Help.tsx` — main page
+- `src/components/help/HelpSection.tsx` — section wrapper (heading + body + screenshot slot)
+- `src/components/help/HelpToc.tsx` — sticky TOC / mobile dropdown
+- `src/assets/help/*.png` — screenshots (captured from live preview at `/index`)
 
-### 10. Autosave races during rapid multi-chord drags → on-disk divergence
-Each per-chord move dispatches a separate update; debounced autosave can persist intermediate state.
+**Modified files**
+- `src/App.tsx` — register `/help` route
+- `src/components/header/TransportHeader.tsx` — add "Help" link in menu
+- `src/pages/Landing.tsx` — add Help link in footer (small)
 
-**Fix:** add counter-based `beginInteraction()`/`endInteraction()` on the song store; while count > 0 autosave is paused. Wire from `Index.tsx`: `onBeforeDragStart` → begin; `onDragEnd` (after per-tab handler) → end (autosave fires once with final state). Combine with `withHistoryGroup` (#5) so the whole drag is one undo step.
-**Files:** `src/store/song.ts`, `src/pages/Index.tsx`.
+**Screenshot pipeline** (during build only, not runtime):
+- Use browser tool to navigate the preview at relevant states (lyrics tab with a picker open, chords tab with basket, progressions tab with a pattern block, sound panel open).
+- Save to `src/assets/help/` and import as ES6 modules.
+- Add red-circle/arrow callouts via simple absolute-positioned overlay divs in `HelpSection` (no image editing needed).
 
-### 11. Paste validates per-token, not whole input
-`parseChordTextToClips` filters invalid tokens individually → silent partial pastes.
+**Styling**
+- Page uses `bg-paper`, `font-display` for h1/h2, `font-nunito` for body.
+- Screenshots in rounded `paper-card` containers with `shadow-card`.
+- Numbered steps as `<ol>` with custom marker styling matching the app's amber accent.
 
-**Fix:** validate the whole input first; if any token fails `parseChord`, do not mutate — toast "Couldn't paste — N of M tokens aren't valid chords" listing bad tokens (truncated), with a "Paste valid only" secondary action. Apply at both call sites; extract helper to `src/lib/music/chordClipboard.ts` for reuse with #3 / #6.
+**Accessibility/SEO**
+- Single H1 ("Help & User Manual"), H2 per section, anchor IDs for TOC links.
+- `<title>` and `<meta description>` set via `<Helmet>` if available, else direct `document.title` effect.
+- Alt text on every screenshot describing what it shows.
 
-### 12. User-typed chords reach DOM without `parseChord` enforcement
-`chord.display` is rendered directly. Invariant ("every `ChordSymbol` is parser-validated") is currently informal.
+## Out of scope
+- No video tutorials.
+- No backend storage of help-read state.
+- No i18n (English only for v1).
 
-**Fix:** add canonical constructor `makeChordFromInput(raw): ChordSymbol | null` in `src/lib/music/chords.ts` that runs `parseChord`, normalizes `display` to canonical form, rejects on null. Audit all construction sites: `FocusedChordEditor`, `ChordPickerSheet`, the new clipboard helper, and the JSON load path in `song.ts` (re-validate every chord on import; reject the file with a toast on failure). Add a unit test that round-trips every persisted chord through `parseChord` to the same `display`.
-**Files:** `src/lib/music/chords.ts`, `src/components/lyrics/FocusedChordEditor.tsx`, `src/components/chord/ChordPickerSheet.tsx`, `src/store/song.ts`, new test in `src/test/`.
-
----
-
-## Files to edit (consolidated)
-
-- `src/store/song.ts` — paste/format/move overflow & validation, `withHistoryGroup`, `beginInteraction/endInteraction`, load-time chord validation, `removeSection` cleanup hooks.
-- `src/store/playback.ts` — `clearStartCursor`.
-- `src/store/basket-selection.ts`, `src/store/dnd.ts`, `src/hooks/use-dnd-selection.ts` — frozen drag-snapshot semantics.
-- `src/lib/music/chords.ts` — `makeChordFromInput`.
-- `src/lib/music/chordLayout.ts` — SSOT-aware snap helper.
-- `src/lib/music/chordClipboard.ts` (new) — whole-input validating paste.
-- `src/components/header/TransportHeader.tsx` — playback guards + audio resume.
-- `src/components/lyrics/LyricsTab.tsx` — desktop direct-drag, mobile armed-drag, cut wrapping, clipboard helper, stale-ID cleanup.
-- `src/components/progressions/ProgressionsTab.tsx` — same drag split, Cut/Paste toolbar, move-to toast, stale-ID cleanup.
-- `src/components/basket/BasketBar.tsx` — reactive `<DragCloneBadge>`.
-- `src/components/lyrics/FocusedChordEditor.tsx`, `src/components/chord/ChordPickerSheet.tsx` — route through `makeChordFromInput`.
-- `src/pages/Index.tsx` — global DnD `onBeforeDragStart`/`onDragEnd` for interaction window + frozen drag IDs.
-- `src/test/` — chord-invariant test.
+## Open question
+Confirm the menu placement for the Help link — top of the header dropdown, or under a new "?" icon button next to the menu? I'll default to the dropdown unless you prefer the icon.

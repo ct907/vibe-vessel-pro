@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -26,9 +24,11 @@ interface Props {
   /** Optional controlled query (kept in sync with the active chord row). */
   query?: string;
   onQueryChange?: (q: string) => void;
+  /** Live-save hook for octave-only edits (no chord re-pick). */
+  onOctaveChange?: (octave: number) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -40,9 +40,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
 
   useEffect(() => {
     if (open) {
-      // When uncontrolled, seed with the existing chord display. When parent
-      // controls the query, leave it alone (parent owns sync with chord row).
       if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
+      setOctave(initialChord?.octave ?? 4);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord, queryProp]);
@@ -110,7 +109,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   // Close manually via the X button. Pressing Enter or double-tapping a suggestion
   // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
-    onPick(chord);
+    onPick({ ...chord, octave });
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
@@ -118,15 +117,22 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
   const SHEET_CHROME = isMobile ? 160 : 200;
-  const sheetMaxHeight = Math.max(220, vvHeight - TOP_RESERVED);
-  const gridMaxHeight = Math.max(80, vvHeight - TOP_RESERVED - SHEET_CHROME);
+  // Desktop: cap the sheet at 40% of viewport height so a short query like
+  // "G" doesn't flood the screen with a long scrolling list. Mobile keeps
+  // the previous behavior (use as much height as is available above the
+  // editing row) because there's much less screen real estate to work with
+  // and the keyboard already eats most of it.
+  const sheetMaxHeight = isMobile
+    ? Math.max(220, vvHeight - TOP_RESERVED)
+    : Math.max(220, Math.min(vvHeight * 0.4, vvHeight - TOP_RESERVED));
+  const gridMaxHeight = Math.max(80, sheetMaxHeight - SHEET_CHROME);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="bottom"
-        className="paper-card rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
-        style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px` }}
+        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
+        style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           // We focus the input ourselves; don't let Radix steal focus from
           // the chord row if user tapped to switch back.
@@ -152,13 +158,28 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
       >
         <div className="space-y-3 flex-1 min-h-0 flex flex-col">
           <div className="flex items-stretch gap-1.5">
-            <Input
+            <input
               ref={inputRef}
               data-chord-picker-input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Type a chord… e.g. Bbm9, Fmaj7, Csus4"
-              className="font-mono-chord text-base flex-1 min-w-0"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: "var(--paper-card)",
+                boxShadow: "var(--shadow-sculpt-cream-rest)",
+                border: 0,
+                borderRadius: 8,
+                padding: "10px 14px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                fontSize: 15,
+                color: "var(--ink)",
+                outline: "none",
+              }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
+              onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && exact) { handlePick(exact); return; }
                 if ((e.key === "ArrowUp" || e.key === "ArrowDown") && activeLineId) {
@@ -169,8 +190,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
-            <Select value={String(octave)} onValueChange={(v) => setOctave(Number(v))}>
-              <SelectTrigger className="h-10 w-[64px] px-2 text-xs font-mono-chord" aria-label="Audition octave">
+            <Select value={String(octave)} onValueChange={(v) => { const o = Number(v); setOctave(o); onOctaveChange?.(o); }}>
+              <SelectTrigger
+                className="h-10 w-[64px] px-2 text-xs font-mono-chord border-0"
+                style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
+                aria-label="Audition octave"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -465,7 +490,11 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
   return (
     <>
       <Select value={typeVal} onValueChange={(v) => handleType(v as TypeKey)}>
-        <SelectTrigger className="h-10 w-[68px] px-2 text-xs font-mono-chord" aria-label="Chord type">
+        <SelectTrigger
+          className="h-10 w-[68px] px-2 text-xs font-mono-chord border-0"
+          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
+          aria-label="Chord type"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -479,7 +508,11 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
         value={variantVal || "__base"}
         onValueChange={(v) => onChange(compose(typeVal, v === "__base" ? "" : v, "", bass))}
       >
-        <SelectTrigger className="h-10 w-[78px] px-2 text-xs font-mono-chord" aria-label="Chord variant">
+        <SelectTrigger
+          className="h-10 w-[78px] px-2 text-xs font-mono-chord border-0"
+          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
+          aria-label="Chord variant"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -496,7 +529,11 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
       </Select>
 
       <Select value={bass || "__none"} onValueChange={(v) => onChange(compose(typeVal, variantVal, alteredVal, v === "__none" ? "" : v))}>
-        <SelectTrigger className="h-10 w-[72px] px-2 text-xs font-mono-chord" aria-label="Slash bass">
+        <SelectTrigger
+          className="h-10 w-[72px] px-2 text-xs font-mono-chord border-0"
+          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
+          aria-label="Slash bass"
+        >
           <SelectValue placeholder="/—" />
         </SelectTrigger>
         <SelectContent>
@@ -509,21 +546,35 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
 
       {typeVal === "maj" && variantVal === "7" && (
         <div className="flex items-center gap-1 ml-1" role="group" aria-label="Altered dominant">
-          {ALTERED_CHIPS.map((c) => (
-            <button
-              key={c.value || "plain"}
-              type="button"
-              onClick={() => onChange(compose("maj", "7", c.value, bass))}
-              className={cn(
-                "h-7 px-2 rounded text-[10px] font-mono-chord border transition-colors",
-                alteredVal === c.value
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:bg-accent",
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
+          {ALTERED_CHIPS.map((c) => {
+            const isActive = alteredVal === c.value;
+            const isAltered = c.value !== "";
+            const activeGrad = isAltered
+              ? "linear-gradient(to right in oklch, oklch(0.9088 0.0353 150.52), oklch(0.8693 0.0443 18.04))"
+              : "linear-gradient(to right in oklch, oklch(0.9013 0.0465 54.45), oklch(0.8744 0.0387 264.35))";
+            return (
+              <button
+                key={c.value || "plain"}
+                type="button"
+                onClick={() => onChange(compose("maj", "7", c.value, bass))}
+                style={{
+                  background: isActive ? activeGrad : "var(--paper-shade)",
+                  color: "oklch(0.25 0.02 260)",
+                  border: isActive ? "2px solid oklch(0.75 0.05 80)" : "2px solid transparent",
+                  borderRadius: 6,
+                  padding: "0 8px",
+                  height: 28,
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "border-color 120ms ease, background 120ms ease",
+                }}
+              >
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       )}
     </>

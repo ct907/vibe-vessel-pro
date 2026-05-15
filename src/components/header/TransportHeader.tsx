@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
-import { downloadProjectJSON, loadProjectFromFile } from "@/store/song";
+import { downloadProjectJSON, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Play,
   Square,
@@ -21,7 +21,11 @@ import {
   FileText,
   FilePlus,
   Image as ImageIcon,
+
+  Palette,
+  HelpCircle,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
 import { getAudioContext } from "@/lib/audio/context";
@@ -32,6 +36,12 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMetronomeStore } from "@/store/metronome";
 import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
+import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
+import { useAppTintStore } from "@/store/appTint";
+import { useAppBackgroundStore } from "@/store/appBackground";
+import { SectionColorPicker, type SectionColor } from "@/components/section/SectionColorPicker";
+import { PatternPicker } from "@/components/bg/PatternPicker";
+import { MaskToggle } from "@/components/bg/MaskToggle";
 import { ExportLyricsSheet } from "@/components/lyrics/ExportLyricsSheet";
 import {
   AlertDialog,
@@ -44,7 +54,158 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Music2 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
+
+async function convertToWebP(file: File, maxPx = 400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/webp", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load")); };
+    img.src = url;
+  });
+}
+
+const PHOTO_SLOTS = [
+  { left: "30%", top: -48, rotate: -7 },
+  { left: "46%", top: -58, rotate: 5 },
+  { left: "61%", top: -47, rotate: -3 },
+] as const;
+
+const DESKTOP_PHOTO_SLOTS = [
+  { left: "calc(30% + 240px)", top: -48, rotate: -7 },
+  { left: "calc(30% + 390px)", top: -58, rotate: 5 },
+  { left: "calc(30% + 540px)", top: -47, rotate: -3 },
+] as const;
+
+const TABLET_PHOTO_SLOTS = [
+  { left: "calc(30% + 100px)", top: -48, rotate: -7 },
+  { left: "calc(30% + 220px)", top: -58, rotate: 5 },
+  { left: "calc(30% + 340px)", top: -47, rotate: -3 },
+] as const;
+
+function InspirationLightbox({
+  photos,
+  initialIndex,
+  onClose,
+  onRemove,
+  onRemoveAll,
+  onAddPhotos,
+}: {
+  photos: InspirationPhoto[];
+  initialIndex: number;
+  onClose: () => void;
+  onRemove: (id: string) => void;
+  onRemoveAll: () => void;
+  onAddPhotos: () => void;
+}) {
+  const [idx, setIdx] = useState(initialIndex);
+  const current = photos[idx] ?? photos[0];
+  if (!current) return null;
+  const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
+  const next = () => setIdx((i) => (i + 1) % photos.length);
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.88)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 16,
+      }}
+      onClick={onClose}
+    >
+      {/* Photo */}
+      <div
+        style={{ position: "relative", maxWidth: "min(90vw, 480px)", maxHeight: "60vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={current.dataUrl}
+          alt={`Inspiration photo ${idx + 1}`}
+          draggable={false}
+          style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", display: "block" }}
+        />
+      </div>
+      {/* Inline nav: [‹] 1/3 [›] */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+        {photos.length > 1 && (
+          <button
+            type="button"
+            onClick={prev}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)", color: "white",
+              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}
+            aria-label="Previous photo"
+          >‹</button>
+        )}
+        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "'JetBrains Mono', monospace", minWidth: 36, textAlign: "center" }}>
+          {idx + 1}/{photos.length}
+        </span>
+        {photos.length > 1 && (
+          <button
+            type="button"
+            onClick={next}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)", color: "white",
+              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}
+            aria-label="Next photo"
+          >›</button>
+        )}
+      </div>
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
+        {photos.length < 3 && (
+          <button
+            type="button"
+            onClick={onAddPhotos}
+            style={{
+              padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+              background: "rgba(255,255,255,0.18)", color: "white",
+              border: "1px solid rgba(255,255,255,0.35)", fontSize: 13,
+            }}
+          >Add photos</button>
+        )}
+        <button
+          type="button"
+          onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
+          style={{
+            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(255,255,255,0.12)", color: "white",
+            border: "1px solid rgba(255,255,255,0.25)", fontSize: 13,
+          }}
+        >Remove this photo</button>
+        <button
+          type="button"
+          onClick={() => { onRemoveAll(); onClose(); }}
+          style={{
+            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(220,50,50,0.75)", color: "white",
+            border: "1px solid rgba(255,255,255,0.2)", fontSize: 13,
+          }}
+        >Remove all photos</button>
+      </div>
+      {/* Close hint */}
+      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, marginTop: 4 }}>Tap outside to close</span>
+    </div>
+  );
+}
 
 interface Props {
   isPlaying: boolean;
@@ -61,6 +222,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     setTimeSignature,
     transposeSong,
     progression,
+    sections,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
     resetSong,
@@ -68,11 +230,17 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     redo,
     canUndo,
     canRedo,
+    inspirationPhotos,
+    addInspirationPhoto,
+    removeInspirationPhoto,
   } = useSongStore();
-  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
+  const { preset, setPreset } = useSoundStore();
   const [fileInputKey, setFileInputKey] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
@@ -80,15 +248,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [confirmNewSong, setConfirmNewSong] = useState(false);
   const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
   const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
+  const appTint = useAppTintStore();
+  const appBg = useAppBackgroundStore();
+  const stopRequestedRef = useRef(false);
 
-  // Drive the metronome from playback + meta. Starts/stops with isPlaying;
-  // updates rate/time-signature live without needing a restart. The actual
-  // start moment is set in handlePlay so it lines up with the first chord.
+  // Stop the metronome only on unmount. Don't return a cleanup keyed to
+  // [isPlaying] — React would run it on the false→true transition AFTER
+  // handlePlay scheduled the first tick, killing the metronome moments
+  // before its first downbeat. handleStop drives the stop side directly.
+  useEffect(() => () => stopMetronome(), []);
   useEffect(() => {
     if (!isPlaying) stopMetronome();
-    return () => stopMetronome();
   }, [isPlaying]);
 
   useEffect(() => {
@@ -112,6 +285,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   };
 
   const handlePlay = async () => {
+    stopRequestedRef.current = false;
     await ensureAudio();
     // Defensive: AudioContext may be suspended after autoplay-policy
     // restrictions (Safari, mobile). resume() is idempotent.
@@ -119,38 +293,60 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
     } catch { /* ignore */ }
-    // Drop a stale focused-pattern cursor that no longer exists in the
-    // current progression (e.g. after section delete or cross-tab edit).
-    let activeFocusedId = focusedPatternId;
-    if (activeFocusedId && !progression.some((p) => p.id === activeFocusedId)) {
-      usePlaybackStore.getState().setStartFromChord(null, null);
-      activeFocusedId = null;
-    }
-    const startIdx = activeFocusedId
-      ? Math.max(0, progression.findIndex((p) => p.id === activeFocusedId))
-      : 0;
-    const ordered =
-      startIdx > 0 ? [...progression.slice(startIdx), ...progression.slice(0, startIdx)] : progression;
+    const startFromChordId = usePlaybackStore.getState().startFromChordId;
 
+    // Walk the SSOT (section.chords) directly instead of the legacy
+    // pattern.chords mirror. The mirror is rebuilt by
+    // deriveMirrorsFromSectionChords and can silently drop SectionChords
+    // whose progressionPlacement.patternId no longer matches any block in
+    // the section (orphaned placements, sections with no blocks, etc.).
+    // Reading the SSOT keeps playback immune to those derivation gaps so
+    // pressing Play always plays whatever chords actually exist.
     let cursorBeat = 0;
     const events: ScheduledChord[] = [];
     const meta2: Array<{ patternId: string; patternChordId: string; mirrorId?: string }> = [];
-    ordered.forEach((p) => {
-      const totalBeats = p.bars * p.beatsPerBar;
-      [...p.chords]
-        .sort((a, b) => a.startBeat - b.startBeat)
-        .forEach((c) => {
-          events.push({ chord: c.chord, startBeat: cursorBeat + c.startBeat, lengthBeats: c.lengthBeats });
-          meta2.push({ patternId: p.id, patternChordId: c.id, mirrorId: c.mirrorId });
+    for (const sec of sections) {
+      // Patterns belonging to this section, in progression array order.
+      const sectionPatterns = progression.filter(
+        (p) => (p.sectionId ?? p.id) === sec.id,
+      );
+      if (sectionPatterns.length === 0) continue;
+
+      // Cumulative beat offset of each pattern within this section.
+      const patternOffset = new Map<string, number>();
+      let accBeats = 0;
+      for (const p of sectionPatterns) {
+        patternOffset.set(p.id, accBeats);
+        accBeats += p.bars * p.beatsPerBar;
+      }
+
+      // Emit one event per SectionChord that has a progressionPlacement
+      // pointing at a block in THIS section, in SSOT array order.
+      for (const sc of sec.chords) {
+        const pp = sc.progressionPlacement;
+        if (!pp) continue;
+        const localOffset = patternOffset.get(pp.patternId);
+        if (localOffset == null) continue;
+        events.push({
+          chord: sc.chord,
+          startBeat: cursorBeat + localOffset + pp.startBeat,
+          lengthBeats: pp.lengthBeats,
         });
-      cursorBeat += totalBeats;
-    });
+        meta2.push({
+          patternId: pp.patternId,
+          patternChordId: sc.id,
+          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+        });
+      }
+
+      cursorBeat += accBeats;
+    }
+
     if (!events.length) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
     }
 
-    const startFromChordId = usePlaybackStore.getState().startFromChordId;
     let playEvents = events;
     let playMeta = meta2;
     if (startFromChordId) {
@@ -176,7 +372,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     setPlayingStore(true);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
-    const startAt = getAudioContext().currentTime + 0.12;
+    const startAt = getAudioContext().currentTime + 0.04;
     if (metronome.enabled) {
       startMetronome({
         bpm: meta.bpm,
@@ -186,17 +382,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       });
     }
     await playProgression(playEvents, meta.bpm, {
+      onChordStart: (idx) => setCurrent(playMeta[idx % playMeta.length] ?? null),
       loopBeats: cursorBeat,
-      onChordStart: (idx) => setCurrent(playMeta[idx] ?? null),
       startAt,
     });
   };
 
   const handleStop = () => {
+    stopRequestedRef.current = true;
     stopProgression();
+    stopMetronome();
     setIsPlaying(false);
     setPlayingStore(false);
     setCurrent(null);
+    usePlaybackStore.getState().setStartFromChord(null, null);
   };
 
   useEffect(() => {
@@ -205,8 +404,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     };
     window.addEventListener("lovable:request-play", onReq);
     return () => window.removeEventListener("lovable:request-play", onReq);
+    // handlePlay is recreated on every render but reads startFromChordId
+    // via getState(), so we only need to re-bind when the SSOT inputs
+    // (sections, progression, bpm) change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progression, focusedPatternId, meta.bpm]);
+  }, [sections, progression, meta.bpm]);
 
   const handleLoad = async (file?: File) => {
     if (!file) return;
@@ -227,71 +429,180 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const remaining = 3 - inspirationPhotos.length;
+    const toProcess = files.slice(0, Math.max(0, remaining));
+    const vw = typeof window !== "undefined" ? window.innerWidth : 400;
+    const containerW = Math.min(vw - 32, 600);
+    for (let i = 0; i < toProcess.length; i++) {
+      try {
+        const dataUrl = await convertToWebP(toProcess[i]);
+        const currentCount = useSongStore.getState().inspirationPhotos.length;
+        const x = Math.round(containerW * (0.12 + currentCount * 0.32));
+        const y = 4 + (currentCount % 2) * 12;
+        addInspirationPhoto({ id: nanoid(), dataUrl, x, y });
+      } catch { /* ignore */ }
+    }
+  };
+
   return (
-    <header id="main-header" className="noise-texture sticky top-2 z-40 mx-2 sm:mx-4 mt-2 rounded-xl bg-card/95 backdrop-blur border border-border/60 shadow-[0_8px_24px_-8px_color-mix(in_oklch,var(--primary)_45%,transparent),0_2px_8px_-2px_color-mix(in_oklch,var(--primary)_25%,transparent)]">
-      <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
-        {/* Row 1: Bookmark icon + Gallery placeholder + Menu */}
+    <>
+      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 ink-chord shrink-0" />
-
-          {/* Gallery placeholder (deferred) */}
-          <div className="flex-1 flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled
-              aria-label="Add inspiration image (coming soon)"
-              title="Add up to 3 inspiration images — coming soon"
-              className="inline-flex items-center gap-1.5 h-8 px-2 rounded-md border border-dashed border-border text-xs text-muted-foreground/70 hover:bg-accent/40 disabled:opacity-60"
-            >
-              <ImageIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Add inspiration</span>
-            </button>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
+              𝆑
+            </span>
+            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -2 }}>
+              elt.
+            </span>
           </div>
+        </div>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (inspirationPhotos.length > 0) {
+                setLightboxIndex(0);
+                setLightboxOpen(true);
+              } else {
+                photoInputRef.current?.click();
+              }
+            }}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
+            aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
+            title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
+          >
+            <ImageIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="sticky top-2 z-40 mx-2 sm:mx-4 mb-2">
+      <div className="relative">
+        {/* Static inspiration photos — positioned behind header card */}
+        {inspirationPhotos.map((photo, i) => {
+          const slots = isMobile ? PHOTO_SLOTS : isDesktop ? DESKTOP_PHOTO_SLOTS : TABLET_PHOTO_SLOTS;
+          const slot = slots[slots.length - 1 - i] ?? slots[0];
+          return (
+            <img
+              key={photo.id}
+              src={photo.dataUrl}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute",
+                left: slot.left,
+                top: slot.top,
+                maxWidth: 90,
+                maxHeight: 90,
+                borderRadius: 8,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+                transform: `rotate(${slot.rotate}deg)`,
+                zIndex: 0,
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            />
+          );
+        })}
 
-          <div className="flex items-center gap-0.5 shrink-0">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={() => undo()}
-              disabled={!canUndo()}
-              aria-label="Undo"
-              title="Undo (⌘/Ctrl+Z)"
-            >
-              <Undo2 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={() => redo()}
-              disabled={!canRedo()}
-              aria-label="Redo"
-              title="Redo (⌘/Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* Lightbox portal */}
+        {lightboxOpen && inspirationPhotos.length > 0 && (
+          <InspirationLightbox
+            photos={inspirationPhotos}
+            initialIndex={lightboxIndex}
+            onClose={() => setLightboxOpen(false)}
+            onRemove={(id) => { removeInspirationPhoto(id); if (inspirationPhotos.length <= 1) setLightboxOpen(false); }}
+            onRemoveAll={() => { inspirationPhotos.forEach((p) => removeInspirationPhoto(p.id)); setLightboxOpen(false); }}
+            onAddPhotos={() => photoInputRef.current?.click()}
+          />
+        )}
 
-          <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <header id="main-header" className="rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
+          <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {/* Row 1: SongNote wordmark + undo/redo + menu */}
+            <div className="flex items-center justify-between gap-2 sm:[display:contents]">
+              {!isPlaying ? (
+                <button
+                  onClick={handlePlay}
+                  className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm sm:order-1"
+                  aria-label="Play"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  {!isMobile && <span>Play</span>}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStop}
+                  className="btn-sculpt-cocoa shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm sm:order-1"
+                  aria-label="Stop"
+                >
+                  <Square className="h-4 w-4" />
+                  {!isMobile && <span>Stop</span>}
+                </button>
+              )}
+
+              <div className="flex items-center gap-1.5 shrink-0 sm:order-3">
+                <button
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
+                  onClick={() => undo()}
+                  disabled={!canUndo()}
+                  aria-label="Undo"
+                  title="Undo (⌘/Ctrl+Z)"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
+                  onClick={() => redo()}
+                  disabled={!canRedo()}
+                  aria-label="Redo"
+                  title="Redo (⌘/Ctrl+Shift+Z)"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+
+                <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open menu">
+              <button className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
-              </Button>
+              </button>
             </SheetTrigger>
-            <SheetContent side="right" className="noise-texture w-80 overflow-y-auto">
+            <SheetContent side="right" className="w-80 overflow-y-auto" style={{ background: "var(--ink-soft)" }}>
               <SheetHeader>
-                <SheetTitle>Menu</SheetTitle>
+                <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>
+
+              {/* Sound */}
+              <div className="mt-6 flex flex-col gap-2">
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Sound</h3>
+                <Select value={preset} onValueChange={(v) => setPreset(v as SoundPreset)}>
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOUND_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  className="justify-start border border-border"
+                  onClick={() => { setSoundOpen(true); setNavOpen(false); }}
+                >
+                  <Music2 className="h-4 w-4" /> Sound
+                </Button>
+              </div>
 
               {/* Song Settings */}
               <div className="mt-6">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  Song Settings
-                </h3>
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Song Settings</h3>
                 <div className="rounded-md border border-border p-3 flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Key</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Key</span>
                     <div className="flex items-center gap-1">
                       <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
                         <SelectTrigger className="h-9 w-auto min-w-0 px-2 gap-1 font-mono-chord">
@@ -299,9 +610,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         </SelectTrigger>
                         <SelectContent>
                           {ALL_ROOTS.map((r) => (
-                            <SelectItem key={r} value={r} className="font-mono-chord">
-                              {r}
-                            </SelectItem>
+                            <SelectItem key={r} value={r} className="font-mono-chord">{r}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -311,9 +620,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                         </SelectTrigger>
                         <SelectContent>
                           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {MODE_LABEL[m]}
-                            </SelectItem>
+                            <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -322,7 +629,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
                   <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">Metronome</span>
+                      <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Metronome</span>
                       <Switch
                         checked={metronome.enabled}
                         onCheckedChange={(b) => {
@@ -334,7 +641,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                     </div>
                     {metronome.enabled && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vol</span>
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--paper-card)]">Vol</span>
                         <Slider
                           value={[Math.round(metronome.volume * 100)]}
                           min={0}
@@ -343,7 +650,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                           onValueChange={(v) => metronome.setVolume((v[0] ?? 0) / 100)}
                           className="flex-1"
                         />
-                        <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground">
+                        <span className="text-[10px] tabular-nums w-8 text-right text-[var(--paper-card)]">
                           {Math.round(metronome.volume * 100)}%
                         </span>
                       </div>
@@ -351,7 +658,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">BPM</span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">BPM</span>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -371,9 +678,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Time Signature
-                    </span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Time Signature</span>
                     <Select
                       value={`${meta.beatsPerBar}/${meta.beatUnit}`}
                       onValueChange={(v) => {
@@ -386,189 +691,217 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       </SelectTrigger>
                       <SelectContent>
                         {["2/4", "3/4", "4/4", "5/4", "6/4", "6/8", "7/8", "9/8", "12/8"].map((ts) => (
-                          <SelectItem key={ts} value={ts} className="font-mono-chord">
-                            {ts}
-                          </SelectItem>
+                          <SelectItem key={ts} value={ts} className="font-mono-chord">{ts}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Transpose
-                    </span>
+                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Transpose</span>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => stepTranspose(-1)}
-                        aria-label="Transpose down semitone"
-                      >
-                        <span aria-hidden className="text-base leading-none">
-                          −
-                        </span>
+                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(-1)} aria-label="Transpose down semitone">
+                        <span aria-hidden className="text-base leading-none">−</span>
                       </Button>
-                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center">
+                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center text-[var(--paper-card)]">
                         {fmtOffset(transposeOffset)}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => stepTranspose(1)}
-                        aria-label="Transpose up semitone"
-                      >
-                        <span aria-hidden className="text-base leading-none">
-                          +
-                        </span>
+                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(1)} aria-label="Transpose up semitone">
+                        <span aria-hidden className="text-base leading-none">+</span>
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Other actions */}
-              <div className="mt-6 flex flex-col gap-2">
-                <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                    Dark mode
+              {/* Backgrounds */}
+              <div className="mt-6">
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Backgrounds</h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                    <PatternPicker value={appBg.pattern} onChange={appBg.setPattern} />
                   </div>
-                  <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <MaskToggle value={appBg.mask} onChange={appBg.setMask} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <div className="flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
+                      <Palette className="h-4 w-4" />
+                      Background Tint
+                    </div>
+                    <SectionColorPicker
+                      value={appTint.tint}
+                      onChange={(c) => appTint.setTint(c as SectionColor | null)}
+                    />
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setSoundOpen(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <Music2 className="h-4 w-4" /> Sound
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setExportOpen(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <FileText className="h-4 w-4" /> Export Lyrics
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json");
-                    setNavOpen(false);
-                  }}
-                >
-                  <Save className="h-4 w-4" /> Save
-                </Button>
-                <label className="inline-flex">
-                  <input
-                    key={fileInputKey}
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      handleLoad(e.target.files?.[0]);
-                      setNavOpen(false);
-                    }}
-                  />
-                  <span className="inline-flex w-full h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent">
-                    <Upload className="h-4 w-4" /> Load
-                  </span>
-                </label>
-                <Button
-                  variant="outline"
-                  className="justify-start border border-border"
-                  onClick={() => {
-                    setConfirmNewSong(true);
-                    setNavOpen(false);
-                  }}
-                >
-                  <FilePlus className="h-4 w-4" /> New song
-                </Button>
-                {suppressCrossTabDeleteWarning && (
-                  <Button
-                    variant="outline"
-                    className="justify-start border border-border"
-                    onClick={() => {
-                      setSuppressCrossTabDeleteWarning(false);
-                      toast({ title: "Delete warnings re-enabled" });
-                      setNavOpen(false);
-                    }}
+              </div>
+
+              {/* Project Settings */}
+              <div className="mt-6">
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Project Settings</h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-between border-0"
+                      style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
+                      onClick={() => { downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json"); setNavOpen(false); }}
+                    >
+                      <Save className="h-4 w-4" /> Save
+                    </Button>
+                    <label className="flex-1 flex">
+                      <input
+                        key={fileInputKey}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
+                      />
+                      <span
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2 w-full justify-between border-0"
+                      >
+                        <Upload className="h-4 w-4" /> Load
+                      </span>
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border-0"
+                      style={{ background: "var(--primary-inset)", color: "var(--primary-foreground)" }}
+                      onClick={() => { setConfirmNewSong(true); setNavOpen(false); }}
+                    >
+                      <FilePlus className="h-4 w-4" /> New
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border-0"
+                      style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                      onClick={() => { setExportOpen(true); setNavOpen(false); }}
+                    >
+                      <FileText className="h-4 w-4" /> Export Lyrics
+                    </Button>
+                  </div>
+                  <Link
+                    to="/help"
+                    onClick={() => setNavOpen(false)}
+                    className="inline-flex items-center gap-2 h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
                   >
-                    Reset delete warnings
-                  </Button>
-                )}
+                    <HelpCircle className="h-4 w-4" /> Help & User Manual
+                  </Link>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 h-9">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                      Dark mode
+                    </div>
+                    <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                  </div>
+                  {suppressCrossTabDeleteWarning && (
+                    <Button
+                      variant="outline"
+                      className="justify-start border border-border"
+                      onClick={() => { setSuppressCrossTabDeleteWarning(false); toast({ title: "Delete warnings re-enabled" }); setNavOpen(false); }}
+                    >
+                      Reset delete warnings
+                    </Button>
+                  )}
+                </div>
               </div>
             </SheetContent>
           </Sheet>
+              </div>
         </div>
 
-        {/* Row 2: Play + Tabs */}
-        <div className="flex items-center gap-2">
-          {!isPlaying ? (
-            <Button size="sm" onClick={handlePlay} className="btn-neumorphic-play shrink-0">
-              <Play className="h-4 w-4" />
-              {!isMobile && "Play"}
-            </Button>
-          ) : (
-            <Button size="sm" variant="secondary" onClick={handleStop} className="shrink-0">
-              <Square className="h-4 w-4" />
-              {!isMobile && "Stop"}
-            </Button>
-          )}
+        {/* Row 2: Tabs */}
+        <div className="flex items-center justify-center gap-3 sm:order-2 sm:justify-start">
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 flex justify-center">
-            <TabsList className="bg-paper-shade/70 gap-1.5 p-1.5">
-              <TabsTrigger value="lyrics" className="px-3 sm:px-4">Lyrics</TabsTrigger>
-              <TabsTrigger value="chords" className="px-3 sm:px-4">Chords</TabsTrigger>
-              <TabsTrigger value="progressions" className="px-3 sm:px-4">Progressions</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {/* Tabs bar — recessed well with cocoa active pill */}
+          <div
+            className="inline-flex items-center gap-1"
+            style={{
+              padding: "7px 5px 7px",
+              background: "var(--paper-shade)",
+              borderRadius: 10,
+              boxShadow: "var(--shadow-recess)",
+            }}
+          >
+            {(["lyrics", "chords", "progressions"] as const).map((t) => {
+              const active = tab === t;
+              const label = t.charAt(0).toUpperCase() + t.slice(1);
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    padding: "7px 14px",
+                    border: 0,
+                    borderRadius: 7.6,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-body, 'Nunito', sans-serif)",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    background: active ? "var(--cocoa)" : "transparent",
+                    color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)",
+                    boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
+                    marginTop: active ? -2 : 0,
+                    marginBottom: active ? 2 : 0,
+                    transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
-      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
-      <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
-      <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Start a new song?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will clear all lyrics, chords, and progressions in the current song. Make sure
-              you've saved your work first — unsaved changes can't be recovered.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
-              }
-            >
-              <Save className="h-4 w-4" /> Save first
-            </Button>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                resetSong();
-                setTransposeOffset(0);
-                setConfirmNewSong(false);
-                toast({ title: "New song started" });
-              }}
-            >
-              Start new song
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </header>
+        </header>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePhotoUpload}
+        />
+      </div>
+    </div>
+    <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
+    <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
+    <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Start a new song?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will clear all lyrics, chords, and progressions in the current song. Make sure
+            you've saved your work first — unsaved changes can't be recovered.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button
+            variant="outline"
+            onClick={() =>
+              downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
+            }
+          >
+            <Save className="h-4 w-4" /> Save first
+          </Button>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              resetSong();
+              setTransposeOffset(0);
+              setConfirmNewSong(false);
+              toast({ title: "New song started" });
+            }}
+          >
+            Start new song
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

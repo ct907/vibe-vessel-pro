@@ -1,7 +1,6 @@
 import { forwardRef } from "react";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
-import { Button } from "@/components/ui/button";
 import { ArrowRight, GripVertical, Trash2, X } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { ChordSymbol } from "@/lib/music/chords";
@@ -155,7 +154,8 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
   return (
     <div
       ref={ref}
-      className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade shadow-[0_-8px_24px_-12px_color-mix(in_oklch,var(--foreground)_20%,transparent)] [overscroll-behavior:contain]"
+      className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-paper-shade [overscroll-behavior:contain]"
+      style={{ boxShadow: "var(--shadow-paper)" }}
     >
       <div className="mx-auto max-w-6xl px-4 py-2 flex flex-col gap-2">
         {/* Row A: count + action buttons */}
@@ -166,30 +166,40 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
 
           <div className="flex items-center gap-1 shrink-0">
             {selectionSize > 0 && (
-              <Button size="sm" variant="ghost" onClick={clearSelected} aria-label="Clear basket selection">
+              <button
+                type="button"
+                className="btn-sculpt-cream inline-flex items-center gap-1.5 justify-center rounded-lg h-8 px-3 text-xs font-semibold"
+                onClick={clearSelected}
+                aria-label="Clear basket selection"
+              >
                 <X className="h-4 w-4" /> Clear selection
-              </Button>
+              </button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                clearSelected();
-                clearBasket();
-              }}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            <button
+              type="button"
+              onClick={() => { clearSelected(); clearBasket(); }}
+              className="btn-sculpt-cream inline-flex items-center gap-1.5 justify-center rounded-lg h-8 px-3 text-xs font-semibold"
+              style={{ color: "var(--destructive)" }}
             >
               <Trash2 className="h-4 w-4" /> Discard
-            </Button>
+            </button>
             {onSendToLyrics && (
-              <Button size="sm" variant="outline" onClick={onSendToLyrics}>
+              <button
+                type="button"
+                className="btn-sculpt-cream inline-flex items-center gap-1.5 justify-center rounded-lg h-8 px-3 text-xs font-semibold"
+                onClick={onSendToLyrics}
+              >
                 To Lyrics <ArrowRight className="h-4 w-4" />
-              </Button>
+              </button>
             )}
             {onSendToProgressions && (
-              <Button size="sm" onClick={onSendToProgressions}>
+              <button
+                type="button"
+                className="btn-sculpt-cocoa inline-flex items-center gap-1.5 justify-center rounded-lg h-8 px-3 text-xs font-semibold"
+                onClick={onSendToProgressions}
+              >
                 To Progressions <ArrowRight className="h-4 w-4" />
-              </Button>
+              </button>
             )}
           </div>
         </div>
@@ -197,7 +207,7 @@ export const BasketBar = forwardRef<HTMLDivElement, Props>(function BasketBar(
         {/* Row B: helper text on its own line */}
         <div className="text-[11px] text-muted-foreground/90">
           {selectionSize === 0 ? (
-            "Drag to move · tap to multi-select"
+            "Tap to focus · drag to move"
           ) : (
             <span className="text-primary font-medium">
               {selectionSize} selected · drag any to move {selectionSize > 1 ? "all" : ""}

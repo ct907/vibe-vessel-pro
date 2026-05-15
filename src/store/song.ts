@@ -3,6 +3,9 @@ import { nanoid } from "nanoid";
 import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/lib/music/chords";
 import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
+import { useAppTintStore } from "@/store/appTint";
+import { useAppBackgroundStore, PATTERN_KEYS, MASK_KEYS, type BackgroundPattern, type MaskStyle } from "@/store/appBackground";
+import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/SectionColorPicker";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 
@@ -121,6 +124,13 @@ export interface BasketItem {
   chord: ChordSymbol;
 }
 
+export interface InspirationPhoto {
+  id: string;
+  dataUrl: string;
+  x: number;
+  y: number;
+}
+
 export interface SongState {
   meta: {
     title: string;
@@ -138,6 +148,10 @@ export interface SongState {
   /** When true, cross-tab delete confirmation dialogs are suppressed. */
   suppressCrossTabDeleteWarning: boolean;
   setSuppressCrossTabDeleteWarning: (v: boolean) => void;
+  inspirationPhotos: InspirationPhoto[];
+  addInspirationPhoto: (photo: InspirationPhoto) => void;
+  removeInspirationPhoto: (id: string) => void;
+  moveInspirationPhoto: (id: string, x: number, y: number) => void;
 
   // ---- meta ----
   setTitle: (t: string) => void;
@@ -260,6 +274,11 @@ export interface SerializedSong {
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
+  inspirationPhotos?: InspirationPhoto[];
+  /** Background tint key (matches SECTION_COLOR_KEYS), or null/undefined for no tint. */
+  appTint?: SectionColor | null;
+  /** Background pattern and mask settings. */
+  appBackground?: { pattern: BackgroundPattern; mask: MaskStyle } | null;
   /** Layout metadata captured at save time (Phase 1.5 Issue #1). */
   layoutMeta?: {
     lastEditedScreenWidth: number;
@@ -758,6 +777,114 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
 
 // ---------- SSOT inversion (Phase 4b) ----------
 /**
+ * Insert a fresh SectionChord into a section.chords array at the position
+ * that matches its lyricsPlacement (line index then slotIndex). Without
+ * this, callers like `placeChordInSlot` that just append the new chord
+ * would have it placed at the LAST occupied slot on the line — because
+ * `recomputeLyricsSlotsForSection` walks the SSOT array and pairs sorted-
+ * ascending slot indices with SSOT-array order. Tapping empty slot 3
+ * would land the chord at whatever the line's last-occupied slot was.
+ *
+ * Progression-only chords (no lyricsPlacement) are skipped during the
+ * walk so they don't influence ordering. A new chord with no
+ * lyricsPlacement is appended at the tail.
+ */
+function insertSectionChordAtSlot(
+  chords: SectionChord[],
+  newChord: SectionChord,
+  lines: LyricLine[],
+): SectionChord[] {
+  const lp = newChord.lyricsPlacement;
+  if (!lp) return [...chords, newChord];
+
+  const lineIdx = new Map<string, number>();
+  lines.forEach((l, i) => lineIdx.set(l.id, i));
+  const newLineIdx = lineIdx.get(lp.lineId) ?? Number.MAX_SAFE_INTEGER;
+
+  // Find the last index whose chord logically comes BEFORE the new one
+  // (earlier line, or same line with smaller slot). Insert right after.
+  let lastBeforeIdx = -1;
+  for (let i = 0; i < chords.length; i++) {
+    const lp2 = chords[i].lyricsPlacement;
+    if (!lp2) continue;
+    const otherLineIdx = lineIdx.get(lp2.lineId) ?? Number.MAX_SAFE_INTEGER;
+    if (otherLineIdx < newLineIdx) {
+      lastBeforeIdx = i;
+    } else if (otherLineIdx === newLineIdx && (lp2.slotIndex ?? 0) < lp.slotIndex) {
+      lastBeforeIdx = i;
+    }
+  }
+  const insertAt = lastBeforeIdx + 1;
+  return [...chords.slice(0, insertAt), newChord, ...chords.slice(insertAt)];
+}
+
+/**
+ * Reassigns `lyricsPlacement.slotIndex` on every SectionChord so the lyric
+ * row reflects the SSOT array order, while preserving the SET of occupied
+ * slot positions per line.
+ *
+ * Why: lyrics-side reorders update `slotIndex` directly, but progression-
+ * side reorders only shuffle the SSOT array. Without this pass the lyric
+ * row would render in stale order (the bug the user reported). Running
+ * this at the entry of `deriveMirrorsFromSectionChords` means every SSOT
+ * mutation — past and future — gets the sync for free.
+ *
+ * Algorithm (per line):
+ *  1. Walk `section.chords` in array order, collecting the chords whose
+ *     `lyricsPlacement.lineId === line.id`.
+ *  2. Collect their CURRENT slot indices (defined → those values; missing
+ *     → fall back to a synthesized 0..n sequence).
+ *  3. Sort the slot list ascending; reassign so the i-th chord in SSOT
+ *     order gets the i-th slot. The footprint of occupied columns is
+ *     unchanged — only which chord sits at each gets swapped.
+ *
+ * Idempotent: if SSOT order already matches slot order, the per-chord
+ * assignment yields the same value and the section object is returned
+ * unchanged (no React re-renders triggered downstream).
+ */
+function recomputeLyricsSlotsForSection(section: Section): Section {
+  const byLine = new Map<string, SectionChord[]>();
+  for (const sc of section.chords) {
+    const lp = sc.lyricsPlacement;
+    if (!lp) continue;
+    const bucket = byLine.get(lp.lineId);
+    if (bucket) bucket.push(sc);
+    else byLine.set(lp.lineId, [sc]);
+  }
+  if (byLine.size === 0) return section;
+
+  // Build per-chord target slot map. We only mutate chords whose target
+  // differs from their current slotIndex, so unchanged inputs short-circuit.
+  const newSlot = new Map<string, number>();
+  let changed = false;
+  for (const [, chordsOnLine] of byLine) {
+    if (chordsOnLine.length <= 1) continue; // single chord can't be re-ordered
+    const slots = chordsOnLine
+      .map((sc, i) => sc.lyricsPlacement?.slotIndex ?? i)
+      .slice()
+      .sort((a, b) => a - b);
+    chordsOnLine.forEach((sc, i) => {
+      const cur = sc.lyricsPlacement?.slotIndex;
+      const next = slots[i];
+      if (cur !== next) {
+        newSlot.set(sc.id, next);
+        changed = true;
+      }
+    });
+  }
+  if (!changed) return section;
+
+  return {
+    ...section,
+    chords: section.chords.map((sc) => {
+      const target = newSlot.get(sc.id);
+      if (target == null || !sc.lyricsPlacement) return sc;
+      return { ...sc, lyricsPlacement: { ...sc.lyricsPlacement, slotIndex: target } };
+    }),
+  };
+}
+
+/**
  * Inverse of `recomputeSectionChordsFromMirrors`: given an updated
  * `section.chords` (SSOT), rebuild `line.chords` and the section's pattern
  * blocks' chords so the legacy mirrors stay in sync.
@@ -773,9 +900,14 @@ export function getPatternChordsViaSSOT(section: Section, pattern: PatternBlock)
  * Pattern chord `startBeat` is recomputed left-to-right (no spacing rule).
  */
 function deriveMirrorsFromSectionChords(
-  section: Section,
+  rawSection: Section,
   sectionPatterns: PatternBlock[],
 ): { section: Section; patterns: PatternBlock[] } {
+  // Reassign lyricsPlacement.slotIndex so the lyric row follows the SSOT
+  // array order. Without this, dragging a chord in ProgressionsTab would
+  // shuffle the SSOT but leave stale slot indices behind, so the lyric
+  // row would render in the old order.
+  const section = recomputeLyricsSlotsForSection(rawSection);
   // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
   const anchorsByLine = new Map<string, ChordAnchor[]>();
   section.lines.forEach((l) => anchorsByLine.set(l.id, []));
@@ -1104,6 +1236,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   progression: [seed.pattern],
   suppressCrossTabDeleteWarning: false,
   setSuppressCrossTabDeleteWarning: (v) => set({ suppressCrossTabDeleteWarning: v }),
+  inspirationPhotos: [],
+  addInspirationPhoto: (photo) => set((s) => ({ inspirationPhotos: [...s.inspirationPhotos, photo] })),
+  removeInspirationPhoto: (id) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.filter((p) => p.id !== id) })),
+  moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
   setKey: (keyRoot, keyMode) => set((s) => ({ meta: { ...s.meta, keyRoot, keyMode } })),
@@ -1177,7 +1313,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     } catch { /* ignore */ }
     return {
       sections: s.sections.filter((sec) => sec.id !== id),
-      progression: s.progression.filter((p) => p.sectionId !== id),
+      progression: s.progression.filter((p) => (p.sectionId ?? p.id) !== id),
     };
   }),
   duplicateSection: (id) => {
@@ -1309,6 +1445,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sections: [fresh.section],
       progression: [fresh.pattern],
       basket: [],
+      inspirationPhotos: [],
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
     }));
   },
@@ -1792,15 +1929,29 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // Phase 1.5: a single song-wide action that (1) snaps each lyric line's
     // chords onto word boundaries and (2) reflows for the current viewport.
     const w = typeof window !== "undefined" ? window.innerWidth : 800;
-    set((s) => ({
-      sections: s.sections.map((sec) => {
-        const snapped: Section = {
-          ...sec,
-          lines: sec.lines.map((l) => snapLineToWords(l)),
-        };
-        return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
-      }),
-    }));
+    // SSOT mode: formatChordsAndLyrics returns sections whose `lines[].chords`
+    // arrays are EMPTY by design (it only updates section.chords +
+    // lines[].id/text). Without the SSOT_MODE marker the wrapped setter
+    // would take the legacy "rebuild SSOT from mirrors" path
+    // (refreshAllSectionChords → recomputeSectionChordsFromMirrors), which
+    // reads line.chords[]; finding them empty it would drop every
+    // lyrics-anchored chord — the exact bug the user hit. Routing through
+    // SSOT mode rebuilds line.chords + pattern.chords from the formatter's
+    // section.chords output instead.
+    set((s) => {
+      const next = {
+        sections: s.sections.map((sec) => {
+          const snapped: Section = {
+            ...sec,
+            lines: sec.lines.map((l) => snapLineToWords(l)),
+          };
+          return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
+        }),
+        [SSOT_MODE]: true,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return next as any;
+    });
   },
 
   autoLayoutSection: (sectionId, screenWidth, slotWidth) => {
@@ -1924,7 +2075,9 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         { lineId, slotIndex: placeSlot },
       );
       const nextSections = nextSectionsBase.map((x) =>
-        x.id !== sectionId ? x : { ...x, chords: [...x.chords, placement.sectionChord] },
+        x.id !== sectionId
+          ? x
+          : { ...x, chords: insertSectionChordAtSlot(x.chords, placement.sectionChord, x.lines) },
       );
       result = { id: newId, lineId, slotIndex: placeSlot };
       if (__dbg) {
@@ -3194,9 +3347,29 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       progression: migratedProgression,
       basket: [],
       suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
+      inspirationPhotos: Array.isArray(parsed.inspirationPhotos) ? parsed.inspirationPhotos : [],
     });
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
+    // App background tint also travels with the project.
+    const rawTint = parsed.appTint;
+    useAppTintStore.getState().setTint(
+      typeof rawTint === "string" && (SECTION_COLOR_KEYS as readonly string[]).includes(rawTint)
+        ? (rawTint as SectionColor)
+        : null,
+    );
+    const rawBg = parsed.appBackground;
+    if (rawBg && typeof rawBg === "object") {
+      useAppBackgroundStore.getState().setPattern(
+        (PATTERN_KEYS as string[]).includes(rawBg.pattern) ? rawBg.pattern as BackgroundPattern : "none",
+      );
+      useAppBackgroundStore.getState().setMask(
+        (MASK_KEYS as string[]).includes(rawBg.mask) ? rawBg.mask as MaskStyle : "none",
+      );
+    } else {
+      useAppBackgroundStore.getState().setPattern("none");
+      useAppBackgroundStore.getState().setMask("none");
+    }
     // Surface layout metadata so the UI can offer a friendly auto-format
     // toast when the device width has changed since last save.
     if (parsed.layoutMeta && typeof window !== "undefined") {
@@ -3222,7 +3395,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       sections: cleanedSections,
       progression: s.progression,
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
+      inspirationPhotos: s.inspirationPhotos.length > 0 ? s.inspirationPhotos : undefined,
       sound: useSoundStore.getState().toJSON(),
+      appTint: useAppTintStore.getState().tint,
+      appBackground: {
+        pattern: useAppBackgroundStore.getState().pattern,
+        mask: useAppBackgroundStore.getState().mask,
+      },
       layoutMeta: width > 0 ? {
         lastEditedScreenWidth: width,
         lastEditedDevice: getDeviceTypeForWidth(width),
