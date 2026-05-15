@@ -69,15 +69,15 @@ function ChipScatterBackground() {
 
   const maskStyle: CSSProperties = {
     WebkitMaskImage:
-      "radial-gradient(ellipse 25% 25% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
     maskImage:
-      "radial-gradient(ellipse 25% 25% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
   };
 
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 overflow-hidden"
+      className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
       style={{ zIndex: 0, ...maskStyle }}
     >
       {particles.map((p) => (
@@ -90,12 +90,11 @@ function ChipScatterBackground() {
             fontSize: `${p.size}px`,
             padding: "0.2em 0.5em",
             transform: "translate(-50%, -50%)",
-            color: "transparent",
-            opacity: 0.5,
+            opacity: 0.4,
             ...p.style,
           }}
         >
-          Am7
+          <span style={{ visibility: "hidden" }}>Am7</span>
         </span>
       ))}
     </div>
