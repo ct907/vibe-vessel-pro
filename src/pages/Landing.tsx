@@ -69,9 +69,9 @@ function ChipScatterBackground() {
 
   const maskStyle: CSSProperties = {
     WebkitMaskImage:
-      "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
     maskImage:
-      "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
   };
 
   return (
@@ -141,7 +141,7 @@ export default function Landing() {
           <Play className="h-5 w-5 fill-current" />
         </Link>
 
-        <div className="mt-24 flex items-center justify-center">
+        <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto">
           <span
             style={{
               color: "rgb(47, 39, 30)",
@@ -167,7 +167,7 @@ export default function Landing() {
           </span>
         </div>
 
-        <p className="mt-6 text-xl text-foreground/80">
+        <p className="mt-6 text-xl font-bold text-foreground/80">
           The songwriter's notebook. Free to use. Use offline.
         </p>
 
