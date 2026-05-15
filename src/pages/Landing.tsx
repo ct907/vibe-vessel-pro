@@ -136,9 +136,9 @@ export default function Landing() {
         <Link
           to="/app"
           aria-label="Open editor"
-          className="btn-sculpt-amber inline-flex items-center justify-center rounded-full h-12 w-12"
+          className="btn-sculpt-amber inline-flex items-center justify-center rounded-full h-6 w-6"
         >
-          <Play className="h-5 w-5 fill-current" />
+          <Play className="h-2.5 w-2.5 fill-current" />
         </Link>
 
         <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto">
@@ -183,12 +183,12 @@ export default function Landing() {
         <button
           type="button"
           onClick={startWriting}
-          className="btn-sculpt-amber mt-24 inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+          className="btn-sculpt-amber mt-12 inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
         >
           Start Writing
         </button>
 
-        <section className="mt-8 w-full max-w-md" aria-label="Recent projects">
+        <section className="mt-32 w-full max-w-md" aria-label="Recent projects">
           <h2 className="text-center font-semibold mb-3">Recent Projects</h2>
           <div className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] divide-y divide-border/50">
             {recents.length === 0 ? (

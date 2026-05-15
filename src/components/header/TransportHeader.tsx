@@ -524,7 +524,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="noise-texture rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(8px) saturate(200%)", WebkitBackdropFilter: "blur(8px) saturate(200%)" }}>
+        <header id="main-header" className="noise-texture rounded-xl border border-border/60 mx-auto w-full max-w-[1600px]" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(8px) saturate(200%)", WebkitBackdropFilter: "blur(8px) saturate(200%)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center justify-between gap-2 sm:[display:contents]">
