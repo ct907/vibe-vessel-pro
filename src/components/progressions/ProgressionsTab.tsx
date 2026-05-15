@@ -1121,10 +1121,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       <div
         className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl"
         style={{
-          background: "var(--ink-soft)",
+          background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)",
           borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
           paddingBottom: "60rem",
-          opacity: 0.4,
         }}
       >
         <span
@@ -1135,7 +1134,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--ink-soft)",
+            color: "var(--ink)",
           }}
         >
           Add Section

@@ -518,7 +518,7 @@ function LineRow({
           }}
           placeholder="Write your lyric line…"
           className={cn(
-            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
+            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
             isFocused && "pr-8",
           )}
         />
@@ -1340,7 +1340,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
       <div
         className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl pb-[60rem]"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "var(--ink-soft)", opacity: 0.4 }}
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)" }}
       >
         <span
           className="text-center"
@@ -1350,7 +1350,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--ink-soft)",
+            color: "var(--ink)",
           }}
         >
           Add Section
