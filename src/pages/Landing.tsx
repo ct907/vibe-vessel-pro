@@ -132,7 +132,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-paper text-foreground relative overflow-hidden">
       <ChipScatterBackground />
-      <main className="relative mx-auto max-w-2xl px-4 pt-10 pb-24 flex flex-col items-center text-center">
+      <main className="relative mx-auto max-w-[1600px] px-4 pt-10 pb-24 flex flex-col items-center text-center">
         <Link
           to="/app"
           aria-label="Open editor"
