@@ -815,27 +815,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
               </div>
         </div>
 
-        {/* Row 2: Play + Tabs */}
+        {/* Row 2: Tabs */}
         <div className="flex items-center gap-3">
-          {!isPlaying ? (
-            <button
-              onClick={handlePlay}
-              className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm mb-1"
-              aria-label="Play"
-            >
-              <Play className="h-4 w-4 fill-current" />
-              {!isMobile && <span>Play</span>}
-            </button>
-          ) : (
-            <button
-              onClick={handleStop}
-              className="btn-sculpt-cocoa shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm"
-              aria-label="Stop"
-            >
-              <Square className="h-4 w-4" />
-              {!isMobile && <span>Stop</span>}
-            </button>
-          )}
 
           {/* Tabs bar — recessed well with cocoa active pill */}
           <div
