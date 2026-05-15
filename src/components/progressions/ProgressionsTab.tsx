@@ -782,8 +782,8 @@ function SectionGroup({
     <div
       ref={cardRef}
       data-section-id={sectionId}
-      style={sectionTintStyle(section?.color)}
-      className={cn("noise-texture rounded-xl px-2 py-4 space-y-3 transition-shadow")}
+      style={sectionTintStyle(section?.color, 0.35)}
+      className={cn("noise-texture-surface rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2">

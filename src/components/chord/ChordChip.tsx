@@ -165,7 +165,7 @@ export function ChordChip({
       }}
       style={chipStyle}
       className={cn(
-        "inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
+        "noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
         sizeCls,
         variantCls,
         selected && "scale-[1.04]",
