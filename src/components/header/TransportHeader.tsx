@@ -519,7 +519,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center gap-2">
               <span
-                className="font-display shrink-0 leading-none select-none"
+                className="font-display shrink-0 leading-none select-none text-xl"
                 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--cocoa-deep)", marginTop: 6 }}
               >
                 SongNote
