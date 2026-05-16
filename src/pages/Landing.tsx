@@ -32,54 +32,47 @@ function TaglineChip({ label, style }: { label: string; style: CSSProperties }) 
   );
 }
 
-const SCATTER_ROWS = 8;
-const SCATTER_COLS = 15;
-const POSITION_JITTER = 0.8;
 const BASE_CHIP_FONT_PX = 14;
 const SIZE_JITTER = 0.2;
 
+function chipCount() {
+  if (typeof window === "undefined") return 160;
+  const w = window.innerWidth;
+  return w >= 1024 ? 160 : w >= 768 ? 80 : 40;
+}
+
 function ChipScatterBackground() {
-  const particles = useMemo(() => {
-    const cellW = 100 / SCATTER_COLS;
-    const cellH = 100 / SCATTER_ROWS;
-    const out: Array<{
-      id: number;
-      top: number;
-      left: number;
-      size: number;
-      style: CSSProperties;
-    }> = [];
-    for (let r = 0; r < SCATTER_ROWS; r++) {
-      for (let c = 0; c < SCATTER_COLS; c++) {
-        const centerX = c * cellW + cellW / 2;
-        const centerY = r * cellH + cellH / 2;
-        const jitterX = (Math.random() - 0.5) * cellW * POSITION_JITTER;
-        const jitterY = (Math.random() - 0.5) * cellH * POSITION_JITTER;
-        const sizeFactor = 1 + (Math.random() - 0.5) * 2 * SIZE_JITTER;
-        out.push({
-          id: r * SCATTER_COLS + c,
-          top: centerY + jitterY,
-          left: centerX + jitterX,
-          size: BASE_CHIP_FONT_PX * sizeFactor,
-          style: ALL_CHIP_STYLES[Math.floor(Math.random() * ALL_CHIP_STYLES.length)],
-        });
-      }
-    }
-    return out;
+  const { theme } = useTheme();
+  const [count, setCount] = useState(chipCount);
+
+  useEffect(() => {
+    const onResize = () => setCount(chipCount());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  const particles = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      size: BASE_CHIP_FONT_PX * (1 + (Math.random() - 0.5) * 2 * SIZE_JITTER),
+      style: ALL_CHIP_STYLES[Math.floor(Math.random() * ALL_CHIP_STYLES.length)],
+    }));
+  }, [count]);
 
   const maskStyle: CSSProperties = {
     WebkitMaskImage:
-      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(35% 35% at 50% calc(50% - 120px), transparent 0%, transparent 70%, black 100%)",
     maskImage:
-      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+      "radial-gradient(35% 35% at 50% calc(50% - 120px), transparent 0%, transparent 70%, black 100%)",
   };
 
   return (
     <div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
-      style={{ zIndex: 0, mixBlendMode: "soft-light", ...maskStyle }}
+      style={{ zIndex: 0, mixBlendMode: theme === "dark" ? "soft-light" : "multiply", ...maskStyle }}
     >
       {particles.map((p) => (
         <span
