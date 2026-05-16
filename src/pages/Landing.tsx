@@ -212,8 +212,7 @@ export default function Landing() {
                     onClick={() => openRecent(r)}
                   >
                     <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 ink-chord" />
-                      <h3 className="font-display text-lg">{title}</h3>
+                      <h3 className="font-display text-lg">{r.name}</h3>
                     </div>
                   </button>
                   <DropdownMenu>
