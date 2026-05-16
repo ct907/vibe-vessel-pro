@@ -490,7 +490,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           <Link
             to="/"
             aria-label="Return to introduction"
-            style={{ display: "flex", alignItems: "center", textDecoration: "none" }}
+            style={{ display: "flex", alignItems: "center", textDecoration: "none", marginLeft: 8 }}
           >
             <span className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
@@ -610,7 +610,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="noise-texture-nav w-80 overflow-y-auto" style={{ background: "color-mix(in oklch, var(--ink-soft) 60%, transparent)" }}>
+            <SheetContent side="right" className="noise-texture-nav w-80 overflow-y-auto" style={{ background: "color-mix(in oklch, var(--ink-soft) 60%, transparent)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
               <SheetHeader>
                 <SheetTitle className="text-[var(--paper-card)]">Menu</SheetTitle>
               </SheetHeader>
@@ -784,7 +784,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-between border-0"
+                      className="flex-1 justify-start gap-2 border-0"
                       style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
                       onClick={() => { downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json"); setNavOpen(false); }}
                     >
