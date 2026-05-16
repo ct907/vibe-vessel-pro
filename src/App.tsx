@@ -47,6 +47,7 @@ const App = () => {
               <Route path="/" element={<Landing />} />
               <Route path="/defaults" element={<FullScreenOverlay><Defaults /></FullScreenOverlay>} />
               <Route path="/help" element={<FullScreenOverlay><Help /></FullScreenOverlay>} />
+              <Route path="/app" element={null} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<FullScreenOverlay><NotFound /></FullScreenOverlay>} />
             </Routes>
