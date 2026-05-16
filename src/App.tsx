@@ -21,6 +21,46 @@ function FullScreenOverlay({ children }: { children: React.ReactNode }) {
 
 const App = () => {
   useEffect(() => {
+    function makeUri(baseFreq: number, dpr: number): string {
+      const f = (baseFreq / dpr).toFixed(4);
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'> <filter id='noise'> <feTurbulence type='turbulence' baseFrequency='${f}' numOctaves='3' stitchTiles='stitch' seed='179' /> </filter> <rect width='100%' height='100%' filter='url(%23noise)'/> </svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    }
+    function injectStyle(dpr: number): void {
+      let el = document.getElementById("noise-texture-dpr-override") as HTMLStyleElement | null;
+      if (!el) {
+        el = document.createElement("style");
+        el.id = "noise-texture-dpr-override";
+        document.head.appendChild(el);
+      }
+      const u = (freq: number) => makeUri(freq, dpr);
+      el.textContent = `
+        .noise-texture::before { mask-image: ${u(0.90)}; -webkit-mask-image: ${u(0.90)}; }
+        .noise-texture-surface::before { mask-image: ${u(1.50)}; -webkit-mask-image: ${u(1.50)}; }
+        .noise-texture-nav::before { mask-image: ${u(0.90)}; -webkit-mask-image: ${u(0.90)}; }
+        .noise-texture-chip::before { mask-image: ${u(0.90)}; -webkit-mask-image: ${u(0.90)}; }
+      `;
+    }
+    let cleanup: (() => void) | null = null;
+    function applyAndWatch(): void {
+      const dpr = window.devicePixelRatio;
+      injectStyle(dpr);
+      const mql = window.matchMedia(`(resolution: ${dpr}dppx)`);
+      function onChange() {
+        mql.removeEventListener("change", onChange);
+        applyAndWatch();
+      }
+      mql.addEventListener("change", onChange);
+      cleanup = () => mql.removeEventListener("change", onChange);
+    }
+    applyAndWatch();
+    return () => {
+      cleanup?.();
+      document.getElementById("noise-texture-dpr-override")?.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     hydrateFromStorage();
     const unsub = startAutosave();
     let lastPush = 0;
