@@ -127,7 +127,10 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
         <div className="flex flex-wrap gap-2">
           {ladder.map((d) => {
             const active = numeralFilter.has(d.numeral);
-            const labelColor = theme === "dark" ? "var(--paper)" : "var(--cocoa)";
+            const activeBg = theme === "light" ? "var(--paper)" : "var(--cocoa)";
+            const labelColor = active
+              ? (theme === "light" ? "var(--cocoa)" : "var(--paper)")
+              : "var(--paper)";
             return (
               <button
                 key={d.numeral}
@@ -140,10 +143,12 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 6,
-                  background: "transparent",
+                  background: active ? activeBg : "transparent",
+                  backdropFilter: active ? "blur(8px) saturate(200%)" : undefined,
+                  WebkitBackdropFilter: active ? "blur(8px) saturate(200%)" : undefined,
                   boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
                   border: "none",
-                  transition: "box-shadow 120ms ease",
+                  transition: "background 120ms ease, box-shadow 120ms ease",
                   cursor: "pointer",
                 }}
               >
