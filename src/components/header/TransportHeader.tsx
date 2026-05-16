@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
-import { ensureAudio, playProgression, stopProgression, ScheduledChord } from "@/lib/music/audio";
+import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, ScheduledChord } from "@/lib/music/audio";
 import { getAudioContext } from "@/lib/audio/context";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -94,6 +94,80 @@ const TABLET_PHOTO_SLOTS = [
   { left: "calc(30% + 220px)", top: -58, rotate: 5 },
   { left: "calc(30% + 340px)", top: -47, rotate: -3 },
 ] as const;
+
+type PlaybackMeta = {
+  patternId: string;
+  patternChordId: string;
+  mirrorId?: string;
+};
+
+type BuiltPlayback = {
+  events: ScheduledChord[];
+  meta: PlaybackMeta[];
+  loopBeats: number;
+  /** True when no rotation was applied because the anchor chord no longer exists. */
+  startAnchorStale: boolean;
+};
+
+function buildPlayback(
+  sections: ReturnType<typeof useSongStore.getState>["sections"],
+  progression: ReturnType<typeof useSongStore.getState>["progression"],
+  startFromChordId: string | null,
+): BuiltPlayback | null {
+  let cursorBeat = 0;
+  const events: ScheduledChord[] = [];
+  const meta: PlaybackMeta[] = [];
+  for (const sec of sections) {
+    const sectionPatterns = progression.filter(
+      (p) => (p.sectionId ?? p.id) === sec.id,
+    );
+    if (sectionPatterns.length === 0) continue;
+    const patternOffset = new Map<string, number>();
+    let accBeats = 0;
+    for (const p of sectionPatterns) {
+      patternOffset.set(p.id, accBeats);
+      accBeats += p.bars * p.beatsPerBar;
+    }
+    for (const sc of sec.chords) {
+      const pp = sc.progressionPlacement;
+      if (!pp) continue;
+      const localOffset = patternOffset.get(pp.patternId);
+      if (localOffset == null) continue;
+      events.push({
+        chord: sc.chord,
+        startBeat: cursorBeat + localOffset + pp.startBeat,
+        lengthBeats: pp.lengthBeats,
+      });
+      meta.push({
+        patternId: pp.patternId,
+        patternChordId: sc.id,
+        mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+      });
+    }
+    cursorBeat += accBeats;
+  }
+  if (!events.length) return null;
+
+  let outEvents = events;
+  let outMeta = meta;
+  let startAnchorStale = false;
+  if (startFromChordId) {
+    const i = meta.findIndex((m) => m.patternChordId === startFromChordId);
+    if (i < 0) {
+      startAnchorStale = true;
+    } else if (i > 0) {
+      const offset = events[i].startBeat;
+      outEvents = events.map((_, k) => {
+        const src = events[(i + k) % events.length];
+        const rawStart = src.startBeat - offset;
+        const wrapped = rawStart < 0 ? rawStart + cursorBeat : rawStart;
+        return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats };
+      });
+      outMeta = outEvents.map((_, k) => meta[(i + k) % meta.length]);
+    }
+  }
+  return { events: outEvents, meta: outMeta, loopBeats: cursorBeat, startAnchorStale };
+}
 
 function InspirationLightbox({
   photos,
@@ -254,6 +328,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const appTint = useAppTintStore();
   const appBg = useAppBackgroundStore();
   const stopRequestedRef = useRef(false);
+  const playMetaRef = useRef<PlaybackMeta[]>([]);
+  const startFromChordIdAtPlayRef = useRef<string | null>(null);
 
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
   // [isPlaying] — React would run it on the false→true transition AFTER
@@ -296,83 +372,25 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     const startFromChordId = usePlaybackStore.getState().startFromChordId;
 
     // Walk the SSOT (section.chords) directly instead of the legacy
-    // pattern.chords mirror. The mirror is rebuilt by
-    // deriveMirrorsFromSectionChords and can silently drop SectionChords
-    // whose progressionPlacement.patternId no longer matches any block in
-    // the section (orphaned placements, sections with no blocks, etc.).
-    // Reading the SSOT keeps playback immune to those derivation gaps so
-    // pressing Play always plays whatever chords actually exist.
-    let cursorBeat = 0;
-    const events: ScheduledChord[] = [];
-    const meta2: Array<{ patternId: string; patternChordId: string; mirrorId?: string }> = [];
-    for (const sec of sections) {
-      // Patterns belonging to this section, in progression array order.
-      const sectionPatterns = progression.filter(
-        (p) => (p.sectionId ?? p.id) === sec.id,
-      );
-      if (sectionPatterns.length === 0) continue;
-
-      // Cumulative beat offset of each pattern within this section.
-      const patternOffset = new Map<string, number>();
-      let accBeats = 0;
-      for (const p of sectionPatterns) {
-        patternOffset.set(p.id, accBeats);
-        accBeats += p.bars * p.beatsPerBar;
-      }
-
-      // Emit one event per SectionChord that has a progressionPlacement
-      // pointing at a block in THIS section, in SSOT array order.
-      for (const sc of sec.chords) {
-        const pp = sc.progressionPlacement;
-        if (!pp) continue;
-        const localOffset = patternOffset.get(pp.patternId);
-        if (localOffset == null) continue;
-        events.push({
-          chord: sc.chord,
-          startBeat: cursorBeat + localOffset + pp.startBeat,
-          lengthBeats: pp.lengthBeats,
-        });
-        meta2.push({
-          patternId: pp.patternId,
-          patternChordId: sc.id,
-          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-        });
-      }
-
-      cursorBeat += accBeats;
-    }
-
-    if (!events.length) {
+    // pattern.chords mirror. Orphaned placements / empty sections are
+    // tolerated so Play always plays whatever chords actually exist.
+    const built = buildPlayback(sections, progression, startFromChordId);
+    if (!built) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
     }
-
-    let playEvents = events;
-    let playMeta = meta2;
-    if (startFromChordId) {
-      const i = meta2.findIndex((m) => m.patternChordId === startFromChordId);
-      if (i < 0) {
-        // Stale start cursor — chord no longer exists. Clear it and fall
-        // through to playing from the beginning.
-        usePlaybackStore.getState().setStartFromChord(null, null);
-      } else if (i > 0) {
-        const offset = events[i].startBeat;
-        const total = cursorBeat;
-        playEvents = events.map((_, k) => {
-          const src = events[(i + k) % events.length];
-          const rawStart = src.startBeat - offset;
-          const wrapped = rawStart < 0 ? rawStart + total : rawStart;
-          return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats };
-        });
-        playMeta = playEvents.map((_, k) => meta2[(i + k) % meta2.length]);
-      }
+    if (built.startAnchorStale) {
+      usePlaybackStore.getState().setStartFromChord(null, null);
     }
+    const anchorAtPlay = built.startAnchorStale ? null : startFromChordId;
+    startFromChordIdAtPlayRef.current = anchorAtPlay;
+    playMetaRef.current = built.meta;
 
     setIsPlaying(true);
     setPlayingStore(true);
     // Seed the playhead to the first chord immediately so the visual indicator
-    // appears even if the first Tone.Draw callback is delayed or dropped.
-    setCurrent(playMeta[0] ?? null);
+    // appears even if the first draw callback is delayed.
+    setCurrent(built.meta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     const startAt = getAudioContext().currentTime + 0.04;
@@ -384,12 +402,27 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         startAt,
       });
     }
-    await playProgression(playEvents, meta.bpm, {
-      onChordStart: (idx) => setCurrent(playMeta[idx % playMeta.length] ?? null),
-      loopBeats: cursorBeat,
+    await playProgression(built.events, meta.bpm, {
+      onChordStart: (idx) => {
+        const m = playMetaRef.current;
+        setCurrent(m[idx % m.length] ?? null);
+      },
+      loopBeats: built.loopBeats,
       startAt,
     });
   };
+
+  // Live re-feed: while the loop is running, mirror SSOT edits into the
+  // scheduler so quality / length / add / remove edits ahead of the playhead
+  // take effect this iteration, and behind-the-playhead edits land on the
+  // next loop wrap.
+  useEffect(() => {
+    if (!isPlaying) return;
+    const built = buildPlayback(sections, progression, startFromChordIdAtPlayRef.current);
+    if (!built) return;
+    playMetaRef.current = built.meta;
+    updateScheduledProgression(built.events, built.loopBeats);
+  }, [sections, progression, isPlaying]);
 
   const handleStop = () => {
     stopRequestedRef.current = true;
