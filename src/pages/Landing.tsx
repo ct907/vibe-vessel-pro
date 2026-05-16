@@ -78,7 +78,7 @@ function ChipScatterBackground() {
     <div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
-      style={{ zIndex: 0, ...maskStyle }}
+      style={{ zIndex: 0, mixBlendMode: "soft-light", ...maskStyle }}
     >
       {particles.map((p) => (
         <span
