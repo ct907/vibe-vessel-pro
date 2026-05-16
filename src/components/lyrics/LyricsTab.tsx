@@ -66,6 +66,7 @@ import {
   Sparkles,
   Pencil,
   WholeWord,
+  Music2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -75,6 +76,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
+import { useTheme } from "@/hooks/use-theme";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -630,6 +632,7 @@ function SectionCard({
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     setDraftLabel(section.label);
@@ -725,6 +728,7 @@ function SectionCard({
               textTransform: "uppercase",
             }}
           >
+            <Music2 className="h-3.5 w-3.5 shrink-0" />
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>

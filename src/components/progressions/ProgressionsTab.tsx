@@ -33,6 +33,7 @@ import {
   MoreVertical,
   CheckSquare,
   ListChecks,
+  Music2,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -41,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { sectionTintStyle, SectionColorPicker } from "@/components/section/SectionColorPicker";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTheme } from "@/hooks/use-theme";
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -777,12 +779,13 @@ function SectionGroup({
   const collapsed = !!section?.collapsed;
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
+  const { theme } = useTheme();
 
   return (
     <div
       ref={cardRef}
       data-section-id={sectionId}
-      style={sectionTintStyle(section?.color, 0.35)}
+      style={sectionTintStyle(section?.color, theme === "dark" ? 0.175 : 0.35)}
       className={cn("noise-texture-surface rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
@@ -798,9 +801,12 @@ function SectionGroup({
             fontSize: 12,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
-            display: "inline-block",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
+          <Music2 style={{ width: 14, height: 14, flexShrink: 0 }} />
           {displayName}
         </span>
         {!sortMode && (
