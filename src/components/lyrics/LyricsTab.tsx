@@ -692,8 +692,8 @@ function SectionCard({
       data-section-id={section.id}
       style={{
         ...sectionTintStyle(section.color, 0.35),
-        backdropFilter: "blur(2px) saturate(200%)",
-        WebkitBackdropFilter: "blur(2px) saturate(200%)",
+        backdropFilter: "blur(2px) saturate(200%) opacity(20%)",
+        WebkitBackdropFilter: "blur(2px) saturate(200%) opacity(20%)",
       }}
       className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
     >

@@ -78,7 +78,7 @@ function ChipScatterBackground() {
     <div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
-      style={{ zIndex: 0, ...maskStyle }}
+      style={{ zIndex: 0, mixBlendMode: "soft-light", ...maskStyle }}
     >
       {particles.map((p) => (
         <span
@@ -151,8 +151,8 @@ export default function Landing() {
 
         <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto">
           <span
+            className="logomark-ink"
             style={{
-              color: "rgb(47, 39, 30)",
               fontFamily: '"Noto Music"',
               fontSize: 144,
               lineHeight: "120px",
@@ -162,8 +162,8 @@ export default function Landing() {
             𝆑
           </span>
           <span
+            className="logomark-ink"
             style={{
-              color: "#2F271E",
               fontFamily: '"Noto Music"',
               fontSize: 96,
               fontStyle: "italic",
