@@ -102,11 +102,20 @@ function ChipScatterBackground() {
   );
 }
 
+const DECO_CHORDS = [
+  { label: "Cmaj7", x: "7%",  y: "10%", r: -12 },
+  { label: "Am",    x: "81%", y: "7%",  r: 8   },
+  { label: "F",     x: "14%", y: "54%", r: -6  },
+  { label: "G7",    x: "87%", y: "44%", r: 14  },
+  { label: "Dm7",   x: "71%", y: "77%", r: -9  },
+];
+
 export default function Landing() {
   const navigate = useNavigate();
   const loadFromJSON = useSongStore((s) => s.loadFromJSON);
   const resetSong = useSongStore((s) => s.resetSong);
   const [recents, setRecents] = useState<RecentProject[]>([]);
+  const { theme } = useTheme();
 
   useEffect(() => {
     setRecents(listRecent());
@@ -203,9 +212,9 @@ export default function Landing() {
                     className="flex-1 text-left"
                     onClick={() => openRecent(r)}
                   >
-                    <div className="font-medium">{r.name}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {new Date(r.savedAt).toLocaleString()}
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-5 w-5 ink-chord" />
+                      <h3 className="font-display text-lg">{title}</h3>
                     </div>
                   </button>
                   <DropdownMenu>

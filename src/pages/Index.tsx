@@ -19,9 +19,11 @@ import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
 import { pushRecent } from "@/lib/recent-projects";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
+import { useTheme } from "@/hooks/use-theme";
 
 const Index = () => {
   const bg = useAppBackgroundStore();
+  const { theme } = useTheme();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const initialTab = ((): "lyrics" | "chords" | "progressions" => {
@@ -112,7 +114,7 @@ const Index = () => {
       {bg.pattern !== "none" && (
         <div
           className="fixed inset-0 pointer-events-none"
-          style={{ zIndex: -1, opacity: bg.pattern === "dot" ? 0.8 : 0.3, ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
+          style={{ zIndex: -1, opacity: theme === "dark" ? 0.2 : (bg.pattern === "dot" ? 0.8 : 0.3), ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
         />
       )}
       <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} />

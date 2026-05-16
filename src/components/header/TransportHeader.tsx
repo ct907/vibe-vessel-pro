@@ -462,7 +462,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
             </span>
-            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
+            <span style={{ color: theme === "dark" ? "var(--cocoa)" : "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
               elt.
             </span>
           </Link>

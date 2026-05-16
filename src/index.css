@@ -190,17 +190,17 @@
     --paper-shade-b:        oklch(0.1750 0.0110 60.85);
     --paper-shade-soft-b:   oklch(0.2499 0.0142 57.56);
     --paper-card-b:         oklch(0.2499 0.0142 57.56);
-    --paper:              color-mix(in oklch, var(--paper-b)            50%, var(--app-tint-raw, var(--paper-b))            50%);
-    --paper-shade:        color-mix(in oklch, var(--paper-shade-b)      50%, var(--app-tint-raw, var(--paper-shade-b))      50%);
-    --paper-shade-soft:   color-mix(in oklch, var(--paper-shade-soft-b) 50%, var(--app-tint-raw, var(--paper-shade-soft-b)) 50%);
-    --paper-card:         color-mix(in oklch, var(--paper-card-b)       50%, var(--app-tint-raw, var(--paper-card-b))       50%);
+    --paper:              color-mix(in oklch, var(--paper-b)            75%, var(--app-tint-raw, var(--paper-b))            25%);
+    --paper-shade:        color-mix(in oklch, var(--paper-shade-b)      75%, var(--app-tint-raw, var(--paper-shade-b))      25%);
+    --paper-shade-soft:   color-mix(in oklch, var(--paper-shade-soft-b) 75%, var(--app-tint-raw, var(--paper-shade-soft-b)) 25%);
+    --paper-card:         color-mix(in oklch, var(--paper-card-b)       75%, var(--app-tint-raw, var(--paper-card-b))       25%);
 
     --background:         var(--paper);
     --foreground:         oklch(0.9327 0.0161 82.79);
     --card:               var(--paper-card);
     --card-foreground:    oklch(0.9327 0.0161 82.79);
     --popover-b:            oklch(0.2499 0.0142 57.56);
-    --popover:            color-mix(in oklch, var(--popover-b)          50%, var(--app-tint-raw, var(--popover-b))          50%);
+    --popover:            color-mix(in oklch, var(--popover-b)          75%, var(--app-tint-raw, var(--popover-b))          25%);
     --popover-foreground: oklch(0.9327 0.0161 82.79);
 
     --primary:            oklch(0.7262 0.1414 58.64);
@@ -210,18 +210,18 @@
     --primary-halo:       oklch(0.7262 0.1414 58.64 / 0.40);
 
     --secondary-b:          oklch(0.3229 0.0133 57.79);
-    --secondary:          color-mix(in oklch, var(--secondary-b)        50%, var(--app-tint-raw, var(--secondary-b))        50%);
+    --secondary:          color-mix(in oklch, var(--secondary-b)        75%, var(--app-tint-raw, var(--secondary-b))        25%);
     --secondary-foreground: oklch(0.9327 0.0161 82.79);
     --muted-b:              oklch(0.3019 0.0124 62.15);
-    --muted:              color-mix(in oklch, var(--muted-b)            50%, var(--app-tint-raw, var(--muted-b))            50%);
+    --muted:              color-mix(in oklch, var(--muted-b)            75%, var(--app-tint-raw, var(--muted-b))            25%);
     --muted-foreground:   oklch(0.7323 0.0249 69.49);
     --accent-b:             oklch(0.3589 0.0476 61.59);
-    --accent:             color-mix(in oklch, var(--accent-b)           50%, var(--app-tint-raw, var(--accent-b))           50%);
+    --accent:             color-mix(in oklch, var(--accent-b)           75%, var(--app-tint-raw, var(--accent-b))           25%);
     --accent-foreground:  oklch(0.8519 0.0763 62.62);
     --destructive:        oklch(0.5189 0.1750 25.76);
     --destructive-foreground: oklch(0.9327 0.0161 82.79);
     --border-b:             oklch(0.3432 0.0153 59.11);
-    --border:             color-mix(in oklch, var(--border-b)           50%, var(--app-tint-raw, var(--border-b))           50%);
+    --border:             color-mix(in oklch, var(--border-b)           75%, var(--app-tint-raw, var(--border-b))           25%);
     --input:              var(--border);
     --ring:               oklch(0.7262 0.1414 58.64);
 
@@ -274,7 +274,7 @@
     --pill-rest-bg:   var(--paper-card);
     --pill-rest-fg:   var(--ink);
     --pill-hover-bg-b: oklch(0.30 0.014 58);
-    --pill-hover-bg:  color-mix(in oklch, var(--pill-hover-bg-b)        50%, var(--app-tint-raw, var(--pill-hover-bg-b))        50%);
+    --pill-hover-bg:  color-mix(in oklch, var(--pill-hover-bg-b)        75%, var(--app-tint-raw, var(--pill-hover-bg-b))        25%);
     --pill-active-bg: var(--ink);
     --pill-active-fg: var(--paper);
 
@@ -467,7 +467,7 @@
     mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.90'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.90'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
     opacity: 0.5;
-    mix-blend-mode: overlay;
+    mix-blend-mode: screen;
     pointer-events: none;
     z-index: 0;
   }
@@ -530,8 +530,23 @@
     mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.90'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.90'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
     opacity: 0.5;
-    mix-blend-mode: overlay;
+    mix-blend-mode: screen;
     pointer-events: none;
     z-index: -1;
+  }
+
+  /* Nav menu variant — noise baked into background-image; no position override so SheetContent keeps position:fixed */
+  .noise-bg-nav {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.45'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
+    background-blend-mode: screen;
+  }
+
+  .dark .noise-texture::before,
+  .dark .noise-texture-chip::before {
+    mix-blend-mode: multiply;
+    background-color: #888888;
+  }
+  .dark .noise-bg-nav {
+    background-blend-mode: multiply;
   }
 }
