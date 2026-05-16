@@ -15,7 +15,8 @@ import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 const TAGLINE_TEXT: CSSProperties = { color: "oklch(0.25 0.02 260)" };
 const LYRICS_STYLE: CSSProperties = { background: "oklch(0.8460 0.0483 311.68)" };
 const CHORDS_STYLE: CSSProperties = {
-  background: "linear-gradient(to right in oklch, oklch(0.9272 0.0651 83.56), oklch(0.8689 0.0539 11.07))",
+  background:
+    "linear-gradient(to right in oklch, oklch(0.9272 0.0651 83.56), oklch(0.8689 0.0539 11.07))",
 };
 const PROGRESSIONS_STYLE: CSSProperties = { background: "oklch(0.9265 0.0286 238.25)" };
 
@@ -67,8 +68,10 @@ function ChipScatterBackground() {
   }, []);
 
   const maskStyle: CSSProperties = {
-    WebkitMaskImage: "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
-    maskImage: "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+    WebkitMaskImage:
+      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
+    maskImage:
+      "radial-gradient(35% 35% at 50% 50%, transparent 0%, transparent 70%, black 100%)",
   };
 
   return (
@@ -100,11 +103,11 @@ function ChipScatterBackground() {
 }
 
 const DECO_CHORDS = [
-  { label: "Cmaj7", x: "7%", y: "10%", r: -12 },
-  { label: "Am", x: "81%", y: "7%", r: 8 },
-  { label: "F", x: "14%", y: "54%", r: -6 },
-  { label: "G7", x: "87%", y: "44%", r: 14 },
-  { label: "Dm7", x: "71%", y: "77%", r: -9 },
+  { label: "Cmaj7", x: "7%",  y: "10%", r: -12 },
+  { label: "Am",    x: "81%", y: "7%",  r: 8   },
+  { label: "F",     x: "14%", y: "54%", r: -6  },
+  { label: "G7",    x: "87%", y: "44%", r: 14  },
+  { label: "Dm7",   x: "71%", y: "77%", r: -9  },
 ];
 
 export default function Landing() {
@@ -160,7 +163,7 @@ export default function Landing() {
           </span>
           <span
             style={{
-              color: "var(--paper)",
+              color: "#2F271E",
               fontFamily: '"Noto Music"',
               fontSize: 96,
               fontStyle: "italic",
@@ -197,23 +200,36 @@ export default function Landing() {
           <h2 className="text-center font-semibold mb-3">Recent Projects</h2>
           <div className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] divide-y divide-border/50">
             {recents.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">No recent projects yet.</p>
+              <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">
+                No recent projects yet.
+              </p>
             ) : (
               recents.map((r) => (
                 <div key={r.id} className="flex items-center gap-3 px-4 py-2">
-                  <button type="button" className="flex-1 text-left" onClick={() => openRecent(r)}>
+                  <button
+                    type="button"
+                    className="flex-1 text-left"
+                    onClick={() => openRecent(r)}
+                  >
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-lg">{r.name}</h3>
                     </div>
                   </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`More actions for ${r.name}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label={`More actions for ${r.name}`}
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => removeOne(r.id)}>Remove from recents</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => removeOne(r.id)}>
+                        Remove from recents
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
