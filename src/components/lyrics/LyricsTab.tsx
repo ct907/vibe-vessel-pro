@@ -518,7 +518,7 @@ function LineRow({
           }}
           placeholder="Write your lyric line…"
           className={cn(
-            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 px-1 ml-1 break-words",
+            "w-full bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
             isFocused && "pr-8",
           )}
         />
@@ -695,7 +695,7 @@ function SectionCard({
         backdropFilter: "blur(2px) saturate(200%) opacity(20%)",
         WebkitBackdropFilter: "blur(2px) saturate(200%) opacity(20%)",
       }}
-      className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
+      className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0 backdrop-opacity-20")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>

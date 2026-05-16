@@ -104,8 +104,8 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       {/* Nashville header strip */}
       <div className="rounded-xl">
         <div className="flex items-center gap-2 mb-3 mt-3 h-8">
-          <Music className="h-4 w-4 ink-chord" />
-          <h2 className="font-display text-sm flex-1 min-w-0 truncate">
+          <Music className="ink-chord" style={{ width: "1.4rem", height: "1.4rem" }} />
+          <h2 className="font-display flex-1 min-w-0 truncate" style={{ fontSize: "1.18rem" }}>
             <span className="font-mono-chord">
               {meta.keyRoot}
               {keySuffix}
@@ -178,7 +178,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           </div>
         )}
         {visibleGrid.map((row) => (
-          <div key={row.numeral} className="noise-texture-surface rounded-xl p-3" style={{ background: "color-mix(in oklch, var(--paper-shade) 70%, transparent)" }}>
+          <div key={row.numeral} className="noise-texture-surface rounded-xl p-3" style={{ background: "var(--paper-shade-soft)" }}>
             <div className="mb-2" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 12px", borderRadius: "var(--pill-radius, 8px)", background: "var(--primary)", color: "var(--paper-card)" }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 12 }}>{row.numeral}</span>
               <span style={{ fontFamily: "'Nunito', system-ui, sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{row.root}</span>
