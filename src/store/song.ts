@@ -2851,7 +2851,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const freeInTarget = totalBeats - usedInTarget;
 
       // B1: default lyricsPlacement so the chord appears in the Lyrics view.
-      const firstLine = sec.lines[0];
+      const firstLine = sec.lines.find((l) => !l._isChordOverflow);
       const lyricsPlacement: LyricsPlacement | undefined = firstLine
         ? (() => {
             const occupied = new Set<number>();
