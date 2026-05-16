@@ -96,6 +96,7 @@ interface PatternProps {
   /** Tab-level active chord id — shared across all blocks. */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
+  onAddBlock?: () => void;
 }
 
 function formatBeats(n: number) {
@@ -112,6 +113,7 @@ function PatternBlock({
   onEditChordOpen,
   activeChordId,
   onSetActiveChordId,
+  onAddBlock,
 }: PatternProps) {
   const {
     updatePattern,
@@ -732,7 +734,14 @@ function PatternBlock({
           chords directly onto any pattern slot, so duplicating that as a
           tap-list inside every block was redundant noise. */}
 
-      <SuggestionsPanel pattern={pattern} />
+      <div className="flex items-center gap-2">
+        <SuggestionsPanel pattern={pattern} />
+        {onAddBlock && (
+          <Button variant="outline" size="sm" className="shrink-0" onClick={onAddBlock}>
+            <Plus className="h-3.5 w-3.5" /> Add pattern block
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -967,16 +976,11 @@ function SectionGroup({
                 onEditChordOpen={onEditChordOpen}
                 activeChordId={activeChordId}
                 onSetActiveChordId={onSetActiveChordId}
+                onAddBlock={i === blocks.length - 1 ? () => addPatternToSection(sectionId) : undefined}
               />
             );
           })}
         </div>
-      )}
-
-      {!collapsed && (
-        <Button variant="outline" size="sm" className="w-full" onClick={() => addPatternToSection(sectionId)}>
-          <Plus className="h-3.5 w-3.5" /> Add pattern block
-        </Button>
       )}
 
       <Dialog
