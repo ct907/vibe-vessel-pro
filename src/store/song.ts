@@ -239,6 +239,7 @@ export interface SongState {
    * chords right and cascading overflow further down if needed).
    */
   resizePatternChordsWithOverflow: (patternId: string, chordIds: string[], deltaBeats: number) => void;
+  bulkSetChordOctave: (patternId: string, chordIds: string[], octave: number) => void;
   reorderPatternChord: (patternId: string, chordId: string, toIndex: number) => void;
   movePatternChordToPatternAt: (fromPatternId: string, toPatternId: string, chordId: string, toIndex: number) => void;
   /** Slot-based: reorder a chord (or group of chords preserving relative order) to a target slot index in the same pattern. */
@@ -2474,6 +2475,25 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return ({ sections, [SSOT_MODE]: true } as any);
   }),
 
+  bulkSetChordOctave: (patternId, chordIds, octave) => set((s) => {
+    const pattern = s.progression.find((p) => p.id === patternId);
+    if (!pattern) return {};
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const idSet = new Set(chordIds);
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      if (!sec.chords.some((sc) => idSet.has(sc.id))) return sec;
+      return {
+        ...sec,
+        chords: sec.chords.map((sc) =>
+          idSet.has(sc.id) ? { ...sc, chord: { ...sc.chord, octave } } : sc
+        ),
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
+  }),
+
   // SSOT-first: chordId === SectionChord.id. Mutate that chord's
   // progressionPlacement.lengthBeats; mirror derivation re-packs startBeats.
   setPatternChordLength: (patternId, chordId, lengthBeats) => set((s) => {
@@ -3295,7 +3315,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       if (!c || typeof c !== "object") return null;
       const display = (c as { display?: unknown }).display;
       if (typeof display !== "string") return null;
-      return parseChord(display);
+      const parsed = parseChord(display);
+      if (!parsed) return null;
+      const raw = c as { octave?: unknown };
+      return typeof raw.octave === "number" ? { ...parsed, octave: raw.octave } : parsed;
     };
     let invalidCount = 0;
     const sectionsRaw: Section[] = parsed.sections?.length ? parsed.sections : [makeSection().section];

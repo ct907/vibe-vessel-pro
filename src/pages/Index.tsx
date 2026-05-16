@@ -14,10 +14,9 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { BasketBar } from "@/components/basket/BasketBar";
-import { hydrateFromStorage, startAutosave, useSongStore, beginInteraction, endInteraction } from "@/store/song";
+import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
-import { pushRecent } from "@/lib/recent-projects";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -73,21 +72,6 @@ const Index = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  useEffect(() => {
-    hydrateFromStorage();
-    const unsub = startAutosave();
-    // Throttled recents push: every 30s while song changes, snapshot title + json.
-    let lastPush = 0;
-    const unsubRecents = useSongStore.subscribe((state) => {
-      const now = Date.now();
-      if (now - lastPush < 30_000) return;
-      lastPush = now;
-      try {
-        pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
-      } catch { /* ignore */ }
-    });
-    return () => { unsub(); unsubRecents(); };
-  }, []);
 
   // Single global DragDropContext. Only basket chips are draggable; chord
   // chips in Lyrics and Progressions are no longer draggable.
