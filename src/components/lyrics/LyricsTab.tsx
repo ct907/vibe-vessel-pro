@@ -66,6 +66,7 @@ import {
   Sparkles,
   Pencil,
   WholeWord,
+  Music2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -75,6 +76,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
+import { useTheme } from "@/hooks/use-theme";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -630,6 +632,7 @@ function SectionCard({
   const [commentOpen, setCommentOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     setDraftLabel(section.label);
@@ -691,11 +694,11 @@ function SectionCard({
     <div
       data-section-id={section.id}
       style={{
-        ...sectionTintStyle(section.color, 0.35),
+        ...sectionTintStyle(section.color, theme === "dark" ? 0.175 : 0.35),
         backdropFilter: "blur(2px) saturate(200%)",
         WebkitBackdropFilter: "blur(2px) saturate(200%)",
       }}
-      className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0")}
+      className={cn("noise-texture-surface rounded-xl px-2 py-2")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>
@@ -729,6 +732,7 @@ function SectionCard({
               textTransform: "uppercase",
             }}
           >
+            <Music2 className="h-3.5 w-3.5 shrink-0" />
             <SelectValue>{displayName}</SelectValue>
           </SelectTrigger>
           <SelectContent>

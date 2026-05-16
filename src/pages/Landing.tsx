@@ -11,6 +11,7 @@ import {
 import { useSongStore } from "@/store/song";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
+import { useTheme } from "@/hooks/use-theme";
 
 const TAGLINE_TEXT: CSSProperties = { color: "oklch(0.25 0.02 260)" };
 const LYRICS_STYLE: CSSProperties = { background: "oklch(0.8460 0.0483 311.68)" };
@@ -153,7 +154,7 @@ export default function Landing() {
         <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto">
           <span
             style={{
-              color: "rgb(47, 39, 30)",
+              color: theme === "dark" ? "var(--paper)" : "rgb(47, 39, 30)",
               fontFamily: '"Noto Music"',
               fontSize: 144,
               lineHeight: "120px",
@@ -164,7 +165,7 @@ export default function Landing() {
           </span>
           <span
             style={{
-              color: "#2F271E",
+              color: theme === "dark" ? "var(--paper)" : "#2F271E",
               fontFamily: '"Noto Music"',
               fontSize: 96,
               fontStyle: "italic",
