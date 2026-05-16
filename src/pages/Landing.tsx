@@ -143,7 +143,7 @@ export default function Landing() {
           <Play className="h-2.5 w-2.5 fill-current" />
         </Link>
 
-        <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto" style={{ marginLeft: 20 }}>
+        <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2">
           <span
             className="logomark-ink"
             style={{

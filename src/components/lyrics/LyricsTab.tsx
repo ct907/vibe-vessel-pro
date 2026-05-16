@@ -709,7 +709,7 @@ function SectionCard({
               updateSection(section.id, { type: next, label: section.label });
             }
           }}
-          disabled={sortMode}
+          disabled={sortMode || total === 1}
         >
           <SelectTrigger
             className="h-auto w-auto min-w-[120px] ml-2 border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"

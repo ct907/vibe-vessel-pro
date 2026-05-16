@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import { useBasketSelectionStore } from "@/store/basket-selection";
-import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType } from "@/store/song";
+import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -10,6 +10,8 @@ import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +36,7 @@ import {
   CheckSquare,
   ListChecks,
   Music2,
+  Pencil,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -43,6 +46,8 @@ import { sectionTintStyle, SectionColorPicker } from "@/components/section/Secti
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
+
+const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -776,6 +781,25 @@ function SectionGroup({
   const cardRef = useRef<HTMLDivElement>(null);
   const canDeleteSection = totalSections > 1;
   const { theme } = useTheme();
+  const [customRenameOpen, setCustomRenameOpen] = useState(false);
+  const [draftLabel, setDraftLabel] = useState(section?.label ?? "");
+  const prevTypeRef = useRef<SectionType | null>(null);
+  const prevLabelRef = useRef<string>(section?.label ?? "");
+
+  function acceptCustomName() {
+    const trimmed = draftLabel.trim() || "Section";
+    updateSection(sectionId, { label: trimmed });
+    prevTypeRef.current = null;
+    setCustomRenameOpen(false);
+  }
+
+  function cancelCustomName() {
+    if (prevTypeRef.current && prevTypeRef.current !== "custom") {
+      updateSection(sectionId, { type: prevTypeRef.current, label: prevLabelRef.current });
+    }
+    prevTypeRef.current = null;
+    setCustomRenameOpen(false);
+  }
 
   return (
     <div
@@ -786,25 +810,58 @@ function SectionGroup({
     >
       {/* Section header */}
       <div className="flex items-center gap-2">
-        <span
-          style={{
-            padding: "5px 12px",
-            borderRadius: "var(--pill-radius, 8px)",
-            background: "var(--pill-rest-bg)",
-            color: "var(--pill-rest-fg)",
-            fontFamily: "'Nunito', system-ui, sans-serif",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
+        <Select
+          value={section?.type ?? "verse"}
+          onValueChange={(v) => {
+            const next = v as SectionType;
+            if (next === "custom") {
+              prevTypeRef.current = section?.type ?? "verse";
+              prevLabelRef.current = section?.label ?? "";
+              updateSection(sectionId, { type: next, label: section?.label || "Section" });
+              setDraftLabel(section?.label && section?.type === "custom" ? section.label : "");
+              setCustomRenameOpen(true);
+            } else {
+              updateSection(sectionId, { type: next, label: section?.label ?? "" });
+            }
           }}
+          disabled={sortMode || totalSections === 1}
         >
-          <Music2 style={{ width: 14, height: 14, flexShrink: 0 }} />
-          {displayName}
-        </span>
+          <SelectTrigger
+            className="h-auto w-auto min-w-[120px] border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
+            style={{
+              padding: "5px 12px",
+              borderRadius: "var(--pill-radius, 8px)",
+              background: "var(--pill-rest-bg)",
+              color: "var(--pill-rest-fg)",
+              fontFamily: "'Nunito', system-ui, sans-serif",
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            <Music2 style={{ width: 14, height: 14, flexShrink: 0 }} />
+            <SelectValue>{displayName}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {SECTION_TYPES.map((t) => (
+              <SelectItem key={t} value={t} className="text-xs capitalize">
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {section?.type === "custom" && !sortMode && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => setCustomRenameOpen(true)}
+            aria-label="Rename custom section"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
         {!sortMode && (
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             {blocks.length} block{blocks.length === 1 ? "" : "s"}
@@ -921,6 +978,34 @@ function SectionGroup({
           <Plus className="h-3.5 w-3.5" /> Add pattern block
         </Button>
       )}
+
+      <Dialog
+        open={customRenameOpen}
+        onOpenChange={(o) => {
+          if (!o) cancelCustomName();
+          else setCustomRenameOpen(true);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Name this section</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") acceptCustomName();
+            }}
+            placeholder="e.g. Refrain, Tag, Solo…"
+            className="font-display text-base"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={cancelCustomName}>Cancel</Button>
+            <Button onClick={acceptCustomName}>Accept</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
