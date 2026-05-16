@@ -130,7 +130,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
             const activeBg = theme === "light" ? "var(--paper)" : "var(--cocoa)";
             const labelColor = active
               ? (theme === "light" ? "var(--cocoa)" : "var(--paper)")
-              : "var(--paper)";
+              : "var(--cocoa)";
             return (
               <button
                 key={d.numeral}

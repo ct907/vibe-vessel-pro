@@ -241,43 +241,44 @@ function clearScheduler() {
 
 function tick() {
   if (!schedEvents.length) return;
-  const ctx = getAudioContext();
-  const beatSec = 60 / schedBpm;
-  const horizon = ctx.currentTime + SCHEDULE_AHEAD_S;
+  try {
+    const ctx = getAudioContext();
+    const beatSec = 60 / schedBpm;
+    const horizon = ctx.currentTime + SCHEDULE_AHEAD_S;
 
-  while (schedNextIdx < schedEvents.length) {
-    const ev = schedEvents[schedNextIdx];
-    const eventAt = schedOriginAcTime + ev.startBeat * beatSec;
-    if (eventAt >= horizon) break;
-    const durSec = ev.lengthBeats * beatSec;
-    const safeStart = Math.max(ctx.currentTime, eventAt);
-    spawnChord(ev.chord, safeStart, safeStart + durSec, ev.chord.octave ?? schedOctave);
-    if (schedOnChordStart) {
-      const idx = schedNextIdx;
-      const delayMs = Math.max(0, (eventAt - ctx.currentTime) * 1000);
-      const cb = schedOnChordStart;
-      window.setTimeout(() => cb(idx), delayMs);
+    while (schedNextIdx < schedEvents.length) {
+      const ev = schedEvents[schedNextIdx];
+      const eventAt = schedOriginAcTime + ev.startBeat * beatSec;
+      if (eventAt >= horizon) break;
+      const durSec = ev.lengthBeats * beatSec;
+      const safeStart = Math.max(ctx.currentTime, eventAt);
+      spawnChord(ev.chord, safeStart, safeStart + durSec, ev.chord.octave ?? schedOctave);
+      if (schedOnChordStart) {
+        const idx = schedNextIdx;
+        const delayMs = Math.max(0, (eventAt - ctx.currentTime) * 1000);
+        const cb = schedOnChordStart;
+        window.setTimeout(() => cb(idx), delayMs);
+      }
+      schedNextIdx++;
     }
-    schedNextIdx++;
-  }
 
-  if (schedNextIdx >= schedEvents.length) {
-    if (schedLoopBeats != null && schedLoopBeats > 0) {
-      schedOriginAcTime += schedLoopBeats * beatSec;
-      schedNextIdx = 0;
-    } else if (schedOnEnd && !schedEndedScheduled) {
-      schedEndedScheduled = true;
-      const lastEnd = schedEvents.reduce(
-        (m, e) => Math.max(m, e.startBeat + e.lengthBeats),
-        0,
-      );
-      const endAt = schedOriginAcTime + lastEnd * beatSec;
-      const delayMs = Math.max(0, (endAt - ctx.currentTime) * 1000);
-      const cb = schedOnEnd;
-      window.setTimeout(() => cb(), delayMs);
+    if (schedNextIdx >= schedEvents.length) {
+      if (schedLoopBeats != null && schedLoopBeats > 0) {
+        schedOriginAcTime += schedLoopBeats * beatSec;
+        schedNextIdx = 0;
+      } else if (schedOnEnd && !schedEndedScheduled) {
+        schedEndedScheduled = true;
+        const lastEnd = schedEvents.reduce(
+          (m, e) => Math.max(m, e.startBeat + e.lengthBeats),
+          0,
+        );
+        const endAt = schedOriginAcTime + lastEnd * beatSec;
+        const delayMs = Math.max(0, (endAt - ctx.currentTime) * 1000);
+        const cb = schedOnEnd;
+        window.setTimeout(() => cb(), delayMs);
+      }
     }
-  }
-
+  } catch { /* audio glitch acceptable; scheduler must survive */ }
   schedulerTimerId = window.setTimeout(tick, LOOKAHEAD_MS);
 }
 
