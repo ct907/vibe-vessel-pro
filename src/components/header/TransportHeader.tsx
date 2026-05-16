@@ -452,10 +452,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <div style={{ display: "flex", alignItems: "center" }}>
-            <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
+            <span style={{ color: theme === "dark" ? "var(--cocoa)" : "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
             </span>
-            <span style={{ color: "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
+            <span style={{ color: theme === "dark" ? "var(--cocoa)" : "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
               elt.
             </span>
           </div>
