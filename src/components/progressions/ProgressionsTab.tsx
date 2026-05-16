@@ -121,6 +121,8 @@ function PatternBlock({
     removePatternChordsBatch,
     setPatternChordLength,
     resizePatternChordsWithOverflow,
+    updatePatternChord,
+    bulkSetChordOctave,
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
@@ -725,6 +727,36 @@ function PatternBlock({
             >
               <ListChecks className="h-5 w-5" />
             </Button>
+
+            <div className="w-px h-6 bg-border mx-0.5" />
+
+            {/* Octave picker */}
+            <span className="text-xs text-muted-foreground select-none">Oct</span>
+            <Select
+              value={String(activeChordInThisBlock.chord.octave ?? 4)}
+              onValueChange={(v) => {
+                const oct = Number(v);
+                const ids = selectedIds.size > 0 ? Array.from(selectedIds) : [activeChordId!];
+                if (ids.length > 1) {
+                  bulkSetChordOctave(pattern.id, ids, oct);
+                } else {
+                  updatePatternChord(pattern.id, activeChordId!, {
+                    chord: { ...activeChordInThisBlock.chord, octave: oct },
+                  });
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2, 3, 4, 5, 6].map((o) => (
+                  <SelectItem key={o} value={String(o)} className="text-sm font-mono-chord">
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       )}
