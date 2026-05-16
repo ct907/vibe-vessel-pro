@@ -81,9 +81,6 @@ import { useTheme } from "@/hooks/use-theme";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
-// Used by sortAnchors-style fallbacks during legacy reads.
-const slotOf = (a: ChordAnchor): number =>
-  a.slotIndex ?? a.wordIndex ?? a.chordCol ?? a.offset ?? 0;
 
 /**
  * Build slot → chord map from a chord list. `slotIndex` is treated as the

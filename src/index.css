@@ -399,52 +399,6 @@
     transform: translateY(1px);
   }
 
-  /* Legacy neumorphic play (kept for any stragglers) */
-  .btn-neumorphic-play {
-    color: var(--primary-foreground);
-    background-color: var(--primary);
-    border: 0;
-    box-shadow: var(--shadow-sculpt-amber-rest);
-    transition:
-      box-shadow 120ms cubic-bezier(0.22, 0.61, 0.36, 1),
-      transform 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
-  .btn-neumorphic-play:active {
-    box-shadow: var(--shadow-sculpt-amber-press);
-    transform: translateY(1px);
-  }
-
-  /* ────────────────────────────────────────────────────────────
-     Section-label pill — quiet header for collapsible groups.
-  ──────────────────────────────────────────────────────────── */
-  .section-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border-radius: var(--pill-radius);
-    background: var(--pill-rest-bg);
-    color: var(--pill-rest-fg);
-    font-family: "Nunito", system-ui, sans-serif;
-    font-weight: 700;
-    font-size: 0.8125rem; /* ~13px */
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    transition: background 120ms ease;
-  }
-  .section-pill:hover {
-    background: var(--pill-hover-bg);
-  }
-  .section-pill[data-active="true"] {
-    background: var(--pill-active-bg);
-    color: var(--pill-active-fg);
-    box-shadow: var(--shadow-sculpt-cocoa-rest);
-  }
-
-  /* Ruled paper background (legacy — kept for any remaining callers) */
-  .paper-ruled {
-    background-color: var(--paper);
-  }
 
   /* Recess well — tabs container, input groups */
   .shadow-recess {
@@ -540,18 +494,10 @@
     z-index: -1;
   }
 
-  /* Nav menu variant — noise baked into background-image; no position override so SheetContent keeps position:fixed */
-  .noise-bg-nav {
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'100%25'%20height%3D'100%25'%3E%20%3Cfilter%20id%3D'noise'%3E%20%3CfeTurbulence%20type%3D'turbulence'%20baseFrequency%3D'0.45'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%20seed%3D'179'%20%2F%3E%20%3C%2Ffilter%3E%20%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23noise)'%2F%3E%20%3C%2Fsvg%3E");
-    background-blend-mode: screen;
-  }
 
   .dark .noise-texture::before,
   .dark .noise-texture-chip::before {
     mix-blend-mode: multiply;
     background-color: #888888;
-  }
-  .dark .noise-bg-nav {
-    background-blend-mode: multiply;
   }
 }
