@@ -79,7 +79,7 @@ function ChipScatterBackground() {
     <div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
-      style={{ zIndex: 0, ...maskStyle }}
+      style={{ zIndex: 0, mixBlendMode: "soft-light", ...maskStyle }}
     >
       {particles.map((p) => (
         <span
@@ -116,7 +116,6 @@ export default function Landing() {
   const loadFromJSON = useSongStore((s) => s.loadFromJSON);
   const resetSong = useSongStore((s) => s.resetSong);
   const [recents, setRecents] = useState<RecentProject[]>([]);
-  const { theme } = useTheme();
 
   useEffect(() => {
     setRecents(listRecent());
@@ -153,8 +152,8 @@ export default function Landing() {
 
         <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto">
           <span
+            className="logomark-ink"
             style={{
-              color: theme === "dark" ? "var(--paper)" : "rgb(47, 39, 30)",
               fontFamily: '"Noto Music"',
               fontSize: 144,
               lineHeight: "120px",
@@ -164,8 +163,8 @@ export default function Landing() {
             𝆑
           </span>
           <span
+            className="logomark-ink"
             style={{
-              color: theme === "dark" ? "var(--paper)" : "#2F271E",
               fontFamily: '"Noto Music"',
               fontSize: 96,
               fontStyle: "italic",
@@ -214,8 +213,7 @@ export default function Landing() {
                     onClick={() => openRecent(r)}
                   >
                     <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 ink-chord" />
-                      <h3 className="font-display text-lg">{title}</h3>
+                      <h3 className="font-display text-lg">{r.name}</h3>
                     </div>
                   </button>
                   <DropdownMenu>

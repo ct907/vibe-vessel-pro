@@ -313,3 +313,33 @@ export function stopProgression() {
   const t = Math.max(0, ctx.currentTime);
   for (const v of liveVoices) { try { v.release(t); } catch { /* noop */ } }
 }
+
+/**
+ * Swap the live schedule with a fresh event array without restarting playback.
+ * Chords already handed to the AudioContext (inside the lookahead window) keep
+ * their pre-update sound this iteration. Anything past the lookahead, including
+ * inserts and removes ahead of the playhead, is picked up immediately by the
+ * next tick. Behind-the-playhead changes apply on the next loop wrap.
+ *
+ * No-op when the scheduler is idle.
+ */
+export function updateScheduledProgression(
+  events: ScheduledChord[],
+  loopBeats?: number,
+): void {
+  if (schedulerTimerId == null) return;
+  const ctx = getAudioContext();
+  const beatSec = 60 / schedBpm;
+  const currentBeat = (ctx.currentTime - schedOriginAcTime) / beatSec;
+  const lookaheadBeats = SCHEDULE_AHEAD_S / beatSec;
+  schedEvents = events;
+  if (loopBeats != null) {
+    schedLoopBeats = loopBeats > 0 ? loopBeats : null;
+  }
+  let nextIdx = events.findIndex(
+    (e) => e.startBeat > currentBeat + lookaheadBeats,
+  );
+  if (nextIdx < 0) nextIdx = events.length;
+  schedNextIdx = nextIdx;
+  schedEndedScheduled = false;
+}

@@ -549,4 +549,6 @@
   .dark .noise-bg-nav {
     background-blend-mode: multiply;
   }
+  .logomark-ink { color: rgb(47, 39, 30); }
+  .dark .logomark-ink { color: var(--paper); }
 }

@@ -246,7 +246,7 @@ function PatternBlock({
         background: "var(--paper-card)",
         boxShadow: isFocused
           ? "var(--shadow-sculpt-cream-rest), 0 0 0 2px var(--primary-strong)"
-          : "var(--shadow-card)",
+          : "0 3px 7px -8px color-mix(in oklch, var(--paper-shade) 80%, transparent), 0 1px 2px -2px color-mix(in oklch, var(--paper-shade) 65%, transparent)",
       }}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
