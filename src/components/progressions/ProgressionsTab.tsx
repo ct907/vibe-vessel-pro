@@ -96,7 +96,6 @@ interface PatternProps {
   /** Tab-level active chord id — shared across all blocks. */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
-  onAddBlock?: () => void;
 }
 
 function formatBeats(n: number) {
@@ -113,7 +112,6 @@ function PatternBlock({
   onEditChordOpen,
   activeChordId,
   onSetActiveChordId,
-  onAddBlock,
 }: PatternProps) {
   const {
     updatePattern,
@@ -766,14 +764,7 @@ function PatternBlock({
           chords directly onto any pattern slot, so duplicating that as a
           tap-list inside every block was redundant noise. */}
 
-      <div className="flex items-center gap-2">
-        <SuggestionsPanel pattern={pattern} />
-        {onAddBlock && (
-          <Button variant="outline" size="sm" className="shrink-0" onClick={onAddBlock}>
-            <Plus className="h-3.5 w-3.5" /> Add pattern block
-          </Button>
-        )}
-      </div>
+      <SuggestionsPanel pattern={pattern} />
     </div>
   );
 }
@@ -1008,10 +999,16 @@ function SectionGroup({
                 onEditChordOpen={onEditChordOpen}
                 activeChordId={activeChordId}
                 onSetActiveChordId={onSetActiveChordId}
-                onAddBlock={i === blocks.length - 1 ? () => addPatternToSection(sectionId) : undefined}
               />
             );
           })}
+          <button
+            type="button"
+            onClick={() => addPatternToSection(sectionId)}
+            className="rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[100px] transition-colors"
+          >
+            <Plus className="h-10 w-10 md:h-16 md:w-16" strokeWidth={2} />
+          </button>
         </div>
       )}
 
