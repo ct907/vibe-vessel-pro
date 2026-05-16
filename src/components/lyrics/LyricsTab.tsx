@@ -690,12 +690,8 @@ function SectionCard({
   return (
     <div
       data-section-id={section.id}
-      style={{
-        ...sectionTintStyle(section.color, 0.35),
-        backdropFilter: "blur(2px) saturate(200%) opacity(20%)",
-        WebkitBackdropFilter: "blur(2px) saturate(200%) opacity(20%)",
-      }}
-      className={cn("noise-texture-surface rounded-xl px-2 py-2 bg-transparent shadow-none border-0 backdrop-opacity-20")}
+      style={sectionTintStyle(section.color, 0.35)}
+      className={cn("noise-texture-surface rounded-xl px-2 py-2 shadow-none border-0")}
     >
       {/* Section header */}
       <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>
