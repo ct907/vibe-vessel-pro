@@ -493,11 +493,10 @@
     z-index: 0;
   }
 
-  /* Nav menu variant — noise at 0.4 opacity (0.4 noise / 0.6 background mix) */
-  .noise-texture-nav {
-    position: relative;
-    overflow: hidden;
-  }
+  /* Nav menu variant — noise at 0.2 opacity. No position/overflow on the host:
+     SheetContent already has position:fixed from sheetVariants, which is the
+     containing block for the ::before pseudo-element. Setting position:relative
+     here would override that fixed positioning and hide the slide-in drawer. */
   .noise-texture-nav::before {
     content: '';
     position: absolute;

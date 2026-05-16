@@ -1,8 +1,8 @@
-// Phase 1.6 — Web Audio synth engine + Tone.Transport scheduler.
+// Phase 1.6 — Web Audio synth engine + lookahead scheduler.
 //
-// Synthesis is 100% raw Web Audio (no Tone.js voices). Tone.js is retained
-// only for the Transport / Part scheduling used by playProgression(), since
-// it provides accurate look-ahead scheduling and a draw scheduler.
+// Synthesis and scheduling are 100% raw Web Audio. Tone.js is retained only
+// for ensureAudio() — it owns the autoplay-policy unlock (Tone.start()) and
+// donates its rawContext so any future Tone-using code shares our AC.
 //
 // Polyphony is hard-capped at MAX_VOICES; the oldest voices are stolen first.
 
@@ -15,6 +15,7 @@ import {
   type FX,
   type SoundSettings,
 } from "@/store/sound";
+import { useSongStore } from "@/store/song";
 import { getAudioContext, getMasterChain } from "@/lib/audio/context";
 import { makeVoice, type Voice } from "@/lib/audio/voices";
 
@@ -86,11 +87,10 @@ function applySettings(s: SoundSettings) {
   const c = getMasterChain();
   c.master.gain.setTargetAtTime(dbToGain(s.volume), c.ctx.currentTime, 0.02);
   applyEQ(s.eq);
-  applyFX(s.fx, Tone.getTransport().bpm.value);
+  applyFX(s.fx, useSongStore.getState().meta.bpm);
 }
 
 // Live-update on store changes.
-let lastBpm: number | null = null;
 useSoundStore.subscribe((state) => {
   if (!started) return;
   applySettings(state);
@@ -182,7 +182,14 @@ export async function holdChord(chord: ChordSymbol, octave = 4): Promise<() => v
   };
 }
 
-// ---- Progression playback (Tone.Transport scheduled) ----
+// ---- Progression playback (Web Audio lookahead scheduler) ----
+//
+// Tone.Transport / Tone.Part proved unreliable across stop/restart cycles in
+// Tone 15.x: after the first stopProgression(), the Part callback would stop
+// firing on subsequent plays even though the Transport reported as started.
+// We schedule directly against the shared AudioContext clock instead, mirroring
+// the pattern in src/lib/audio/metronome.ts. All state is module-local, so a
+// fresh play() always starts from a clean slate.
 
 export interface ScheduledChord {
   chord: ChordSymbol;
@@ -196,8 +203,6 @@ export interface PlaybackHandle {
   stop: () => void;
 }
 
-let activePart: Tone.Part | null = null;
-
 export interface PlayProgressionOptions {
   onChordStart?: (index: number) => void;
   onEnd?: () => void;
@@ -205,6 +210,75 @@ export interface PlayProgressionOptions {
   octave?: number;
   /** Optional: AudioContext time at which playback should start. */
   startAt?: number;
+}
+
+const LOOKAHEAD_MS = 25;
+const SCHEDULE_AHEAD_S = 0.1;
+
+let schedulerTimerId: number | null = null;
+let schedEvents: ScheduledChord[] = [];
+let schedBpm = 120;
+let schedOctave = 4;
+let schedOriginAcTime = 0;
+let schedLoopBeats: number | null = null;
+let schedNextIdx = 0;
+let schedOnChordStart: ((index: number) => void) | undefined;
+let schedOnEnd: (() => void) | undefined;
+let schedEndedScheduled = false;
+
+function clearScheduler() {
+  if (schedulerTimerId != null) {
+    clearTimeout(schedulerTimerId);
+    schedulerTimerId = null;
+  }
+  schedEvents = [];
+  schedLoopBeats = null;
+  schedNextIdx = 0;
+  schedOnChordStart = undefined;
+  schedOnEnd = undefined;
+  schedEndedScheduled = false;
+}
+
+function tick() {
+  if (!schedEvents.length) return;
+  const ctx = getAudioContext();
+  const beatSec = 60 / schedBpm;
+  const horizon = ctx.currentTime + SCHEDULE_AHEAD_S;
+
+  while (schedNextIdx < schedEvents.length) {
+    const ev = schedEvents[schedNextIdx];
+    const eventAt = schedOriginAcTime + ev.startBeat * beatSec;
+    if (eventAt >= horizon) break;
+    const durSec = ev.lengthBeats * beatSec;
+    const safeStart = Math.max(ctx.currentTime, eventAt);
+    spawnChord(ev.chord, safeStart, safeStart + durSec, ev.chord.octave ?? schedOctave);
+    if (schedOnChordStart) {
+      const idx = schedNextIdx;
+      const delayMs = Math.max(0, (eventAt - ctx.currentTime) * 1000);
+      const cb = schedOnChordStart;
+      window.setTimeout(() => cb(idx), delayMs);
+    }
+    schedNextIdx++;
+  }
+
+  if (schedNextIdx >= schedEvents.length) {
+    if (schedLoopBeats != null && schedLoopBeats > 0) {
+      schedOriginAcTime += schedLoopBeats * beatSec;
+      schedNextIdx = 0;
+    } else if (schedOnEnd && !schedEndedScheduled) {
+      schedEndedScheduled = true;
+      const lastEnd = schedEvents.reduce(
+        (m, e) => Math.max(m, e.startBeat + e.lengthBeats),
+        0,
+      );
+      const endAt = schedOriginAcTime + lastEnd * beatSec;
+      const delayMs = Math.max(0, (endAt - ctx.currentTime) * 1000);
+      const cb = schedOnEnd;
+      window.setTimeout(() => cb(), delayMs);
+    }
+  }
+
+  schedulerTimerId = window.setTimeout(tick, LOOKAHEAD_MS);
 }
 
 export async function playProgression(
@@ -215,71 +289,27 @@ export async function playProgression(
   await ensureAudio();
   stopProgression();
 
-  const transport = Tone.getTransport();
-  transport.position = 0;
-  // Optional smooth BPM ramp.
-  const ramp = useSoundStore.getState().bpmRamp;
-  if (ramp && lastBpm !== null && Math.abs(transport.bpm.value - bpm) > 0.5) {
-    transport.bpm.rampTo(bpm, 0.4);
-  } else {
-    transport.bpm.value = bpm;
-  }
-  lastBpm = bpm;
-
   const { onChordStart, onEnd, loopBeats, octave = 4, startAt } = options;
+  const ctx = getAudioContext();
 
-  type Payload = ScheduledChord & { __index: number };
-  const payloads: [number, Payload][] = events.map((e, i) => [
-    e.startBeat * (60 / bpm),
-    { ...e, __index: i },
-  ]);
+  schedEvents = events;
+  schedBpm = bpm;
+  schedOctave = octave;
+  schedOriginAcTime = startAt != null ? startAt : ctx.currentTime + 0.04;
+  schedLoopBeats = loopBeats && loopBeats > 0 ? loopBeats : null;
+  schedNextIdx = 0;
+  schedOnChordStart = onChordStart;
+  schedOnEnd = onEnd;
+  schedEndedScheduled = false;
 
-  const part = new Tone.Part((time, value: Payload) => {
-    // `time` is in the shared AudioContext clock (Tone uses our raw AC).
-    const startAtT = time;
-    const durSec = value.lengthBeats * (60 / Tone.getTransport().bpm.value);
-    spawnChord(value.chord, startAtT, startAtT + durSec, value.chord.octave ?? octave);
-    if (onChordStart) {
-      Tone.getDraw().schedule(() => onChordStart(value.__index), time);
-    }
-  }, payloads);
-
-  part.start(0);
-  if (loopBeats && loopBeats > 0) {
-    part.loop = true;
-    part.loopEnd = loopBeats * (60 / bpm);
-  } else if (onEnd) {
-    const lastEnd = events.reduce((m, e) => Math.max(m, e.startBeat + e.lengthBeats), 0);
-    transport.scheduleOnce((time) => {
-      Tone.getDraw().schedule(() => onEnd(), time);
-    }, lastEnd * (60 / bpm));
-  }
-  activePart = part;
-
-  if (startAt != null) {
-    // Convert AudioContext time to Tone seconds (Tone shares the same clock).
-    transport.start(startAt);
-  } else {
-    transport.start();
-  }
+  tick();
 
   return { stop: () => stopProgression() };
 }
 
 export function stopProgression() {
-  const transport = Tone.getTransport();
-  transport.stop();
-  transport.cancel();
-  transport.position = 0;
-  if (activePart) {
-    activePart.stop();
-    activePart.dispose();
-    activePart = null;
-  }
-  // Force the next playProgression to set BPM immediately rather than ramp —
-  // a 0.4 s ramp can drift the first chord relative to the metronome.
-  lastBpm = null;
-  // Release any sustained voices.
-  const t = getAudioContext().currentTime;
+  clearScheduler();
+  const ctx = getAudioContext();
+  const t = Math.max(0, ctx.currentTime);
   for (const v of liveVoices) { try { v.release(t); } catch { /* noop */ } }
 }

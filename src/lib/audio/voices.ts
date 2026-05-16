@@ -36,7 +36,8 @@ export interface Voice {
 }
 
 // Convenience: schedule a smooth ADSR on a GainNode at the given start time.
-function applyAttack(g: GainNode, adsr: ADSR, peak: number, at: number) {
+function applyAttack(g: GainNode, adsr: ADSR, peak: number, atRaw: number) {
+  const at = Math.max(0, atRaw);
   const p = g.gain;
   p.cancelScheduledValues(at);
   p.setValueAtTime(0.0001, at);
@@ -45,7 +46,8 @@ function applyAttack(g: GainNode, adsr: ADSR, peak: number, at: number) {
   p.exponentialRampToValueAtTime(sustainLevel, at + adsr.attack + Math.max(0.001, adsr.decay));
 }
 
-function applyRelease(g: GainNode, adsr: ADSR, at: number): number {
+function applyRelease(g: GainNode, adsr: ADSR, atRaw: number): number {
+  const at = Math.max(0, atRaw);
   const p = g.gain;
   // Read current value to start a smooth tail
   const v = Math.max(0.0001, p.value);

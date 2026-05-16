@@ -2,7 +2,7 @@ import { type BackgroundPattern, getPatternStyle } from "@/store/appBackground";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
-const PATTERNS: BackgroundPattern[] = ["none", "wavy", "checkerboard", "dot", "lined", "quarters"];
+const PATTERNS: BackgroundPattern[] = ["none", "checkerboard", "dot", "lined", "quarters"];
 
 interface Props {
   value: BackgroundPattern;

@@ -370,6 +370,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
     setIsPlaying(true);
     setPlayingStore(true);
+    // Seed the playhead to the first chord immediately so the visual indicator
+    // appears even if the first Tone.Draw callback is delayed or dropped.
+    setCurrent(playMeta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     const startAt = getAudioContext().currentTime + 0.04;
@@ -449,16 +452,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
 
   return (
     <>
-      <div className="mx-2 sm:mx-4 mt-2 mb-2 flex items-center justify-between px-1">
+      <div className="mx-auto mt-2 mb-2 flex w-full max-w-[1600px] items-center justify-between px-3 sm:px-5">
         <div className="flex items-center gap-2">
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <span style={{ color: theme === "dark" ? "var(--cocoa)" : "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
+          <Link
+            to="/"
+            aria-label="Return to introduction"
+            style={{ display: "flex", alignItems: "center", textDecoration: "none" }}
+          >
+            <span style={{ color: "rgb(47, 39, 30)", fontFamily: '"Noto Music"', fontSize: 48, fontWeight: 400, lineHeight: "40px", marginTop: 4 }}>
               𝆑
             </span>
             <span style={{ color: theme === "dark" ? "var(--cocoa)" : "#2F271E", fontFamily: '"Noto Music"', fontSize: 32, fontStyle: "italic", fontWeight: 400, lineHeight: "40px", marginLeft: -8 }}>
               elt.
             </span>
-          </div>
+          </Link>
         </div>
         <div className="flex items-center">
           <button
@@ -520,7 +527,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           />
         )}
 
-        <header id="main-header" className="noise-texture rounded-xl border border-border/60" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)" }}>
+        <header id="main-header" className="noise-texture rounded-xl border border-border/60 mx-auto w-full max-w-[1600px]" style={{ boxShadow: "var(--shadow-paper)", background: "color-mix(in oklch, var(--card) 20%, transparent)", backdropFilter: "blur(8px) saturate(200%)", WebkitBackdropFilter: "blur(8px) saturate(200%)" }}>
           <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Row 1: SongNote wordmark + undo/redo + menu */}
             <div className="flex items-center justify-between gap-2 sm:[display:contents]">
