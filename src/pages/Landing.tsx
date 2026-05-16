@@ -115,7 +115,6 @@ export default function Landing() {
   const loadFromJSON = useSongStore((s) => s.loadFromJSON);
   const resetSong = useSongStore((s) => s.resetSong);
   const [recents, setRecents] = useState<RecentProject[]>([]);
-  const { theme } = useTheme();
 
   useEffect(() => {
     setRecents(listRecent());
