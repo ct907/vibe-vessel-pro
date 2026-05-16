@@ -459,6 +459,7 @@
   .noise-texture {
     position: relative;
     overflow: hidden;
+    isolation: isolate;
   }
   .noise-texture::before {
     content: "";
