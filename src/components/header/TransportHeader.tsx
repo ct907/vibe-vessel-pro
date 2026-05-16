@@ -342,8 +342,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       cursorBeat += accBeats;
     }
 
-    console.log("[playback] events:", events.length, "cursorBeat:", cursorBeat, "first.startBeat:", events[0]?.startBeat);
-
     if (!events.length) {
       toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
       return;
