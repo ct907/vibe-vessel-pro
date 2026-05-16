@@ -43,11 +43,3 @@ export function parseChordTextStrict(text: string): ParseResult {
   }
   return { clips, invalidTokens, totalTokens: tokens.length };
 }
-
-/** Format a short description of bad tokens for a toast. */
-export function describeInvalidTokens(invalidTokens: string[], max = 5): string {
-  if (!invalidTokens.length) return "";
-  const shown = invalidTokens.slice(0, max).join(", ");
-  const more = invalidTokens.length > max ? ` (+${invalidTokens.length - max} more)` : "";
-  return `${shown}${more}`;
-}

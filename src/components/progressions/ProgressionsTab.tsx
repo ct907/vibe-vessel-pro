@@ -117,9 +117,6 @@ function PatternBlock({
   } = useSongStore();
   const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
-  const setStartFromChord = usePlaybackStore((s) => s.setStartFromChord);
-  const setIsPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
-  const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const isFocused = focusedPatternId === pattern.id;
@@ -157,7 +154,6 @@ function PatternBlock({
   const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
-  const freeBeats = Math.max(0, totalBeats - usedBeats);
   const canDeleteThisBlock = totalBlocksInSong > 1;
 
   const activeChordInThisBlock = activeChordId
