@@ -781,7 +781,7 @@ function SectionGroup({
     <div
       ref={cardRef}
       data-section-id={sectionId}
-      style={sectionTintStyle(section?.color, theme === "dark" ? 0.175 : 0.35)}
+      style={{ ...sectionTintStyle(section?.color, theme === "dark" ? 0.175 : 0.35), backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       className={cn("noise-texture-surface rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
@@ -1126,6 +1126,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)",
           borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
           paddingBottom: "60rem",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
         }}
       >
         <span

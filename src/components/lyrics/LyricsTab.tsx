@@ -690,7 +690,7 @@ function SectionCard({
   return (
     <div
       data-section-id={section.id}
-      style={sectionTintStyle(section.color, 0.35)}
+      style={{ ...sectionTintStyle(section.color, 0.35), backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       className={cn("noise-texture-surface rounded-xl px-2 py-2 shadow-none border-0")}
     >
       {/* Section header */}
@@ -1366,7 +1366,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
       <div
         className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl pb-[60rem]"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)" }}
+        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       >
         <span
           className="text-center"
