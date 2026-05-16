@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
-import { useTheme } from "@/hooks/use-theme";
 import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +17,6 @@ interface ChordsTabProps {
 }
 
 export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
-  const { theme } = useTheme();
   const { meta, addToBasket, basket, removeFromBasket } = useSongStore();
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [selected, setSelected] = useState<Record<string, ChordSymbol>>({});
@@ -106,13 +104,10 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       {/* Nashville header strip */}
       <div className="rounded-xl">
         <div className="flex items-center gap-2 mb-3 mt-3 h-8">
-          <Music className="ink-chord" style={{ width: "1.4rem", height: "1.4rem" }} />
-          <h2 className="font-display flex-1 min-w-0 truncate" style={{ fontSize: "1.18rem" }}>
-            <span className="font-mono-chord">
-              {meta.keyRoot}
-              {keySuffix}
+          <Music className="h-4 w-4 ink-chord" />
+          <h2 className="font-display text-sm flex-1 min-w-0 truncate">
             </span>{" "}
-            · Filter Chord Root
+            Filter Chord Root
           </h2>
           {numeralFilter.size > 0 && (
             <button
@@ -127,7 +122,6 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
         <div className="flex flex-wrap gap-2">
           {ladder.map((d) => {
             const active = numeralFilter.has(d.numeral);
-            const labelColor = theme === "dark" ? "var(--paper)" : "var(--cocoa)";
             return (
               <button
                 key={d.numeral}
@@ -135,19 +129,16 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                 onClick={() => toggleNumeral(d.numeral)}
                 style={{
                   borderRadius: 8,
-                  padding: "4px 8px",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "transparent",
+                  padding: 4,
+                  textAlign: "center",
+                  background: active ? "var(--cocoa)" : "var(--paper-shade)",
                   boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
                   border: "none",
-                  transition: "box-shadow 120ms ease",
+                  transition: "background 120ms ease, box-shadow 120ms ease",
                   cursor: "pointer",
                 }}
               >
-                <div className="font-mono-chord" style={{ fontSize: "1.18rem", color: labelColor }}>{d.numeral}</div>
+                <div className="font-mono-chord text-xs mb-1" style={{ color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)", opacity: active ? 0.8 : 1 }}>{d.numeral}</div>
                 <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} />
               </button>
             );
@@ -184,10 +175,10 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           </div>
         )}
         {visibleGrid.map((row) => (
-          <div key={row.numeral} className="noise-texture-surface rounded-xl p-3" style={{ background: "var(--paper-shade-soft)" }}>
-            <div className="mb-2" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: "1.18rem", color: theme === "dark" ? "var(--paper)" : "var(--cocoa)" }}>{row.numeral}</span>
-              <span style={{ fontFamily: "'Nunito', system-ui, sans-serif", fontWeight: 700, fontSize: "1.18rem", letterSpacing: "0.06em", textTransform: "uppercase" as const, color: theme === "dark" ? "var(--paper)" : "var(--cocoa)" }}>{row.root}</span>
+          <div key={row.numeral} className="noise-texture-surface rounded-xl p-3" style={{ background: "color-mix(in oklch, var(--paper-shade) 70%, transparent)" }}>
+            <div className="mb-2" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 12px", borderRadius: "var(--pill-radius, 8px)", background: "var(--primary)", color: "var(--paper-card)" }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 12 }}>{row.numeral}</span>
+              <span style={{ fontFamily: "'Nunito', system-ui, sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{row.root}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => {
