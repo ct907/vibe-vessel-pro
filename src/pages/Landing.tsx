@@ -11,6 +11,7 @@ import {
 import { useSongStore } from "@/store/song";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
+import { useTheme } from "@/hooks/use-theme";
 
 const TAGLINE_TEXT: CSSProperties = { color: "oklch(0.25 0.02 260)" };
 const LYRICS_STYLE: CSSProperties = { background: "oklch(0.8460 0.0483 311.68)" };
