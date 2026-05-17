@@ -181,11 +181,16 @@ export function FocusedChordEditor(props: Props) {
       return;
     }
     if (!line) return;
+    // Pre-compute slot positions in forward order, then insert in reverse
+    // so placeChordInSlot's prepend behavior results in correct SSOT order.
+    const placements: { chord: ChordSymbol; s: number }[] = [];
     let cur = slot;
     for (const chord of chords) {
-      const placed = placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...chord, octave });
-      const placedSlot = placed?.slotIndex ?? cur;
-      cur = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + chordSlotWidth(chord.display) + 1);
+      placements.push({ chord, s: cur });
+      cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
+    }
+    for (const { chord: ch, s } of [...placements].reverse()) {
+      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...ch, octave });
     }
     setSlot(cur);
     setQuery("");
