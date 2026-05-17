@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChordSymbol, suggestChords, parseChord } from "@/lib/music/chords";
+import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput } from "@/lib/music/chords";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import {
@@ -161,8 +161,36 @@ export function FocusedChordEditor(props: Props) {
     }
   }, [slot, isProgression]);
 
+  const meta = useSongStore((s) => s.meta);
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
+  const nashvilleChords = useMemo(
+    () => parseNashvilleInput(query.trim(), meta.keyRoot, meta.keyMode),
+    [query, meta.keyRoot, meta.keyMode],
+  );
+
+  const handlePickNashville = (chords: ChordSymbol[]) => {
+    if (isProgressionAdd) {
+      chords.forEach((chord) => addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat));
+      props.onClose();
+      return;
+    }
+    if (isProgression) {
+      if (chords[0]) updatePatternChord(props.patternId, props.chordId, { chord: { ...chords[0], octave } });
+      props.onClose();
+      return;
+    }
+    if (!line) return;
+    let cur = slot;
+    for (const chord of chords) {
+      const placed = placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...chord, octave });
+      const placedSlot = placed?.slotIndex ?? cur;
+      cur = Math.min(CHORD_ROW_SLOTS - 1, placedSlot + chordSlotWidth(chord.display) + 1);
+    }
+    setSlot(cur);
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
 
   const handlePick = (chord: ChordSymbol) => {
     const chordWithOctave = { ...chord, octave };
@@ -314,7 +342,7 @@ export function FocusedChordEditor(props: Props) {
                     }}
                   >
                     {c && (
-                      <span className="font-mono-chord text-[11px] font-semibold truncate" style={{ color: "var(--ink)" }}>
+                      <span className="font-mono-chord text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--ink)" }}>
                         {c.chord.display}
                       </span>
                     )}
@@ -429,9 +457,9 @@ export function FocusedChordEditor(props: Props) {
             onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
             onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && exact) {
-                e.preventDefault();
-                handlePick(exact);
+              if (e.key === "Enter") {
+                if (nashvilleChords) { e.preventDefault(); handlePickNashville(nashvilleChords); return; }
+                if (exact) { e.preventDefault(); handlePick(exact); return; }
               } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
                 e.preventDefault();
                 const dir: -1 | 1 = e.key === "ArrowLeft" ? -1 : 1;
@@ -497,10 +525,25 @@ export function FocusedChordEditor(props: Props) {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
+          {nashvilleChords && nashvilleChords.length > 0 && (
+            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg mb-3" style={{ background: "var(--paper-shade)" }}>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
+              {nashvilleChords.map((c, i) => (
+                <span
+                  key={i}
+                  className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
+                  style={getChordColorClasses(c).style}
+                >
+                  {c.display}
+                </span>
+              ))}
+              <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
+            </div>
+          )}
           {!query.trim() && (
             <p className="text-sm text-muted-foreground mb-3">
               Type a root letter (A–G) for variations, or a full chord like{" "}
-              <code className="font-mono-chord">Fmaj7</code>.
+              <code className="font-mono-chord">Fmaj7</code>. Or type Nashville numbers like <code className="font-mono-chord">2 5 1</code>.
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">

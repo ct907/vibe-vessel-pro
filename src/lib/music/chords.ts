@@ -368,6 +368,69 @@ export function nashvilleLadder(keyRoot: string, mode: Mode): DegreeChord[] {
   });
 }
 
+/**
+ * Parse a Nashville-number string ("251", "2 5 1", "2.5 1") into ChordSymbols
+ * using the current key's ladder. x.5 tokens resolve to a major chord 1 semitone
+ * above scale degree x (chromatic passing chord). Returns null if the input is
+ * not in Nashville-number format or contains an out-of-range degree.
+ */
+export function parseNashvilleInput(
+  input: string,
+  keyRoot: string,
+  keyMode: Mode,
+): ChordSymbol[] | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Must start with a digit and contain only digits, spaces, and dots.
+  if (!/^[\d][\d\s.]*$/.test(trimmed)) return null;
+
+  const ladder = nashvilleLadder(keyRoot, keyMode);
+  const useFlat = keyRoot.includes("b") || ["F", "Bb", "Eb", "Ab", "Db", "Gb"].includes(keyRoot);
+
+  let tokens: string[];
+  if (trimmed.includes(" ")) {
+    tokens = trimmed.split(/\s+/).filter(Boolean);
+    if (!tokens.every((t) => /^[1-9](\.[05])?$/.test(t))) return null;
+    // Only allow .5 (not .0 etc.)
+    if (!tokens.every((t) => !t.includes(".") || t.endsWith(".5"))) return null;
+  } else {
+    tokens = [];
+    let i = 0;
+    while (i < trimmed.length) {
+      const c = trimmed[i];
+      if (c >= "1" && c <= "9") {
+        if (i + 2 < trimmed.length && trimmed[i + 1] === "." && trimmed[i + 2] === "5") {
+          tokens.push(c + ".5");
+          i += 3;
+        } else {
+          tokens.push(c);
+          i += 1;
+        }
+      } else {
+        return null;
+      }
+    }
+  }
+
+  if (tokens.length === 0) return null;
+
+  const result: ChordSymbol[] = [];
+  for (const token of tokens) {
+    const deg = parseInt(token, 10);
+    if (isNaN(deg) || deg < 1 || deg > ladder.length) return null;
+    if (token.includes(".")) {
+      // x.5 — chromatic passing chord 1 semitone above degree x
+      const baseRoot = ladder[deg - 1].chord.root;
+      const pc = (rootToPc(baseRoot) + 1) % 12;
+      const root = pcToName(pc, useFlat);
+      result.push({ root, quality: "maj", display: root });
+    } else {
+      result.push({ ...ladder[deg - 1].chord });
+    }
+  }
+  return result.length > 0 ? result : null;
+}
+
 export function transposeChord(chord: ChordSymbol, semitones: number): ChordSymbol {
   const useFlat = chord.root.includes("b");
   const newRoot = pcToName(rootToPc(chord.root) + semitones, useFlat);
