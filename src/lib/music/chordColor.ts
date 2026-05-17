@@ -21,9 +21,16 @@ export interface ChordColorClasses {
   text: string;
 }
 
-// Dark slate text for AA contrast on every pastel.
-const TEXT = "oklch(0.25 0.02 260)";
+const TEXT_DARK = "oklch(0.25 0.02 260)";
+const TEXT_LIGHT = "oklch(0.95 0.01 80)";
 const HOVER = "transition-opacity hover:opacity-90";
+
+function adaptiveText(bg: string): string {
+  const ls = [...bg.matchAll(/oklch\(([\d.]+)/g)].map((m) => parseFloat(m[1]));
+  if (!ls.length) return TEXT_DARK;
+  const avg = ls.reduce((a, b) => a + b, 0) / ls.length;
+  return avg > 0.55 ? TEXT_DARK : TEXT_LIGHT;
+}
 
 // Pastel palette (hex -> oklch).
 const SOFT_PEACH    = "oklch(0.9294 0.0816 89.78)";   // #FDE6A9
@@ -46,10 +53,10 @@ const COTTON_CANDY  = "oklch(0.9065 0.0471 350.82)";  // #FAD4E4
 const PALE_LEMON    = "oklch(0.9565 0.0595 94.86)";   // #FDF1C4
 const BABY_BLUE     = "oklch(0.9265 0.0286 238.25)";  // #D6EAF8
 
-const solid = (color: string): CSSProperties => ({ background: color, color: TEXT });
+const solid = (color: string): CSSProperties => ({ background: color, color: adaptiveText(color) });
 const grad  = (a: string, b: string): CSSProperties => ({
   background: `linear-gradient(to right in oklch, ${a}, ${b})`,
-  color: TEXT,
+  color: adaptiveText(a + b),
 });
 
 function styleFor(quality: ChordSymbol["quality"]): CSSProperties {

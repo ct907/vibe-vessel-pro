@@ -6,12 +6,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useSongStore } from "@/store/song";
 import { useMetronomeStore } from "@/store/metronome";
 import { previewClick } from "@/lib/audio/metronome";
@@ -32,6 +42,7 @@ export function SongAttributesMenu() {
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const [bpmDraft, setBpmDraft] = useState(String(meta.bpm));
   const [transposeOffset, setTransposeOffset] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => { setBpmDraft(String(meta.bpm)); }, [meta.bpm]);
 
@@ -51,6 +62,23 @@ export function SongAttributesMenu() {
   const modeLabel = meta.keyMode === "maj" ? "Major" : "Minor";
 
   return (
+    <>
+    <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm Transposed Key</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have transposed the song by{" "}
+            <strong>{fmtOffset(transposeOffset)} semitones</strong>. The new key is{" "}
+            <strong>{meta.keyRoot}</strong>. Confirming will reset the transpose counter to zero.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => setTransposeOffset(0)}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -174,10 +202,22 @@ export function SongAttributesMenu() {
               <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(1)} aria-label="Transpose up semitone">
                 <span aria-hidden className="text-base leading-none">+</span>
               </Button>
+              {transposeOffset !== 0 && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 text-green-600 border-green-400 hover:bg-green-50 dark:hover:bg-green-950"
+                  onClick={() => setConfirmOpen(true)}
+                  aria-label="Confirm transpose"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }

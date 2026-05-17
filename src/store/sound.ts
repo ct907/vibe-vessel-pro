@@ -71,9 +71,9 @@ export interface FX {
 }
 
 export type ArpPattern = "all" | "asc" | "desc" | "ascDesc" | "descAsc" | "random";
-export type ArpRepeat  = "1" | "1/2" | "1/4" | "1/8" | "1/16";
+export type ArpRepeat  = "1" | "1/2" | "1/4" | "1/8" | "1/16" | "1/32";
 export type BassMode   = "off" | "bass" | "bassArp";
-export type BassRepeat = "1" | "1/2" | "1/4" | "1/8";
+export type BassRepeat = "1" | "1/2" | "1/4" | "1/8" | "1/16";
 
 export interface ArpSettings {
   pattern: ArpPattern;

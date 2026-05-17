@@ -167,10 +167,10 @@ function spawnChord(
 // ---- Arpeggio expansion ----
 
 const ARP_STEP_BEATS: Record<ArpRepeat, number> = {
-  "1": 4, "1/2": 2, "1/4": 1, "1/8": 0.5, "1/16": 0.25,
+  "1": 4, "1/2": 2, "1/4": 1, "1/8": 0.5, "1/16": 0.25, "1/32": 0.125,
 };
 const BASS_STEP_BEATS: Record<BassRepeat, number> = {
-  "1": 4, "1/2": 2, "1/4": 1, "1/8": 0.5,
+  "1": 4, "1/2": 2, "1/4": 1, "1/8": 0.5, "1/16": 0.25,
 };
 
 /**
@@ -274,20 +274,34 @@ function spawnArpForEvent(
   }
 
   // ---- Arp melody scheduling ----
-  // Pattern "all" with no slash means parallel chord (handled by spawnChord upstream).
-  // If we reach here with "all", we still play parallel chord notes per arp step.
   const arpEnabled = arp.pattern !== "all";
   if (melody.length === 0) return;
 
   const stepSec = ARP_STEP_BEATS[arp.repeat] * beatSec;
-  // Chord beat length wins: if step >= length, schedule only one note.
   const noteVel = Math.min(1, 1.4 / Math.sqrt(Math.max(1, melody.length)));
 
   if (!arpEnabled) {
-    // Block chord at start, releases at lengthSec.
-    ensureHeadroom(melody.length);
-    for (const m of melody) {
-      spawnNote(midiToFreq(m), startAt, startAt + lengthSec, noteVel);
+    // "All" pattern: repeat block chord at pattern repeat interval.
+    if (stepSec >= lengthSec) {
+      ensureHeadroom(melody.length);
+      for (const m of melody) {
+        spawnNote(midiToFreq(m), startAt, startAt + lengthSec, noteVel);
+      }
+    } else {
+      let t = 0;
+      let i = 0;
+      while (t < lengthSec - 1e-4) {
+        const delay = swingDelay(i, stepSec, arp.swing);
+        const noteStart = startAt + t + delay;
+        if (noteStart >= startAt + lengthSec) break;
+        const noteEnd = Math.min(startAt + lengthSec, noteStart + stepSec);
+        ensureHeadroom(melody.length);
+        for (const m of melody) {
+          spawnNote(midiToFreq(m), noteStart, noteEnd, noteVel);
+        }
+        t += stepSec;
+        i++;
+      }
     }
     return;
   }
@@ -427,8 +441,7 @@ function tick() {
       const octave = ev.chord.octave ?? schedOctave;
       const arp = useSoundStore.getState().arp;
       const armed = ev.sectionId ? sectionArpArmed(ev.sectionId) : true;
-      const hasSlashBass = !!ev.chord.bass;
-      const useArpPath = armed && (arp.pattern !== "all" || arp.bassMode !== "off" || hasSlashBass);
+      const useArpPath = armed;
       if (useArpPath) {
         spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec);
       } else {

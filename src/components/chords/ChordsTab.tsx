@@ -107,7 +107,10 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       <div className="rounded-xl">
         <div className="flex items-center gap-2 mb-3 mt-3 h-8">
           <Music className="ink-chord" style={{ width: "1.4rem", height: "1.4rem" }} />
-          <h2 className="font-display flex-1 min-w-0 truncate" style={{ fontSize: "1.18rem" }}>
+          <h2
+            className="font-display flex-1 min-w-0 truncate"
+            style={{ fontSize: "1.18rem", color: theme === "dark" ? "var(--cocoa)" : undefined }}
+          >
             <span className="font-mono-chord">
               {meta.keyRoot}
               {keySuffix}
