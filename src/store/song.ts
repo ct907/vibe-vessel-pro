@@ -1401,7 +1401,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         progression.push(p);
       }
     });
-    return { sections, progression };
+    return { sections: refreshAllSectionChords(sections, progression), progression };
   }),
   reorderSection: (id, toIndex) => set((s) => {
     const idx = s.sections.findIndex((sec) => sec.id === id);

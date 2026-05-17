@@ -38,12 +38,14 @@ import {
   ListChecks,
   Music2,
   Pencil,
+  MessageSquare,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
 import { cn } from "@/lib/utils";
-import { sectionTintStyle, SectionColorPicker } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
@@ -809,6 +811,7 @@ function SectionGroup({
   const duplicateSection = useSongStore((s) => s.duplicateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
+  const setSectionComment = useSongStore((s) => s.setSectionComment);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
@@ -816,6 +819,8 @@ function SectionGroup({
   const canDeleteSection = totalSections > 1;
   const { theme } = useTheme();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
+  const hasComment = !!(section?.comment && section.comment.trim().length);
   const [draftLabel, setDraftLabel] = useState(section?.label ?? "");
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section?.label ?? "");
@@ -928,17 +933,25 @@ function SectionGroup({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-1">
-            <SectionColorPicker
-              value={section?.color}
-              onChange={(c) => setSectionColor(sectionId, c)}
-            />
+            <button
+              type="button"
+              onClick={() => setCommentOpen((o) => !o)}
+              className="relative h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label={hasComment ? "View comment" : "Add comment"}
+            >
+              <Plus className="h-3 w-3 absolute top-1.5 left-1.5" />
+              <MessageSquare className="h-3.5 w-3.5" />
+              {hasComment && (
+                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
                   <Copy className="h-4 w-4" /> Duplicate
                 </DropdownMenuItem>
@@ -952,10 +965,37 @@ function SectionGroup({
                   />
                 </div>
                 <DropdownMenuSeparator />
+                <div className="px-2 py-1.5">
+                  <p className="text-xs text-muted-foreground mb-1.5">Section color</p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {SECTION_COLOR_KEYS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSectionColor(sectionId, c)}
+                        title={c}
+                        className={cn(
+                          "h-6 w-6 rounded-md border border-border transition-transform",
+                          section?.color === c && "ring-2 ring-primary scale-110",
+                        )}
+                        style={{ backgroundColor: `var(--section-tint-${c})` }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSectionColor(sectionId, null)}
+                    className="mt-1.5 w-full text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 py-0.5"
+                  >
+                    <X className="h-3 w-3" /> Clear color
+                  </button>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => onRequestDeleteSection(sectionId)}
                   disabled={!canDeleteSection}
+                  title={!canDeleteSection ? "Cannot delete the last section" : undefined}
                 >
                   <Trash2 className="h-4 w-4" /> Delete section
                 </DropdownMenuItem>
@@ -982,6 +1022,7 @@ function SectionGroup({
           driven by the same SSOT, and re-arranging blocks here would
           desync the two surfaces. Blocks are now plain children. */}
       {!collapsed && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {blocks.map((p, i) => {
             const otherAll = allPatterns
@@ -1021,6 +1062,17 @@ function SectionGroup({
             <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
           </button>
         </div>
+        {commentOpen && (
+          <div className="mt-3 w-full">
+            <Textarea
+              value={section?.comment ?? ""}
+              onChange={(e) => setSectionComment(sectionId, e.target.value)}
+              placeholder="Notes for this section…"
+              className="min-h-[80px] font-display text-base"
+            />
+          </div>
+        )}
+        </>
       )}
 
       <Dialog
