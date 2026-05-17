@@ -1005,9 +1005,9 @@ function SectionGroup({
           <button
             type="button"
             onClick={() => addPatternToSection(sectionId)}
-            className="rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[100px] transition-colors"
+            className="rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[50px] md:min-h-[100px] transition-colors"
           >
-            <Plus className="h-10 w-10 md:h-16 md:w-16" strokeWidth={2} />
+            <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
           </button>
         </div>
       )}

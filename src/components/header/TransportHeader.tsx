@@ -128,21 +128,33 @@ function buildPlayback(
       patternOffset.set(p.id, accBeats);
       accBeats += p.bars * p.beatsPerBar;
     }
-    for (const sc of sec.chords) {
-      const pp = sc.progressionPlacement;
-      if (!pp) continue;
-      const localOffset = patternOffset.get(pp.patternId);
-      if (localOffset == null) continue;
-      events.push({
-        chord: sc.chord,
-        startBeat: cursorBeat + localOffset + pp.startBeat,
-        lengthBeats: pp.lengthBeats,
-      });
-      meta.push({
-        patternId: pp.patternId,
-        patternChordId: sc.id,
-        mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-      });
+    if (sec.chords.length > 0) {
+      for (const sc of sec.chords) {
+        const pp = sc.progressionPlacement;
+        if (!pp) continue;
+        const localOffset = patternOffset.get(pp.patternId);
+        if (localOffset == null) continue;
+        events.push({
+          chord: sc.chord,
+          startBeat: cursorBeat + localOffset + pp.startBeat,
+          lengthBeats: pp.lengthBeats,
+        });
+        meta.push({
+          patternId: pp.patternId,
+          patternChordId: sc.id,
+          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
+        });
+      }
+    } else {
+      // sec.chords not yet populated (e.g. duplicated section) — fall back to
+      // pattern.chords so the playhead advances across all sections.
+      for (const p of sectionPatterns) {
+        const localOffset = patternOffset.get(p.id) ?? 0;
+        for (const pc of [...p.chords].sort((a, b) => a.startBeat - b.startBeat)) {
+          events.push({ chord: pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats });
+          meta.push({ patternId: p.id, patternChordId: pc.id, mirrorId: pc.mirrorId });
+        }
+      }
     }
     cursorBeat += accBeats;
   }
