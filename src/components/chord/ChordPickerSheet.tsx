@@ -3,7 +3,8 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot } from "@/lib/music/chords";
+import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot, parseNashvilleInput } from "@/lib/music/chords";
+import { useSongStore } from "@/store/song";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { Play } from "lucide-react";
@@ -102,14 +103,25 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
     };
   }, [open, onOpenChange]);
 
+  const meta = useSongStore((s) => s.meta);
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
+  const nashvilleChords = useMemo(
+    () => parseNashvilleInput(query.trim(), meta.keyRoot, meta.keyMode),
+    [query, meta.keyRoot, meta.keyMode],
+  );
 
   // Picking a chord no longer auto-closes the sheet — user can keep adding chords.
   // Close manually via the X button. Pressing Enter or double-tapping a suggestion
   // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
     onPick({ ...chord, octave });
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
+
+  const handlePickNashville = (chords: ChordSymbol[]) => {
+    chords.forEach((chord) => onPick({ ...chord, octave }));
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
@@ -181,7 +193,10 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
               onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
               onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && exact) { handlePick(exact); return; }
+                if (e.key === "Enter") {
+                  if (nashvilleChords) { handlePickNashville(nashvilleChords); return; }
+                  if (exact) { handlePick(exact); return; }
+                }
                 if ((e.key === "ArrowUp" || e.key === "ArrowDown") && activeLineId) {
                   e.preventDefault();
                   const el = document.querySelector<HTMLDivElement>(`[data-chord-row="${activeLineId}"]`);
@@ -208,9 +223,25 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
             </Select>
           </div>
 
+          {nashvilleChords && nashvilleChords.length > 0 && (
+            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
+              {nashvilleChords.map((c, i) => (
+                <span
+                  key={i}
+                  className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
+                  style={getChordColorClasses(c).style}
+                >
+                  {c.display}
+                </span>
+              ))}
+              <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
+            </div>
+          )}
+
           {!query.trim() && (
             <p className="text-sm text-muted-foreground">
-              Type a root letter (A–G) for variations, or a full chord like <code className="font-mono-chord">Fmaj7</code>.
+              Type a root letter (A–G) for variations, or a full chord like <code className="font-mono-chord">Fmaj7</code>. Or type Nashville numbers like <code className="font-mono-chord">2 5 1</code>.
             </p>
           )}
 
