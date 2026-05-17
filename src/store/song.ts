@@ -96,6 +96,8 @@ export interface Section {
   comment?: string;
   /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
   color?: string | null;
+  /** When false, this section plays as block chords even if the global arp is on. Default true. */
+  arpArmed?: boolean;
 }
 
 export interface PatternChord {
@@ -171,6 +173,7 @@ export interface SongState {
   setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
   setSectionColor: (id: string, color: string | null) => void;
+  setSectionArpArmed: (id: string, armed: boolean) => void;
   /** Wipe all song state and replace with a single empty verse section (factory reset). */
   resetSong: () => void;
 
@@ -1436,6 +1439,9 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   })),
   setSectionColor: (id, color) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, color: color ?? null } : sec)),
+  })),
+  setSectionArpArmed: (id, armed) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, arpArmed: armed } : sec)),
   })),
   resetSong: () => {
     undoStack.length = 0;

@@ -6,10 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useSoundStore, SOUND_PRESETS, PRESET_BY_VALUE, type SoundPreset } from "@/store/sound";
+import { useSoundStore, SOUND_PRESETS, PRESET_BY_VALUE, type SoundPreset, type ArpPattern, type ArpRepeat, type BassMode, type BassRepeat } from "@/store/sound";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { parseChord } from "@/lib/music/chords";
-import { Music2, RotateCcw, Play, ChevronDown } from "lucide-react";
+import {
+  Music2, RotateCcw, Play, ChevronDown,
+  IndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
+  AudioLines, Circle, ListEnd, ChartBarStacked, ListRestart, ChartNoAxesGantt,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -22,7 +26,7 @@ const fmtDb = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)} dB`;
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
 const fmtHz = (n: number) => `${n.toFixed(2)} Hz`;
 
-function Row({ label, value, children }: { label: string; value?: string; children: React.ReactNode }) {
+function Row({ label, value, children }: { label: React.ReactNode; value?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -149,6 +153,10 @@ export function SoundPanel({ open, onOpenChange }: Props) {
             </Row>
           </Section>
 
+          <Section title="Arpeggio" defaultOpen={false}>
+            <ArpControls />
+          </Section>
+
           <Section title="3-band EQ" defaultOpen={false}>
             <Row label="Low" value={fmtDb(s.eq.low)}>
               <Slider min={-24} max={12} step={0.5} value={[s.eq.low]} onValueChange={([v]) => s.setEQ({ low: v })} />
@@ -230,6 +238,112 @@ export function SoundPanel({ open, onOpenChange }: Props) {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+const PATTERN_OPTIONS: { value: ArpPattern; label: string; Icon: typeof IndentIncrease }[] = [
+  { value: "all",     label: "All",                Icon: IndentIncrease },
+  { value: "asc",     label: "Ascending",          Icon: MoveUpRight },
+  { value: "desc",    label: "Descending",         Icon: MoveDownRight },
+  { value: "ascDesc", label: "Asc then Desc",      Icon: TrendingUp },
+  { value: "descAsc", label: "Desc then Asc",      Icon: TrendingDown },
+  { value: "random",  label: "Random",             Icon: Dices },
+];
+
+const REPEAT_OPTIONS: ArpRepeat[] = ["1", "1/2", "1/4", "1/8", "1/16"];
+const BASS_REPEAT_OPTIONS: BassRepeat[] = ["1", "1/2", "1/4", "1/8"];
+
+const BASS_OPTIONS: { value: BassMode; label: string; Icon: typeof Circle }[] = [
+  { value: "off",     label: "Off",        Icon: Circle },
+  { value: "bass",    label: "Bass",       Icon: ListEnd },
+  { value: "bassArp", label: "Bass + Arp", Icon: ChartBarStacked },
+];
+
+function IconRow<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string; Icon: typeof Circle }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="grid grid-flow-col auto-cols-fr gap-1">
+      {options.map(({ value: v, label, Icon }) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          aria-label={label}
+          title={label}
+          className={cn(
+            "inline-flex items-center justify-center h-9 rounded-md border border-border bg-background text-foreground transition-colors",
+            value === v ? "ring-2 ring-primary bg-accent" : "hover:bg-accent",
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TextRow<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: T[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="grid grid-flow-col auto-cols-fr gap-1">
+      {options.map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          className={cn(
+            "inline-flex items-center justify-center h-9 rounded-md border border-border bg-background text-foreground font-mono-chord text-xs transition-colors tabular-nums",
+            value === v ? "ring-2 ring-primary bg-accent" : "hover:bg-accent",
+          )}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ArpControls() {
+  const arp = useSoundStore((s) => s.arp);
+  const setArp = useSoundStore((s) => s.setArp);
+  const showBassRepeat = arp.bassMode !== "off";
+  return (
+    <div className="space-y-3">
+      <Row label={<><IndentIncrease className="inline h-3 w-3 mr-1" />Pattern</>}>
+        <IconRow options={PATTERN_OPTIONS} value={arp.pattern} onChange={(v) => setArp({ pattern: v })} />
+      </Row>
+      <Row label={<><AudioLines className="inline h-3 w-3 mr-1" />Pattern Repeat</>}>
+        <TextRow options={REPEAT_OPTIONS} value={arp.repeat} onChange={(v) => setArp({ repeat: v })} />
+      </Row>
+      <Row label={<><ListEnd className="inline h-3 w-3 mr-1" />Bass Note</>}>
+        <IconRow options={BASS_OPTIONS} value={arp.bassMode} onChange={(v) => setArp({ bassMode: v })} />
+      </Row>
+      {showBassRepeat && (
+        <Row label={<><ListRestart className="inline h-3 w-3 mr-1" />Bass Repeat</>}>
+          <TextRow options={BASS_REPEAT_OPTIONS} value={arp.bassRepeat} onChange={(v) => setArp({ bassRepeat: v })} />
+        </Row>
+      )}
+      <Row
+        label={<><ChartNoAxesGantt className="inline h-3 w-3 mr-1" />Swing</>}
+        value={`${Math.round(arp.swing * 100)}%`}
+      >
+        <Slider min={0.5} max={0.75} step={0.005} value={[arp.swing]} onValueChange={([v]) => setArp({ swing: v })} />
+      </Row>
+    </div>
   );
 }
 

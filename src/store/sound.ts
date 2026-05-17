@@ -70,6 +70,28 @@ export interface FX {
   chorusDepth: number;   // 0 - 1
 }
 
+export type ArpPattern = "all" | "asc" | "desc" | "ascDesc" | "descAsc" | "random";
+export type ArpRepeat  = "1" | "1/2" | "1/4" | "1/8" | "1/16";
+export type BassMode   = "off" | "bass" | "bassArp";
+export type BassRepeat = "1" | "1/2" | "1/4" | "1/8";
+
+export interface ArpSettings {
+  pattern: ArpPattern;
+  repeat: ArpRepeat;
+  bassMode: BassMode;
+  bassRepeat: BassRepeat;
+  /** 0.5 = straight, 0.75 = full dotted-8th + 16th swing (DAW convention). */
+  swing: number;
+}
+
+export const DEFAULT_ARP: ArpSettings = {
+  pattern: "all",
+  repeat: "1/4",
+  bassMode: "off",
+  bassRepeat: "1",
+  swing: 0.5,
+};
+
 export interface SoundSettings {
   preset: SoundPreset;
   volume: number;     // dB, -40 to 6
@@ -78,6 +100,7 @@ export interface SoundSettings {
   adsr: ADSR;
   eq: EQ3;
   fx: FX;
+  arp: ArpSettings;
 }
 
 export const PRESET_DEFAULTS: Record<SoundPreset, ADSR> = {
@@ -102,6 +125,7 @@ export const DEFAULT_SOUND: SoundSettings = {
     delayFeedback: 0.25, reverbWet: 0.18, reverbDecay: 2.2,
     chorusWet: 0, chorusRate: 0.8, chorusDepth: 0.4,
   },
+  arp: { ...DEFAULT_ARP },
 };
 
 interface SoundState extends SoundSettings {
@@ -113,6 +137,7 @@ interface SoundState extends SoundSettings {
   setFX: (patch: Partial<FX>) => void;
   setVolume: (v: number) => void;
   setBpmRamp: (b: boolean) => void;
+  setArp: (patch: Partial<ArpSettings>) => void;
   reset: () => void;
   loadFrom: (s: Partial<SoundSettings> | undefined) => void;
   toJSON: () => SoundSettings;
@@ -132,6 +157,7 @@ export const useSoundStore = create<SoundState>((set, get) => ({
   setFX: (patch) => set((s) => ({ fx: { ...s.fx, ...patch } })),
   setVolume: (v) => set({ volume: v }),
   setBpmRamp: (b) => set({ bpmRamp: b }),
+  setArp: (patch) => set((s) => ({ arp: { ...s.arp, ...patch } })),
   reset: () => set({ ...DEFAULT_SOUND }),
   loadFrom: (data) => {
     if (!data) return;
@@ -149,10 +175,11 @@ export const useSoundStore = create<SoundState>((set, get) => ({
       adsr: { ...PRESET_DEFAULTS[preset], ...(data.adsr ?? {}) },
       eq: { ...DEFAULT_SOUND.eq, ...(data.eq ?? {}) },
       fx: { ...DEFAULT_SOUND.fx, ...(data.fx ?? {}) },
+      arp: { ...DEFAULT_ARP, ...(data.arp ?? {}) },
     });
   },
   toJSON: () => {
-    const { preset, volume, timbre, bpmRamp, adsr, eq, fx } = get();
-    return { preset, volume, timbre, bpmRamp, adsr, eq, fx };
+    const { preset, volume, timbre, bpmRamp, adsr, eq, fx, arp } = get();
+    return { preset, volume, timbre, bpmRamp, adsr, eq, fx, arp };
   },
 }));
