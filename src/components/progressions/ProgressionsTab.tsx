@@ -11,6 +11,7 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -807,6 +808,7 @@ function SectionGroup({
   const updateSection = useSongStore((s) => s.updateSection);
   const duplicateSection = useSongStore((s) => s.duplicateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
+  const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
@@ -940,6 +942,15 @@ function SectionGroup({
                 <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
                   <Copy className="h-4 w-4" /> Duplicate
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-sm">Arpeggiator</span>
+                  <Switch
+                    checked={section?.arpArmed !== false}
+                    onCheckedChange={(b) => setSectionArpArmed(sectionId, b)}
+                    aria-label="Toggle arpeggiator for this section"
+                  />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"

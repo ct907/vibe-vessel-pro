@@ -4,7 +4,6 @@ import { useSongStore } from "@/store/song";
 import { downloadProjectJSON, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -26,15 +25,13 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, ScheduledChord } from "@/lib/music/audio";
 import { getAudioContext } from "@/lib/audio/context";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { useTheme } from "@/hooks/use-theme";
 import { useMetronomeStore } from "@/store/metronome";
-import { startMetronome, stopMetronome, updateMetronome, previewClick } from "@/lib/audio/metronome";
+import { startMetronome, stopMetronome, updateMetronome } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
 import { useAppTintStore } from "@/store/appTint";
@@ -138,6 +135,7 @@ function buildPlayback(
           chord: sc.chord,
           startBeat: cursorBeat + localOffset + pp.startBeat,
           lengthBeats: pp.lengthBeats,
+          sectionId: sec.id,
         });
         meta.push({
           patternId: pp.patternId,
@@ -151,7 +149,7 @@ function buildPlayback(
       for (const p of sectionPatterns) {
         const localOffset = patternOffset.get(p.id) ?? 0;
         for (const pc of [...p.chords].sort((a, b) => a.startBeat - b.startBeat)) {
-          events.push({ chord: pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats });
+          events.push({ chord: pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats, sectionId: sec.id });
           meta.push({ patternId: p.id, patternChordId: pc.id, mirrorId: pc.mirrorId });
         }
       }
@@ -173,7 +171,7 @@ function buildPlayback(
         const src = events[(i + k) % events.length];
         const rawStart = src.startBeat - offset;
         const wrapped = rawStart < 0 ? rawStart + cursorBeat : rawStart;
-        return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats };
+        return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats, sectionId: src.sectionId };
       });
       outMeta = outEvents.map((_, k) => meta[(i + k) % meta.length]);
     }
@@ -303,10 +301,6 @@ interface Props {
 export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props) {
   const {
     meta,
-    setKey,
-    setBpm,
-    setTimeSignature,
-    transposeSong,
     progression,
     sections,
     suppressCrossTabDeleteWarning,
@@ -332,10 +326,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const [soundOpen, setSoundOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmNewSong, setConfirmNewSong] = useState(false);
-  const [bpmDraft, setBpmDraft] = useState<string>(String(meta.bpm));
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const [transposeOffset, setTransposeOffset] = useState(0);
   const metronome = useMetronomeStore();
   const appTint = useAppTintStore();
   const appBg = useAppBackgroundStore();
@@ -355,22 +347,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   useEffect(() => {
     updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
   }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
-
-  // Keep BPM input in sync if the store value changes externally (load, reset).
-  useEffect(() => {
-    setBpmDraft(String(meta.bpm));
-  }, [meta.bpm]);
-
-  const commitBpm = () => {
-    const n = parseInt(bpmDraft, 10);
-    if (Number.isNaN(n)) {
-      setBpmDraft(String(meta.bpm));
-      return;
-    }
-    const clamped = Math.max(40, Math.min(220, n));
-    setBpm(clamped);
-    setBpmDraft(String(clamped));
-  };
 
   const handlePlay = async () => {
     stopRequestedRef.current = false;
@@ -463,19 +439,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     try {
       await loadProjectFromFile(file);
       toast({ title: "Project loaded", description: file.name });
-      setTransposeOffset(0);
     } catch {
       toast({ title: "Could not load file", description: "Make sure it's a valid song.json" });
     }
     setFileInputKey((k) => k + 1);
   };
-
-  const stepTranspose = (delta: -1 | 1) => {
-    transposeSong(delta);
-    setTransposeOffset((n) => n + delta);
-  };
-
-  const fmtOffset = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -647,123 +615,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                 >
                   <Music2 className="h-4 w-4" /> Sound
                 </Button>
-              </div>
-
-              {/* Song Settings */}
-              <div className="mt-6">
-                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Song Settings</h3>
-                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Key</span>
-                    <div className="flex items-center gap-1">
-                      <Select value={meta.keyRoot} onValueChange={(v) => setKey(v, meta.keyMode)}>
-                        <SelectTrigger className="h-9 w-auto min-w-0 px-2 gap-1 font-mono-chord">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ALL_ROOTS.map((r) => (
-                            <SelectItem key={r} value={r} className="font-mono-chord">{r}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
-                        <SelectTrigger className="h-9 w-[130px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
-                            <SelectItem key={m} value={m}>{MODE_LABEL[m]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Metronome</span>
-                      <Switch
-                        checked={metronome.enabled}
-                        onCheckedChange={(b) => {
-                          metronome.setEnabled(b);
-                          if (b && !isPlaying) previewClick(metronome.volume);
-                        }}
-                        aria-label="Toggle metronome"
-                      />
-                    </div>
-                    {metronome.enabled && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wide text-[var(--paper-card)]">Vol</span>
-                        <Slider
-                          value={[Math.round(metronome.volume * 100)]}
-                          min={0}
-                          max={100}
-                          step={1}
-                          onValueChange={(v) => metronome.setVolume((v[0] ?? 0) / 100)}
-                          className="flex-1"
-                        />
-                        <span className="text-[10px] tabular-nums w-8 text-right text-[var(--paper-card)]">
-                          {Math.round(metronome.volume * 100)}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">BPM</span>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={bpmDraft}
-                      onChange={(e) => setBpmDraft(e.target.value.replace(/[^\d]/g, ""))}
-                      onBlur={commitBpm}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          commitBpm();
-                          (e.target as HTMLInputElement).blur();
-                        }
-                      }}
-                      className="h-9 w-20 px-2 text-center font-mono-chord"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Time Signature</span>
-                    <Select
-                      value={`${meta.beatsPerBar}/${meta.beatUnit}`}
-                      onValueChange={(v) => {
-                        const [n, d] = v.split("/").map((x) => parseInt(x, 10));
-                        if (Number.isFinite(n) && Number.isFinite(d)) setTimeSignature(n, d);
-                      }}
-                    >
-                      <SelectTrigger className="h-9 w-[110px] font-mono-chord">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["2/4", "3/4", "4/4", "5/4", "6/4", "6/8", "7/8", "9/8", "12/8"].map((ts) => (
-                          <SelectItem key={ts} value={ts} className="font-mono-chord">{ts}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wide text-[var(--paper-card)]">Transpose</span>
-                    <div className="flex items-center gap-1">
-                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(-1)} aria-label="Transpose down semitone">
-                        <span aria-hidden className="text-base leading-none">−</span>
-                      </Button>
-                      <span className="font-mono-chord text-xs px-1.5 tabular-nums whitespace-nowrap min-w-[2.5rem] text-center text-[var(--paper-card)]">
-                        {fmtOffset(transposeOffset)}
-                      </span>
-                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => stepTranspose(1)} aria-label="Transpose up semitone">
-                        <span aria-hidden className="text-base leading-none">+</span>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Backgrounds */}
@@ -944,7 +795,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
               resetSong();
-              setTransposeOffset(0);
               setConfirmNewSong(false);
               toast({ title: "New song started" });
             }}

@@ -50,6 +50,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus,
   Trash2,
@@ -619,6 +620,7 @@ function SectionCard({
     basket,
     setSectionComment,
     setSectionColor,
+    setSectionArpArmed,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
   } = useSongStore();
@@ -837,6 +839,15 @@ function SectionCard({
                 <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                   <Copy className="h-4 w-4" /> Duplicate
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-sm">Arpeggiator</span>
+                  <Switch
+                    checked={section.arpArmed !== false}
+                    onCheckedChange={(b) => setSectionArpArmed(section.id, b)}
+                    aria-label="Toggle arpeggiator for this section"
+                  />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
