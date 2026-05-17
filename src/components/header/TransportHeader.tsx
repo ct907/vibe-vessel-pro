@@ -426,8 +426,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     const onReq = () => {
       handlePlay();
     };
+    const onStop = () => {
+      handleStop();
+    };
     window.addEventListener("lovable:request-play", onReq);
-    return () => window.removeEventListener("lovable:request-play", onReq);
+    window.addEventListener("lovable:request-stop", onStop);
+    return () => {
+      window.removeEventListener("lovable:request-play", onReq);
+      window.removeEventListener("lovable:request-stop", onStop);
+    };
     // handlePlay is recreated on every render but reads startFromChordId
     // via getState(), so we only need to re-bind when the SSOT inputs
     // (sections, progression, bpm) change.
