@@ -454,7 +454,7 @@ function LineRow({
       })()}
 
       {/* LYRIC INPUT */}
-      <div className="relative flex items-center rounded-sm bg-[var(--paper-card)]">
+      <div className="relative flex items-center rounded-sm">
         {isFocused && (
           <button
             onMouseDown={(e) => e.preventDefault()}

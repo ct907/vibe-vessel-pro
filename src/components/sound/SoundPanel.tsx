@@ -9,8 +9,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useSoundStore, SOUND_PRESETS, PRESET_BY_VALUE, type SoundPreset, type ArpPattern, type ArpRepeat, type BassMode, type BassRepeat } from "@/store/sound";
 import { ensureAudio, playChord } from "@/lib/music/audio";
 import { parseChord } from "@/lib/music/chords";
+import { usePlaybackStore } from "@/store/playback";
 import {
-  Music2, RotateCcw, Play, ChevronDown,
+  Music2, RotateCcw, Play, Square, ChevronDown,
   ListIndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
   LineStyle, Circle, ListEnd, ChartBarStacked, ListRestart, ChartNoAxesGantt,
 } from "lucide-react";
@@ -75,6 +76,7 @@ function Section({
 export function SoundPanel({ open, onOpenChange }: Props) {
   const s = useSoundStore();
   const presetDef = PRESET_BY_VALUE[s.preset];
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const preview = async () => {
     await ensureAudio();
@@ -82,12 +84,26 @@ export function SoundPanel({ open, onOpenChange }: Props) {
     if (c) void playChord(c, 1.6);
   };
 
+  const togglePlay = () => {
+    window.dispatchEvent(new CustomEvent(isPlaying ? "lovable:request-stop" : "lovable:request-play"));
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Music2 className="h-4 w-4" /> Sound
+            <Music2 className="h-[1em] w-[1em]" />
+            <span>Sound</span>
+            <Button
+              size="icon"
+              variant="outline"
+              className="ml-1 h-8 w-8"
+              onClick={togglePlay}
+              aria-label={isPlaying ? "Stop" : "Play"}
+            >
+              {isPlaying ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </Button>
           </SheetTitle>
         </SheetHeader>
 
