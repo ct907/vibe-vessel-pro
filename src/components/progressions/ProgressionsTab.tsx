@@ -1144,6 +1144,38 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     });
   }, []);
 
+  const sortAnimatingRef = useRef(false);
+
+  const handleAnimatedMoveSection = useCallback((id: string, direction: -1 | 1) => {
+    if (sortAnimatingRef.current) return;
+    const el = document.querySelector<HTMLElement>(`[data-section-id="${id}"]`);
+    if (!el) { moveSection(id, direction); return; }
+    const parent = el.parentElement;
+    if (!parent) { moveSection(id, direction); return; }
+    const siblings = Array.from(parent.children) as HTMLElement[];
+    const idx = siblings.indexOf(el);
+    const neighborIdx = idx + direction;
+    if (neighborIdx < 0 || neighborIdx >= siblings.length) { moveSection(id, direction); return; }
+    const neighbor = siblings[neighborIdx];
+    const r1 = el.getBoundingClientRect();
+    const r2 = neighbor.getBoundingClientRect();
+    const elDelta = r2.top - r1.top;
+    const neighborDelta = r1.top - r2.top;
+    sortAnimatingRef.current = true;
+    el.style.transition = "transform 400ms cubic-bezier(0.4,0,0.2,1)";
+    neighbor.style.transition = "transform 400ms cubic-bezier(0.4,0,0.2,1)";
+    el.style.transform = `translateY(${elDelta}px)`;
+    neighbor.style.transform = `translateY(${neighborDelta}px)`;
+    setTimeout(() => {
+      el.style.transition = "";
+      el.style.transform = "";
+      neighbor.style.transition = "";
+      neighbor.style.transform = "";
+      sortAnimatingRef.current = false;
+      moveSection(id, direction);
+    }, 400);
+  }, [moveSection]);
+
   const MULTI_LENGTH_STEP = 0.5;
 
   const handleMultiResize = useCallback((delta: number) => {
@@ -1342,7 +1374,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onRequestDeleteBlock={requestDeleteBlock}
           onEditChordOpen={openChordEditor}
           sortMode={sortMode}
-          onMoveSection={(id, direction) => moveSection(id, direction)}
+          onMoveSection={handleAnimatedMoveSection}
           activeChordId={activeChordId}
           onSetActiveChordId={setActiveChordId}
           multiSelected={multiSelected}
