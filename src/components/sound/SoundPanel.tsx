@@ -11,8 +11,8 @@ import { ensureAudio, playChord } from "@/lib/music/audio";
 import { parseChord } from "@/lib/music/chords";
 import {
   Music2, RotateCcw, Play, ChevronDown,
-  IndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
-  AudioLines, Circle, ListEnd, ChartBarStacked, ListRestart, ChartNoAxesGantt,
+  ListIndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
+  LineStyle, Circle, ListEnd, ChartBarStacked, ListRestart, ChartNoAxesGantt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -241,8 +241,8 @@ export function SoundPanel({ open, onOpenChange }: Props) {
   );
 }
 
-const PATTERN_OPTIONS: { value: ArpPattern; label: string; Icon: typeof IndentIncrease }[] = [
-  { value: "all",     label: "All",                Icon: IndentIncrease },
+const PATTERN_OPTIONS: { value: ArpPattern; label: string; Icon: typeof ListIndentIncrease }[] = [
+  { value: "all",     label: "All",                Icon: ListIndentIncrease },
   { value: "asc",     label: "Ascending",          Icon: MoveUpRight },
   { value: "desc",    label: "Descending",         Icon: MoveDownRight },
   { value: "ascDesc", label: "Asc then Desc",      Icon: TrendingUp },
@@ -323,10 +323,10 @@ function ArpControls() {
   const showBassRepeat = arp.bassMode !== "off";
   return (
     <div className="space-y-3">
-      <Row label={<><IndentIncrease className="inline h-3 w-3 mr-1" />Pattern</>}>
+      <Row label={<><ListIndentIncrease className="inline h-3 w-3 mr-1" />Pattern</>}>
         <IconRow options={PATTERN_OPTIONS} value={arp.pattern} onChange={(v) => setArp({ pattern: v })} />
       </Row>
-      <Row label={<><AudioLines className="inline h-3 w-3 mr-1" />Pattern Repeat</>}>
+      <Row label={<><LineStyle className="inline h-3 w-3 mr-1" />Pattern Repeat</>}>
         <TextRow options={REPEAT_OPTIONS} value={arp.repeat} onChange={(v) => setArp({ repeat: v })} />
       </Row>
       <Row label={<><ListEnd className="inline h-3 w-3 mr-1" />Bass Note</>}>
