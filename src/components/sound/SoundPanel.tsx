@@ -266,8 +266,8 @@ const PATTERN_OPTIONS: { value: ArpPattern; label: string; Icon: typeof ListInde
   { value: "random",  label: "Random",             Icon: Dices },
 ];
 
-const REPEAT_OPTIONS: ArpRepeat[] = ["1", "1/2", "1/4", "1/8", "1/16"];
-const BASS_REPEAT_OPTIONS: BassRepeat[] = ["1", "1/2", "1/4", "1/8"];
+const REPEAT_OPTIONS: ArpRepeat[] = ["1", "1/2", "1/4", "1/8", "1/16", "1/32"];
+const BASS_REPEAT_OPTIONS: BassRepeat[] = ["1", "1/2", "1/4", "1/8", "1/16"];
 
 const BASS_OPTIONS: { value: BassMode; label: string; Icon: typeof Circle }[] = [
   { value: "off",     label: "Off",        Icon: Circle },

@@ -314,7 +314,7 @@ export function FocusedChordEditor(props: Props) {
                     }}
                   >
                     {c && (
-                      <span className="font-mono-chord text-[11px] font-semibold truncate" style={{ color: "var(--chord-text, oklch(0.25 0.02 260))" }}>
+                      <span className="font-mono-chord text-[11px] font-semibold truncate" style={{ color: "var(--ink)" }}>
                         {c.chord.display}
                       </span>
                     )}
