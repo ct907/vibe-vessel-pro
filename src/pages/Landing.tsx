@@ -169,11 +169,11 @@ export default function Landing() {
           </span>
         </div>
 
-        <p className="mt-6 text-xl font-bold text-foreground/80">
+        <p className="mt-6 text-lg font-bold text-foreground/80">
           The songwriter's notebook. Free to use. Use offline.
         </p>
 
-        <p className="mt-3 text-lg text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
+        <p className="mt-3 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
           <span>Write</span>
           <TaglineChip label="Lyrics." style={LYRICS_STYLE} />
           <span>Find</span>

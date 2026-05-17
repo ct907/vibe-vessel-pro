@@ -856,6 +856,7 @@ function SectionCard({
                     else setConfirmDeleteSection(true);
                   }}
                   disabled={total <= 1}
+                  title={total <= 1 ? "Cannot delete the last section" : undefined}
                 >
                   <Trash2 className="h-4 w-4" /> Delete section
                 </DropdownMenuItem>
