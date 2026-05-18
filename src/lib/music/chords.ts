@@ -445,6 +445,7 @@ export function transposeChord(chord: ChordSymbol, semitones: number): ChordSymb
     quality: chord.quality,
     bass: newBass,
     display: newRoot + QUALITY_PRETTY[chord.quality] + (newBass ? `/${newBass}` : ""),
+    octave: chord.octave,
   };
 }
 
