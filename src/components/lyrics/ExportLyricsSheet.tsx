@@ -12,7 +12,8 @@ interface ExportLyricsSheetProps {
 
 export function ExportLyricsSheet({ open, onOpenChange }: ExportLyricsSheetProps) {
   const sections = useSongStore((s) => s.sections);
-  const text = useMemo(() => (open ? exportLyricsAsText(sections) : ""), [open, sections]);
+  const meta = useSongStore((s) => s.meta);
+  const text = useMemo(() => (open ? exportLyricsAsText(sections, meta) : ""), [open, sections, meta]);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {

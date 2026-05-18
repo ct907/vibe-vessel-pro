@@ -4,6 +4,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot, parseNashvilleInput } from "@/lib/music/chords";
+import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { useSongStore } from "@/store/song";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -18,6 +19,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   initialChord?: ChordSymbol;
   onPick: (chord: ChordSymbol) => void;
+  /**
+   * Section id whose effective key (per running key-change inheritance) governs
+   * Nashville-number resolution. Falls back to the song's root key if omitted.
+   */
+  sectionId?: string;
   /** Active chord row's line id — used so ArrowUp/Down can refocus it. */
   activeLineId?: string;
   /** Active slot index — changes trigger input refocus to keep typing fast. */
@@ -29,7 +35,7 @@ interface Props {
   onOctaveChange?: (octave: number) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -104,11 +110,16 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   }, [open, onOpenChange]);
 
   const meta = useSongStore((s) => s.meta);
+  const sections = useSongStore((s) => s.sections);
+  const effective = useMemo(
+    () => (sectionId ? effectiveKeyAt(sections, sectionId, meta) : { root: meta.keyRoot, mode: meta.keyMode, offset: 0 }),
+    [sections, sectionId, meta],
+  );
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
-    () => parseNashvilleInput(query.trim(), meta.keyRoot, meta.keyMode),
-    [query, meta.keyRoot, meta.keyMode],
+    () => parseNashvilleInput(query.trim(), effective.root, effective.mode),
+    [query, effective.root, effective.mode],
   );
 
   // Picking a chord no longer auto-closes the sheet — user can keep adding chords.

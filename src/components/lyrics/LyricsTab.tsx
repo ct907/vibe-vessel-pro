@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Droppable,
   type DropResult,
@@ -68,10 +68,13 @@ import {
   Pencil,
   WholeWord,
   Music2,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
+import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
@@ -629,10 +632,15 @@ function SectionCard({
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section.label);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
+  const allSections = useSongStore((s) => s.sections);
+  const effectiveOffsets = useMemo(() => computeEffectiveOffsets(allSections), [allSections]);
+  const effectiveOffset = effectiveOffsets[index] ?? 0;
+  const isFirstSection = index === 0;
 
   useEffect(() => {
     setDraftLabel(section.label);
@@ -752,6 +760,16 @@ function SectionCard({
           </Button>
         )}
 
+        {!sortMode && !isFirstSection && (
+          <KeyChangeSticker
+            sectionId={section.id}
+            effectiveOffset={effectiveOffset}
+            explicitOffset={section.keyChangeRootOffset}
+            startInEditMode={pendingKeyChange}
+            onCancelInitial={() => setPendingKeyChange(false)}
+          />
+        )}
+
         {sortMode ? (
           <div className="ml-auto flex items-center gap-1">
             <Button
@@ -839,6 +857,15 @@ function SectionCard({
                 <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
                   <Copy className="h-4 w-4" /> Duplicate
                 </DropdownMenuItem>
+                {effectiveOffset === 0 && (
+                  <DropdownMenuItem
+                    onClick={() => setPendingKeyChange(true)}
+                    disabled={isFirstSection}
+                    title={isFirstSection ? "Key changes start from the second section" : undefined}
+                  >
+                    <KeyRound className="h-4 w-4" /> Add Key Change
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <div className="flex items-center justify-between px-2 py-1.5">
                   <span className="text-sm">Arpeggiator</span>
@@ -1456,6 +1483,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           }}
           initialChord={initialChord}
           onPick={handlePick}
+          sectionId={picker?.sectionId}
           activeLineId={picker?.lineId}
           activeSlotIndex={picker?.slotIndex}
           query={pickerQuery}
