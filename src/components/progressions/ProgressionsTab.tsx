@@ -133,11 +133,9 @@ function PatternBlock({
     updatePatternChord,
     bulkSetChordOctave,
   } = useSongStore();
-  const focusedPatternId = usePlaybackStore((s) => s.focusedPatternId);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
-  const isFocused = focusedPatternId === pattern.id;
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
 
   const blockRef = useRef<HTMLDivElement>(null);
@@ -204,7 +202,7 @@ function PatternBlock({
   resizePatternChordsWithOverflowRef.current = resizePatternChordsWithOverflow;
 
   // Keyboard: while a chord in this block is active and no cross-block selection is active,
-  // ← / → reorders; ↑ / ↓ changes bar length; Esc closes the context menu.
+  // ← / → reorders; ↑ / ↓ changes bar length; Esc closes the context menu; Delete removes it.
   useEffect(() => {
     if (!activeChordInThisBlock) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -213,6 +211,8 @@ function PatternBlock({
       if (!activeChordInThisBlockRef.current) return;
       const id = activeChordIdRef.current;
       if (!id) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "Escape") {
         e.preventDefault();
         onSetActiveChordId(null);
@@ -236,34 +236,31 @@ function PatternBlock({
           id,
           Math.max(MIN_LEN, chord.lengthBeats - LENGTH_STEP),
         );
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        removePatternChordsBatch(pattern.id, [id]);
+        onSetActiveChordId(null);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeChordInThisBlock?.id, pattern.id, multiSelected.size]);
+  }, [activeChordInThisBlock?.id, pattern.id, multiSelected.size, removePatternChordsBatch, onSetActiveChordId]);
 
   return (
     <div
       ref={blockRef}
       data-pattern-block={pattern.id}
-      className={cn(
-        "rounded-lg p-3 transition-shadow",
-        isFocused ? "ring-2" : "",
-      )}
+      className="rounded-lg p-3 transition-shadow"
       style={{
         background: "var(--paper-card)",
-        boxShadow: isFocused
-          ? "var(--shadow-sculpt-cream-rest), 0 0 0 2px var(--primary-strong)"
-          : "0 3px 7px -8px color-mix(in oklch, var(--paper-shade) 80%, transparent), 0 1px 2px -2px color-mix(in oklch, var(--paper-shade) 65%, transparent)",
+        boxShadow:
+          "0 3px 7px -8px color-mix(in oklch, var(--paper-shade) 80%, transparent), 0 1px 2px -2px color-mix(in oklch, var(--paper-shade) 65%, transparent)",
       }}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
           Block {blockIndex + 1}
         </span>
-        {isFocused && (
-          <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">▸ play start</span>
-        )}
         <span className="text-xs text-muted-foreground">·</span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           Bars
@@ -1230,11 +1227,27 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   useEffect(() => {
     if (multiSelected.size === 0) return;
     const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "ArrowLeft") { e.preventDefault(); handleMultiShiftRef.current(-1); }
       else if (e.key === "ArrowRight") { e.preventDefault(); handleMultiShiftRef.current(1); }
       else if (e.key === "ArrowUp") { e.preventDefault(); handleMultiResizeRef.current(MULTI_LENGTH_STEP); }
       else if (e.key === "ArrowDown") { e.preventDefault(); handleMultiResizeRef.current(-MULTI_LENGTH_STEP); }
       else if (e.key === "Escape") { setMultiSelected(new Map()); }
+      else if (e.key === "Delete") {
+        e.preventDefault();
+        const byPattern = new Map<string, string[]>();
+        for (const [chordId, patternId] of multiSelectedRef.current) {
+          const arr = byPattern.get(patternId) ?? [];
+          arr.push(chordId);
+          byPattern.set(patternId, arr);
+        }
+        const removeBatch = useSongStore.getState().removePatternChordsBatch;
+        for (const [patId, ids] of byPattern) {
+          removeBatch(patId, ids);
+        }
+        setMultiSelected(new Map());
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
