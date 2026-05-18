@@ -204,6 +204,11 @@ export function chordToMidi(chord: ChordSymbol, octave = 4): number[] {
   const intervals = QUALITY_INTERVALS[chord.quality];
   const base = 12 * (octave + 1) + rootPc; // MIDI C4 = 60
   const notes = intervals.map((i) => base + i);
+  let padIdx = 0;
+  while (notes.length < 4) {
+    notes.push(notes[padIdx] + 12);
+    padIdx++;
+  }
   if (chord.bass) {
     // Slash-chord inverted bass: always exactly one octave below the chord root.
     const bassPc = rootToPc(chord.bass);
