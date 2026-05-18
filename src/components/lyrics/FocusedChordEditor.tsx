@@ -531,7 +531,12 @@ export function FocusedChordEditor(props: Props) {
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
           {nashvilleChords && nashvilleChords.length > 0 && (
-            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg mb-3" style={{ background: "var(--paper-shade)" }}>
+            <button
+              type="button"
+              onClick={() => handlePickNashville(nashvilleChords)}
+              className="w-full flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg mb-3 hover:brightness-95 active:scale-[0.99] transition-all text-left"
+              style={{ background: "var(--paper-shade)" }}
+            >
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
               {nashvilleChords.map((c, i) => (
                 <span
@@ -543,7 +548,7 @@ export function FocusedChordEditor(props: Props) {
                 </span>
               ))}
               <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
-            </div>
+            </button>
           )}
           {!query.trim() && (
             <p className="text-sm text-muted-foreground mb-3">
