@@ -387,12 +387,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     const startAt = getAudioContext().currentTime + 0.04;
+    const attack = Math.max(0, useSoundStore.getState().adsr.attack);
     if (metronome.enabled) {
       startMetronome({
         bpm: meta.bpm,
         beatsPerBar: meta.beatsPerBar,
         volume: metronome.volume,
-        startAt,
+        startAt: startAt + attack,
       });
     }
     await playProgression(built.events, meta.bpm, {

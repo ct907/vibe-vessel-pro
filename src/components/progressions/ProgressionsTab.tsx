@@ -1483,13 +1483,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           Add Section
         </span>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {(["verse", "chorus", "bridge", "intro"] as const).map((t) => (
+          {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as const).map((t) => (
             <button
               key={t}
               onClick={() => addSection(t)}
               className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
             >
-              <Plus className="h-3.5 w-3.5" /> {t}
+              <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
             </button>
           ))}
           <button
