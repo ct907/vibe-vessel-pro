@@ -218,6 +218,8 @@ function swingDelay(stepIndex: number, stepSec: number, swing: number): number {
  * Schedule one chord event as an arp + optional bass.
  * Honors per-section disarm via `armed`. Returns true if arp path was used.
  */
+const TRIPLET_SUBDIVS = new Set<ArpRepeat>(["1/8", "1/16", "1/32"]);
+
 function spawnArpForEvent(
   chord: ChordSymbol,
   startAt: number,
@@ -225,6 +227,7 @@ function spawnArpForEvent(
   octave: number,
   arp: ArpSettings,
   beatSec: number,
+  triplet: boolean,
 ): void {
   const allMidi = chordToMidi(chord, octave);
   const hasSlashBass = !!chord.bass;
@@ -276,7 +279,8 @@ function spawnArpForEvent(
   const arpEnabled = arp.pattern !== "all";
   if (melody.length === 0) return;
 
-  const stepSec = ARP_STEP_BEATS[arp.repeat] * beatSec;
+  const tripletScale = triplet && TRIPLET_SUBDIVS.has(arp.repeat) ? 2 / 3 : 1;
+  const stepSec = ARP_STEP_BEATS[arp.repeat] * beatSec * tripletScale;
   const noteVel = Math.min(1, 1.4 / Math.sqrt(Math.max(1, melody.length)));
 
   if (!arpEnabled) {
@@ -430,6 +434,9 @@ function tick() {
     const ctx = getAudioContext();
     const beatSec = 60 / schedBpm;
     const horizon = ctx.currentTime + SCHEDULE_AHEAD_S;
+    const m = useSongStore.getState().meta;
+    const triplet = (m.beatsPerBar === 3 && m.beatUnit === 4)
+                 || (m.beatsPerBar === 6 && m.beatUnit === 8);
 
     while (schedNextIdx < schedEvents.length) {
       const ev = schedEvents[schedNextIdx];
@@ -442,7 +449,7 @@ function tick() {
       const armed = ev.sectionId ? sectionArpArmed(ev.sectionId) : true;
       const useArpPath = armed;
       if (useArpPath) {
-        spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec);
+        spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec, triplet);
       } else {
         spawnChord(ev.chord, safeStart, safeStart + durSec, octave);
       }
