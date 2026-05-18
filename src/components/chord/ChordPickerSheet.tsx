@@ -35,14 +35,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
-  const [octave, setOctave] = useState<number>(4);
+  const [octave, setOctave] = useState<number>(3);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     if (open) {
       if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
-      setOctave(initialChord?.octave ?? 4);
+      setOctave(initialChord?.octave ?? 3);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, initialChord, queryProp]);
@@ -121,7 +121,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, act
   };
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
-    chords.forEach((chord) => onPick({ ...chord, octave }));
+    [...chords].reverse().forEach((chord) => onPick({ ...chord, octave }));
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };

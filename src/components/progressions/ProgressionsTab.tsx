@@ -457,7 +457,7 @@ function PatternBlock({
                                       return;
                                     }
                                     setFocusedPattern(pattern.id);
-                                    void playChord(c.chord, undefined, c.chord.octave ?? 4);
+                                    void playChord(c.chord, undefined, c.chord.octave ?? 3);
                                     onSetActiveChordId(activeChordId === c.id ? null : c.id);
                                   }, 250);
                                 }}
@@ -465,7 +465,7 @@ function PatternBlock({
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    void playChord(c.chord, undefined, c.chord.octave ?? 4);
+                                    void playChord(c.chord, undefined, c.chord.octave ?? 3);
                                     onSetActiveChordId(c.id);
                                   }
                                 }}
@@ -716,10 +716,10 @@ function PatternBlock({
             {/* Octave picker */}
             <span className="text-xs text-muted-foreground select-none">Oct</span>
             <Select
-              value={String(activeChordInThisBlock.chord.octave ?? 4)}
+              value={String(activeChordInThisBlock.chord.octave ?? 3)}
               onValueChange={(v) => {
                 const oct = Number(v);
-                const ids = selectedIds.size > 0 ? Array.from(selectedIds) : [activeChordId!];
+                const ids = blockSelectedIds.size > 0 ? Array.from(blockSelectedIds) : [activeChordId!];
                 if (ids.length > 1) {
                   bulkSetChordOctave(pattern.id, ids, oct);
                 } else {
@@ -1452,7 +1452,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
       <ChordPickerSheet
         open={!!picker}
-        onOpenChange={(o) => !o && setPicker(null)}
+        onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); } }}
         onPick={handlePick}
         initialChord={(() => {
           if (!picker?.replaceChordId) return undefined;
@@ -1474,7 +1474,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           sectionId={chordEditor.sectionId}
           patternId={chordEditor.patternId}
           chordId={chordEditor.chordId}
-          onClose={() => setChordEditor(null)}
+          onClose={() => { setChordEditor(null); setMultiSelected(new Map()); }}
         />
       )}
 
@@ -1484,7 +1484,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           sectionId={patternAddSlot.sectionId}
           patternId={patternAddSlot.patternId}
           atBeat={patternAddSlot.atBeat}
-          onClose={() => setPatternAddSlot(null)}
+          onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); }}
         />
       )}
 
