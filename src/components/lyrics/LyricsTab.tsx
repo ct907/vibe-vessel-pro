@@ -916,7 +916,7 @@ function SectionCard({
       {/* Body */}
       {!section.collapsed && (
         <>
-          <div className="space-y-1 overflow-x-hidden">
+          <div className="space-y-1">
             {section.lines.map((line, i) => (
               <LineRow
                 key={line.id}

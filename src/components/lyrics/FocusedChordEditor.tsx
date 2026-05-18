@@ -193,6 +193,13 @@ export function FocusedChordEditor(props: Props) {
       return;
     }
     if (!line) return;
+    if (anchorId && chords[0]) {
+      upsertChordAt(props.sectionId, lyricsLineId, slot, { ...toStorage(chords[0]), octave }, anchorId);
+      setAnchorId(undefined);
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
+      return;
+    }
     // Pre-compute slot positions in forward order, then insert in reverse
     // so placeChordInSlot's prepend behavior results in correct SSOT order.
     const placements: { chord: ChordSymbol; s: number }[] = [];
@@ -562,7 +569,7 @@ export function FocusedChordEditor(props: Props) {
                   {c.display}
                 </span>
               ))}
-              <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">↩ {(isProgression || (!isProgressionAdd && !!anchorId)) ? "Confirm" : `Add ${nashvilleChords.length}`}</span>
             </button>
           )}
           {!query.trim() && (
