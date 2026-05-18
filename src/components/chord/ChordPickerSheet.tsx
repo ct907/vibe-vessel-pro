@@ -3,7 +3,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot, parseNashvilleInput } from "@/lib/music/chords";
+import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { useSongStore } from "@/store/song";
 import { getChordColorClasses } from "@/lib/music/chordColor";
@@ -56,10 +56,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
 
   useEffect(() => {
     if (open) {
-      if (queryProp === undefined) setQueryInner(initialChord?.display ?? "");
+      if (queryProp === undefined) setQueryInner(initialChord ? toSounding(initialChord).display : "");
       setOctave(initialChord?.octave ?? 3);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialChord, queryProp]);
 
   // When the user taps another slot in the chord row while the picker is
@@ -124,6 +125,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     () => (sectionId ? effectiveKeyAt(sections, sectionId, meta) : { root: meta.keyRoot, mode: meta.keyMode, offset: 0 }),
     [sections, sectionId, meta],
   );
+  const sectionOffset = effective.offset;
+  const toSounding = (c: ChordSymbol): ChordSymbol =>
+    sectionOffset ? { ...transposeChord(c, sectionOffset), octave: c.octave } : c;
+  const toStorage = (c: ChordSymbol): ChordSymbol =>
+    sectionOffset ? { ...transposeChord(c, -sectionOffset), octave: c.octave } : c;
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
@@ -135,13 +141,13 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   // Close manually via the X button. Pressing Enter or double-tapping a suggestion
   // simply commits the chord and clears the input for the next entry.
   const handlePick = (chord: ChordSymbol) => {
-    onPick({ ...chord, octave });
+    onPick({ ...toStorage(chord), octave });
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
-    const stamped = chords.map((c) => ({ ...c, octave }));
+    const stamped = chords.map((c) => ({ ...toStorage(c), octave }));
     if (onPickBatch) {
       onPickBatch(stamped);
     } else {

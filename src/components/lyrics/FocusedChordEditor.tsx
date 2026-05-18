@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput } from "@/lib/music/chords";
+import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -121,12 +121,12 @@ export function FocusedChordEditor(props: Props) {
     if (isProgressionAdd) {
       setQuery("");
     } else if (isProgression) {
-      setQuery(progChord?.chord.display ?? "");
+      setQuery(progChord ? toSounding(progChord.chord).display : "");
       setOctave(progChord?.chord.octave ?? 3);
     } else {
       const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
       const initialChord = lineChords.find((c) => c.id === lyricsInitialAnchorId)?.chord;
-      setQuery(initialChord?.display ?? "");
+      setQuery(initialChord ? toSounding(initialChord).display : "");
       setOctave(initialChord?.octave ?? 3);
     }
     setTimeout(() => inputRef.current?.focus(), 60);
@@ -167,6 +167,11 @@ export function FocusedChordEditor(props: Props) {
     () => effectiveKeyAt(sections, props.sectionId, meta),
     [sections, props.sectionId, meta],
   );
+  const sectionOffset = effective.offset;
+  const toSounding = (c: ChordSymbol): ChordSymbol =>
+    sectionOffset ? { ...transposeChord(c, sectionOffset), octave: c.octave } : c;
+  const toStorage = (c: ChordSymbol): ChordSymbol =>
+    sectionOffset ? { ...transposeChord(c, -sectionOffset), octave: c.octave } : c;
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
@@ -177,13 +182,13 @@ export function FocusedChordEditor(props: Props) {
   const handlePickNashville = (chords: ChordSymbol[]) => {
     if (isProgressionAdd) {
       chords.forEach((chord, i) =>
-        addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat + i),
+        addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, props.atBeat + i),
       );
       props.onClose();
       return;
     }
     if (isProgression) {
-      if (chords[0]) updatePatternChord(props.patternId, props.chordId, { chord: { ...chords[0], octave } });
+      if (chords[0]) updatePatternChord(props.patternId, props.chordId, { chord: { ...toStorage(chords[0]), octave } });
       props.onClose();
       return;
     }
@@ -197,7 +202,7 @@ export function FocusedChordEditor(props: Props) {
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
     }
     for (const { chord: ch, s } of [...placements].reverse()) {
-      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...ch, octave });
+      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
     }
     setSlot(cur);
     setQuery("");
@@ -205,7 +210,7 @@ export function FocusedChordEditor(props: Props) {
   };
 
   const handlePick = (chord: ChordSymbol) => {
-    const chordWithOctave = { ...chord, octave };
+    const chordWithOctave = { ...toStorage(chord), octave };
     if (isProgressionAdd) {
       addChordToPatternSlot(props.patternId, chordWithOctave, props.atBeat);
       props.onClose();
@@ -263,7 +268,7 @@ export function FocusedChordEditor(props: Props) {
   const headerEyebrow = isProgressionAdd
     ? `Add chord to ${sectionLabel}`
     : isProgression
-    ? `Editing chord · ${progChord!.chord.display}`
+    ? `Editing chord · ${toSounding(progChord!.chord).display}`
     : `Slot ${slot + 1} of ${CHORD_ROW_SLOTS} ${anchorId ? "· editing" : "· adding"}`;
   const headerTitle = isProgressionAdd
     ? "Add Chord"
@@ -355,7 +360,7 @@ export function FocusedChordEditor(props: Props) {
                   >
                     {c && (
                       <span className="font-mono-chord text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--ink)" }}>
-                        {c.chord.display}
+                        {toSounding(c.chord).display}
                       </span>
                     )}
                   </div>
@@ -381,7 +386,9 @@ export function FocusedChordEditor(props: Props) {
           </div>
         )}
 
-        {isProgression && progChord && (
+        {isProgression && progChord && (() => {
+          const sounding = toSounding(progChord.chord);
+          return (
           <div className="px-3 py-3 shrink-0" style={{ background: "var(--paper-shade)" }}>
             <p
               className="mb-1"
@@ -391,12 +398,13 @@ export function FocusedChordEditor(props: Props) {
             </p>
             <span
               className="noise-texture-chip inline-flex items-center rounded-md px-3 py-1.5 font-mono-chord font-semibold text-base"
-              style={{ ...getChordColorClasses(progChord.chord).style, border: "2px solid transparent" }}
+              style={{ ...getChordColorClasses(sounding).style, border: "2px solid transparent" }}
             >
-              {progChord.chord.display}
+              {sounding.display}
             </span>
           </div>
-        )}
+          );
+        })()}
 
         {/* Reorder controls — operate on the chord currently being edited. */}
         {!isProgressionAdd && (() => {
