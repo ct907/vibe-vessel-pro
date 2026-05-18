@@ -39,15 +39,19 @@ export function KeyChangeSticker({
       ? effectiveOffset
       : 1;
 
-  const [open, setOpen] = useState(startInEditMode);
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<number>(initialDraft);
   const anchorRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (startInEditMode) {
-      setOpen(true);
+    if (!startInEditMode) return;
+    // Delay opening so the DropdownMenu's pointer events fully settle before
+    // Radix registers outside-click listeners on this new Popover.
+    const id = setTimeout(() => {
       setDraft(initialDraft);
-    }
+      setOpen(true);
+    }, 120);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startInEditMode]);
 
