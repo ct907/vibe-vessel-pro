@@ -101,7 +101,7 @@ export function FocusedChordEditor(props: Props) {
   const [slot, setSlot] = useState(lyricsInitialSlot);
   const [anchorId, setAnchorId] = useState<string | undefined>(lyricsInitialAnchorId);
   const [query, setQuery] = useState("");
-  const [octave, setOctave] = useState(4);
+  const [octave, setOctave] = useState(3);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -121,12 +121,12 @@ export function FocusedChordEditor(props: Props) {
       setQuery("");
     } else if (isProgression) {
       setQuery(progChord?.chord.display ?? "");
-      setOctave(progChord?.chord.octave ?? 4);
+      setOctave(progChord?.chord.octave ?? 3);
     } else {
       const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
       const initialChord = lineChords.find((c) => c.id === lyricsInitialAnchorId)?.chord;
       setQuery(initialChord?.display ?? "");
-      setOctave(initialChord?.octave ?? 4);
+      setOctave(initialChord?.octave ?? 3);
     }
     setTimeout(() => inputRef.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,7 +171,7 @@ export function FocusedChordEditor(props: Props) {
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
     if (isProgressionAdd) {
-      chords.forEach((chord) => addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat));
+      [...chords].reverse().forEach((chord) => addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat));
       props.onClose();
       return;
     }
