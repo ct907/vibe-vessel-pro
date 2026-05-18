@@ -1259,26 +1259,27 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   setTimeSignature: (beatsPerBar, beatUnit) => set((s) => {
     const bpb = Math.max(1, Math.min(16, Math.round(beatsPerBar)));
     const bu = [2, 4, 8, 16].includes(beatUnit) ? beatUnit : 4;
-    // Propagate beatsPerBar to every pattern block; clamp/repack chords to fit new capacity.
-    const progression = s.progression.map((p) => {
-      const newTotal = p.bars * bpb;
-      const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
-      const fit: PatternChord[] = [];
-      let cursor = 0;
-      for (const c of sorted) {
-        const len = Math.max(0.5, c.lengthBeats);
-        if (cursor + len <= newTotal + 1e-9) {
-          fit.push({ ...c, startBeat: cursor, lengthBeats: len });
-          cursor += len;
-        } else if (cursor < newTotal) {
-          // Truncate the last chord to fit; drop the rest (rare).
-          fit.push({ ...c, startBeat: cursor, lengthBeats: newTotal - cursor });
-          cursor = newTotal;
-        }
-      }
-      return { ...p, beatsPerBar: bpb, chords: repackChords(fit, newTotal) };
-    });
-    return { meta: { ...s.meta, beatsPerBar: bpb, beatUnit: bu }, progression };
+    // Propagate beatsPerBar to every pattern block and wipe mirrors; placement
+    // is re-derived from SSOT below so overflowing chords spill into the next
+    // block or a fresh (cont.) block instead of being silently dropped.
+    const progression = s.progression.map((p) => ({ ...p, beatsPerBar: bpb, chords: [] as PatternChord[] }));
+    const capById = new Map(progression.map((p) => [p.id, p.bars * bpb] as const));
+    const sections = s.sections.map((sec) => ({
+      ...sec,
+      chords: sec.chords.map((sc) => {
+        const pp = sc.progressionPlacement;
+        if (!pp) return sc;
+        const cap = capById.get(pp.patternId) ?? pp.lengthBeats;
+        const len = Math.max(0.5, Math.min(pp.lengthBeats, cap));
+        return { ...sc, progressionPlacement: { patternId: pp.patternId, startBeat: 0, lengthBeats: len } };
+      }),
+    }));
+    const synced = syncMirrorsFromAllSectionChords(sections, progression);
+    return {
+      meta: { ...s.meta, beatsPerBar: bpb, beatUnit: bu },
+      sections: synced.sections,
+      progression: synced.progression,
+    };
   }),
 
   transposeSong: (semitones) => set((s) => ({
