@@ -176,7 +176,9 @@ export function FocusedChordEditor(props: Props) {
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
     if (isProgressionAdd) {
-      [...chords].reverse().forEach((chord) => addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat));
+      chords.forEach((chord, i) =>
+        addChordToPatternSlot(props.patternId, { ...chord, octave }, props.atBeat + i),
+      );
       props.onClose();
       return;
     }
