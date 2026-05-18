@@ -3207,9 +3207,9 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     });
   },
   removePatternBlock: (patternId) => set((s) => {
-    // SSOT-first: detach progressionPlacement from any SectionChord pointing
-    // at this pattern. If the SC also has no lyricsPlacement, drop it entirely
-    // (orphan). Then remove the pattern block from the progression.
+    // Drop every SectionChord assigned to this pattern, then remove the
+    // pattern block from the progression. Lyric anchors that referenced the
+    // pattern go with it so the Lyrics tab stays in sync.
     const target = s.progression.find((p) => p.id === patternId);
     if (!target) return {};
     const sid = target.sectionId ?? target.id;
@@ -3222,19 +3222,12 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     } catch { /* ignore */ }
     const nextSections = s.sections.map((sec) => {
       if (sec.id !== sid) return sec;
-      const next: SectionChord[] = [];
-      for (const sc of sec.chords) {
-        if (sc.progressionPlacement?.patternId !== patternId) {
-          next.push(sc);
-          continue;
-        }
-        if (sc.lyricsPlacement) {
-          // Keep as lyrics-only orphan.
-          next.push({ ...sc, progressionPlacement: undefined });
-        }
-        // else drop entirely
-      }
-      return { ...sec, chords: next };
+      return {
+        ...sec,
+        chords: sec.chords.filter(
+          (sc) => sc.progressionPlacement?.patternId !== patternId,
+        ),
+      };
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ({
