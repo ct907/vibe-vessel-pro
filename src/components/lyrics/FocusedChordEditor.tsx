@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput } from "@/lib/music/chords";
+import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import {
@@ -162,11 +163,15 @@ export function FocusedChordEditor(props: Props) {
   }, [slot, isProgression]);
 
   const meta = useSongStore((s) => s.meta);
+  const effective = useMemo(
+    () => effectiveKeyAt(sections, props.sectionId, meta),
+    [sections, props.sectionId, meta],
+  );
   const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
-    () => parseNashvilleInput(query.trim(), meta.keyRoot, meta.keyMode),
-    [query, meta.keyRoot, meta.keyMode],
+    () => parseNashvilleInput(query.trim(), effective.root, effective.mode),
+    [query, effective.root, effective.mode],
   );
 
   const handlePickNashville = (chords: ChordSymbol[]) => {

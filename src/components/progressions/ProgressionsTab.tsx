@@ -39,12 +39,15 @@ import {
   Music2,
   Pencil,
   MessageSquare,
+  KeyRound,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { ChordSymbol } from "@/lib/music/chords";
+import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { cn } from "@/lib/utils";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -806,7 +809,11 @@ function SectionGroup({
   const { theme } = useTheme();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const hasComment = !!(section?.comment && section.comment.trim().length);
+  const effectiveOffsets = useMemo(() => computeEffectiveOffsets(allSections), [allSections]);
+  const effectiveOffset = effectiveOffsets[index] ?? 0;
+  const isFirstSection = index === 0;
   const [draftLabel, setDraftLabel] = useState(section?.label ?? "");
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section?.label ?? "");
@@ -887,10 +894,14 @@ function SectionGroup({
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         )}
-        {!sortMode && (
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {blocks.length} block{blocks.length === 1 ? "" : "s"}
-          </span>
+        {!sortMode && !isFirstSection && (
+          <KeyChangeSticker
+            sectionId={sectionId}
+            effectiveOffset={effectiveOffset}
+            explicitOffset={section?.keyChangeRootOffset}
+            startInEditMode={pendingKeyChange}
+            onCancelInitial={() => setPendingKeyChange(false)}
+          />
         )}
         {sortMode ? (
           <div className="ml-auto flex items-center gap-1">
@@ -941,6 +952,15 @@ function SectionGroup({
                 <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
                   <Copy className="h-4 w-4" /> Duplicate
                 </DropdownMenuItem>
+                {effectiveOffset === 0 && (
+                  <DropdownMenuItem
+                    onClick={() => setPendingKeyChange(true)}
+                    disabled={isFirstSection}
+                    title={isFirstSection ? "Key changes start from the second section" : undefined}
+                  >
+                    <KeyRound className="h-4 w-4" /> Add Key Change
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <div className="flex items-center justify-between px-2 py-1.5">
                   <span className="text-sm">Arpeggiator</span>
@@ -1454,6 +1474,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         open={!!picker}
         onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); } }}
         onPick={handlePick}
+        sectionId={(() => {
+          if (!picker) return undefined;
+          const pat = progression.find((p) => p.id === picker.patternId);
+          return pat?.sectionId ?? pat?.id;
+        })()}
         initialChord={(() => {
           if (!picker?.replaceChordId) return undefined;
           const pat = progression.find((p) => p.id === picker.patternId);

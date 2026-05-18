@@ -98,6 +98,12 @@ export interface Section {
   color?: string | null;
   /** When false, this section plays as block chords even if the global arp is on. Default true. */
   arpArmed?: boolean;
+  /**
+   * Optional semitone offset relative to song.meta.keyRoot. Undefined means
+   * the section inherits the running offset from earlier sections (running-key
+   * model). 0 explicitly resets to song key.
+   */
+  keyChangeRootOffset?: number;
 }
 
 export interface PatternChord {
@@ -174,6 +180,7 @@ export interface SongState {
   setSectionComment: (id: string, comment: string) => void;
   setSectionColor: (id: string, color: string | null) => void;
   setSectionArpArmed: (id: string, armed: boolean) => void;
+  setSectionKeyChangeOffset: (id: string, offset: number | undefined) => void;
   /** Wipe all song state and replace with a single empty verse section (factory reset). */
   resetSong: () => void;
 
@@ -1443,6 +1450,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   setSectionArpArmed: (id, armed) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, arpArmed: armed } : sec)),
   })),
+  setSectionKeyChangeOffset: (id, offset) => set((s) => {
+    if (s.sections.length > 0 && s.sections[0].id === id) return s;
+    return {
+      sections: s.sections.map((sec) =>
+        sec.id === id ? { ...sec, keyChangeRootOffset: offset } : sec,
+      ),
+    };
+  }),
   resetSong: () => {
     undoStack.length = 0;
     redoStack.length = 0;

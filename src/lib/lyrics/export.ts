@@ -1,14 +1,11 @@
-import { getSectionDisplayName, type Section, type SectionChord } from "@/store/song";
+import { getSectionDisplayName, type Section, type SectionChord, type SongState } from "@/store/song";
+import { computeEffectiveOffsets } from "@/lib/music/keyChange";
+import { transposeKey } from "@/lib/music/chords";
 
 /**
  * Render a chord row from the SSOT (`section.chords`) for a given line.
  * Each chord is placed at column = `slotIndex * SLOT_WIDTH`. Returns null
  * if there are no chords on this line.
- *
- * Phase 4a: this replaces the legacy renderer that walked `line.chords`
- * and used per-anchor `chordCol`/`offset` fields. Output spacing is now
- * driven purely by `lyricsPlacement.slotIndex` from the SectionChord
- * projection, matching what the user sees in the lyrics tab.
  */
 const SLOT_WIDTH = 4;
 
@@ -27,17 +24,28 @@ function renderChordRow(sectionChords: SectionChord[], lineId: string): string |
   return out.length ? out : null;
 }
 
-export function exportLyricsAsText(sections: Section[]): string {
+export function exportLyricsAsText(sections: Section[], meta: SongState["meta"]): string {
+  const offsets = computeEffectiveOffsets(sections);
+  const modeSuffix = meta.keyMode === "min" ? "min" : "maj";
   const blocks: string[] = [];
-  for (const section of sections) {
-    const title = `[${getSectionDisplayName(sections, section.id)}]`;
-    const lines: string[] = [title];
+  let prev = 0;
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    const eff = offsets[i];
+    const lines: string[] = [];
+    if (i > 0 && eff !== prev) {
+      const target = transposeKey(meta.keyRoot, eff);
+      const signed = eff > 0 ? `+${eff}` : `${eff}`;
+      lines.push(`>> Key change: ${target}${modeSuffix} (${signed})`);
+    }
+    lines.push(`[${getSectionDisplayName(sections, section.id)}]`);
     for (const line of section.lines) {
       const chordRow = renderChordRow(section.chords ?? [], line.id);
       if (chordRow !== null) lines.push(chordRow);
       lines.push(line.text);
     }
     blocks.push(lines.join("\n"));
+    prev = eff;
   }
   return blocks.join("\n\n");
 }
