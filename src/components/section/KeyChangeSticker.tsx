@@ -81,9 +81,10 @@ export function KeyChangeSticker({
     setOpen(false);
   };
 
-  const handleCancel = () => {
+  const handleRemove = () => {
+    setSectionKeyChangeOffset(sectionId, undefined);
     setOpen(false);
-    if (startInEditMode && effectiveOffset === 0) onCancelInitial?.();
+    onCancelInitial?.();
   };
 
   const signed = draft > 0 ? `+${draft}` : `${draft}`;
@@ -169,10 +170,10 @@ export function KeyChangeSticker({
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={handleRemove}
               className="btn-sculpt-cream inline-flex items-center justify-center rounded-md h-8 px-3 text-sm"
             >
-              Cancel
+              Remove
             </button>
             <button
               type="button"

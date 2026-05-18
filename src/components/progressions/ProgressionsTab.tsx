@@ -474,7 +474,7 @@ function PatternBlock({
                                   }
                                 }}
                                 className={cn(
-                                  "rounded-md border border-black/10 flex flex-col items-center justify-center px-1 overflow-hidden select-none transition-colors hover:opacity-90 cursor-pointer w-full",
+                                  "rounded-md border border-black/10 flex flex-col items-center justify-center px-1 select-none transition-colors hover:opacity-90 cursor-pointer w-full",
                                   colors.className,
                                   isActive && "ring-2 ring-primary ring-offset-2 ring-offset-card scale-[1.02]",
                                   isSelected && !isActive && "ring-2 ring-[var(--primary-strong)] ring-offset-1 ring-offset-card",
