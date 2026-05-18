@@ -197,12 +197,15 @@ function LineRow({
   const moveChordToSlotRef = useRef(moveChordToSlot);
   moveChordToSlotRef.current = moveChordToSlot;
 
-  // Task 1: while the chord context menu is showing, arrow keys reorder the chord.
+  // Task 1: while the chord context menu is showing, arrow keys reorder the chord
+  // and Delete removes it.
   useEffect(() => {
     if (!activeChordId) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const anchor = lineChordsRef.current.find((c) => c.id === activeChordId);
       if (!anchor) return; // this chord is not in this line
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         const slot = anchor.slotIndex ?? 0;
@@ -211,11 +214,15 @@ function LineRow({
         e.preventDefault();
         const slot = anchor.slotIndex ?? 0;
         if (slot < CHORD_ROW_SLOTS - 1) moveChordToSlotRef.current(sectionId, line.id, activeChordId, slot + 1);
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        removeChordAnchorsBatch(sectionId, line.id, [activeChordId]);
+        onSetActiveChordId(null);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeChordId, sectionId, line.id]);
+  }, [activeChordId, sectionId, line.id, removeChordAnchorsBatch, onSetActiveChordId]);
 
   // Edit mode is now managed by SectionCard so a single per-section pencil
   // toggles every row in the section. The per-row pencil that used to live
