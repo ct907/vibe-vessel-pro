@@ -214,7 +214,7 @@ function LineRow({
         e.preventDefault();
         const slot = anchor.slotIndex ?? 0;
         if (slot < CHORD_ROW_SLOTS - 1) moveChordToSlotRef.current(sectionId, line.id, activeChordId, slot + 1);
-      } else if (e.key === "Delete") {
+      } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         removeChordAnchorsBatch(sectionId, line.id, [activeChordId]);
         onSetActiveChordId(null);
