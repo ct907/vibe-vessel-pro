@@ -149,6 +149,7 @@ interface LineRowProps {
   onTextFocus: () => void;
   onTextBlur: () => void;
   onRhymeOpen: () => void;
+  effectiveOffset: number;
 }
 
 function LineRow({
@@ -166,6 +167,7 @@ function LineRow({
   onTextFocus,
   onTextBlur,
   onRhymeOpen,
+  effectiveOffset,
 }: LineRowProps) {
   const {
     setLineText,
@@ -369,6 +371,7 @@ function LineRow({
                           size="sm"
                           audition={true}
                           octave={anchor!.chord.octave ?? 4}
+                          keyChangeOffset={effectiveOffset}
                           selected={activeChordId === anchor!.id}
                           onClick={() => {
                             if (singleClickTimerRef.current) {
@@ -932,6 +935,7 @@ function SectionCard({
                 onTextFocus={() => onLineTextFocus(line.id)}
                 onTextBlur={onLineTextBlur}
                 onRhymeOpen={() => onRhymeOpen(line.id)}
+                effectiveOffset={effectiveOffset}
               />
             ))}
           </div>
