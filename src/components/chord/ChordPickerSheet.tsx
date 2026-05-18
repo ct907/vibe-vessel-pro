@@ -20,6 +20,15 @@ interface Props {
   initialChord?: ChordSymbol;
   onPick: (chord: ChordSymbol) => void;
   /**
+   * Optional batch insertion callback for Nashville sequences. When provided,
+   * the picker hands the parsed chord list off in forward order and the parent
+   * decides how to lay them out — used by ProgressionsTab to step `atBeat`
+   * per chord so successive inserts don't collapse onto the same position.
+   * When omitted, falls back to per-chord onPick calls (reversed so the
+   * lyrics-row reflow logic resolves to correct SSOT order).
+   */
+  onPickBatch?: (chords: ChordSymbol[]) => void;
+  /**
    * Section id whose effective key (per running key-change inheritance) governs
    * Nashville-number resolution. Falls back to the song's root key if omitted.
    */
@@ -35,7 +44,7 @@ interface Props {
   onOctaveChange?: (octave: number) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -132,7 +141,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, sec
   };
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
-    [...chords].reverse().forEach((chord) => onPick({ ...chord, octave }));
+    const stamped = chords.map((c) => ({ ...c, octave }));
+    if (onPickBatch) {
+      onPickBatch(stamped);
+    } else {
+      [...stamped].reverse().forEach((c) => onPick(c));
+    }
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };

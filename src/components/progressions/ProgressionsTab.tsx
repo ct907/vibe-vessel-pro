@@ -1474,6 +1474,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         open={!!picker}
         onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); setActiveChordId(null); } }}
         onPick={handlePick}
+        onPickBatch={(chords) => {
+          if (!picker || picker.replaceChordId) return;
+          const { addChordToPatternSlot } = useSongStore.getState();
+          chords.forEach((c, i) =>
+            addChordToPatternSlot(picker.patternId, c, picker.atBeat + i),
+          );
+        }}
         sectionId={(() => {
           if (!picker) return undefined;
           const pat = progression.find((p) => p.id === picker.patternId);
