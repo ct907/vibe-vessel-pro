@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
-import { ChordSymbol } from "@/lib/music/chords";
+import { ChordSymbol, transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { cn } from "@/lib/utils";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
@@ -105,6 +105,8 @@ interface PatternProps {
   /** Cross-block multi-selection: chordId → patternId. */
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
+  effectiveOffset: number;
 }
 
 function formatBeats(n: number) {
@@ -123,6 +125,7 @@ function PatternBlock({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  effectiveOffset,
 }: PatternProps) {
   const {
     updatePattern,
@@ -383,7 +386,8 @@ function PatternBlock({
                         data-pattern-slot={slotIdx}
                       >
                         {occupied && c && (() => {
-                          const colors = getChordColorClasses(c.chord);
+                          const displayChord = effectiveOffset ? transposeChord(c.chord, effectiveOffset) : c.chord;
+                          const colors = getChordColorClasses(displayChord);
                           const isActive = activeChordId === c.id;
                           const isSelected = multiSelected.has(c.id);
                           return (
@@ -457,7 +461,7 @@ function PatternBlock({
                                       return;
                                     }
                                     setFocusedPattern(pattern.id);
-                                    void playChord(c.chord, undefined, c.chord.octave ?? 3);
+                                    void playChord(displayChord, undefined, c.chord.octave ?? 3);
                                     onSetActiveChordId(activeChordId === c.id ? null : c.id);
                                   }, 250);
                                 }}
@@ -465,7 +469,7 @@ function PatternBlock({
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    void playChord(c.chord, undefined, c.chord.octave ?? 3);
+                                    void playChord(displayChord, undefined, c.chord.octave ?? 3);
                                     onSetActiveChordId(c.id);
                                   }
                                 }}
@@ -481,12 +485,25 @@ function PatternBlock({
                                 }}
                               >
                                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
-                                  {c.chord.display}
+                                  {displayChord.display}
                                 </span>
                                 <span className="font-mono-chord text-[10px] opacity-70 leading-tight">
                                   {formatBeats(c.lengthBeats)}b
                                 </span>
                               </div>
+                              {effectiveOffset !== 0 && (
+                                <span
+                                  aria-hidden
+                                  className="pointer-events-none absolute -top-1 -left-1 z-10 inline-flex items-center justify-center rounded-full bg-[var(--paper)] shadow-sm"
+                                  style={{ width: 14, height: 14 }}
+                                >
+                                  {effectiveOffset > 0 ? (
+                                    <ArrowUp className="h-3 w-3" strokeWidth={3} style={{ color: "var(--primary-strong)" }} />
+                                  ) : (
+                                    <ArrowDown className="h-3 w-3" strokeWidth={3} style={{ color: "var(--primary-strong)" }} />
+                                  )}
+                                </span>
+                              )}
                               {isActive && (
                                 <button
                                   type="button"
@@ -617,7 +634,7 @@ function PatternBlock({
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <span className="px-1 text-base font-mono-chord text-muted-foreground">
-              {activeChordInThisBlock.chord.display}
+              {(effectiveOffset ? transposeChord(activeChordInThisBlock.chord, effectiveOffset) : activeChordInThisBlock.chord).display}
             </span>
             <Button
               size="icon"
@@ -1056,6 +1073,7 @@ function SectionGroup({
                 onSetActiveChordId={onSetActiveChordId}
                 multiSelected={multiSelected}
                 onToggleMultiSelected={onToggleMultiSelected}
+                effectiveOffset={effectiveOffset}
               />
             );
           })}

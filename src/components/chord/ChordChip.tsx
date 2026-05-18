@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
-import { ChordSymbol } from "@/lib/music/chords";
+import { useEffect, useMemo, useRef } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { ChordSymbol, transposeChord } from "@/lib/music/chords";
 import { getChordColorClasses, getChordStrokeColor } from "@/lib/music/chordColor";
 import { holdChord, playChord } from "@/lib/music/audio";
 import { cn } from "@/lib/utils";
@@ -17,10 +18,12 @@ interface Props {
   sustainOnHold?: boolean;
   /** Octave for audition (overrides default 4). */
   octave?: number;
+  /** When non-zero, transpose display + audition by N semitones and show a direction arrow. */
+  keyChangeOffset?: number;
 }
 
 export function ChordChip({
-  chord,
+  chord: rawChord,
   onClick,
   onLongPress,
   selected,
@@ -30,7 +33,12 @@ export function ChordChip({
   audition = true,
   sustainOnHold = true,
   octave = 4,
+  keyChangeOffset = 0,
 }: Props) {
+  const chord = useMemo(
+    () => (keyChangeOffset ? transposeChord(rawChord, keyChangeOffset) : rawChord),
+    [rawChord, keyChangeOffset],
+  );
   // Use refs so timer/long-press state survive re-renders.
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
@@ -165,7 +173,7 @@ export function ChordChip({
       }}
       style={chipStyle}
       className={cn(
-        "noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
+        "relative noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
         sizeCls,
         variantCls,
         selected && "scale-[1.04]",
@@ -173,6 +181,19 @@ export function ChordChip({
       )}
     >
       {chord.display}
+      {keyChangeOffset !== 0 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-1 -left-1 z-10 inline-flex items-center justify-center rounded-full bg-[var(--paper)] shadow-sm"
+          style={{ width: 12, height: 12 }}
+        >
+          {keyChangeOffset > 0 ? (
+            <ArrowUp className="h-2.5 w-2.5" strokeWidth={3} style={{ color: "var(--primary-strong)" }} />
+          ) : (
+            <ArrowDown className="h-2.5 w-2.5" strokeWidth={3} style={{ color: "var(--primary-strong)" }} />
+          )}
+        </span>
+      )}
     </button>
   );
 }
