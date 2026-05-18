@@ -236,7 +236,7 @@ function PatternBlock({
           id,
           Math.max(MIN_LEN, chord.lengthBeats - LENGTH_STEP),
         );
-      } else if (e.key === "Delete") {
+      } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         removePatternChordsBatch(pattern.id, [id]);
         onSetActiveChordId(null);
@@ -1234,7 +1234,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       else if (e.key === "ArrowUp") { e.preventDefault(); handleMultiResizeRef.current(MULTI_LENGTH_STEP); }
       else if (e.key === "ArrowDown") { e.preventDefault(); handleMultiResizeRef.current(-MULTI_LENGTH_STEP); }
       else if (e.key === "Escape") { setMultiSelected(new Map()); }
-      else if (e.key === "Delete") {
+      else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         const byPattern = new Map<string, string[]>();
         for (const [chordId, patternId] of multiSelectedRef.current) {

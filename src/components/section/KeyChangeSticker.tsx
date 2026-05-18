@@ -73,9 +73,6 @@ export function KeyChangeSticker({
       );
     }
     setOpen(next);
-    if (!next && startInEditMode && effectiveOffset === 0) {
-      onCancelInitial?.();
-    }
   };
 
   const handleConfirm = () => {
