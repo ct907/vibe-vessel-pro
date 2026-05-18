@@ -260,8 +260,7 @@ function spawnArpForEvent(
       let t = 0;
       let i = 0;
       while (t < lengthSec - 1e-4) {
-        const delay = swingDelay(i, stepSec, arp.swing);
-        const noteStart = startAt + t + delay;
+        const noteStart = startAt + t;
         const noteEnd = Math.min(startAt + lengthSec, noteStart + stepSec);
         if (noteStart < startAt + lengthSec) {
           ensureHeadroom(1);
