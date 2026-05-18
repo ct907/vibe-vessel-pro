@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, ScheduledChord } from "@/lib/music/audio";
+import { transposeChord } from "@/lib/music/chords";
+import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { getAudioContext } from "@/lib/audio/context";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -114,7 +116,10 @@ function buildPlayback(
   let cursorBeat = 0;
   const events: ScheduledChord[] = [];
   const meta: PlaybackMeta[] = [];
-  for (const sec of sections) {
+  const effectiveOffsets = computeEffectiveOffsets(sections);
+  for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+    const sec = sections[sIdx];
+    const sectionOffset = effectiveOffsets[sIdx] ?? 0;
     const sectionPatterns = progression.filter(
       (p) => (p.sectionId ?? p.id) === sec.id,
     );
@@ -132,7 +137,7 @@ function buildPlayback(
         const localOffset = patternOffset.get(pp.patternId);
         if (localOffset == null) continue;
         events.push({
-          chord: sc.chord,
+          chord: sectionOffset ? transposeChord(sc.chord, sectionOffset) : sc.chord,
           startBeat: cursorBeat + localOffset + pp.startBeat,
           lengthBeats: pp.lengthBeats,
           sectionId: sec.id,
@@ -149,7 +154,7 @@ function buildPlayback(
       for (const p of sectionPatterns) {
         const localOffset = patternOffset.get(p.id) ?? 0;
         for (const pc of [...p.chords].sort((a, b) => a.startBeat - b.startBeat)) {
-          events.push({ chord: pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats, sectionId: sec.id });
+          events.push({ chord: sectionOffset ? transposeChord(pc.chord, sectionOffset) : pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats, sectionId: sec.id });
           meta.push({ patternId: p.id, patternChordId: pc.id, mirrorId: pc.mirrorId });
         }
       }
