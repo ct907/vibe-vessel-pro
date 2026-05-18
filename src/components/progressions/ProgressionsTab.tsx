@@ -1472,7 +1472,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
       <ChordPickerSheet
         open={!!picker}
-        onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); } }}
+        onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); setActiveChordId(null); } }}
         onPick={handlePick}
         sectionId={(() => {
           if (!picker) return undefined;
@@ -1499,7 +1499,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           sectionId={chordEditor.sectionId}
           patternId={chordEditor.patternId}
           chordId={chordEditor.chordId}
-          onClose={() => { setChordEditor(null); setMultiSelected(new Map()); }}
+          onClose={() => { setChordEditor(null); setMultiSelected(new Map()); setActiveChordId(null); }}
         />
       )}
 
@@ -1509,7 +1509,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           sectionId={patternAddSlot.sectionId}
           patternId={patternAddSlot.patternId}
           atBeat={patternAddSlot.atBeat}
-          onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); }}
+          onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); setActiveChordId(null); }}
         />
       )}
 
