@@ -36,8 +36,10 @@ function applyTint(tint: SectionColor | null) {
   const root = document.documentElement;
   if (tint) {
     root.style.setProperty("--app-tint-raw", `var(--section-tint-${tint})`);
+    root.classList.add("app-tinted");
   } else {
     root.style.removeProperty("--app-tint-raw");
+    root.classList.remove("app-tinted");
   }
 }
 

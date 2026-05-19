@@ -279,24 +279,52 @@
     --chord-chip: oklch(0.7199 0.1598 56.2);
     --chord-chip-foreground: oklch(0.2179 0.011 60.85);
 
-    --section-tint-red: oklch(0.485 0.122 25);
-    --section-tint-orange: oklch(0.550 0.104 48);
-    --section-tint-amber: oklch(0.598 0.094 76);
-    --section-tint-yellow: oklch(0.592 0.090 97);
-    --section-tint-lime: oklch(0.536 0.085 126);
-    --section-tint-green: oklch(0.505 0.079 152);
-    --section-tint-teal: oklch(0.501 0.059 180);
-    --section-tint-cyan: oklch(0.504 0.058 213);
-    --section-tint-sky: oklch(0.475 0.070 243);
-    --section-tint-blue: oklch(0.470 0.105 263);
-    --section-tint-indigo: oklch(0.415 0.121 277);
-    --section-tint-violet: oklch(0.454 0.107 300);
-    --section-tint-purple: oklch(0.488 0.102 317);
-    --section-tint-pink: oklch(0.502 0.127 343);
-    --section-tint-rose: oklch(0.488 0.112 8);
-    --section-tint-slate: oklch(0.434 0.019 266);
+    --section-tint-red: oklch(0.243 0.122 25);
+    --section-tint-orange: oklch(0.275 0.104 48);
+    --section-tint-amber: oklch(0.299 0.094 76);
+    --section-tint-yellow: oklch(0.296 0.090 97);
+    --section-tint-lime: oklch(0.268 0.085 126);
+    --section-tint-green: oklch(0.253 0.079 152);
+    --section-tint-teal: oklch(0.251 0.059 180);
+    --section-tint-cyan: oklch(0.252 0.058 213);
+    --section-tint-sky: oklch(0.238 0.070 243);
+    --section-tint-blue: oklch(0.235 0.105 263);
+    --section-tint-indigo: oklch(0.208 0.121 277);
+    --section-tint-violet: oklch(0.227 0.107 300);
+    --section-tint-purple: oklch(0.244 0.102 317);
+    --section-tint-pink: oklch(0.251 0.127 343);
+    --section-tint-rose: oklch(0.244 0.112 8);
+    --section-tint-slate: oklch(0.217 0.019 266);
     --section-tint-alpha: 18%;
     --tint-base: oklch(0.238 0.006 88);
+  }
+
+  /* When an app tint is active, every -b base color the tint blends with
+     drops its chroma to 0 so the resulting color-mix is purely tinted
+     rather than muddied by the underlying paper hue. Toggled from
+     src/store/appTint.ts. */
+  .app-tinted {
+    --paper-b: oklch(0.9613 0 89.2);
+    --paper-shade-b: oklch(0.883 0 89.3);
+    --paper-shade-soft-b: oklch(0.9234 0 90.1);
+    --paper-card-b: oklch(0.974 0 84.5);
+    --popover-b: oklch(0.9803 0 75.41);
+    --muted-b: oklch(0.915 0 78.26);
+    --accent-b: oklch(0.9287 0 61.99);
+    --border-b: oklch(0.819 0 78.8);
+  }
+
+  .dark.app-tinted {
+    --paper-b: oklch(0.2179 0 60.85);
+    --paper-shade-b: oklch(0.175 0 60.85);
+    --paper-shade-soft-b: oklch(0.2499 0 57.56);
+    --paper-card-b: oklch(0.2499 0 57.56);
+    --popover-b: oklch(0.2499 0 57.56);
+    --secondary-b: oklch(0.3229 0 57.79);
+    --muted-b: oklch(0.3019 0 62.15);
+    --accent-b: oklch(0.3589 0 61.59);
+    --border-b: oklch(0.3432 0 59.11);
+    --pill-hover-bg-b: oklch(0.3 0 58);
   }
 }
 
