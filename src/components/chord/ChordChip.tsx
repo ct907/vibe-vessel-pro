@@ -155,32 +155,34 @@ export function ChordChip({
       };
 
   return (
-    <button
-      type="button"
-      onMouseDown={() => start(false)}
-      onMouseUp={cancel}
-      onMouseLeave={cancel}
-      onTouchStart={() => start(true)}
-      onTouchEnd={cancel}
-      onTouchCancel={cancel}
-      onClick={handleClick}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        swallowClickRef.current = true;
-        longFiredRef.current = true;
-        releaseHold();
-        onLongPress?.();
-      }}
-      style={chipStyle}
-      className={cn(
-        "relative noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
-        sizeCls,
-        variantCls,
-        selected && "scale-[1.04]",
-        className,
-      )}
-    >
-      {chord.display}
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        onMouseDown={() => start(false)}
+        onMouseUp={cancel}
+        onMouseLeave={cancel}
+        onTouchStart={() => start(true)}
+        onTouchEnd={cancel}
+        onTouchCancel={cancel}
+        onClick={handleClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          swallowClickRef.current = true;
+          longFiredRef.current = true;
+          releaseHold();
+          onLongPress?.();
+        }}
+        style={chipStyle}
+        className={cn(
+          "relative noise-texture-chip inline-flex items-center rounded-md font-mono-chord font-semibold select-none",
+          sizeCls,
+          variantCls,
+          selected && "scale-[1.04]",
+          className,
+        )}
+      >
+        {chord.display}
+      </button>
       {keyChangeOffset !== 0 && (
         <span
           aria-hidden
@@ -194,6 +196,6 @@ export function ChordChip({
           )}
         </span>
       )}
-    </button>
+    </span>
   );
 }

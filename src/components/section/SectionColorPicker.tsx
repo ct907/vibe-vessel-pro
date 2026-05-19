@@ -25,12 +25,12 @@ export const SECTION_COLOR_KEYS = [
 export type SectionColor = (typeof SECTION_COLOR_KEYS)[number];
 
 /** Inline style background for a section using its color key. Falls back to --paper-shade-soft when no color. */
-export function sectionTintStyle(color: string | null | undefined, factor = 0.5): React.CSSProperties {
+export function sectionTintStyle(color: string | null | undefined, _factor = 0.5): React.CSSProperties {
   if (!color || !SECTION_COLOR_KEYS.includes(color as SectionColor)) {
     return { backgroundColor: "var(--paper-shade-soft)" };
   }
   return {
-    backgroundColor: `color-mix(in oklch, var(--section-tint-${color}) ${factor * 100}%, transparent)`,
+    backgroundColor: `color-mix(in oklch, var(--section-tint-${color}) var(--section-tint-alpha), var(--tint-base))`,
   };
 }
 
