@@ -12,6 +12,7 @@ import {
   Plus,
   CheckSquare,
   ListChecks,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -31,6 +32,7 @@ export interface FloatingChordToolbarProps {
   onOctaveChange?: (oct: number) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
+  onDelete?: () => void;
   onExitEdit: () => void;
 }
 
@@ -52,6 +54,7 @@ export function FloatingChordToolbar({
   onOctaveChange,
   onSelectAll,
   onClearAll,
+  onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
   const isMobile = useIsMobile();
@@ -178,6 +181,17 @@ export function FloatingChordToolbar({
             title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
           >
             <CheckSquare className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+            disabled={!hasContext}
+            onClick={onDelete}
+            aria-label="Delete selected chord(s)"
+            title="Delete"
+          >
+            <Trash2 className="h-5 w-5" />
           </Button>
           <div className="w-px h-6 bg-border mx-0.5" />
           <Button

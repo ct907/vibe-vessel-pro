@@ -107,6 +107,7 @@ interface PatternProps {
   /** Cross-block multi-selection: chordId → patternId. */
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onClearMultiSelected: () => void;
   /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
   effectiveOffset: number;
 }
@@ -127,6 +128,7 @@ function PatternBlock({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onClearMultiSelected,
   effectiveOffset,
 }: PatternProps) {
   const {
@@ -520,17 +522,12 @@ function PatternBlock({
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (selectedIds.size > 1 && selectedIds.has(c.id)) {
-                                      removePatternChordsBatch(pattern.id, Array.from(selectedIds));
-                                      setSelectedIds(new Set());
+                                    if (blockSelectedIds.size > 1 && blockSelectedIds.has(c.id)) {
+                                      removePatternChordsBatch(pattern.id, Array.from(blockSelectedIds));
                                     } else {
                                       removePatternChordsBatch(pattern.id, [c.id]);
-                                      setSelectedIds((prev) => {
-                                        const n = new Set(prev);
-                                        n.delete(c.id);
-                                        return n;
-                                      });
                                     }
+                                    onClearMultiSelected();
                                     onSetActiveChordId(null);
                                   }}
                                   aria-label="Delete chord"
@@ -799,6 +796,7 @@ interface SectionGroupProps {
   onSetActiveChordId: (id: string | null) => void;
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onClearMultiSelected: () => void;
 }
 
 function SectionGroup({
@@ -818,6 +816,7 @@ function SectionGroup({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onClearMultiSelected,
 }: SectionGroupProps) {
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
@@ -1083,6 +1082,7 @@ function SectionGroup({
                 onSetActiveChordId={onSetActiveChordId}
                 multiSelected={multiSelected}
                 onToggleMultiSelected={onToggleMultiSelected}
+                onClearMultiSelected={onClearMultiSelected}
                 effectiveOffset={effectiveOffset}
               />
             );
@@ -1448,6 +1448,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onSetActiveChordId={setActiveChordId}
           multiSelected={multiSelected}
           onToggleMultiSelected={toggleMultiSelected}
+          onClearMultiSelected={() => setMultiSelected(new Map())}
         />
       ))}
 
@@ -1578,6 +1579,24 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
             onClearAll={() => {
               setActiveChordId(null);
               setMultiSelected(new Map());
+            }}
+            onDelete={() => {
+              const removeBatch = useSongStore.getState().removePatternChordsBatch;
+              if (multiSelected.size > 0) {
+                const byPattern = new Map<string, string[]>();
+                for (const [chordId, patternId] of multiSelected) {
+                  const arr = byPattern.get(patternId) ?? [];
+                  arr.push(chordId);
+                  byPattern.set(patternId, arr);
+                }
+                for (const [patId, ids] of byPattern) {
+                  removeBatch(patId, ids);
+                }
+                setMultiSelected(new Map());
+              } else if (activeChordId && patternOfActive) {
+                removeBatch(patternOfActive.id, [activeChordId]);
+              }
+              setActiveChordId(null);
             }}
             onExitEdit={() => {
               setActiveChordId(null);
