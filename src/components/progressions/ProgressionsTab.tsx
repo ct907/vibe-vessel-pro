@@ -51,7 +51,8 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
+import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -148,6 +149,9 @@ function PatternBlock({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
   const isMobile = useIsMobile();
+  const multiSelectMode = useUIStore((s) => s.multiSelectMode);
+  const multiSelectModeRef = useRef(multiSelectMode);
+  multiSelectModeRef.current = multiSelectMode;
 
   // Shift key tracking for multi-select via Shift+click / Shift+contextMenu.
   const isShiftDownRef = useRef(false);
@@ -164,7 +168,6 @@ function PatternBlock({
     () => new Set([...multiSelected.entries()].filter(([, pid]) => pid === pattern.id).map(([cid]) => cid)),
     [multiSelected, pattern.id],
   );
-  const multiSelectMode = multiSelected.size > 0;
 
   // Stable refs so the keyboard handler always reads the freshest values.
   const activeChordIdRef = useRef<string | null>(null);
@@ -458,6 +461,10 @@ function PatternBlock({
                                   const shiftHeld = e.shiftKey;
                                   singleClickTimerRef.current = setTimeout(() => {
                                     singleClickTimerRef.current = null;
+                                    if (multiSelectModeRef.current) {
+                                      onToggleMultiSelected(c.id, pattern.id);
+                                      return;
+                                    }
                                     if (shiftHeld || isShiftDownRef.current) {
                                       onToggleMultiSelected(c.id, pattern.id);
                                       return;
@@ -1282,6 +1289,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
 
   const openChordEditor = (patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
@@ -1327,7 +1335,12 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       updatePatternChord(picker.patternId, picker.replaceChordId, { chord });
     } else {
       // picker.atBeat is reused as a slot index by the new slot grid.
-      useSongStore.getState().addChordToPatternSlot(picker.patternId, chord, picker.atBeat);
+      useSongStore.getState().addChordToPatternSlot(
+        picker.patternId,
+        chord,
+        picker.atBeat,
+        !isDesktop ? 4 : undefined,
+      );
     }
   };
 
@@ -1496,6 +1509,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         const canShiftLeft = useMulti ? canShiftLeftMulti : canShiftLeftSingle;
         const canShiftRight = useMulti ? canShiftRightMulti : canShiftRightSingle;
 
+        const selectedOctaves: number[] = [];
+        multiSelected.forEach((patternId, chordId) => {
+          const pat = progression.find((p) => p.id === patternId);
+          if (!pat) return;
+          const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
+          const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
+          const c = chords.find((cc) => cc.id === chordId);
+          if (c?.chord.octave !== undefined) selectedOctaves.push(c.chord.octave);
+        });
+
         return (
           <FloatingChordToolbar
             mode="progression"
@@ -1510,7 +1533,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
                 : null
             }
             selectedCount={multiSelected.size}
-            isActiveInMultiSet={!!activeChordId && multiSelected.has(activeChordId)}
+            selectedOctaves={selectedOctaves}
             canShiftLeft={canShiftLeft}
             canShiftRight={canShiftRight}
             onShift={(dir) => {
@@ -1531,14 +1554,18 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
                   byPattern.set(patternId, arr);
                 });
                 byPattern.forEach((chordIds, patternId) => bulkSetChordOctave(patternId, chordIds, oct));
+                if (patternOfActive) {
+                  const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
+                  const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+                  const firstSelected = chords.find((c) => multiSelected.has(c.id));
+                  if (firstSelected) void playChord(firstSelected.chord, undefined, oct);
+                }
               } else if (patternOfActive && activeChordData) {
                 updatePatternChord(patternOfActive.id, activeChordData.id, {
                   chord: { ...activeChordData.chord, octave: oct },
                 });
+                void playChord(activeChordData.chord, undefined, oct);
               }
-            }}
-            onToggleMultiSelectActive={() => {
-              if (patternOfActive && activeChordId) toggleMultiSelected(activeChordId, patternOfActive.id);
             }}
             onSelectAll={() => {
               if (!patternOfActive) return;
@@ -1547,6 +1574,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
               chords.forEach((c) => {
                 if (!multiSelected.has(c.id)) toggleMultiSelected(c.id, patternOfActive.id);
               });
+            }}
+            onClearAll={() => {
+              setActiveChordId(null);
+              setMultiSelected(new Map());
             }}
             onExitEdit={() => {
               setActiveChordId(null);
@@ -1632,7 +1663,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           if (!picker || picker.replaceChordId) return;
           const { addChordToPatternSlot } = useSongStore.getState();
           chords.forEach((c, i) =>
-            addChordToPatternSlot(picker.patternId, c, picker.atBeat + i),
+            addChordToPatternSlot(picker.patternId, c, picker.atBeat + i, !isDesktop ? 4 : undefined),
           );
         }}
         sectionId={(() => {

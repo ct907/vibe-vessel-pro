@@ -79,7 +79,7 @@ export function SongAttributesMenu() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"

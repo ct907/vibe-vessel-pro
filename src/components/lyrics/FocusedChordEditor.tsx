@@ -182,7 +182,7 @@ export function FocusedChordEditor(props: Props) {
   const handlePickNashville = (chords: ChordSymbol[]) => {
     if (isProgressionAdd) {
       chords.forEach((chord, i) =>
-        addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, props.atBeat + i),
+        addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, props.atBeat + i, 4),
       );
       props.onClose();
       return;
@@ -219,7 +219,7 @@ export function FocusedChordEditor(props: Props) {
   const handlePick = (chord: ChordSymbol) => {
     const chordWithOctave = { ...toStorage(chord), octave };
     if (isProgressionAdd) {
-      addChordToPatternSlot(props.patternId, chordWithOctave, props.atBeat);
+      addChordToPatternSlot(props.patternId, chordWithOctave, props.atBeat, 4);
       props.onClose();
       return;
     }
