@@ -82,7 +82,7 @@ export function KeyChangeSticker({
   };
 
   const handleRemove = () => {
-    setSectionKeyChangeOffset(sectionId, undefined);
+    setSectionKeyChangeOffset(sectionId, 0);
     setOpen(false);
     onCancelInitial?.();
   };
