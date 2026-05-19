@@ -515,11 +515,15 @@ function PatternBlock({
                                   )}
                                 </span>
                               )}
-                              {isActive && (
+                              {(isActive || isSelected) && (
                                 <button
                                   type="button"
-                                  className="absolute -top-1.5 -right-1.5 z-20 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                                  className="absolute -top-1.5 -right-1.5 z-20 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                                  style={{ touchAction: "manipulation" }}
                                   onPointerDown={(e) => e.stopPropagation()}
+                                  onPointerUp={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (blockSelectedIds.size > 1 && blockSelectedIds.has(c.id)) {
@@ -532,7 +536,7 @@ function PatternBlock({
                                   }}
                                   aria-label="Delete chord"
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
@@ -1167,8 +1171,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     moveSection,
     removeSection,
     removePatternBlock,
-    suppressCrossTabDeleteWarning,
-    setSuppressCrossTabDeleteWarning,
     setAllSectionsCollapsed,
     shiftPatternChords,
     resizePatternChordsWithOverflow,
@@ -1285,7 +1287,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
-  const [confirmDeleteSection, setConfirmDeleteSection] = useState<string | null>(null);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
   const isMobile = useIsMobile();
@@ -1391,21 +1392,17 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
   };
 
-  const requestDeleteSection = (sectionId: string) => {
-    if (suppressCrossTabDeleteWarning) {
-      removeSection(sectionId);
-    } else {
-      // Defer so the DropdownMenu's close event doesn't immediately dismiss the AlertDialog.
-      setTimeout(() => setConfirmDeleteSection(sectionId), 0);
-    }
-  };
+  const requestDeleteSection = (sectionId: string) => removeSection(sectionId);
 
   const requestDeleteBlock = (patternId: string) => {
     setConfirmDeleteBlock(patternId);
   };
 
   return (
-    <div className="space-y-4" onClick={() => setActiveChordId(null)}>
+    <div
+      className="space-y-4"
+      onClick={(e) => { if (e.target === e.currentTarget) setActiveChordId(null); }}
+    >
       <div className="flex items-center gap-2">
         <p className="text-xs text-muted-foreground flex-1">
           Each section can hold multiple pattern blocks. Adding a chord here also drops it into the matching section in
@@ -1723,23 +1720,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); setActiveChordId(null); }}
         />
       )}
-
-      <ConfirmDeleteDialog
-        open={!!confirmDeleteSection}
-        onOpenChange={(o) => {
-          if (!o) setConfirmDeleteSection(null);
-        }}
-        title="Delete entire section?"
-        description="This removes the section from BOTH the Progression and Lyrics tabs, including all chord pattern blocks and lyric lines inside it."
-        confirmLabel="Delete section"
-        showSuppressOption
-        onConfirm={(suppress) => {
-          const id = confirmDeleteSection;
-          setConfirmDeleteSection(null);
-          if (suppress) setSuppressCrossTabDeleteWarning(true);
-          if (id) removeSection(id);
-        }}
-      />
 
       <ConfirmDeleteDialog
         open={!!confirmDeleteBlock}
