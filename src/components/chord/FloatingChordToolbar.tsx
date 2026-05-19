@@ -184,10 +184,12 @@ export function FloatingChordToolbar({
           </Button>
           <Button
             size="icon"
-            variant="ghost"
-            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-            disabled={!hasContext}
-            onClick={onDelete}
+            className={cn(
+              "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
+              !hasContext && "opacity-60 cursor-not-allowed",
+            )}
+            aria-disabled={!hasContext}
+            onClick={hasContext ? onDelete : undefined}
             aria-label="Delete selected chord(s)"
             title="Delete"
           >
