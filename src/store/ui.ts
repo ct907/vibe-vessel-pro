@@ -12,6 +12,8 @@ interface UIState {
   setFocusedEditorOpen: (open: boolean) => void;
   toolbarExpanded: boolean;
   setToolbarExpanded: (open: boolean) => void;
+  multiSelectMode: boolean;
+  setMultiSelectMode: (v: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -19,4 +21,6 @@ export const useUIStore = create<UIState>((set) => ({
   setFocusedEditorOpen: (open) => set({ focusedEditorOpen: open }),
   toolbarExpanded: false,
   setToolbarExpanded: (open) => set({ toolbarExpanded: open }),
+  multiSelectMode: false,
+  setMultiSelectMode: (v) => set({ multiSelectMode: v }),
 }));

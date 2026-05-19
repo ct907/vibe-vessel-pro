@@ -256,7 +256,7 @@ export interface SongState {
   movePatternChordToSlot: (patternId: string, chordId: string, slotIndex: number) => void;
   movePatternChordsToSlot: (patternId: string, chordIds: string[], slotIndex: number) => void;
   /** Slot-based: insert a brand-new chord into a specific slot (left-packed). */
-  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number) => void;
+  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number, lengthBeatsOverride?: number) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
   addPatternToSection: (sectionId: string) => string;
   /** Reorder a pattern block within its section (Phase 3 / Item 3). */
@@ -2870,7 +2870,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // SSOT-first: add a SectionChord assigned to this pattern (or a sibling
   // pattern with room / a fresh continuation block), placed at slotIndex
   // within the pattern's chord order.
-  addChordToPatternSlot: (patternId, chord, slotIndex) => {
+  addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride) => {
     pushHistory(get);
     set((s) => {
       const target = s.progression.find((p) => p.id === patternId);
@@ -2884,7 +2884,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       // → spawn continuation". It picks the first pattern in section order
       // with room. To honor the requested patternId when it has room, we
       // pre-check capacity here.
-      const defaultLen = getDefaults().defaultChordLengthBeats;
+      const defaultLen = lengthBeatsOverride ?? getDefaults().defaultChordLengthBeats;
       const totalBeats = target.bars * target.beatsPerBar;
       const usedInTarget = sec.chords.reduce((sum, sc) => {
         const pp = sc.progressionPlacement;
