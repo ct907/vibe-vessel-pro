@@ -30,7 +30,7 @@ export function sectionTintStyle(color: string | null | undefined, _factor = 0.5
     return { backgroundColor: "var(--paper-shade-soft)" };
   }
   return {
-    backgroundColor: `color-mix(in oklch, var(--section-tint-${color}) var(--section-tint-alpha), var(--tint-base))`,
+    backgroundColor: `var(--section-tint-${color})`,
   };
 }
 

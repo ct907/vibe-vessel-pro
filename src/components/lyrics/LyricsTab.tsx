@@ -1655,6 +1655,22 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
             }}
+            onDelete={() => {
+              if (targets.length === 0) return;
+              const byLine = new Map<string, { sectionId: string; lineId: string; ids: string[] }>();
+              for (const t of targets) {
+                const key = `${t.sectionId}:${t.lineId}`;
+                const entry = byLine.get(key) ?? { sectionId: t.sectionId, lineId: t.lineId, ids: [] };
+                entry.ids.push(t.id);
+                byLine.set(key, entry);
+              }
+              const removeBatch = useSongStore.getState().removeChordAnchorsBatch;
+              for (const { sectionId, lineId, ids } of byLine.values()) {
+                removeBatch(sectionId, lineId, ids);
+              }
+              setActiveChordId(null);
+              setLyricMultiSelected(new Map());
+            }}
             onExitEdit={() => {
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
