@@ -152,22 +152,24 @@
     --chord-chip-foreground: oklch(0.2742 0.0267 54.04);
 
     /* ─── 16 section tint swatches ────────────────────────────── */
-    --section-tint-red: oklch(0.7797 0.1008 19.6);
-    --section-tint-orange: oklch(0.8151 0.0961 51.41);
-    --section-tint-amber: oklch(0.8549 0.1077 80.53);
-    --section-tint-yellow: oklch(0.9024 0.1239 98.37);
-    --section-tint-lime: oklch(0.8727 0.1138 123.59);
-    --section-tint-green: oklch(0.8268 0.0896 155);
-    --section-tint-teal: oklch(0.8237 0.0716 182.41);
-    --section-tint-cyan: oklch(0.8279 0.0735 211.34);
-    --section-tint-sky: oklch(0.8054 0.0812 240.11);
-    --section-tint-blue: oklch(0.7852 0.086 263.89);
-    --section-tint-indigo: oklch(0.7542 0.0886 284.07);
-    --section-tint-violet: oklch(0.7757 0.091 303.53);
-    --section-tint-purple: oklch(0.7972 0.0898 317.57);
-    --section-tint-pink: oklch(0.8147 0.1041 339.67);
-    --section-tint-rose: oklch(0.8037 0.0925 3);
-    --section-tint-slate: oklch(0.7717 0.017 262.74);
+    --section-tint-red: oklch(0.820 0.086 22);
+    --section-tint-orange: oklch(0.852 0.082 54);
+    --section-tint-amber: oklch(0.890 0.091 83);
+    --section-tint-yellow: oklch(0.928 0.103 100);
+    --section-tint-lime: oklch(0.906 0.094 126);
+    --section-tint-green: oklch(0.860 0.075 157);
+    --section-tint-teal: oklch(0.857 0.059 185);
+    --section-tint-cyan: oklch(0.858 0.061 213);
+    --section-tint-sky: oklch(0.836 0.067 242);
+    --section-tint-blue: oklch(0.818 0.071 265);
+    --section-tint-indigo: oklch(0.788 0.072 285);
+    --section-tint-violet: oklch(0.809 0.073 304);
+    --section-tint-purple: oklch(0.830 0.073 318);
+    --section-tint-pink: oklch(0.846 0.086 340);
+    --section-tint-rose: oklch(0.836 0.076 5);
+    --section-tint-slate: oklch(0.820 0.013 263);
+    --section-tint-alpha: 35%;
+    --tint-base: oklch(0.968 0.006 88);
 
     /* Sidebar (shadcn) */
     --sidebar-background: var(--paper-card);
@@ -277,22 +279,24 @@
     --chord-chip: oklch(0.7199 0.1598 56.2);
     --chord-chip-foreground: oklch(0.2179 0.011 60.85);
 
-    --section-tint-red: oklch(0.4561 0.1416 24.72);
-    --section-tint-orange: oklch(0.522 0.121 47.49);
-    --section-tint-amber: oklch(0.5698 0.1094 75.74);
-    --section-tint-yellow: oklch(0.5633 0.1053 97);
-    --section-tint-lime: oklch(0.5075 0.0991 125.31);
-    --section-tint-green: oklch(0.4758 0.0918 152.08);
-    --section-tint-teal: oklch(0.4723 0.0683 180.22);
-    --section-tint-cyan: oklch(0.4751 0.0672 213.43);
-    --section-tint-sky: oklch(0.4466 0.0822 242.73);
-    --section-tint-blue: oklch(0.4408 0.1234 262.68);
-    --section-tint-indigo: oklch(0.3853 0.1421 277.4);
-    --section-tint-violet: oklch(0.4249 0.1262 299.99);
-    --section-tint-purple: oklch(0.4585 0.1199 317.15);
-    --section-tint-pink: oklch(0.4732 0.1494 343.25);
-    --section-tint-rose: oklch(0.4585 0.1316 8.32);
-    --section-tint-slate: oklch(0.405 0.0232 265.72);
+    --section-tint-red: oklch(0.485 0.122 25);
+    --section-tint-orange: oklch(0.550 0.104 48);
+    --section-tint-amber: oklch(0.598 0.094 76);
+    --section-tint-yellow: oklch(0.592 0.090 97);
+    --section-tint-lime: oklch(0.536 0.085 126);
+    --section-tint-green: oklch(0.505 0.079 152);
+    --section-tint-teal: oklch(0.501 0.059 180);
+    --section-tint-cyan: oklch(0.504 0.058 213);
+    --section-tint-sky: oklch(0.475 0.070 243);
+    --section-tint-blue: oklch(0.470 0.105 263);
+    --section-tint-indigo: oklch(0.415 0.121 277);
+    --section-tint-violet: oklch(0.454 0.107 300);
+    --section-tint-purple: oklch(0.488 0.102 317);
+    --section-tint-pink: oklch(0.502 0.127 343);
+    --section-tint-rose: oklch(0.488 0.112 8);
+    --section-tint-slate: oklch(0.434 0.019 266);
+    --section-tint-alpha: 18%;
+    --tint-base: oklch(0.238 0.006 88);
   }
 }
 

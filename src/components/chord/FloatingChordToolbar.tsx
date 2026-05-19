@@ -123,7 +123,7 @@ export function FloatingChordToolbar({
           expanded ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100",
         )}
       >
-        <Pencil className="h-4 w-4" />
+        <Pencil className="h-6 w-6" />
       </button>
 
       <div
