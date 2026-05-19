@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
+import { useUIStore } from "@/store/ui";
 import { downloadProjectJSON, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
@@ -304,6 +305,17 @@ interface Props {
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props) {
+  const toolbarExpanded = useUIStore((s) => s.toolbarExpanded);
+  const guardedSetTab = (t: "lyrics" | "chords" | "progressions") => {
+    if (toolbarExpanded) {
+      toast({
+        title: "Finish editing chords first",
+        description: "Close the chord toolbar before switching tabs.",
+      });
+      return;
+    }
+    setTab(t);
+  };
   const {
     meta,
     progression,
@@ -748,7 +760,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
               return (
                 <button
                   key={t}
-                  onClick={() => setTab(t)}
+                  onClick={() => guardedSetTab(t)}
+                  aria-disabled={toolbarExpanded && !active}
                   style={{
                     padding: "7px 14px",
                     border: 0,
@@ -762,6 +775,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                     boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
                     marginTop: active ? -2 : 0,
                     marginBottom: active ? 2 : 0,
+                    opacity: toolbarExpanded && !active ? 0.5 : 1,
                     transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
                   }}
                 >

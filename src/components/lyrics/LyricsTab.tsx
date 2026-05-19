@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Droppable,
   type DropResult,
@@ -77,6 +77,7 @@ import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
+import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
@@ -145,6 +146,7 @@ interface LineRowProps {
   /** The chord id that currently shows its X chip (tab-level, one at a time). */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
+  multiSelectedIds?: Set<string>;
   isFocused?: boolean;
   onTextFocus: () => void;
   onTextBlur: () => void;
@@ -163,6 +165,7 @@ function LineRow({
   onChordFocus,
   activeChordId,
   onSetActiveChordId,
+  multiSelectedIds,
   isFocused,
   onTextFocus,
   onTextBlur,
@@ -372,7 +375,7 @@ function LineRow({
                           audition={true}
                           octave={anchor!.chord.octave ?? 4}
                           keyChangeOffset={effectiveOffset}
-                          selected={activeChordId === anchor!.id}
+                          selected={activeChordId === anchor!.id || !!multiSelectedIds?.has(anchor!.id)}
                           onClick={() => {
                             if (singleClickTimerRef.current) {
                               clearTimeout(singleClickTimerRef.current);
@@ -425,8 +428,10 @@ function LineRow({
 
       </div>
 
-      {/* Floating chord movement menu — appears below chord row when a chord is active */}
+      {/* Floating chord movement menu — appears below chord row when a chord is active.
+          Hidden on mobile; mobile uses the global FloatingChordToolbar. */}
       {(() => {
+        if (isMobile) return null;
         if (!activeChordId) return null;
         const activeAnchor = lineChords.find((c) => c.id === activeChordId);
         if (!activeAnchor) return null;
@@ -599,6 +604,7 @@ interface SectionCardProps {
   /** Tab-level active chord for X chip (one across all sections). */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
+  multiSelectedIds?: Set<string>;
   focusedLineId?: string;
   onLineTextFocus: (lineId: string) => void;
   onLineTextBlur: () => void;
@@ -617,6 +623,7 @@ function SectionCard({
   onMoveSection,
   activeChordId,
   onSetActiveChordId,
+  multiSelectedIds,
   focusedLineId,
   onLineTextFocus,
   onLineTextBlur,
@@ -931,6 +938,7 @@ function SectionCard({
                 onChordFocus={() => {}}
                 activeChordId={activeChordId}
                 onSetActiveChordId={onSetActiveChordId}
+                multiSelectedIds={multiSelectedIds}
                 isFocused={focusedLineId === line.id}
                 onTextFocus={() => onLineTextFocus(line.id)}
                 onTextBlur={onLineTextBlur}
@@ -1060,6 +1068,23 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   const isMobile = useIsMobile();
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
+  const [lyricMultiSelected, setLyricMultiSelected] =
+    useState<Map<string, { sectionId: string; lineId: string }>>(new Map());
+  const lyricMultiSelectedIds = useMemo(
+    () => new Set(lyricMultiSelected.keys()),
+    [lyricMultiSelected],
+  );
+  const toggleLyricMultiSelected = useCallback(
+    (anchorId: string, ctx: { sectionId: string; lineId: string }) => {
+      setLyricMultiSelected((prev) => {
+        const next = new Map(prev);
+        if (next.has(anchorId)) next.delete(anchorId);
+        else next.set(anchorId, ctx);
+        return next;
+      });
+    },
+    [],
+  );
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
   const [rhymeTarget, setRhymeTarget] = useState<{
@@ -1394,6 +1419,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             onPickerClose={() => setPicker(null)}
             activeChordId={activeChordId}
             onSetActiveChordId={setActiveChordId}
+            multiSelectedIds={lyricMultiSelectedIds}
             sortMode={sortMode}
             onMoveSection={(id, direction) => moveSection(id, direction)}
             focusedLineId={focusedLineInfo?.sectionId === sec.id ? focusedLineInfo.lineId : undefined}
@@ -1520,6 +1546,92 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
           if (targetId && rhymeTarget) setLineText(rhymeTarget.sectionId, targetId, newText);
         }}
       />
+
+      {isMobile && (() => {
+        const activeCtx = (() => {
+          if (!activeChordId) return null;
+          for (const sec of sections) {
+            for (const line of sec.lines) {
+              const anchor = line.chords.find((c) => c.id === activeChordId);
+              if (anchor) return { sectionId: sec.id, lineId: line.id, anchor };
+            }
+          }
+          return null;
+        })();
+        const lookupAnchor = (id: string) => {
+          for (const sec of sections) {
+            for (const line of sec.lines) {
+              const anchor = line.chords.find((c) => c.id === id);
+              if (anchor) return { sectionId: sec.id, lineId: line.id, anchor };
+            }
+          }
+          return null;
+        };
+
+        const useMulti = lyricMultiSelected.size > 0;
+        const targets = useMulti
+          ? Array.from(lyricMultiSelected.entries()).map(([id, ctx]) => ({ id, ...ctx }))
+          : activeCtx
+            ? [{ id: activeCtx.anchor.id, sectionId: activeCtx.sectionId, lineId: activeCtx.lineId }]
+            : [];
+        const slotsOf = targets.map((t) => lookupAnchor(t.id)?.anchor.slotIndex ?? 0);
+        const canShiftLeft = targets.length > 0 && slotsOf.every((s) => s > 0);
+        const canShiftRight = targets.length > 0 && slotsOf.every((s) => s < CHORD_ROW_SLOTS - 1);
+
+        return (
+          <FloatingChordToolbar
+            mode="lyrics"
+            activeChord={
+              activeCtx
+                ? {
+                    id: activeCtx.anchor.id,
+                    display: activeCtx.anchor.chord.display,
+                    octave: activeCtx.anchor.chord.octave,
+                  }
+                : null
+            }
+            selectedCount={lyricMultiSelected.size}
+            isActiveInMultiSet={!!activeChordId && lyricMultiSelected.has(activeChordId)}
+            canShiftLeft={canShiftLeft}
+            canShiftRight={canShiftRight}
+            onShift={(dir) => {
+              for (const t of targets) {
+                const found = lookupAnchor(t.id);
+                if (!found) continue;
+                const slot = found.anchor.slotIndex ?? 0;
+                const next = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slot + dir));
+                if (next !== slot) moveChordToSlot(t.sectionId, t.lineId, t.id, next);
+              }
+            }}
+            onOctaveChange={(oct) => {
+              for (const t of targets) {
+                const found = lookupAnchor(t.id);
+                if (!found) continue;
+                const slot = found.anchor.slotIndex ?? 0;
+                upsertChordAt(t.sectionId, t.lineId, slot, { ...found.anchor.chord, octave: oct }, t.id);
+              }
+            }}
+            onToggleMultiSelectActive={() => {
+              if (activeCtx) toggleLyricMultiSelected(activeCtx.anchor.id, { sectionId: activeCtx.sectionId, lineId: activeCtx.lineId });
+            }}
+            onSelectAll={() => {
+              if (!activeCtx) return;
+              const sec = sections.find((s) => s.id === activeCtx.sectionId);
+              const line = sec?.lines.find((l) => l.id === activeCtx.lineId);
+              if (!line) return;
+              line.chords.forEach((c) => {
+                if (!lyricMultiSelected.has(c.id)) {
+                  toggleLyricMultiSelected(c.id, { sectionId: activeCtx.sectionId, lineId: activeCtx.lineId });
+                }
+              });
+            }}
+            onExitEdit={() => {
+              setActiveChordId(null);
+              setLyricMultiSelected(new Map());
+            }}
+          />
+        );
+      })()}
 
       <Dialog open={orientationOpen} onOpenChange={setOrientationOpen}>
         <DialogContent>

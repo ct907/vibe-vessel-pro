@@ -5,6 +5,7 @@ import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
+import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -146,6 +147,7 @@ function PatternBlock({
   const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
+  const isMobile = useIsMobile();
 
   // Shift key tracking for multi-select via Shift+click / Shift+contextMenu.
   const isShiftDownRef = useRef(false);
@@ -615,8 +617,9 @@ function PatternBlock({
           })()}
       </div>
 
-      {/* Floating chord toolbar — reorder, bar-length, multi-select. */}
-      {activeChordInThisBlock && (
+      {/* Floating chord toolbar — reorder, bar-length, multi-select.
+          Hidden on mobile; mobile uses the global FloatingChordToolbar. */}
+      {!isMobile && activeChordInThisBlock && (
         <div className="mt-2 flex justify-center">
           <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-2 py-1.5 flex-wrap">
             {/* ← → reorder */}
@@ -1162,6 +1165,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     setAllSectionsCollapsed,
     shiftPatternChords,
     resizePatternChordsWithOverflow,
+    movePatternChord,
+    bulkSetChordOctave,
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
@@ -1433,8 +1438,126 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         />
       ))}
 
-      {/* Cross-block multi-select toolbar */}
-      {multiSelected.size > 0 && (
+      {isMobile && (() => {
+        const patternOfActive = activeChordId
+          ? progression.find((p) => {
+              const owner = sections.find((s) => s.id === (p.sectionId ?? p.id));
+              const chords = owner ? getPatternChordsViaSSOT(owner, p) : p.chords;
+              return chords.some((c) => c.id === activeChordId);
+            }) ?? null
+          : null;
+        const activeChordData = (() => {
+          if (!patternOfActive || !activeChordId) return null;
+          const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
+          const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+          return chords.find((c) => c.id === activeChordId) ?? null;
+        })();
+        const activeIdx = patternOfActive && activeChordId
+          ? (() => {
+              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
+              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+              return chords.findIndex((c) => c.id === activeChordId);
+            })()
+          : -1;
+        const activeBlockLen = patternOfActive
+          ? (() => {
+              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
+              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+              return chords.length;
+            })()
+          : 0;
+
+        const canShiftLeftSingle = activeIdx > 0;
+        const canShiftRightSingle = activeIdx >= 0 && activeIdx < activeBlockLen - 1;
+        const canShiftLeftMulti = multiSelected.size > 0 && (() => {
+          for (const [chordId, patternId] of multiSelected) {
+            const pat = progression.find((p) => p.id === patternId);
+            if (!pat) return false;
+            const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
+            const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
+            const idx = chords.findIndex((c) => c.id === chordId);
+            if (idx <= 0) return false;
+          }
+          return true;
+        })();
+        const canShiftRightMulti = multiSelected.size > 0 && (() => {
+          for (const [chordId, patternId] of multiSelected) {
+            const pat = progression.find((p) => p.id === patternId);
+            if (!pat) return false;
+            const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
+            const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
+            const idx = chords.findIndex((c) => c.id === chordId);
+            if (idx < 0 || idx >= chords.length - 1) return false;
+          }
+          return true;
+        })();
+
+        const useMulti = multiSelected.size > 0;
+        const canShiftLeft = useMulti ? canShiftLeftMulti : canShiftLeftSingle;
+        const canShiftRight = useMulti ? canShiftRightMulti : canShiftRightSingle;
+
+        return (
+          <FloatingChordToolbar
+            mode="progression"
+            activeChord={
+              activeChordData
+                ? {
+                    id: activeChordData.id,
+                    display: activeChordData.chord.display,
+                    octave: activeChordData.chord.octave,
+                    lengthBeats: activeChordData.lengthBeats,
+                  }
+                : null
+            }
+            selectedCount={multiSelected.size}
+            isActiveInMultiSet={!!activeChordId && multiSelected.has(activeChordId)}
+            canShiftLeft={canShiftLeft}
+            canShiftRight={canShiftRight}
+            onShift={(dir) => {
+              if (useMulti) handleMultiShift(dir);
+              else if (patternOfActive && activeChordId) movePatternChord(patternOfActive.id, activeChordId, dir);
+            }}
+            onResize={(delta) => {
+              if (useMulti) handleMultiResize(delta);
+              else if (patternOfActive && activeChordId)
+                resizePatternChordsWithOverflow(patternOfActive.id, [activeChordId], delta);
+            }}
+            onOctaveChange={(oct) => {
+              if (useMulti) {
+                const byPattern = new Map<string, string[]>();
+                multiSelected.forEach((patternId, chordId) => {
+                  const arr = byPattern.get(patternId) ?? [];
+                  arr.push(chordId);
+                  byPattern.set(patternId, arr);
+                });
+                byPattern.forEach((chordIds, patternId) => bulkSetChordOctave(patternId, chordIds, oct));
+              } else if (patternOfActive && activeChordData) {
+                updatePatternChord(patternOfActive.id, activeChordData.id, {
+                  chord: { ...activeChordData.chord, octave: oct },
+                });
+              }
+            }}
+            onToggleMultiSelectActive={() => {
+              if (patternOfActive && activeChordId) toggleMultiSelected(activeChordId, patternOfActive.id);
+            }}
+            onSelectAll={() => {
+              if (!patternOfActive) return;
+              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
+              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+              chords.forEach((c) => {
+                if (!multiSelected.has(c.id)) toggleMultiSelected(c.id, patternOfActive.id);
+              });
+            }}
+            onExitEdit={() => {
+              setActiveChordId(null);
+              setMultiSelected(new Map());
+            }}
+          />
+        );
+      })()}
+
+      {/* Cross-block multi-select toolbar (desktop). Mobile uses FloatingChordToolbar. */}
+      {!isMobile && multiSelected.size > 0 && (
         <div className="sticky bottom-10 z-30 flex justify-center pointer-events-none">
           <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-3 py-2 pointer-events-auto">
             <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handleMultiShift(-1)} aria-label="Move selection earlier" title="Move left (← also works)">
