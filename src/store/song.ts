@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord } from "@/lib/music/chords";
+import { ChordSymbol, transposeChord, transposeKey, Mode, parseChord, rootToPc } from "@/lib/music/chords";
 import { usePlaybackStore } from "@/store/playback";
 import { useSoundStore, type SoundSettings } from "@/store/sound";
 import { useAppTintStore } from "@/store/appTint";
@@ -1253,7 +1253,24 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
-  setKey: (keyRoot, keyMode) => set((s) => ({ meta: { ...s.meta, keyRoot, keyMode } })),
+  setKey: (keyRoot, keyMode) => set((s) => {
+    const semitones = (rootToPc(keyRoot) - rootToPc(s.meta.keyRoot) + 12) % 12;
+    if (semitones === 0) return { meta: { ...s.meta, keyRoot, keyMode } };
+    return {
+      meta: { ...s.meta, keyRoot, keyMode },
+      sections: s.sections.map((sec) => ({
+        ...sec,
+        lines: sec.lines.map((l) => ({
+          ...l,
+          chords: l.chords.map((a) => ({ ...a, chord: transposeChord(a.chord, semitones) })),
+        })),
+      })),
+      progression: s.progression.map((p) => ({
+        ...p,
+        chords: p.chords.map((c) => ({ ...c, chord: transposeChord(c.chord, semitones) })),
+      })),
+    };
+  }),
   setBpm: (bpm) => set((s) => ({ meta: { ...s.meta, bpm: Math.max(40, Math.min(220, bpm)) } })),
 
   setTimeSignature: (beatsPerBar, beatUnit) => set((s) => {
