@@ -1350,7 +1350,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const idx = state.sections.findIndex((s) => s.id === id);
     if (idx < 0) return null;
     const src = state.sections[idx];
-    const srcPattern = state.progression.find((p) => p.id === id);
+    const srcPatterns = state.progression.filter((p) => (p.sectionId ?? p.id) === id);
     const newId = nanoid();
     // Rebuild lines + chords with fresh ids and mirror relationships.
     const idMap = new Map<string, string>(); // oldAnchorId -> newAnchorId
@@ -1371,17 +1371,16 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       lines: newLines,
       chords: [],
     };
-    const newPattern: PatternBlock = srcPattern
-      ? {
-          id: newId,
+    const newPatterns: PatternBlock[] = srcPatterns.length
+      ? srcPatterns.map((srcPattern, pi) => ({
+          id: pi === 0 ? newId : nanoid(),
           sectionId: newId,
-          label: newSection.label,
+          label: pi === 0 ? newSection.label : srcPattern.label,
           bars: srcPattern.bars,
           beatsPerBar: srcPattern.beatsPerBar,
           chords: srcPattern.chords.map((c) => {
             const newPcId = nanoid();
             const linkedAnchor = c.mirrorId ? idMap.get(c.mirrorId) : undefined;
-            // also re-link the anchor's mirrorId
             if (linkedAnchor) {
               for (const ln of newLines) {
                 const found = ln.chords.find((a) => a.id === linkedAnchor);
@@ -1390,15 +1389,19 @@ export const useSongStore = create<SongState>((rawSet, get) => {
             }
             return { id: newPcId, chord: c.chord, startBeat: c.startBeat, lengthBeats: c.lengthBeats, mirrorId: linkedAnchor };
           }),
-        }
-      : { id: newId, sectionId: newId, label: newSection.label, bars: 4, beatsPerBar: 4, chords: [] };
+        }))
+      : [{ id: newId, sectionId: newId, label: newSection.label, bars: 4, beatsPerBar: 4, chords: [] }];
 
     set((s) => {
       const sections = [...s.sections];
       sections.splice(idx + 1, 0, newSection);
-      const pIdx = s.progression.findIndex((p) => p.id === id);
+      let lastPIdx = -1;
+      for (let k = 0; k < s.progression.length; k++) {
+        if ((s.progression[k].sectionId ?? s.progression[k].id) === id) lastPIdx = k;
+      }
+      const insertAt = (lastPIdx >= 0 ? lastPIdx : s.progression.length - 1) + 1;
       const progression = [...s.progression];
-      progression.splice((pIdx >= 0 ? pIdx : s.progression.length - 1) + 1, 0, newPattern);
+      progression.splice(insertAt, 0, ...newPatterns);
       return { sections, progression };
     });
     return newId;

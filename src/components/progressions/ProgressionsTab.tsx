@@ -822,6 +822,7 @@ function SectionGroup({
   onToggleMultiSelected,
   onClearMultiSelected,
 }: SectionGroupProps) {
+  const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
   const duplicateSection = useSongStore((s) => s.duplicateSection);
@@ -1056,8 +1057,8 @@ function SectionGroup({
           desync the two surfaces. Blocks are now plain children. */}
       {!collapsed && (
         <>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {blocks.map((p, i) => {
+        {(() => {
+          const renderBlock = (p: PatternBlock, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
               .map((q) => {
@@ -1090,15 +1091,36 @@ function SectionGroup({
                 effectiveOffset={effectiveOffset}
               />
             );
-          })}
-          <button
-            type="button"
-            onClick={() => addPatternToSection(sectionId)}
-            className="rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[50px] md:min-h-[100px] transition-colors"
-          >
-            <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
-          </button>
-        </div>
+          };
+          const addButton = (
+            <button
+              type="button"
+              onClick={() => addPatternToSection(sectionId)}
+              className="w-full h-full rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[50px] md:min-h-[100px] transition-colors"
+            >
+              <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
+            </button>
+          );
+          return isMobile ? (
+            <div className="flex flex-col gap-3">
+              {blocks.length === 0 && <div className="flex">{addButton}</div>}
+              {blocks.map((p, i) => {
+                const isLast = i === blocks.length - 1;
+                return (
+                  <div key={p.id} className="flex items-stretch gap-2">
+                    <div className="basis-[85%] shrink-0 min-w-0">{renderBlock(p, i)}</div>
+                    {isLast && <div className="flex-1 min-w-0">{addButton}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {blocks.map((p, i) => renderBlock(p, i))}
+              {addButton}
+            </div>
+          );
+        })()}
         {commentOpen && (
           <div className="mt-3 w-full">
             <Textarea
