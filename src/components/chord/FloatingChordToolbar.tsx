@@ -8,6 +8,8 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Minus,
   Plus,
   CheckSquare,
@@ -28,6 +30,10 @@ export interface FloatingChordToolbarProps {
   canShiftLeft: boolean;
   canShiftRight: boolean;
   onShift: (direction: -1 | 1) => void;
+  /** Lyrics mode only: move the current selection to the chord row above/below. */
+  onMoveVertical?: (direction: -1 | 1) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   onResize?: (deltaBeats: number) => void;
   onOctaveChange?: (oct: number) => void;
   onSelectAll: () => void;
@@ -50,6 +56,9 @@ export function FloatingChordToolbar({
   canShiftLeft,
   canShiftRight,
   onShift,
+  onMoveVertical,
+  canMoveUp = false,
+  canMoveDown = false,
   onResize,
   onOctaveChange,
   onSelectAll,
@@ -209,6 +218,33 @@ export function FloatingChordToolbar({
         </div>
 
         <div className="flex items-center gap-1">
+          {mode === "lyrics" && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                disabled={!hasContext || !canMoveUp}
+                onClick={() => onMoveVertical?.(-1)}
+                aria-label="Move chord(s) to the row above"
+                title="Move to row above"
+              >
+                <ChevronUp className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                disabled={!hasContext || !canMoveDown}
+                onClick={() => onMoveVertical?.(1)}
+                aria-label="Move chord(s) to the row below"
+                title="Move to row below"
+              >
+                <ChevronDown className="h-5 w-5" />
+              </Button>
+              <div className="w-px h-6 bg-border mx-0.5" />
+            </>
+          )}
           {mode === "progression" && (
             <>
               <Button

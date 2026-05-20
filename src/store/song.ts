@@ -226,6 +226,18 @@ export interface SongState {
     toSectionId: string, toLineId: string,
     anchorIds: string[], dropSlot: number,
   ) => void;
+  /**
+   * Move chord anchors to the chord row directly above/below in the lyrics
+   * view. At a section's first row, up crosses to the previous section's last
+   * row; at the last row, down crosses to the next section's first row
+   * (single press). Moved chords are appended after the target row's existing
+   * chords; a new row is created if the adjacent section has none. Returns
+   * whether the move spawned a new pattern block (so the caller can toast).
+   */
+  moveChordsToAdjacentRow: (
+    sourceSectionId: string, sourceLineId: string,
+    anchorIds: string[], direction: -1 | 1,
+  ) => { moved: boolean; createdBlock: boolean; movedIds: string[]; targetSectionId?: string; targetLineId?: string };
 
   // ---- basket ----
   addToBasket: (chords: ChordSymbol[]) => void;
@@ -2308,6 +2320,136 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         [SSOT_MODE]: true,
       } as any);
     });
+  },
+
+  moveChordsToAdjacentRow: (sourceSectionId, sourceLineId, anchorIds, direction) => {
+    const blockCountBefore = get().progression.length;
+    let moved = false;
+    let movedIds: string[] = [];
+    let targetSectionId: string | undefined;
+    let targetLineId: string | undefined;
+
+    pushHistory(get);
+    set((s) => {
+      const srcSecIdx = s.sections.findIndex((x) => x.id === sourceSectionId);
+      if (srcSecIdx < 0) return {};
+      const srcSec = s.sections[srcSecIdx];
+      const lineIdx = srcSec.lines.findIndex((l) => l.id === sourceLineId);
+      if (lineIdx < 0) return {};
+
+      const idSet = new Set(anchorIds);
+      // anchorId === SectionChord.id under SSOT.
+      const moving = srcSec.chords
+        .filter((sc) => idSet.has(sc.id) && sc.lyricsPlacement?.lineId === sourceLineId)
+        .sort((a, b) => (a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex));
+      if (!moving.length) return {};
+
+      // Resolve target section + line (auto-cross section boundaries).
+      let tgtSecIdx = srcSecIdx;
+      let tgtLineId: string;
+      let createdLine: LyricLine | null = null;
+      const within = srcSec.lines[lineIdx + direction];
+      if (within) {
+        tgtLineId = within.id;
+      } else {
+        tgtSecIdx = srcSecIdx + direction;
+        const adjSec = s.sections[tgtSecIdx];
+        if (!adjSec) return {}; // absolute first/last row of the song
+        const adjLine = direction === -1 ? adjSec.lines[adjSec.lines.length - 1] : adjSec.lines[0];
+        if (adjLine) {
+          tgtLineId = adjLine.id;
+        } else {
+          createdLine = { id: nanoid(), text: "", chords: [] as ChordAnchor[] };
+          tgtLineId = createdLine.id;
+        }
+      }
+      const tgtSec = s.sections[tgtSecIdx];
+      const sameSection = tgtSec.id === sourceSectionId;
+
+      // Working sections, with the optionally-created target line appended.
+      let workingSections = s.sections;
+      if (createdLine) {
+        workingSections = workingSections.map((x) =>
+          x.id !== tgtSec.id ? x : { ...x, lines: [...x.lines, createdLine!] },
+        );
+      }
+
+      // Append base: one slot past the last chord already on the target line.
+      const occupied = new Set<number>();
+      workingSections[tgtSecIdx].chords.forEach((sc) => {
+        if (sc.lyricsPlacement?.lineId === tgtLineId && !idSet.has(sc.id)) {
+          occupied.add(sc.lyricsPlacement.slotIndex);
+        }
+      });
+      const base = occupied.size ? Math.max(...occupied) + 1 : 0;
+
+      if (sameSection) {
+        // Re-slot lyricsPlacement onto the target line and reorder
+        // section.chords so the moved chords sit after the target row's
+        // existing chords — array order drives both lyric slot order and
+        // pattern-block packing.
+        const movingIds = new Set(moving.map((m) => m.id));
+        let chords = workingSections[srcSecIdx].chords.filter((sc) => !movingIds.has(sc.id));
+        const lines = workingSections[srcSecIdx].lines;
+        moving.forEach((m, k) => {
+          const slot = Math.min(CHORD_ROW_SLOTS - 1, base + k);
+          const updated: SectionChord = { ...m, lyricsPlacement: { lineId: tgtLineId, slotIndex: slot } };
+          chords = insertSectionChordAtSlot(chords, updated, lines);
+        });
+        const nextSections = workingSections.map((sec, i) =>
+          i === srcSecIdx ? { ...sec, chords } : sec,
+        );
+        moved = true;
+        movedIds = moving.map((m) => m.id);
+        targetSectionId = tgtSec.id;
+        targetLineId = tgtLineId;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return ({ sections: nextSections, [SSOT_MODE]: true } as any);
+      }
+
+      // Cross-section: drop from the source, allocate fresh SectionChords in
+      // the target section so it owns the progression placement.
+      let workingProgression = s.progression;
+      let nextSections = workingSections.map((sec) =>
+        sec.id !== sourceSectionId
+          ? sec
+          : { ...sec, chords: sec.chords.filter((sc) => !idSet.has(sc.id)) },
+      );
+      const freshIds: string[] = [];
+      moving.forEach((m, k) => {
+        const slot = Math.min(CHORD_ROW_SLOTS - 1, base + k);
+        const targetSec = nextSections[tgtSecIdx];
+        const placement = placeSectionChordInProgression(
+          workingProgression,
+          tgtSec.id,
+          targetSec.chords,
+          m.chord,
+          nanoid(),
+          { lineId: tgtLineId, slotIndex: slot },
+        );
+        workingProgression = placement.progression;
+        freshIds.push(placement.sectionChord.id);
+        nextSections = nextSections.map((sec, i) =>
+          i === tgtSecIdx
+            ? { ...sec, chords: insertSectionChordAtSlot(sec.chords, placement.sectionChord, sec.lines) }
+            : sec,
+        );
+      });
+      moved = true;
+      movedIds = freshIds;
+      targetSectionId = tgtSec.id;
+      targetLineId = tgtLineId;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ sections: nextSections, progression: workingProgression, [SSOT_MODE]: true } as any);
+    });
+
+    return {
+      moved,
+      createdBlock: get().progression.length > blockCountBefore,
+      movedIds,
+      targetSectionId,
+      targetLineId,
+    };
   },
 
   addToBasket: (chords) => set((s) => ({

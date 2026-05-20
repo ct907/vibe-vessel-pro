@@ -278,7 +278,34 @@ export function formatChordsAndLyrics(
     }
   });
 
+  // 4.5) Orphan rescue: SectionChords with a progressionPlacement but no
+  //      lyricsPlacement are invisible — deriveMirrorsFromSectionChords and the
+  //      step-4 overflow pass both skip chords with no placement. Append them
+  //      onto fresh _isChordOverflow rows at the end of the section so they
+  //      show up as chords in a new chord row.
+  const orphanChords = remappedChords.filter(
+    (sc) => !sc.lyricsPlacement && !!sc.progressionPlacement,
+  );
+  const orphanPlacement = new Map<string, string>();
+  if (orphanChords.length > 0) {
+    let cursor = cap; // force a fresh row on the first chord
+    let rescueRowId = "";
+    for (const sc of orphanChords) {
+      const w = chordSlotWidth(sc.chord.display);
+      if (cursor + w > cap) {
+        rescueRowId = nanoid();
+        finalLines.push({ id: rescueRowId, text: "", chords: [] as ChordAnchor[], _isChordOverflow: true });
+        overflowRowsAdded += 1;
+        cursor = 0;
+      }
+      orphanPlacement.set(sc.id, rescueRowId);
+      cursor += w + SPACING;
+    }
+  }
+
   const retargetedChords = remappedChords.map((sc) => {
+    const orphanTarget = orphanPlacement.get(sc.id);
+    if (orphanTarget) return { ...sc, lyricsPlacement: { lineId: orphanTarget, slotIndex: 0 } };
     const lp = sc.lyricsPlacement;
     if (!lp) return sc;
     const target = overflowRetarget.get(sc.id);
@@ -303,6 +330,6 @@ export function formatChordsAndLyrics(
       chords: finalChords,
     },
     overflowRowsAdded,
-    orphansFixed: orphanCount,
+    orphansFixed: orphanCount + orphanChords.length,
   };
 }
