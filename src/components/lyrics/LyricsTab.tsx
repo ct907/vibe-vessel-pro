@@ -1595,6 +1595,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
         const canShiftLeft = targets.length > 0 && slotsOf.every((s) => s > 0);
         const canShiftRight = targets.length > 0 && slotsOf.every((s) => s < CHORD_ROW_SLOTS - 1);
 
+        // Vertical move is row-scoped: enabled only when the whole selection
+        // sits on one line of one section.
+        const sourceRows = new Set(targets.map((t) => `${t.sectionId}:${t.lineId}`));
+        const sourceRow = sourceRows.size === 1 && targets[0]
+          ? { sectionId: targets[0].sectionId, lineId: targets[0].lineId }
+          : null;
+        const canMoveVertical = (dir: -1 | 1): boolean => {
+          if (!sourceRow) return false;
+          const si = sections.findIndex((sec) => sec.id === sourceRow.sectionId);
+          if (si < 0) return false;
+          const li = sections[si].lines.findIndex((l) => l.id === sourceRow.lineId);
+          if (li < 0) return false;
+          return !!sections[si].lines[li + dir] || !!sections[si + dir];
+        };
+
         const selectedOctaves: number[] = [];
         lyricMultiSelected.forEach((_ctx, anchorId) => {
           const found = lookupAnchor(anchorId);
@@ -1619,6 +1634,34 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
             selectedOctaves={selectedOctaves}
             canShiftLeft={canShiftLeft}
             canShiftRight={canShiftRight}
+            canMoveUp={canMoveVertical(-1)}
+            canMoveDown={canMoveVertical(1)}
+            onMoveVertical={(dir) => {
+              if (!sourceRow) return;
+              const res = useSongStore
+                .getState()
+                .moveChordsToAdjacentRow(
+                  sourceRow.sectionId,
+                  sourceRow.lineId,
+                  targets.map((t) => t.id),
+                  dir,
+                );
+              if (!res.moved) return;
+              if (res.createdBlock) {
+                toast.info("New pattern block created to fit the moved chords");
+              }
+              if (res.targetSectionId && res.targetLineId) {
+                if (useMulti) {
+                  const next = new Map<string, { sectionId: string; lineId: string }>();
+                  res.movedIds.forEach((id) =>
+                    next.set(id, { sectionId: res.targetSectionId!, lineId: res.targetLineId! }),
+                  );
+                  setLyricMultiSelected(next);
+                } else {
+                  setActiveChordId(res.movedIds[0] ?? null);
+                }
+              }
+            }}
             onShift={(dir) => {
               for (const t of targets) {
                 const found = lookupAnchor(t.id);

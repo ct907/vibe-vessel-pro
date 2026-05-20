@@ -110,6 +110,8 @@ interface PatternProps {
   onClearMultiSelected: () => void;
   /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
   effectiveOffset: number;
+  /** When true, the card background spans the full row width while content stays in the left ~85% (mobile non-last blocks). */
+  extendBackground?: boolean;
 }
 
 function formatBeats(n: number) {
@@ -130,6 +132,7 @@ function PatternBlock({
   onToggleMultiSelected,
   onClearMultiSelected,
   effectiveOffset,
+  extendBackground = false,
 }: PatternProps) {
   const {
     updatePattern,
@@ -260,7 +263,7 @@ function PatternBlock({
     <div
       ref={blockRef}
       data-pattern-block={pattern.id}
-      className="rounded-lg p-3 transition-shadow"
+      className={cn("rounded-lg p-3 transition-shadow", extendBackground && "pr-[15%]")}
       style={{
         background: "var(--paper-card)",
         boxShadow:
@@ -1058,7 +1061,7 @@ function SectionGroup({
       {!collapsed && (
         <>
         {(() => {
-          const renderBlock = (p: PatternBlock, i: number) => {
+          const renderBlock = (p: PatternBlockType, i: number, extendBackground = false) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
               .map((q) => {
@@ -1089,6 +1092,7 @@ function SectionGroup({
                 onToggleMultiSelected={onToggleMultiSelected}
                 onClearMultiSelected={onClearMultiSelected}
                 effectiveOffset={effectiveOffset}
+                extendBackground={extendBackground}
               />
             );
           };
@@ -1106,11 +1110,13 @@ function SectionGroup({
               {blocks.length === 0 && <div className="flex">{addButton}</div>}
               {blocks.map((p, i) => {
                 const isLast = i === blocks.length - 1;
-                return (
+                return isLast ? (
                   <div key={p.id} className="flex items-stretch gap-2">
                     <div className="basis-[85%] shrink-0 min-w-0">{renderBlock(p, i)}</div>
-                    {isLast && <div className="flex-1 min-w-0">{addButton}</div>}
+                    <div className="flex-1 min-w-0">{addButton}</div>
                   </div>
+                ) : (
+                  <div key={p.id} className="w-full min-w-0">{renderBlock(p, i, true)}</div>
                 );
               })}
             </div>
