@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Defaults from "./pages/Defaults.tsx";
 import Landing from "./pages/Landing.tsx";
 import Help from "./pages/Help.tsx";
+import ChordExplorer from "./pages/ChordExplorer.tsx";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
 import { pushRecent } from "@/lib/recent-projects";
@@ -107,6 +108,7 @@ const App = () => {
               <Route path="/" element={<Landing />} />
               <Route path="/defaults" element={<FullScreenOverlay><Defaults /></FullScreenOverlay>} />
               <Route path="/help" element={<FullScreenOverlay><Help /></FullScreenOverlay>} />
+              <Route path="/chord-explorer" element={<FullScreenOverlay><ChordExplorer /></FullScreenOverlay>} />
               <Route path="/app" element={null} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<FullScreenOverlay><NotFound /></FullScreenOverlay>} />
