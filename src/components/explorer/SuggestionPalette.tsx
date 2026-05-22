@@ -23,11 +23,9 @@ interface SuggestionPaletteProps {
   steps: ExplorerStep[];
   keyRoot: string;
   mode: ExplorerMode;
-  started: boolean;
   focusIdx: number;
   onAddCandidate: (c: Candidate) => void;
   onAddStarter: (root: string, quality: "maj" | "min" | "dim") => void;
-  onPickQuality: (quality: "maj" | "min" | "dim") => void;
 }
 
 function voiceLinkBadges(c: Candidate) {
@@ -53,65 +51,16 @@ export default function SuggestionPalette({
   steps,
   keyRoot,
   mode,
-  started,
   focusIdx,
   onAddCandidate,
   onAddStarter,
-  onPickQuality,
 }: SuggestionPaletteProps) {
   const [primedId, setPrimedId] = useState<string | null>(null);
   useEffect(() => {
     setPrimedId(null);
   }, [focusIdx, steps.length]);
 
-  if (steps.length === 0 && !started) {
-    const previewQuality = (suffix: string) => {
-      const chord = parseChord(keyRoot + suffix);
-      if (!chord) return;
-      void playNotes(voiceChord(chord), 1);
-    };
-    return (
-      <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
-        <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-          Pick a quality for {keyRoot}
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {([
-            { q: "maj", label: "Major", suffix: "" },
-            { q: "min", label: "Minor", suffix: "m" },
-            { q: "dim", label: "Dim", suffix: "dim", display: "°" },
-          ] as const).map((x) => (
-            <div
-              key={x.q}
-              className="btn-sculpt-cream flex min-w-[110px] items-center gap-1.5 rounded-lg px-2 py-2"
-            >
-              <button
-                type="button"
-                aria-label={`Preview ${keyRoot}${x.suffix}`}
-                onClick={() => previewQuality(x.suffix)}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft hover:bg-[var(--paper-shade)] hover:text-ink"
-              >
-                <Volume2 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onPickQuality(x.q)}
-                className="flex flex-1 flex-col items-center"
-              >
-                <span className="font-mono-chord text-lg font-bold">
-                  {keyRoot}
-                  {"display" in x ? x.display : x.suffix}
-                </span>
-                <span className="text-[9px] uppercase tracking-wide text-ink-soft">{x.label}</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (steps.length === 0 && started) {
+  if (steps.length === 0) {
     const dias = diatonicChords(keyRoot, mode);
     return (
       <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
@@ -139,6 +88,8 @@ export default function SuggestionPalette({
       </div>
     );
   }
+
+
 
 
   const focus = steps[focusIdx] ?? steps[steps.length - 1];
