@@ -154,11 +154,13 @@ function SectionPanel({
   const recomputeLines = useCallback(() => {
     const container = gridWrapRef.current;
     if (!container || !leftStep || !rightStep) {
-      setLineSpecs([]);
+      setLineSpecs((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     const rect = container.getBoundingClientRect();
-    setSvgSize({ w: rect.width, h: rect.height });
+    setSvgSize((prev) =>
+      prev.w === rect.width && prev.h === rect.height ? prev : { w: rect.width, h: rect.height },
+    );
     const links = findVoiceLinks(leftStep.pitches, rightStep.pitches);
     const specs: LineSpec[] = [];
     for (const lk of links) {
@@ -178,12 +180,25 @@ function SectionPanel({
         opacity: lk.type === "direct" ? 0.7 : 0.4,
       });
     }
-    setLineSpecs(specs);
+    setLineSpecs((prev) => {
+      if (
+        prev.length === specs.length &&
+        prev.every((p, i) =>
+          p.x1 === specs[i].x1 && p.y1 === specs[i].y1 &&
+          p.x2 === specs[i].x2 && p.y2 === specs[i].y2 &&
+          p.color === specs[i].color && p.dash === specs[i].dash &&
+          p.width === specs[i].width && p.opacity === specs[i].opacity,
+        )
+      ) {
+        return prev;
+      }
+      return specs;
+    });
   }, [leftStep, rightStep]);
 
   useLayoutEffect(() => {
     recomputeLines();
-  });
+  }, [recomputeLines]);
 
   useEffect(() => {
     const el = gridWrapRef.current;
