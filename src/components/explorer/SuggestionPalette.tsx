@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { Repeat, Volume2 } from "lucide-react";
+import { Repeat } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { parseChord } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
 import {
   CATEGORY_META,
@@ -18,6 +17,7 @@ import {
   type ExplorerMode,
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
+
 
 interface SuggestionPaletteProps {
   steps: ExplorerStep[];
