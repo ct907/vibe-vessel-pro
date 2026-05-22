@@ -9,6 +9,11 @@ import { secondaryDominantOf } from "./suggestions";
 export type ExplorerMode = "maj" | "min";
 export type ExplorerCategory = "linger" | "push" | "glide" | "drift";
 
+export interface Trait {
+  tag: string;
+  note: string;
+}
+
 export interface VoiceLink {
   fromVoice: number;
   toVoice: number;
@@ -34,14 +39,14 @@ export interface Candidate {
   voiceLinks: VoiceLink[];
   voiceDist: VoiceDistance;
   loopSmooth: boolean;
-  trait: { tag: string; note: string } | null;
+  trait: Trait | null;
 }
 
 export interface ExplorerStep {
   id: string;
   chord: ChordSymbol;
   category: ExplorerCategory | "starter" | "typed";
-  trait: string | null;
+  trait: Trait | null;
   pitches: number[];
 }
 
@@ -250,7 +255,7 @@ function traitFor(
   c: Candidate,
   focus: ChordSymbol,
   cat: ExplorerCategory,
-): { tag: string; note: string } {
+): Trait {
   const vd = c.voiceDist;
   const ri = (((rootToPc(c.chord.root) - rootToPc(focus.root)) % 12) + 12) % 12;
   if (cat === "glide") {

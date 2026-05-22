@@ -1,5 +1,6 @@
-import { useMemo } from "react";
-import { Pencil, X } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { GripHorizontal, Pencil, X } from "lucide-react";
+import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { pcToName, rootToPc, type Quality } from "@/lib/music/chords";
 import {
   CATEGORY_META,
@@ -14,6 +15,7 @@ import {
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
 import ChordInput from "./ChordInput";
+import ChordDescription from "./ChordDescription";
 
 interface VoiceLeadingChartProps {
   steps: ExplorerStep[];
@@ -21,11 +23,10 @@ interface VoiceLeadingChartProps {
   mode: ExplorerMode;
   focusIdx: number;
   playIndex: number;
-  voicingEditIdx: number;
   canEdit: boolean;
   onToggleEdit: () => void;
-  onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
   onFocus: (idx: number) => void;
+  onScrollFocus: (idx: number) => void;
   onRemove: (idx: number) => void;
   onSetExtension: (idx: number, quality: Quality) => void;
   onAddTyped: (input: string) => boolean;
@@ -37,8 +38,7 @@ const PAD_R = 24;
 const PAD_T = 56;
 const PAD_B = 14;
 const PLOT_H = H - PAD_T - PAD_B;
-const COL_NORMAL = 100;
-const COL_EDIT = 176;
+const COL = 100;
 
 function shapePoints(shape: string, cx: number, cy: number, sz: number): string {
   switch (shape) {
@@ -78,28 +78,27 @@ export default function VoiceLeadingChart({
   mode,
   focusIdx,
   playIndex,
-  voicingEditIdx,
   canEdit,
   onToggleEdit,
-  onMoveVoice,
   onFocus,
+  onScrollFocus,
   onRemove,
   onSetExtension,
   onAddTyped,
 }: VoiceLeadingChartProps) {
   const useFlat = keyUsesFlat(keyRoot);
-  const editing = voicingEditIdx >= 0;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const colRefs = useRef<(HTMLElement | null)[]>([]);
 
   const layout = useMemo(() => {
-    const colW = steps.map((_, i) => (i === voicingEditIdx ? COL_EDIT : COL_NORMAL));
     const xs: number[] = [];
     let acc = PAD_L;
     for (let i = 0; i < steps.length; i++) {
-      xs.push(acc + colW[i] / 2);
-      acc += colW[i];
+      xs.push(acc + COL / 2);
+      acc += COL;
     }
     const contentW = acc + PAD_R;
-    const footerW = contentW + COL_NORMAL;
+    const footerW = contentW + COL;
     let minP = Infinity;
     let maxP = -Infinity;
     for (const s of steps) {
@@ -112,12 +111,29 @@ export default function VoiceLeadingChart({
     maxP += 3;
     const range = maxP - minP || 1;
     const yFor = (p: number) => PAD_T + PLOT_H - ((p - minP) / range) * PLOT_H;
-    return { xs, colW, contentW, footerW, yFor };
-  }, [steps, voicingEditIdx]);
+    return { xs, contentW, footerW, yFor };
+  }, [steps]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const idx = colRefs.current.indexOf(e.target as HTMLElement);
+          if (idx >= 0) onScrollFocus(idx);
+        }
+      },
+      { root, rootMargin: "0px -45% 0px -45%", threshold: 0 },
+    );
+    colRefs.current.forEach((el) => el && obs.observe(el));
+    return () => obs.disconnect();
+  }, [steps, onScrollFocus]);
 
   if (steps.length === 0) return null;
 
-  const { xs, colW, contentW, footerW, yFor } = layout;
+  const { xs, contentW, footerW, yFor } = layout;
   const hiker = hikerColors(keyRoot);
   const hikerIdx = playIndex >= 0 ? playIndex : focusIdx;
 
@@ -139,18 +155,16 @@ export default function VoiceLeadingChart({
           <button
             type="button"
             onClick={onToggleEdit}
-            disabled={!canEdit && !editing}
-            className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-semibold disabled:opacity-40 ${
-              editing ? "btn-sculpt-amber" : "btn-sculpt-cream"
-            }`}
+            disabled={!canEdit}
+            className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-semibold disabled:opacity-40"
           >
             <Pencil className="h-3 w-3" />
-            {editing ? "Done" : "Edit Voicing"}
+            Edit Voicing
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div ref={scrollRef} className="snap-x snap-proximity overflow-x-auto scroll-px-6">
         <div className="mx-auto" style={{ width: footerW }}>
           <svg
             width={contentW}
@@ -163,12 +177,12 @@ export default function VoiceLeadingChart({
             {steps.map((_, i) => (
               <rect
                 key={`band-${i}`}
-                x={xs[i] - colW[i] / 2 + 4}
+                x={xs[i] - COL / 2 + 4}
                 y={PAD_T - 6}
-                width={colW[i] - 8}
+                width={COL - 8}
                 height={PLOT_H + 12}
                 rx="6"
-                fill={i === voicingEditIdx ? "var(--primary-halo)" : "oklch(0 0 0 / 0.025)"}
+                fill="oklch(0 0 0 / 0.025)"
               />
             ))}
 
@@ -203,28 +217,25 @@ export default function VoiceLeadingChart({
               ));
             })}
 
-            {steps.map((step, i) => {
-              const isEdit = i === voicingEditIdx;
-              const sz = isEdit ? 13 : 8;
-              return step.pitches.map((pitch, v) => {
+            {steps.map((step, i) =>
+              step.pitches.map((pitch, v) => {
                 const shapeIdx = Math.min(v, 3);
                 const cx = xs[i];
                 const cy = yFor(pitch);
-                const bx = cx + sz + 13;
                 return (
                   <g key={`sh-${i}-${v}`}>
                     <polygon
-                      points={shapePoints(VOICE_SHAPES[shapeIdx], cx, cy, sz)}
+                      points={shapePoints(VOICE_SHAPES[shapeIdx], cx, cy, 8)}
                       fill={VOICE_COLORS[shapeIdx]}
                       stroke="oklch(1 0 0 / 0.75)"
                       strokeWidth="0.75"
                     />
                     <text
                       x={cx}
-                      y={cy + (VOICE_SHAPES[shapeIdx] === "triangle" ? sz * 0.22 : 0)}
+                      y={cy + (VOICE_SHAPES[shapeIdx] === "triangle" ? 8 * 0.22 : 0)}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize={isEdit ? 12 : 9}
+                      fontSize={9}
                       fontFamily="'JetBrains Mono', monospace"
                       fontWeight="700"
                       fill="oklch(1 0 0)"
@@ -234,39 +245,15 @@ export default function VoiceLeadingChart({
                     >
                       {pcToName(((pitch % 12) + 12) % 12, useFlat)}
                     </text>
-                    {isEdit && (
-                      <>
-                        <g
-                          role="button"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => onMoveVoice(i, v, 1)}
-                        >
-                          <rect x={bx - 9} y={cy - 16} width="18" height="14" rx="3"
-                            fill="var(--paper)" stroke="var(--border)" strokeWidth="1" />
-                          <polygon points={`${bx},${cy - 12} ${bx - 4},${cy - 6} ${bx + 4},${cy - 6}`}
-                            fill="var(--ink)" />
-                        </g>
-                        <g
-                          role="button"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => onMoveVoice(i, v, -1)}
-                        >
-                          <rect x={bx - 9} y={cy + 2} width="18" height="14" rx="3"
-                            fill="var(--paper)" stroke="var(--border)" strokeWidth="1" />
-                          <polygon points={`${bx},${cy + 12} ${bx - 4},${cy + 6} ${bx + 4},${cy + 6}`}
-                            fill="var(--ink)" />
-                        </g>
-                      </>
-                    )}
                   </g>
                 );
-              });
-            })}
+              }),
+            )}
 
             {hikerIdx >= 0 && hikerIdx < steps.length && (
               <g
                 transform={`translate(${xs[hikerIdx]} ${
-                  yFor(Math.max(...steps[hikerIdx].pitches)) - (hikerIdx === voicingEditIdx ? 13 : 8)
+                  yFor(Math.max(...steps[hikerIdx].pitches)) - 8
                 }) scale(0.62)`}
               >
                 <ellipse cx="0" cy="2" rx="15" ry="4.5" fill="oklch(0.3 0.02 60 / 0.2)" />
@@ -282,102 +269,124 @@ export default function VoiceLeadingChart({
             )}
           </svg>
 
-          <div className="flex" style={{ paddingLeft: PAD_L, paddingRight: PAD_R }}>
-            {steps.map((step, i) => {
-              const cat = step.category;
-              const meta = cat === "starter" || cat === "typed" ? null : CATEGORY_META[cat];
-              const numeral = nashvilleNumeral(step.chord, keyRoot, mode);
-              const keyTag = keyChangeLabel(step.chord, keyRoot, mode);
-              const exts = extensionOptions(step.chord.quality);
-              const focused = i === focusIdx;
-              const playing = i === playIndex;
-              return (
-                <div key={step.id} style={{ width: colW[i] }} className="flex justify-center px-0.5">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onFocus(i)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onFocus(i);
-                      }
-                    }}
-                    className={`group relative w-full cursor-pointer rounded-lg border bg-[var(--paper)] px-1.5 pb-2 pt-2 text-center transition-colors ${
-                      focused
-                        ? "border-[var(--primary)] shadow-[var(--shadow-card)]"
-                        : "border-border"
-                    } ${playing ? "ring-2 ring-[var(--primary-halo)]" : ""}`}
-                    style={{ borderBottom: meta ? `3px solid ${meta.tint}` : undefined }}
-                  >
-                    <button
-                      type="button"
-                      aria-label="Remove chord"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemove(i);
-                      }}
-                      className="absolute -right-1.5 -top-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-ink text-[var(--paper)] group-hover:flex group-focus-within:flex"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                    <div className="font-mono-chord text-base font-bold leading-tight text-ink">
-                      {step.chord.display}
-                    </div>
-                    <div className="mt-0.5 font-mono-chord text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                      {numeral}
-                    </div>
-                    {meta && (
-                      <div
-                        className="mt-0.5 text-[9px] font-bold uppercase tracking-wide"
-                        style={{ color: meta.ink }}
-                      >
-                        {meta.name.split(" ")[0]}
-                      </div>
-                    )}
-                    {step.trait && (
-                      <div className="mt-0.5 truncate text-[8px] uppercase tracking-wide text-ink-soft/80">
-                        {step.trait}
-                      </div>
-                    )}
-                    {keyTag && (
-                      <div
-                        className="mt-1 inline-block rounded bg-[var(--section-tint-violet)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide"
-                        style={{ color: "oklch(0.42 0.1 300)" }}
-                      >
-                        {keyTag}
-                      </div>
-                    )}
-                    {exts.length > 1 && (
-                      <select
-                        value={step.chord.quality}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => onSetExtension(i, e.target.value as Quality)}
-                        className="mt-1.5 w-full rounded border border-border bg-[var(--paper-shade)] py-0.5 text-center font-mono-chord text-[10px] text-ink-soft"
-                      >
-                        {exts.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+          <Droppable droppableId="explorer-footer" direction="horizontal">
+            {(dropProvided) => (
+              <div
+                ref={dropProvided.innerRef}
+                {...dropProvided.droppableProps}
+                className="flex"
+                style={{ paddingLeft: PAD_L, paddingRight: PAD_R }}
+              >
+                {steps.map((step, i) => {
+                  const cat = step.category;
+                  const meta = cat === "starter" || cat === "typed" ? null : CATEGORY_META[cat];
+                  const numeral = nashvilleNumeral(step.chord, keyRoot, mode);
+                  const keyTag = keyChangeLabel(step.chord, keyRoot, mode);
+                  const exts = extensionOptions(step.chord.quality);
+                  const focused = i === focusIdx;
+                  const playing = i === playIndex;
+                  return (
+                    <Draggable key={step.id} draggableId={step.id} index={i}>
+                      {(dragProvided) => (
+                        <div
+                          ref={(el) => {
+                            dragProvided.innerRef(el);
+                            colRefs.current[i] = el;
+                          }}
+                          {...dragProvided.draggableProps}
+                          style={{ width: COL, ...dragProvided.draggableProps.style }}
+                          className="shrink-0 snap-center px-0.5"
+                        >
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onFocus(i)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                onFocus(i);
+                              }
+                            }}
+                            className={`group relative w-full cursor-pointer rounded-lg border bg-[var(--paper)] px-1.5 pb-2 pt-1 text-center transition-colors ${
+                              focused
+                                ? "border-[var(--primary)] shadow-[var(--shadow-card)]"
+                                : "border-border"
+                            } ${playing ? "ring-2 ring-[var(--primary-halo)]" : ""}`}
+                            style={{ borderBottom: meta ? `3px solid ${meta.tint}` : undefined }}
+                          >
+                            <div
+                              {...dragProvided.dragHandleProps}
+                              aria-label="Reorder chord"
+                              className="mx-auto flex h-3.5 w-full cursor-grab items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                            >
+                              <GripHorizontal className="h-3 w-3" />
+                            </div>
+                            <button
+                              type="button"
+                              aria-label="Remove chord"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemove(i);
+                              }}
+                              className="absolute -right-1.5 -top-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-ink text-[var(--paper)] group-hover:flex group-focus-within:flex"
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                            <div className="font-mono-chord text-base font-bold leading-tight text-ink">
+                              {step.chord.display}
+                            </div>
+                            <div className="mt-0.5 font-mono-chord text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                              {numeral}
+                            </div>
+                            {meta && (
+                              <div
+                                className="mt-0.5 text-[9px] font-bold uppercase tracking-wide"
+                                style={{ color: meta.ink }}
+                              >
+                                {meta.name.split(" ")[0]}
+                              </div>
+                            )}
+                            {keyTag && (
+                              <div
+                                className="mt-1 inline-block rounded bg-[var(--section-tint-violet)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide"
+                                style={{ color: "oklch(0.42 0.1 300)" }}
+                              >
+                                {keyTag}
+                              </div>
+                            )}
+                            {exts.length > 1 && (
+                              <select
+                                value={step.chord.quality}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => onSetExtension(i, e.target.value as Quality)}
+                                className="mt-1.5 w-full rounded border border-border bg-[var(--paper-shade)] py-0.5 text-center font-mono-chord text-[10px] text-ink-soft"
+                              >
+                                {exts.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {dropProvided.placeholder}
+                <div style={{ width: COL }} className="shrink-0 px-0.5">
+                  <ChordInput onAdd={onAddTyped} />
                 </div>
-              );
-            })}
-            <div style={{ width: COL_NORMAL }} className="px-0.5">
-              <ChordInput onAdd={onAddTyped} />
-            </div>
-          </div>
+              </div>
+            )}
+          </Droppable>
         </div>
       </div>
 
-      {editing && (
-        <p className="mt-1 text-center text-[10px] italic text-ink-soft">
-          Nudge each voice up or down an octave — the leading lines redraw as you go.
-        </p>
-      )}
+      <div className="mt-2">
+        <ChordDescription step={steps[focusIdx] ?? null} keyRoot={keyRoot} mode={mode} />
+      </div>
     </div>
   );
 }

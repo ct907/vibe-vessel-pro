@@ -29,10 +29,26 @@ import {
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
 import { useSongStore } from "@/store/song";
+import {
+  DragDropContext,
+  useKeyboardSensor,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import { useInstantMouseSensor } from "@/lib/dnd/instant-mouse-sensor";
+import { useInstantTouchSensor } from "@/lib/dnd/instant-touch-sensor";
 import VoiceLeadingChart from "@/components/explorer/VoiceLeadingChart";
+import VoicingEditor from "@/components/explorer/VoicingEditor";
 import SuggestionPalette from "@/components/explorer/SuggestionPalette";
 
 const BEATS_PER_CHORD = 4;
+
+function remapIndex(idx: number, from: number, to: number): number {
+  if (idx < 0) return idx;
+  if (idx === from) return to;
+  if (from < to && idx > from && idx <= to) return idx - 1;
+  if (from > to && idx >= to && idx < from) return idx + 1;
+  return idx;
+}
 
 function ModeToggle({
   mode,
@@ -106,7 +122,7 @@ export default function ChordExplorer() {
   const makeStep = (
     chord: ExplorerStep["chord"],
     category: ExplorerStep["category"],
-    trait: string | null,
+    trait: ExplorerStep["trait"],
   ): ExplorerStep => ({
     id: crypto.randomUUID(),
     chord,
@@ -138,7 +154,7 @@ export default function ChordExplorer() {
 
   const addCandidate = (c: Candidate) => {
     stopPlay();
-    const step = makeStep(c.chord, c.category, c.trait?.tag ?? null);
+    const step = makeStep(c.chord, c.category, c.trait);
     setSteps((prev) => [...prev, step]);
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
@@ -214,6 +230,49 @@ export default function ChordExplorer() {
     void playNotes(pitches, 1);
   };
 
+  const shiftChordOctave = (stepIdx: number, dir: 1 | -1) => {
+    const step = steps[stepIdx];
+    if (!step) return;
+    const shifted = step.pitches.map((p) => p + dir * 12);
+    if (shifted.some((p) => p < 24 || p > 96)) return;
+    stopPlay();
+    setSteps((prev) => prev.map((s, i) => (i === stepIdx ? { ...s, pitches: shifted } : s)));
+    void playNotes(shifted, 1);
+  };
+
+  const reorderSteps = useCallback(
+    (from: number, to: number) => {
+      stopPlay();
+      setSteps((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return next;
+      });
+      setFocusIdx((i) => remapIndex(i, from, to));
+      setVoicingEditIdx((i) => remapIndex(i, from, to));
+    },
+    [stopPlay],
+  );
+
+  const onDragEnd = useCallback(
+    (result: DropResult) => {
+      const { source, destination } = result;
+      if (!destination || source.index === destination.index) return;
+      reorderSteps(source.index, destination.index);
+    },
+    [reorderSteps],
+  );
+
+  const setScrollFocus = useCallback((idx: number) => {
+    setFocusIdx(idx);
+  }, []);
+
+  const changeEditIdx = useCallback((idx: number) => {
+    setVoicingEditIdx(idx);
+    setFocusIdx(idx);
+  }, []);
+
   const togglePlay = () => {
     if (isPlaying) {
       stopPlay();
@@ -282,7 +341,7 @@ export default function ChordExplorer() {
     : "—";
 
   return (
-    <div className="min-h-dvh bg-paper text-ink">
+    <div className="h-dvh snap-y snap-proximity overflow-y-auto bg-paper text-ink">
       <div className="mx-auto flex max-w-[880px] flex-col gap-3 px-4 pb-20 pt-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -386,30 +445,52 @@ export default function ChordExplorer() {
           </div>
         )}
 
-        <VoiceLeadingChart
-          steps={steps}
-          keyRoot={keyRoot}
-          mode={mode}
-          focusIdx={resolvedFocus}
-          playIndex={playIndex}
-          voicingEditIdx={voicingEditIdx}
-          canEdit={hasChords}
-          onToggleEdit={toggleVoicingEdit}
-          onMoveVoice={moveVoice}
-          onFocus={focusStep}
-          onRemove={removeStep}
-          onSetExtension={setExtension}
-          onAddTyped={addTyped}
-        />
+        <DragDropContext
+          onDragEnd={onDragEnd}
+          enableDefaultSensors={false}
+          sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
+        >
+          <section className={voicingEditIdx >= 0 ? "snap-start" : "snap-start scroll-mt-16"}>
+            {voicingEditIdx >= 0 ? (
+              <VoicingEditor
+                steps={steps}
+                keyRoot={keyRoot}
+                mode={mode}
+                editIdx={voicingEditIdx}
+                onChangeEditIdx={changeEditIdx}
+                onMoveVoice={moveVoice}
+                onShiftChordOctave={shiftChordOctave}
+                onClose={toggleVoicingEdit}
+              />
+            ) : (
+              <VoiceLeadingChart
+                steps={steps}
+                keyRoot={keyRoot}
+                mode={mode}
+                focusIdx={resolvedFocus}
+                playIndex={playIndex}
+                canEdit={hasChords}
+                onToggleEdit={toggleVoicingEdit}
+                onFocus={focusStep}
+                onScrollFocus={setScrollFocus}
+                onRemove={removeStep}
+                onSetExtension={setExtension}
+                onAddTyped={addTyped}
+              />
+            )}
+          </section>
 
-        <SuggestionPalette
-          steps={steps}
-          keyRoot={keyRoot}
-          mode={mode}
-          focusIdx={resolvedFocus}
-          onAddCandidate={addCandidate}
-          onAddStarter={addStarter}
-        />
+          <section className="snap-start scroll-mt-16">
+            <SuggestionPalette
+              steps={steps}
+              keyRoot={keyRoot}
+              mode={mode}
+              focusIdx={resolvedFocus}
+              onAddCandidate={addCandidate}
+              onAddStarter={addStarter}
+            />
+          </section>
+        </DragDropContext>
 
         <div className="flex gap-5 px-1 text-[10px] uppercase tracking-[0.12em] text-ink-soft">
           <div>
