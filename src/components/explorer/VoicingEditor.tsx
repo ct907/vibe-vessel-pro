@@ -60,6 +60,7 @@ function VoiceColumn({
       {[...step.pitches.entries()].reverse().map(([v, pitch]) => {
         const shapeIdx = Math.min(v, 3);
         const name = pcToName(((pitch % 12) + 12) % 12, useFlat);
+        const octave = Math.floor(pitch / 12) - 1;
         return (
           <div
             key={v}
@@ -75,10 +76,13 @@ function VoiceColumn({
             <button
               type="button"
               onClick={() => void playNotes([pitch], 0.5)}
-              aria-label={`Play ${name}`}
+              aria-label={`Play ${name}${octave}`}
               className="font-mono-chord rounded px-1 text-base font-bold text-ink hover:bg-[var(--paper-shade)]"
             >
               {name}
+              <sub className="ml-0.5 align-baseline text-[10px] font-semibold text-ink-soft">
+                {octave}
+              </sub>
             </button>
             {editable && (
               <div className="ml-auto flex gap-1">
