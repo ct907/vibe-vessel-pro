@@ -151,9 +151,10 @@ export default function ChordExplorer() {
   };
 
   const handleBack = () => {
-    if (hasChords) {
+    if (hasChords || started) {
       stopPlay();
       setSteps([]);
+      setStarted(false);
       setFocusIdx(-1);
       setVoicingEditIdx(-1);
     } else {
@@ -168,6 +169,14 @@ export default function ChordExplorer() {
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
     void playNotes(step.pitches, 1);
+  };
+
+  const pickQuality = (quality: "maj" | "min" | "dim") => {
+    stopPlay();
+    setMode(quality === "maj" ? "maj" : "min");
+    setStarted(true);
+    setFocusIdx(-1);
+    setVoicingEditIdx(-1);
   };
 
   const addStarter = (root: string, quality: "maj" | "min" | "dim") => {
