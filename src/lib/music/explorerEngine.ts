@@ -98,7 +98,7 @@ function baseQuality(q: Quality): Quality {
   }
 }
 
-export function voiceChord(chord: ChordSymbol, octave = 4): number[] {
+export function voiceChord(chord: ChordSymbol, octave = 3): number[] {
   return [...chordToMidi(chord, octave)].sort((a, b) => a - b);
 }
 
