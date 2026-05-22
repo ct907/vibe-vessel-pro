@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square, Music2 } from "lucide-react";
+import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square, Music2, Volume2 } from "lucide-react";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
