@@ -233,7 +233,7 @@ function SectionPanel({
   return (
     <section
       ref={onPanelRef}
-      className="flex h-full w-[60%] min-w-[280px] max-w-[480px] shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
+      className="flex h-full w-[45%] min-w-[260px] max-w-[400px] shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
     >
       <div className="flex items-baseline justify-between gap-2">
         <div>
