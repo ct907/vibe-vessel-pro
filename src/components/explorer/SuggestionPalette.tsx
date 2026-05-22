@@ -53,50 +53,49 @@ export default function SuggestionPalette({
   onAddCandidate,
   onAddStarter,
 }: SuggestionPaletteProps) {
-  const [starterNote, setStarterNote] = useState<string | null>(null);
-
   if (steps.length === 0) {
+    const previewQuality = (suffix: string) => {
+      const chord = parseChord(keyRoot + suffix);
+      if (!chord) return;
+      void playNotes(voiceChord(chord), 1);
+    };
     return (
       <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
         <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-          {starterNote ? `Pick a quality for ${starterNote}` : "Pick a starting note"}
+          Pick a quality for {keyRoot}
         </h2>
-        <div className="flex flex-wrap gap-1.5">
-          {NOTES_SHARP.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setStarterNote(n)}
-              className={`h-11 w-12 rounded-md text-base font-bold ${
-                n === starterNote ? "btn-sculpt-amber" : "btn-sculpt-cream"
-              }`}
+        <div className="flex flex-wrap gap-2">
+          {([
+            { q: "maj", label: "Major", suffix: "" },
+            { q: "min", label: "Minor", suffix: "m" },
+            { q: "dim", label: "Dim", suffix: "dim", display: "°" },
+          ] as const).map((x) => (
+            <div
+              key={x.q}
+              className="btn-sculpt-cream flex min-w-[110px] items-center gap-1.5 rounded-lg px-2 py-2"
             >
-              {n}
-            </button>
-          ))}
-        </div>
-        {starterNote && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-            {([
-              { q: "maj", label: "Major", suffix: "" },
-              { q: "min", label: "Minor", suffix: "m" },
-              { q: "dim", label: "Dim", suffix: "°" },
-            ] as const).map((x) => (
               <button
-                key={x.q}
                 type="button"
-                onClick={() => onAddStarter(starterNote, x.q)}
-                className="btn-sculpt-cream flex min-w-[84px] flex-col items-center rounded-lg px-4 py-2.5"
+                aria-label={`Preview ${keyRoot}${x.suffix}`}
+                onClick={() => previewQuality(x.suffix)}
+                className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft hover:bg-[var(--paper-shade)] hover:text-ink"
+              >
+                <Volume2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onAddStarter(keyRoot, x.q)}
+                className="flex flex-1 flex-col items-center"
               >
                 <span className="font-mono-chord text-lg font-bold">
-                  {starterNote}
-                  {x.suffix}
+                  {keyRoot}
+                  {"display" in x ? x.display : x.suffix}
                 </span>
                 <span className="text-[9px] uppercase tracking-wide text-ink-soft">{x.label}</span>
               </button>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
