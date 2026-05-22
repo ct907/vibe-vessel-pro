@@ -9,6 +9,7 @@ import {
   VOICE_NAMES,
   VOICE_SYMBOLS,
   activeKeyContext,
+  diatonicChords,
   getCandidates,
   nashvilleNumeral,
   voiceChord,
@@ -21,9 +22,11 @@ interface SuggestionPaletteProps {
   steps: ExplorerStep[];
   keyRoot: string;
   mode: ExplorerMode;
+  started: boolean;
   focusIdx: number;
   onAddCandidate: (c: Candidate) => void;
   onAddStarter: (root: string, quality: "maj" | "min" | "dim") => void;
+  onPickQuality: (quality: "maj" | "min" | "dim") => void;
 }
 
 function voiceLinkBadges(c: Candidate) {
@@ -49,11 +52,13 @@ export default function SuggestionPalette({
   steps,
   keyRoot,
   mode,
+  started,
   focusIdx,
   onAddCandidate,
   onAddStarter,
+  onPickQuality,
 }: SuggestionPaletteProps) {
-  if (steps.length === 0) {
+  if (steps.length === 0 && !started) {
     const previewQuality = (suffix: string) => {
       const chord = parseChord(keyRoot + suffix);
       if (!chord) return;
@@ -84,7 +89,7 @@ export default function SuggestionPalette({
               </button>
               <button
                 type="button"
-                onClick={() => onAddStarter(keyRoot, x.q)}
+                onClick={() => onPickQuality(x.q)}
                 className="flex flex-1 flex-col items-center"
               >
                 <span className="font-mono-chord text-lg font-bold">
@@ -99,6 +104,36 @@ export default function SuggestionPalette({
       </div>
     );
   }
+
+  if (steps.length === 0 && started) {
+    const dias = diatonicChords(keyRoot, mode);
+    return (
+      <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
+        <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+          Pick a starting chord in {keyRoot} {mode === "maj" ? "Major" : "Minor"}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {dias.map((d, i) => {
+            const q = d.chord.quality;
+            const starterQ: "maj" | "min" | "dim" =
+              q === "min" ? "min" : q === "dim" ? "dim" : "maj";
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onAddStarter(d.chord.root, starterQ)}
+                className="btn-sculpt-cream flex min-w-[64px] flex-col items-center rounded-lg px-2 py-2"
+              >
+                <span className="font-mono-chord text-base font-bold">{d.chord.display}</span>
+                <span className="font-mono-chord text-[9px] text-ink-soft">{d.numeral}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
 
   const focus = steps[focusIdx] ?? steps[steps.length - 1];
   const cands = getCandidates(focus.chord, focus.pitches, keyRoot, mode, {
