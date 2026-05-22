@@ -60,6 +60,7 @@ function VoiceColumn({
       {[...step.pitches.entries()].reverse().map(([v, pitch]) => {
         const shapeIdx = Math.min(v, 3);
         const name = pcToName(((pitch % 12) + 12) % 12, useFlat);
+        const octave = Math.floor(pitch / 12) - 1;
         return (
           <div
             key={v}
@@ -75,10 +76,13 @@ function VoiceColumn({
             <button
               type="button"
               onClick={() => void playNotes([pitch], 0.5)}
-              aria-label={`Play ${name}`}
+              aria-label={`Play ${name}${octave}`}
               className="font-mono-chord rounded px-1 text-base font-bold text-ink hover:bg-[var(--paper-shade)]"
             >
               {name}
+              <sub className="ml-0.5 align-baseline text-[10px] font-semibold text-ink-soft">
+                {octave}
+              </sub>
             </button>
             {editable && (
               <div className="ml-auto flex gap-1">
@@ -248,7 +252,7 @@ function SectionPanel({
 
       <div
         ref={gridWrapRef}
-        className={`relative grid gap-x-3 ${rightStep ? "grid-cols-2" : "grid-cols-1"}`}
+        className={`relative flex ${rightStep ? "items-stretch" : "justify-center"}`}
       >
         {rightStep && svgSize.w > 0 && (
           <svg
@@ -279,27 +283,34 @@ function SectionPanel({
             ))}
           </svg>
         )}
-        <VoiceColumn
-          step={leftStep!}
-          stepIdx={i}
-          editable={editableIsLeft}
-          useFlat={useFlat}
-          onMoveVoice={onMoveVoice}
-          rowRef={(el, v) => {
-            leftRowRefs.current[v] = el;
-          }}
-        />
-        {rightStep && (
+        <div style={{ flex: rightStep ? "0 0 20%" : "0 0 auto" }}>
           <VoiceColumn
-            step={rightStep}
+            step={leftStep!}
             stepIdx={i}
-            editable={!editableIsLeft}
+            editable={editableIsLeft}
             useFlat={useFlat}
             onMoveVoice={onMoveVoice}
             rowRef={(el, v) => {
-              rightRowRefs.current[v] = el;
+              leftRowRefs.current[v] = el;
             }}
           />
+        </div>
+        {rightStep && (
+          <>
+            <div style={{ flex: "1 1 auto" }} aria-hidden="true" />
+            <div style={{ flex: "0 0 20%" }}>
+              <VoiceColumn
+                step={rightStep}
+                stepIdx={i}
+                editable={!editableIsLeft}
+                useFlat={useFlat}
+                onMoveVoice={onMoveVoice}
+                rowRef={(el, v) => {
+                  rightRowRefs.current[v] = el;
+                }}
+              />
+            </div>
+          </>
         )}
       </div>
 
