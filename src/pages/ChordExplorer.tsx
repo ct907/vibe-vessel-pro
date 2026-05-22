@@ -153,10 +153,10 @@ export default function ChordExplorer() {
   };
 
   const handleBack = () => {
-    if (hasChords || started) {
+    if (phase === "progression") {
       stopPlay();
       setSteps([]);
-      setStarted(false);
+      setPhase("start");
       setFocusIdx(-1);
       setVoicingEditIdx(-1);
     } else {
@@ -176,10 +176,17 @@ export default function ChordExplorer() {
   const pickQuality = (quality: "maj" | "min" | "dim") => {
     stopPlay();
     setMode(quality === "maj" ? "maj" : "min");
-    setStarted(true);
+    setPhase("progression");
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
   };
+
+  const previewQuality = (suffix: string) => {
+    const chord = parseChord(keyRoot + suffix);
+    if (!chord) return;
+    void playNotes(voiceChord(chord), 1);
+  };
+
 
   const addStarter = (root: string, quality: "maj" | "min" | "dim") => {
     stopPlay();
