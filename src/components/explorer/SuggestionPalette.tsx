@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Repeat } from "lucide-react";
+import { Repeat, Volume2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NOTES_SHARP } from "@/lib/music/chords";
+import { parseChord } from "@/lib/music/chords";
+import { playNotes } from "@/lib/music/audio";
 import {
   CATEGORY_META,
   CATEGORY_ORDER,
@@ -11,6 +11,7 @@ import {
   activeKeyContext,
   getCandidates,
   nashvilleNumeral,
+  voiceChord,
   type Candidate,
   type ExplorerMode,
   type ExplorerStep,
