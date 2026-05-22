@@ -98,6 +98,7 @@ export default function ChordExplorer() {
   const [sendOpen, setSendOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [semis, setSemis] = useState(0);
+  const [rangeMode, setRangeMode] = useState<"piano" | "guitar">("piano");
 
   const playTimer = useRef<number | null>(null);
 
@@ -492,6 +493,25 @@ export default function ChordExplorer() {
                       }}
                     />
                   </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft">
+                      Instrument
+                    </div>
+                    <div className="flex">
+                      {(["piano", "guitar"] as const).map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRangeMode(r)}
+                          className={`h-7 flex-1 text-xs font-semibold ${
+                            r === "piano" ? "rounded-l-md" : "rounded-r-md"
+                          } ${rangeMode === r ? "btn-sculpt-amber" : "btn-sculpt-cream"}`}
+                        >
+                          {r === "piano" ? "Piano" : "Guitar"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -606,7 +626,7 @@ export default function ChordExplorer() {
                   keyRoot={keyRoot}
                   mode={mode}
                   editIdx={voicingEditIdx}
-                  guitarMode={false}
+                  guitarMode={rangeMode === "guitar"}
                   onChangeEditIdx={changeEditIdx}
                   onMoveVoice={moveVoice}
                   onShiftChordOctave={shiftChordOctave}
@@ -621,6 +641,7 @@ export default function ChordExplorer() {
                   mode={mode}
                   focusIdx={resolvedFocus}
                   playIndex={playIndex}
+                  guitarMode={rangeMode === "guitar"}
                   canEdit={hasChords}
                   onToggleEdit={toggleVoicingEdit}
                   onFocus={focusStep}
@@ -641,6 +662,7 @@ export default function ChordExplorer() {
                   mode={mode}
                   focusIdx={resolvedFocus}
                   afterGate={afterGate}
+                  guitarMode={rangeMode === "guitar"}
                   onAddCandidate={addCandidate}
                   onAddStarter={addStarter}
                 />

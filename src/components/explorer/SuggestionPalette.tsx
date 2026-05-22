@@ -26,6 +26,7 @@ interface SuggestionPaletteProps {
   mode: ExplorerMode;
   focusIdx: number;
   afterGate?: boolean;
+  guitarMode?: boolean;
   onAddCandidate: (c: Candidate) => void;
   onAddStarter: (root: string, quality: "maj" | "min" | "dim") => void;
 }
@@ -55,6 +56,7 @@ export default function SuggestionPalette({
   mode,
   focusIdx,
   afterGate = false,
+  guitarMode = false,
   onAddCandidate,
   onAddStarter,
 }: SuggestionPaletteProps) {
@@ -99,6 +101,7 @@ export default function SuggestionPalette({
   const cands = getCandidates(focus.chord, focus.pitches, keyRoot, mode, {
     firstChord: { chord: steps[0].chord, pitches: steps[0].pitches },
     suggestLoop: steps.length >= 3,
+    guitarMode,
   });
   const order: ExplorerCategory[] = afterGate
     ? ["push", "glide", "linger", "drift"]

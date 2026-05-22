@@ -21,6 +21,7 @@ import {
   VOICE_NAMES,
   VOICE_SYMBOLS,
   findVoiceLinks,
+  fretShapeLabel,
   keyUsesFlat,
   nashvilleNumeral,
   type ExplorerMode,
@@ -142,6 +143,7 @@ function SectionPanel({
   keyRoot,
   mode,
   useFlat,
+  guitarMode,
   onMoveVoice,
   onShiftChordOctave,
   onSelectVoice,
@@ -153,6 +155,7 @@ function SectionPanel({
   keyRoot: string;
   mode: ExplorerMode;
   useFlat: boolean;
+  guitarMode: boolean;
   onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
   onShiftChordOctave: (stepIdx: number, dir: 1 | -1) => void;
   onSelectVoice: (stepIdx: number, voiceIdx: number) => void;
@@ -243,6 +246,11 @@ function SectionPanel({
               <span className="font-semibold text-[var(--primary-strong)]"> · editing</span>
             )}
           </div>
+          {guitarMode && (
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--primary-strong)]">
+              {fretShapeLabel(leftStep!.chord)}
+            </div>
+          )}
         </div>
         {rightStep && (
           <div className="text-right">
@@ -255,6 +263,11 @@ function SectionPanel({
                 <span className="font-semibold text-[var(--primary-strong)]"> · editing</span>
               )}
             </div>
+            {guitarMode && (
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--primary-strong)]">
+                {fretShapeLabel(rightStep.chord)}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -466,6 +479,7 @@ export default function VoicingEditor({
             keyRoot={keyRoot}
             mode={mode}
             useFlat={useFlat}
+            guitarMode={guitarMode}
             onMoveVoice={onMoveVoice}
             onShiftChordOctave={onShiftChordOctave}
             onSelectVoice={(stepIdx, voiceIdx) => setSheetVoice({ stepIdx, voiceIdx })}

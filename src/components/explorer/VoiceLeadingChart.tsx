@@ -9,6 +9,7 @@ import {
   extensionOptions,
   findLoopGates,
   findVoiceLinks,
+  fretShapeLabel,
   keyChangeLabel,
   keyUsesFlat,
   nashvilleNumeral,
@@ -26,6 +27,7 @@ interface VoiceLeadingChartProps {
   mode: ExplorerMode;
   focusIdx: number;
   playIndex: number;
+  guitarMode?: boolean;
   canEdit: boolean;
   onToggleEdit: () => void;
   onFocus: (idx: number) => void;
@@ -82,6 +84,7 @@ export default function VoiceLeadingChart({
   mode,
   focusIdx,
   playIndex,
+  guitarMode = false,
   canEdit,
   onToggleEdit,
   onFocus,
@@ -498,6 +501,11 @@ export default function VoiceLeadingChart({
                             <div className="mt-0.5 font-mono-chord text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                               {numeral}
                             </div>
+                            {guitarMode && (
+                              <div className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-[var(--primary-strong)]">
+                                {fretShapeLabel(step.chord)}
+                              </div>
+                            )}
                             {meta && (
                               <div
                                 className="mt-0.5 text-[9px] font-bold uppercase tracking-wide"

@@ -282,6 +282,7 @@ function traitFor(
 export interface CandidateOptions {
   firstChord?: { chord: ChordSymbol; pitches: number[] } | null;
   suggestLoop?: boolean;
+  guitarMode?: boolean;
 }
 
 export interface LoopGate {
@@ -469,6 +470,28 @@ export function bassInversions(chord: ChordSymbol): ChordSymbol[] {
   ];
 }
 
+const OPEN_GUITAR_SHAPES: Record<string, string> = {
+  "C-maj": "open C", "A-maj": "open A", "G-maj": "open G",
+  "E-maj": "open E", "D-maj": "open D",
+  "A-min": "open Am", "E-min": "open Em", "D-min": "open Dm",
+};
+
+// A rough CAGED fret-shape hint for a chord block in Guitar mode.
+export function fretShapeLabel(chord: ChordSymbol): string {
+  const base = baseQuality(chord.quality);
+  const open = OPEN_GUITAR_SHAPES[`${chord.root}-${base}`];
+  if (open) return open;
+  const pc = rootToPc(chord.root);
+  const eFret = (((pc - 4) % 12) + 12) % 12;
+  const aFret = (((pc - 9) % 12) + 12) % 12;
+  const useE = eFret <= aFret;
+  const fret = useE ? eFret : aFret;
+  const shape = useE
+    ? base === "min" ? "Em-shape" : "E-shape"
+    : base === "min" ? "Am-shape" : "A-shape";
+  return fret === 0 ? shape : `${shape} · fret ${fret}`;
+}
+
 export function getCandidates(
   focusChord: ChordSymbol,
   focusPitches: number[],
@@ -522,6 +545,7 @@ export function getCandidates(
   for (const raw of all) {
     if (rootToPc(raw.chord.root) === focusPc && raw.chord.quality === focusChord.quality) continue;
     const pitches = voiceChord(raw.chord);
+    if (opts.guitarMode && !isGuitarPlayable(pitches)) continue;
     const voiceDist = voiceDistance(focusPitches, pitches);
     const voiceLinks = findVoiceLinks(focusPitches, pitches, useFlat);
     let category: ExplorerCategory;
