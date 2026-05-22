@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square } from "lucide-react";
+import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square, Music2 } from "lucide-react";
+import { SoundPanel } from "@/components/sound/SoundPanel";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -92,6 +93,7 @@ export default function ChordExplorer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [voicingEditIdx, setVoicingEditIdx] = useState(-1);
   const [sendOpen, setSendOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const [semis, setSemis] = useState(0);
 
   const playTimer = useRef<number | null>(null);
@@ -373,7 +375,16 @@ export default function ChordExplorer() {
             </button>
             <span className="font-display text-xl font-bold text-ink-soft">Chord Explorer</span>
           </div>
-          {hasChords && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSoundOpen(true)}
+              aria-label="Sound settings"
+              className="btn-sculpt-cream inline-flex h-10 w-10 items-center justify-center rounded-lg"
+            >
+              <Music2 className="h-4 w-4" />
+            </button>
+            {hasChords && (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -436,7 +447,9 @@ export default function ChordExplorer() {
               </Popover>
             </div>
           )}
+          </div>
         </div>
+
 
         {!hasChords && !started && (
           <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
@@ -595,6 +608,7 @@ export default function ChordExplorer() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     </div>
   );
 }

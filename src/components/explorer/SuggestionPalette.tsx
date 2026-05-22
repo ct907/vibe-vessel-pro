@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Repeat, Volume2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseChord } from "@/lib/music/chords";
@@ -58,6 +59,11 @@ export default function SuggestionPalette({
   onAddStarter,
   onPickQuality,
 }: SuggestionPaletteProps) {
+  const [primedId, setPrimedId] = useState<string | null>(null);
+  useEffect(() => {
+    setPrimedId(null);
+  }, [focusIdx, steps.length]);
+
   if (steps.length === 0 && !started) {
     const previewQuality = (suffix: string) => {
       const chord = parseChord(keyRoot + suffix);
@@ -190,14 +196,25 @@ export default function SuggestionPalette({
                       ? c.numeral
                       : nashvilleNumeral(c.chord, keyRoot, mode);
                     const badges = voiceLinkBadges(c);
+                    const id = `${cat}-${ci}`;
+                    const isPrimed = primedId === id;
                     return (
                       <button
-                        key={`${cat}-${ci}`}
+                        key={id}
                         type="button"
-                        onClick={() => onAddCandidate(c)}
+                        onClick={() => {
+                          if (isPrimed) {
+                            setPrimedId(null);
+                            onAddCandidate(c);
+                          } else {
+                            setPrimedId(id);
+                            void playNotes(voiceChord(c.chord), 1);
+                          }
+                        }}
+                        title={isPrimed ? "Tap again to add" : "Tap to audition"}
                         className={`relative flex min-w-[58px] flex-col items-center rounded-md border bg-[var(--paper-card)] px-2 py-1.5 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)] ${
                           c.isDiatonic ? "border-border" : "border-dashed border-border"
-                        }`}
+                        } ${isPrimed ? "ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--paper)]" : ""}`}
                         style={{ borderLeft: c.inKey ? `2px solid ${meta.tint}` : undefined }}
                       >
                         {c.loopSmooth && (
