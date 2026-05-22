@@ -59,6 +59,11 @@ export default function SuggestionPalette({
   onAddStarter,
   onPickQuality,
 }: SuggestionPaletteProps) {
+  const [primedId, setPrimedId] = useState<string | null>(null);
+  useEffect(() => {
+    setPrimedId(null);
+  }, [focusIdx, steps.length]);
+
   if (steps.length === 0 && !started) {
     const previewQuality = (suffix: string) => {
       const chord = parseChord(keyRoot + suffix);
