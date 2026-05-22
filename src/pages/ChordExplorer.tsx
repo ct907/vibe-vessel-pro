@@ -608,6 +608,7 @@ export default function ChordExplorer() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     </div>
   );
 }
