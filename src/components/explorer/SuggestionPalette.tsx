@@ -116,7 +116,7 @@ export default function SuggestionPalette({
     return (
       <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
         <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-          Pick a starting chord in {keyRoot} {mode === "maj" ? "Major" : "Minor"}
+          Choose Your Path · {keyRoot} {mode === "maj" ? "Major" : "Minor"}
         </h2>
         <div className="flex flex-wrap gap-2">
           {dias.map((d, i) => {
