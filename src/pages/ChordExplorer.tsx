@@ -447,7 +447,9 @@ export default function ChordExplorer() {
               </Popover>
             </div>
           )}
+          </div>
         </div>
+
 
         {!hasChords && !started && (
           <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
