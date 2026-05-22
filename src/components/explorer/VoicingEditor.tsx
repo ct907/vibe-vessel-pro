@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Check,
   ChevronDown,
@@ -13,7 +19,6 @@ import { playNotes } from "@/lib/music/audio";
 import {
   VOICE_COLORS,
   VOICE_NAMES,
-  VOICE_SHAPES,
   VOICE_SYMBOLS,
   findVoiceLinks,
   keyUsesFlat,
@@ -35,134 +40,20 @@ interface VoicingEditorProps {
   onClose: () => void;
 }
 
-const MINI_H = 120;
-const MINI_PAD_T = 28;
-const MINI_PAD_B = 12;
-const MINI_PLOT = MINI_H - MINI_PAD_T - MINI_PAD_B;
-const MINI_LX = 80;
-const MINI_RX = 220;
-
-function shapePoints(shape: string, cx: number, cy: number, sz: number): string {
-  switch (shape) {
-    case "triangle":
-      return `${cx},${cy - sz} ${cx - sz * 0.866},${cy + sz * 0.5} ${cx + sz * 0.866},${cy + sz * 0.5}`;
-    case "square": {
-      const s = sz * 0.82;
-      return `${cx - s},${cy - s} ${cx + s},${cy - s} ${cx + s},${cy + s} ${cx - s},${cy + s}`;
-    }
-    case "pentagon": {
-      const pts: string[] = [];
-      for (let i = 0; i < 5; i++) {
-        const a = (i * 2 * Math.PI) / 5 - Math.PI / 2;
-        pts.push(`${cx + sz * Math.cos(a)},${cy + sz * Math.sin(a)}`);
-      }
-      return pts.join(" ");
-    }
-    case "diamond":
-      return `${cx},${cy - sz} ${cx + sz * 0.82},${cy} ${cx},${cy + sz} ${cx - sz * 0.82},${cy}`;
-    default:
-      return "";
-  }
-}
-
-function VoiceLeadingMiniChart({
-  leftStep,
-  rightStep,
-  useFlat,
-}: {
-  leftStep: ExplorerStep;
-  rightStep: ExplorerStep;
-  useFlat: boolean;
-}) {
-  const all = [...leftStep.pitches, ...rightStep.pitches];
-  const minP = Math.min(...all) - 3;
-  const maxP = Math.max(...all) + 3;
-  const range = maxP - minP || 1;
-  const yFor = (p: number) => MINI_PAD_T + MINI_PLOT - ((p - minP) / range) * MINI_PLOT;
-  const links = findVoiceLinks(leftStep.pitches, rightStep.pitches);
-
-  const renderChord = (step: ExplorerStep, cx: number) =>
-    step.pitches.map((pitch, v) => {
-      const shapeIdx = Math.min(v, 3);
-      const cy = yFor(pitch);
-      return (
-        <g key={`${cx}-${v}`}>
-          <polygon
-            points={shapePoints(VOICE_SHAPES[shapeIdx], cx, cy, 7)}
-            fill={VOICE_COLORS[shapeIdx]}
-            stroke="oklch(1 0 0 / 0.75)"
-            strokeWidth="0.75"
-          />
-          <text
-            x={cx}
-            y={cy + (VOICE_SHAPES[shapeIdx] === "triangle" ? 7 * 0.22 : 0)}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={8}
-            fontFamily="'JetBrains Mono', monospace"
-            fontWeight="700"
-            fill="oklch(1 0 0)"
-            stroke="oklch(0.2 0.02 60 / 0.45)"
-            strokeWidth="0.5"
-            paintOrder="stroke"
-          >
-            {pcToName(((pitch % 12) + 12) % 12, useFlat)}
-          </text>
-        </g>
-      );
-    });
-
-  return (
-    <svg
-      width="100%"
-      height={MINI_H}
-      viewBox={`0 0 300 ${MINI_H}`}
-      className="block"
-      role="img"
-      aria-label="Voice leading between the two chords"
-    >
-      {[MINI_LX, MINI_RX].map((cx) => (
-        <rect
-          key={cx}
-          x={cx - 44}
-          y={MINI_PAD_T - 8}
-          width={88}
-          height={MINI_PLOT + 16}
-          rx="8"
-          fill="oklch(0 0 0 / 0.025)"
-        />
-      ))}
-      {links.map((lk, li) => (
-        <line
-          key={li}
-          x1={MINI_LX}
-          y1={yFor(leftStep.pitches[lk.fromVoice])}
-          x2={MINI_RX}
-          y2={yFor(rightStep.pitches[lk.toVoice])}
-          stroke={VOICE_COLORS[Math.min(lk.fromVoice, 3)]}
-          strokeWidth={lk.type === "direct" ? (lk.dist === 0 ? 3 : 2.2) : 1.6}
-          strokeOpacity={lk.type === "direct" ? 0.7 : 0.4}
-          strokeDasharray={lk.type === "octave" ? "4 3" : undefined}
-        />
-      ))}
-      {renderChord(leftStep, MINI_LX)}
-      {renderChord(rightStep, MINI_RX)}
-    </svg>
-  );
-}
-
 function VoiceColumn({
   step,
   stepIdx,
   editable,
   useFlat,
   onMoveVoice,
+  rowRef,
 }: {
   step: ExplorerStep;
   stepIdx: number;
   editable: boolean;
   useFlat: boolean;
   onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
+  rowRef?: (el: HTMLDivElement | null, v: number) => void;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -172,6 +63,7 @@ function VoiceColumn({
         return (
           <div
             key={v}
+            ref={(el) => rowRef?.(el, v)}
             className="flex items-center gap-1.5 rounded-lg border border-border bg-[var(--paper)] px-1.5 py-1.5"
           >
             <span
@@ -212,6 +104,219 @@ function VoiceColumn({
         );
       })}
     </div>
+  );
+}
+
+interface LineSpec {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  dash?: string;
+  width: number;
+  opacity: number;
+}
+
+function SectionPanel({
+  editStep,
+  i,
+  steps,
+  keyRoot,
+  mode,
+  useFlat,
+  onMoveVoice,
+  onShiftChordOctave,
+  onPanelRef,
+}: {
+  editStep: ExplorerStep;
+  i: number;
+  steps: ExplorerStep[];
+  keyRoot: string;
+  mode: ExplorerMode;
+  useFlat: boolean;
+  onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
+  onShiftChordOctave: (stepIdx: number, dir: 1 | -1) => void;
+  onPanelRef: (el: HTMLElement | null) => void;
+}) {
+  const isFirst = i === 0;
+  const neighbor = isFirst ? steps[1] ?? null : steps[i - 1];
+  const leftStep = isFirst ? editStep : neighbor;
+  const rightStep = isFirst ? neighbor : editStep;
+  const editableIsLeft = isFirst;
+
+  const gridWrapRef = useRef<HTMLDivElement>(null);
+  const leftRowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rightRowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [lineSpecs, setLineSpecs] = useState<LineSpec[]>([]);
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  const recomputeLines = useCallback(() => {
+    const container = gridWrapRef.current;
+    if (!container || !leftStep || !rightStep) {
+      setLineSpecs([]);
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    setSvgSize({ w: rect.width, h: rect.height });
+    const links = findVoiceLinks(leftStep.pitches, rightStep.pitches);
+    const specs: LineSpec[] = [];
+    for (const lk of links) {
+      const leftEl = leftRowRefs.current[lk.fromVoice];
+      const rightEl = rightRowRefs.current[lk.toVoice];
+      if (!leftEl || !rightEl) continue;
+      const lr = leftEl.getBoundingClientRect();
+      const rr = rightEl.getBoundingClientRect();
+      specs.push({
+        x1: lr.right - rect.left,
+        y1: lr.top + lr.height / 2 - rect.top,
+        x2: rr.left - rect.left,
+        y2: rr.top + rr.height / 2 - rect.top,
+        color: VOICE_COLORS[Math.min(lk.fromVoice, 3)],
+        dash: lk.type === "octave" ? "4 3" : undefined,
+        width: lk.type === "direct" ? (lk.dist === 0 ? 3 : 2.2) : 1.6,
+        opacity: lk.type === "direct" ? 0.7 : 0.4,
+      });
+    }
+    setLineSpecs(specs);
+  }, [leftStep, rightStep]);
+
+  useLayoutEffect(() => {
+    recomputeLines();
+  });
+
+  useEffect(() => {
+    const el = gridWrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(recomputeLines);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [recomputeLines]);
+
+  return (
+    <section
+      ref={onPanelRef}
+      className="flex w-full shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <div className="font-mono-chord text-xl font-bold leading-none text-ink">
+            {leftStep!.chord.display}
+          </div>
+          <div className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-soft">
+            {nashvilleNumeral(leftStep!.chord, keyRoot, mode)}
+            {editableIsLeft && (
+              <span className="font-semibold text-[var(--primary-strong)]"> · editing</span>
+            )}
+          </div>
+        </div>
+        {rightStep && (
+          <div className="text-right">
+            <div className="font-mono-chord text-xl font-bold leading-none text-ink">
+              {rightStep.chord.display}
+            </div>
+            <div className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-soft">
+              {nashvilleNumeral(rightStep.chord, keyRoot, mode)}
+              {!editableIsLeft && (
+                <span className="font-semibold text-[var(--primary-strong)]"> · editing</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!rightStep && (
+        <div className="flex items-center justify-center rounded-lg bg-[var(--paper-shade)] px-4 py-3 text-center text-[11px] italic text-ink-soft">
+          Add a chord from the palette to see voice leading.
+        </div>
+      )}
+
+      <div
+        ref={gridWrapRef}
+        className={`relative grid gap-x-3 ${rightStep ? "grid-cols-2" : "grid-cols-1"}`}
+      >
+        {rightStep && svgSize.w > 0 && (
+          <svg
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: svgSize.w,
+              height: svgSize.h,
+              pointerEvents: "none",
+              zIndex: 10,
+              overflow: "visible",
+            }}
+          >
+            {lineSpecs.map((ls, li) => (
+              <line
+                key={li}
+                x1={ls.x1}
+                y1={ls.y1}
+                x2={ls.x2}
+                y2={ls.y2}
+                stroke={ls.color}
+                strokeWidth={ls.width}
+                strokeOpacity={ls.opacity}
+                strokeDasharray={ls.dash}
+                strokeLinecap="round"
+              />
+            ))}
+          </svg>
+        )}
+        <VoiceColumn
+          step={leftStep!}
+          stepIdx={i}
+          editable={editableIsLeft}
+          useFlat={useFlat}
+          onMoveVoice={onMoveVoice}
+          rowRef={(el, v) => {
+            leftRowRefs.current[v] = el;
+          }}
+        />
+        {rightStep && (
+          <VoiceColumn
+            step={rightStep}
+            stepIdx={i}
+            editable={!editableIsLeft}
+            useFlat={useFlat}
+            onMoveVoice={onMoveVoice}
+            rowRef={(el, v) => {
+              rightRowRefs.current[v] = el;
+            }}
+          />
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 rounded-lg bg-[var(--primary-halo)] px-2.5 py-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-ink">
+          Change chord octave
+        </span>
+        <span className="font-mono-chord text-[11px] text-ink-soft">
+          {editStep.chord.display}
+        </span>
+        <div className="ml-auto flex gap-1.5">
+          <button
+            type="button"
+            aria-label="Raise whole chord an octave"
+            onClick={() => onShiftChordOctave(i, 1)}
+            className="btn-sculpt-amber flex h-10 w-10 items-center justify-center rounded-lg"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Lower whole chord an octave"
+            onClick={() => onShiftChordOctave(i, -1)}
+            className="btn-sculpt-amber flex h-10 w-10 items-center justify-center rounded-lg"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <ChordDescription step={editStep} keyRoot={keyRoot} mode={mode} />
+    </section>
   );
 }
 
@@ -303,116 +408,26 @@ export default function VoicingEditor({
         </button>
       </div>
 
-      <div className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden">
-        {steps.map((editStep, i) => {
-          const isFirst = i === 0;
-          const neighbor = isFirst ? steps[1] ?? null : steps[i - 1];
-          const leftStep = isFirst ? editStep : neighbor;
-          const rightStep = isFirst ? neighbor : editStep;
-          const editableIsLeft = isFirst;
-          return (
-            <section
-              key={editStep.id}
-              ref={(el) => {
-                panelRefs.current[i] = el;
-              }}
-              className="flex w-full shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <div>
-                  <div className="font-mono-chord text-xl font-bold leading-none text-ink">
-                    {leftStep!.chord.display}
-                  </div>
-                  <div className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-soft">
-                    {nashvilleNumeral(leftStep!.chord, keyRoot, mode)}
-                    {editableIsLeft && (
-                      <span className="font-semibold text-[var(--primary-strong)]"> · editing</span>
-                    )}
-                  </div>
-                </div>
-                {rightStep && (
-                  <div className="text-right">
-                    <div className="font-mono-chord text-xl font-bold leading-none text-ink">
-                      {rightStep.chord.display}
-                    </div>
-                    <div className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-soft">
-                      {nashvilleNumeral(rightStep.chord, keyRoot, mode)}
-                      {!editableIsLeft && (
-                        <span className="font-semibold text-[var(--primary-strong)]">
-                          {" "}
-                          · editing
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {leftStep && rightStep ? (
-                <VoiceLeadingMiniChart
-                  leftStep={leftStep}
-                  rightStep={rightStep}
-                  useFlat={useFlat}
-                />
-              ) : (
-                <div
-                  className="flex items-center justify-center rounded-lg bg-[var(--paper-shade)] px-4 text-center text-[11px] italic text-ink-soft"
-                  style={{ height: MINI_H }}
-                >
-                  Add a chord from the palette to see voice leading.
-                </div>
-              )}
-
-              <div className={`grid gap-x-3 ${rightStep ? "grid-cols-2" : "grid-cols-1"}`}>
-                <VoiceColumn
-                  step={leftStep!}
-                  stepIdx={i}
-                  editable={editableIsLeft}
-                  useFlat={useFlat}
-                  onMoveVoice={onMoveVoice}
-                />
-                {rightStep && (
-                  <VoiceColumn
-                    step={rightStep}
-                    stepIdx={i}
-                    editable={!editableIsLeft}
-                    useFlat={useFlat}
-                    onMoveVoice={onMoveVoice}
-                  />
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 rounded-lg bg-[var(--primary-halo)] px-2.5 py-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-ink">
-                  Change chord octave
-                </span>
-                <span className="font-mono-chord text-[11px] text-ink-soft">
-                  {editStep.chord.display}
-                </span>
-                <div className="ml-auto flex gap-1.5">
-                  <button
-                    type="button"
-                    aria-label="Raise whole chord an octave"
-                    onClick={() => onShiftChordOctave(i, 1)}
-                    className="btn-sculpt-amber flex h-10 w-10 items-center justify-center rounded-lg"
-                  >
-                    <ChevronUp className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Lower whole chord an octave"
-                    onClick={() => onShiftChordOctave(i, -1)}
-                    className="btn-sculpt-amber flex h-10 w-10 items-center justify-center rounded-lg"
-                  >
-                    <ChevronDown className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              <ChordDescription step={editStep} keyRoot={keyRoot} mode={mode} />
-            </section>
-          );
-        })}
+      <div
+        ref={stripRef}
+        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+      >
+        {steps.map((editStep, i) => (
+          <SectionPanel
+            key={editStep.id}
+            editStep={editStep}
+            i={i}
+            steps={steps}
+            keyRoot={keyRoot}
+            mode={mode}
+            useFlat={useFlat}
+            onMoveVoice={onMoveVoice}
+            onShiftChordOctave={onShiftChordOctave}
+            onPanelRef={(el) => {
+              panelRefs.current[i] = el;
+            }}
+          />
+        ))}
       </div>
 
       <div className="flex items-center gap-1.5 border-t border-border p-2">
