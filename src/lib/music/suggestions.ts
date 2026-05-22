@@ -75,7 +75,7 @@ function tritoneSub(c: ChordSymbol, useFlat: boolean): ChordSymbol {
 }
 
 /** Secondary dominant: V7 of the next chord (perfect-fifth-up to next root). */
-function secondaryDominantOf(next: ChordSymbol, useFlat: boolean): ChordSymbol {
+export function secondaryDominantOf(next: ChordSymbol, useFlat: boolean): ChordSymbol {
   const pc = (rootToPc(next.root) + 7) % 12;
   return buildChord(pc, "7", useFlat);
 }

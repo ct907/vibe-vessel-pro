@@ -346,6 +346,19 @@ export async function playChord(chord: ChordSymbol, durationSec = 1.2, octave = 
   spawnChord(chord, start, start + durationSec, octave);
 }
 
+/** Play an explicit set of MIDI notes (used by the Chord Explorer's edited voicings). */
+export async function playNotes(midiNotes: number[], durationSec = 1.2): Promise<void> {
+  await ensureAudio();
+  if (midiNotes.length === 0) return;
+  const ac = getAudioContext();
+  const start = ac.currentTime + 0.005;
+  ensureHeadroom(midiNotes.length);
+  const vel = Math.min(1, 1.4 / Math.sqrt(midiNotes.length));
+  for (const m of midiNotes) {
+    spawnNote(midiToFreq(m), start, start + durationSec, vel);
+  }
+}
+
 /**
  * Begin sustaining a chord; returns a release callback.
  * If the preset's release > 0 the natural decay still applies after release.

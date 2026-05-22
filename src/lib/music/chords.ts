@@ -97,7 +97,7 @@ const QUALITY_INTERVALS: Record<Quality, number[]> = {
   "6/9":   [0, 4, 7, 9, 14],
 };
 
-const QUALITY_PRETTY: Record<Quality, string> = {
+export const QUALITY_PRETTY: Record<Quality, string> = {
   maj: "", min: "m", dim: "dim", aug: "aug", sus2: "sus2", sus4: "sus4",
   maj7: "maj7", min7: "m7", "7": "7", dim7: "dim7", m7b5: "m7b5", minMaj7: "mMaj7",
   maj9: "maj9", min9: "m9", "9": "9", "6": "6", min6: "m6", add9: "add9",
