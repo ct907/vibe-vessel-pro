@@ -88,6 +88,7 @@ export default function ChordExplorer() {
   const [bpm, setLocalBpm] = useState(100);
   const [steps, setSteps] = useState<ExplorerStep[]>([]);
   const [phase, setPhase] = useState<"start" | "progression">("start");
+  const [qualityVisible, setQualityVisible] = useState(false);
   const [focusIdx, setFocusIdx] = useState(-1);
   const [playIndex, setPlayIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -143,7 +144,8 @@ export default function ChordExplorer() {
   const changeKey = (k: string) => {
     stopPlay();
     setKeyRoot(k);
-    if (!hasChords) auditionTonic(k, mode);
+    setQualityVisible(true);
+    auditionTonic(k, mode);
   };
 
   const changeMode = (m: ExplorerMode) => {
@@ -159,6 +161,7 @@ export default function ChordExplorer() {
       setPhase("start");
       setFocusIdx(-1);
       setVoicingEditIdx(-1);
+      setQualityVisible(false);
     } else {
       navigate("/");
     }
@@ -463,7 +466,7 @@ export default function ChordExplorer() {
             <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-                  Starting Key
+                  Select a Starting Key
                 </h2>
                 <ModeToggle mode={mode} onChange={changeMode} />
               </div>
@@ -483,9 +486,10 @@ export default function ChordExplorer() {
               </div>
             </div>
 
+            {qualityVisible && (
             <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
               <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-                Pick a quality for {keyRoot}
+                Pick a Quality for {keyRoot}
               </h2>
               <div className="flex flex-wrap gap-2">
                 {([
@@ -522,6 +526,7 @@ export default function ChordExplorer() {
                 ))}
               </div>
             </div>
+            )}
           </>
         )}
 
