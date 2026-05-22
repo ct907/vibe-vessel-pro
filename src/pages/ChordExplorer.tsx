@@ -503,9 +503,11 @@ export default function ChordExplorer() {
               steps={steps}
               keyRoot={keyRoot}
               mode={mode}
+              started={started}
               focusIdx={resolvedFocus}
               onAddCandidate={addCandidate}
               onAddStarter={addStarter}
+              onPickQuality={pickQuality}
             />
           </section>
         </DragDropContext>
