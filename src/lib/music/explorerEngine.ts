@@ -2,7 +2,7 @@
 // Pure functions over ChordSymbol + MIDI voicings; no React, no audio.
 
 import {
-  ChordSymbol, Quality, chordToMidi, nashvilleLadder, pcToName, rootToPc,
+  ChordSymbol, QUALITY_PRETTY, Quality, chordToMidi, nashvilleLadder, pcToName, rootToPc,
 } from "./chords";
 import { secondaryDominantOf } from "./suggestions";
 
@@ -281,6 +281,215 @@ function traitFor(
 
 export interface CandidateOptions {
   firstChord?: { chord: ChordSymbol; pitches: number[] } | null;
+  suggestLoop?: boolean;
+  guitarMode?: boolean;
+}
+
+export interface LoopGate {
+  stepIndex: number;
+  family: number;
+}
+
+// A tonic-family chord landing on a phrase boundary (every 4th step) resolves
+// the local arc — a "basecamp" the tension map rebases from.
+export function findLoopGates(
+  steps: ExplorerStep[],
+  keyRoot: string,
+  mode: ExplorerMode,
+): LoopGate[] {
+  const dia = diatonicChords(keyRoot, mode);
+  const gates: LoopGate[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    if ((i + 1) % 4 !== 0) continue;
+    const ch = steps[i].chord;
+    const base = baseQuality(ch.quality);
+    const match = dia.find(
+      (d) =>
+        rootToPc(d.chord.root) === rootToPc(ch.root) &&
+        baseQuality(d.chord.quality) === base,
+    );
+    if (match && match.family === 0) gates.push({ stepIndex: i, family: 0 });
+  }
+  return gates;
+}
+
+// Top-note elevation per step, rebased to the most recent basecamp so each
+// phrase visually "returns to ground" after a cadence resolves.
+export function tensionElevations(steps: ExplorerStep[], gates: LoopGate[]): number[] {
+  const gateIdx = new Set(gates.map((g) => g.stepIndex));
+  const topNote = (s: ExplorerStep) => Math.max(...s.pitches);
+  let baseline = steps.length > 0 ? topNote(steps[0]) : 0;
+  const out: number[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    out.push(topNote(steps[i]) - baseline);
+    if (gateIdx.has(i)) baseline = topNote(steps[i]);
+  }
+  return out;
+}
+
+export interface PassingChord {
+  kind: "dim7" | "secondaryDom" | "chromatic";
+  label: string;
+  chord: ChordSymbol;
+}
+
+// Passing-chord options for two structural chords a whole step apart.
+export function passingChords(
+  a: ChordSymbol,
+  b: ChordSymbol,
+  keyRoot: string,
+  mode: ExplorerMode,
+): PassingChord[] {
+  const pcA = rootToPc(a.root);
+  const pcB = rootToPc(b.root);
+  const diff = (((pcB - pcA) % 12) + 12) % 12;
+  if (diff !== 2 && diff !== 10) return [];
+  const useFlat = keyUsesFlat(keyRoot);
+  const dir = diff === 2 ? 1 : -1;
+
+  const dimRoot = pcToName((pcA + dir + 12) % 12, useFlat);
+  const secDom = secondaryDominantOf(b, useFlat);
+  const chromRoot = pcToName((pcB - 1 + 12) % 12, useFlat);
+
+  return [
+    {
+      kind: "dim7",
+      label: `${dimRoot}°7`,
+      chord: { root: dimRoot, quality: "dim7", display: dimRoot + QUALITY_PRETTY.dim7 },
+    },
+    {
+      kind: "secondaryDom",
+      label: `${secDom.display}→${b.display}`,
+      chord: secDom,
+    },
+    {
+      kind: "chromatic",
+      label: `${chromRoot}${QUALITY_PRETTY[b.quality]} slide`,
+      chord: {
+        root: chromRoot,
+        quality: b.quality,
+        display: chromRoot + QUALITY_PRETTY[b.quality],
+      },
+    },
+  ];
+}
+
+// A voicing is guitar-playable when bass-to-melody span fits two octaves and
+// it has no impossible three-note cluster within a whole step.
+export function isGuitarPlayable(pitches: number[]): boolean {
+  if (pitches.length === 0) return true;
+  const sorted = [...pitches].sort((a, b) => a - b);
+  if (sorted[sorted.length - 1] - sorted[0] > 24) return false;
+  for (let i = 0; i + 2 < sorted.length; i++) {
+    if (sorted[i + 2] - sorted[i] <= 2) return false;
+  }
+  return true;
+}
+
+export interface VoicingAlternative {
+  pitches: number[];
+  delta: number;
+  label: string;
+}
+
+export interface TrajectoryTiers {
+  hold: VoicingAlternative[];
+  stable: VoicingAlternative[];
+  dramatic: VoicingAlternative[];
+}
+
+function midiLabel(midi: number): string {
+  return pitchName(midi, false) + (Math.floor(midi / 12) - 1);
+}
+
+// Alternative voicings of a chord, bucketed by how far the selected voice
+// travels: Hold (drone, 0), Stable (1-2 semitones), Dramatic (>2).
+export function lineTrajectories(
+  step: ExplorerStep,
+  voiceIdx: number,
+  guitarMode: boolean,
+): TrajectoryTiers {
+  const tiers: TrajectoryTiers = { hold: [], stable: [], dramatic: [] };
+  const cur = step.pitches[voiceIdx];
+  if (cur == null) return tiers;
+
+  const tones = new Set(chordToMidi(step.chord).map((m) => ((m % 12) + 12) % 12));
+  const seen = new Set<string>();
+  const curKey = [...step.pitches].sort((a, b) => a - b).join(",");
+
+  const push = (pitches: number[], delta: number, label: string) => {
+    const sorted = [...pitches].sort((a, b) => a - b);
+    const key = sorted.join(",");
+    if (key === curKey || seen.has(key)) return;
+    if (guitarMode && !isGuitarPlayable(sorted)) return;
+    seen.add(key);
+    const tier = delta === 0 ? tiers.hold : delta <= 2 ? tiers.stable : tiers.dramatic;
+    if (tier.length < 4) tier.push({ pitches: sorted, delta, label });
+  };
+
+  for (let j = 0; j < step.pitches.length; j++) {
+    if (j === voiceIdx) continue;
+    for (const dir of [12, -12]) {
+      const moved = step.pitches[j] + dir;
+      if (moved < 24 || moved > 96) continue;
+      const v = [...step.pitches];
+      v[j] = moved;
+      push(v, 0, `Drone · ${midiLabel(step.pitches[j])} ${dir > 0 ? "↑" : "↓"}8ve`);
+    }
+  }
+
+  for (let target = Math.max(24, cur - 14); target <= Math.min(96, cur + 14); target++) {
+    if (!tones.has(((target % 12) + 12) % 12)) continue;
+    const delta = Math.abs(target - cur);
+    if (delta === 0) continue;
+    const v = [...step.pitches];
+    v[voiceIdx] = target;
+    push(v, delta, `${midiLabel(cur)} → ${midiLabel(target)}`);
+  }
+
+  return tiers;
+}
+
+// Root / third / fifth in the bass — slash-chord inversions of a chord.
+export function bassInversions(chord: ChordSymbol): ChordSymbol[] {
+  const base = baseQuality(chord.quality);
+  const third = base === "min" || base === "dim" ? 3 : 4;
+  const fifth = base === "dim" ? 6 : 7;
+  const rootPc = rootToPc(chord.root);
+  const useFlat = keyUsesFlat(chord.root);
+  const make = (bass?: string): ChordSymbol => ({
+    root: chord.root,
+    quality: chord.quality,
+    bass,
+    display: chord.root + QUALITY_PRETTY[chord.quality] + (bass ? `/${bass}` : ""),
+  });
+  return [
+    make(undefined),
+    make(pcToName((rootPc + third) % 12, useFlat)),
+    make(pcToName((rootPc + fifth) % 12, useFlat)),
+  ];
+}
+
+const OPEN_GUITAR_SHAPES: Record<string, string> = {
+  "C-maj": "open C", "A-maj": "open A", "G-maj": "open G",
+  "E-maj": "open E", "D-maj": "open D",
+  "A-min": "open Am", "E-min": "open Em", "D-min": "open Dm",
+};
+
+// A rough CAGED fret-shape hint for a chord block in Guitar mode.
+export function fretShapeLabel(chord: ChordSymbol): string {
+  const base = baseQuality(chord.quality);
+  const open = OPEN_GUITAR_SHAPES[`${chord.root}-${base}`];
+  if (open) return open;
+  const pc = rootToPc(chord.root);
+  const eFret = (((pc - 4) % 12) + 12) % 12;
+  const aFret = (((pc - 9) % 12) + 12) % 12;
+  const useE = eFret <= aFret;
+  const fret = useE ? eFret : aFret;
+  const shape = useE
+    ? base === "min" ? "Em-shape" : "E-shape"
+    : base === "min" ? "Am-shape" : "A-shape";
+  return fret === 0 ? shape : `${shape} · fret ${fret}`;
 }
 
 export function getCandidates(
@@ -336,6 +545,7 @@ export function getCandidates(
   for (const raw of all) {
     if (rootToPc(raw.chord.root) === focusPc && raw.chord.quality === focusChord.quality) continue;
     const pitches = voiceChord(raw.chord);
+    if (opts.guitarMode && !isGuitarPlayable(pitches)) continue;
     const voiceDist = voiceDistance(focusPitches, pitches);
     const voiceLinks = findVoiceLinks(focusPitches, pitches, useFlat);
     let category: ExplorerCategory;
@@ -363,6 +573,9 @@ export function getCandidates(
   for (const cat of CATEGORY_ORDER) {
     cats[cat].sort((a, b) => {
       if (a.inKey !== b.inKey) return a.inKey ? -1 : 1;
+      if (opts.suggestLoop && a.loopSmooth !== b.loopSmooth) {
+        return a.loopSmooth ? -1 : 1;
+      }
       return a.voiceDist.score - b.voiceDist.score;
     });
     cats[cat] = cats[cat].slice(0, 8);

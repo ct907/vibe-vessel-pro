@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GripHorizontal, Pencil, X } from "lucide-react";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
-import { pcToName, rootToPc, type Quality } from "@/lib/music/chords";
+import { pcToName, rootToPc, type ChordSymbol, type Quality } from "@/lib/music/chords";
 import {
   CATEGORY_META,
   VOICE_COLORS,
   VOICE_SHAPES,
   extensionOptions,
+  findLoopGates,
   findVoiceLinks,
+  fretShapeLabel,
   keyChangeLabel,
   keyUsesFlat,
   nashvilleNumeral,
+  passingChords,
+  tensionElevations,
   type ExplorerMode,
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
@@ -23,6 +27,7 @@ interface VoiceLeadingChartProps {
   mode: ExplorerMode;
   focusIdx: number;
   playIndex: number;
+  guitarMode?: boolean;
   canEdit: boolean;
   onToggleEdit: () => void;
   onFocus: (idx: number) => void;
@@ -30,6 +35,7 @@ interface VoiceLeadingChartProps {
   onRemove: (idx: number) => void;
   onSetExtension: (idx: number, quality: Quality) => void;
   onAddTyped: (input: string) => boolean;
+  onInsertPassing: (afterIndex: number, chord: ChordSymbol) => void;
 }
 
 const H = 210;
@@ -78,6 +84,7 @@ export default function VoiceLeadingChart({
   mode,
   focusIdx,
   playIndex,
+  guitarMode = false,
   canEdit,
   onToggleEdit,
   onFocus,
@@ -85,10 +92,18 @@ export default function VoiceLeadingChart({
   onRemove,
   onSetExtension,
   onAddTyped,
+  onInsertPassing,
 }: VoiceLeadingChartProps) {
   const useFlat = keyUsesFlat(keyRoot);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const colRefs = useRef<(HTMLElement | null)[]>([]);
+  const [passingMenu, setPassingMenu] = useState<
+    { pairIndex: number; x: number; y: number } | null
+  >(null);
+
+  useEffect(() => {
+    setPassingMenu(null);
+  }, [steps]);
 
   const layout = useMemo(() => {
     const xs: number[] = [];
@@ -111,8 +126,13 @@ export default function VoiceLeadingChart({
     maxP += 3;
     const range = maxP - minP || 1;
     const yFor = (p: number) => PAD_T + PLOT_H - ((p - minP) / range) * PLOT_H;
-    return { xs, contentW, footerW, yFor };
-  }, [steps]);
+    const gates = findLoopGates(steps, keyRoot, mode);
+    const elevations = tensionElevations(steps, gates);
+    let tensionBase = Infinity;
+    for (const s of steps) tensionBase = Math.min(tensionBase, Math.max(...s.pitches));
+    if (!Number.isFinite(tensionBase)) tensionBase = 0;
+    return { xs, contentW, footerW, yFor, gates, elevations, tensionBase };
+  }, [steps, keyRoot, mode]);
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -150,7 +170,8 @@ export default function VoiceLeadingChart({
   }
 
 
-  const { xs, contentW, footerW, yFor } = layout;
+  const { xs, contentW, footerW, yFor, gates, elevations, tensionBase } = layout;
+  const tensionY = (i: number) => yFor(tensionBase + elevations[i]);
   const hiker = hikerColors(keyRoot);
   const hikerIdx = playIndex >= 0 ? playIndex : focusIdx;
 
@@ -176,13 +197,13 @@ export default function VoiceLeadingChart({
             className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-semibold disabled:opacity-40"
           >
             <Pencil className="h-3 w-3" />
-            Edit Voicing
+            Step 2 · Voicings
           </button>
         </div>
       </div>
 
       <div ref={scrollRef} className="snap-x snap-proximity overflow-x-auto scroll-px-6">
-        <div className="mx-auto" style={{ width: footerW }}>
+        <div className="relative mx-auto" style={{ width: footerW }}>
           <svg
             width={contentW}
             height={H}
@@ -205,7 +226,7 @@ export default function VoiceLeadingChart({
 
             {steps.length > 1 && (
               <polyline
-                points={steps.map((s, i) => `${xs[i]},${yFor(Math.max(...s.pitches))}`).join(" ")}
+                points={steps.map((_, i) => `${xs[i]},${tensionY(i)}`).join(" ")}
                 fill="none"
                 stroke="var(--primary)"
                 strokeWidth="1.5"
@@ -267,6 +288,87 @@ export default function VoiceLeadingChart({
               }),
             )}
 
+            {gates.map((g) => {
+              const gx = xs[g.stepIndex];
+              const gy = yFor(Math.max(...steps[g.stepIndex].pitches));
+              return (
+                <g key={`gate-${g.stepIndex}`}>
+                  <title>Cadence resolved — basecamp</title>
+                  <line
+                    x1={gx}
+                    y1={gy - 4}
+                    x2={gx}
+                    y2={gy - 24}
+                    stroke="var(--primary-strong)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <polygon
+                    points={`${gx},${gy - 24} ${gx + 12},${gy - 20.5} ${gx},${gy - 17}`}
+                    fill="var(--primary-strong)"
+                  />
+                </g>
+              );
+            })}
+
+            {steps.slice(0, -1).map((prev, i) => {
+              const next = steps[i + 1];
+              const d =
+                (((rootToPc(next.chord.root) - rootToPc(prev.chord.root)) % 12) + 12) % 12;
+              if (d !== 2 && d !== 10) return null;
+              const hx = (xs[i] + xs[i + 1]) / 2;
+              const hy = (tensionY(i) + tensionY(i + 1)) / 2;
+              return (
+                <g
+                  key={`handle-${i}`}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPassingMenu((cur) =>
+                      cur?.pairIndex === i ? null : { pairIndex: i, x: hx, y: hy },
+                    );
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPassingMenu({ pairIndex: i, x: hx, y: hy });
+                    }
+                  }}
+                >
+                  <title>Insert a passing chord</title>
+                  <circle cx={hx} cy={hy} r={16} fill="transparent" pointerEvents="all" />
+                  <circle
+                    cx={hx}
+                    cy={hy}
+                    r={7}
+                    fill="var(--paper-card)"
+                    stroke="var(--primary)"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1={hx - 3.5}
+                    y1={hy}
+                    x2={hx + 3.5}
+                    y2={hy}
+                    stroke="var(--primary)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={hx}
+                    y1={hy - 3.5}
+                    x2={hx}
+                    y2={hy + 3.5}
+                    stroke="var(--primary)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </g>
+              );
+            })}
+
             {hikerIdx >= 0 && hikerIdx < steps.length && (
               <g
                 transform={`translate(${xs[hikerIdx]} ${
@@ -285,6 +387,50 @@ export default function VoiceLeadingChart({
               </g>
             )}
           </svg>
+
+          {passingMenu && steps[passingMenu.pairIndex] && steps[passingMenu.pairIndex + 1] && (
+            <>
+              <button
+                type="button"
+                aria-label="Close passing-chord menu"
+                className="absolute inset-0 z-10 cursor-default"
+                onClick={() => setPassingMenu(null)}
+              />
+              <div
+                className="absolute z-20 -translate-x-1/2 rounded-lg border border-border bg-[var(--paper-card)] p-1.5 shadow-[var(--shadow-card)]"
+                style={{ left: passingMenu.x, top: passingMenu.y + 14 }}
+              >
+                <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-wide text-ink-soft">
+                  Passing chord
+                </div>
+                <div className="flex gap-1">
+                  {passingChords(
+                    steps[passingMenu.pairIndex].chord,
+                    steps[passingMenu.pairIndex + 1].chord,
+                    keyRoot,
+                    mode,
+                  ).map((p) => (
+                    <button
+                      key={p.kind}
+                      type="button"
+                      onClick={() => {
+                        onInsertPassing(passingMenu.pairIndex, p.chord);
+                        setPassingMenu(null);
+                      }}
+                      className="btn-sculpt-cream flex min-w-[52px] flex-col items-center rounded-md px-2 py-1"
+                    >
+                      <span className="font-mono-chord text-sm font-bold text-ink">
+                        {p.chord.display}
+                      </span>
+                      <span className="text-[8px] uppercase tracking-wide text-ink-soft">
+                        {p.kind === "dim7" ? "dim" : p.kind === "secondaryDom" ? "applied" : "slide"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <Droppable droppableId="explorer-footer" direction="horizontal">
             {(dropProvided) => (
@@ -355,6 +501,11 @@ export default function VoiceLeadingChart({
                             <div className="mt-0.5 font-mono-chord text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                               {numeral}
                             </div>
+                            {guitarMode && (
+                              <div className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-[var(--primary-strong)]">
+                                {fretShapeLabel(step.chord)}
+                              </div>
+                            )}
                             {meta && (
                               <div
                                 className="mt-0.5 text-[9px] font-bold uppercase tracking-wide"

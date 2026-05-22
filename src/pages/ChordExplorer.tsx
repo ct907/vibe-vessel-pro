@@ -19,10 +19,12 @@ import {
   parseChord,
   transposeChord,
   transposeKey,
+  type ChordSymbol,
   type Quality,
 } from "@/lib/music/chords";
 import { playNotes, stopProgression } from "@/lib/music/audio";
 import {
+  findLoopGates,
   nashvilleNumeral,
   voiceChord,
   type Candidate,
@@ -96,6 +98,7 @@ export default function ChordExplorer() {
   const [sendOpen, setSendOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [semis, setSemis] = useState(0);
+  const [rangeMode, setRangeMode] = useState<"piano" | "guitar">("piano");
 
   const playTimer = useRef<number | null>(null);
 
@@ -122,6 +125,9 @@ export default function ChordExplorer() {
       : focusIdx >= 0 && focusIdx < steps.length
         ? focusIdx
         : steps.length - 1;
+  const afterGate = findLoopGates(steps, keyRoot, mode).some(
+    (g) => g.stepIndex === resolvedFocus,
+  );
 
   const makeStep = (
     chord: ExplorerStep["chord"],
@@ -221,6 +227,19 @@ export default function ChordExplorer() {
     setVoicingEditIdx(-1);
   };
 
+  const insertStep = (afterIndex: number, chord: ChordSymbol) => {
+    stopPlay();
+    const step = makeStep(chord, "typed", null);
+    setSteps((prev) => {
+      const next = [...prev];
+      next.splice(afterIndex + 1, 0, step);
+      return next;
+    });
+    setFocusIdx(-1);
+    setVoicingEditIdx(-1);
+    void playNotes(step.pitches, 1);
+  };
+
   const setExtension = (idx: number, quality: Quality) => {
     stopPlay();
     setVoicingEditIdx(-1);
@@ -247,6 +266,9 @@ export default function ChordExplorer() {
     setVoicingEditIdx((cur) => (cur >= 0 ? -1 : resolvedFocus));
   };
 
+  const goToStep1 = () => setVoicingEditIdx(-1);
+  const goToStep2 = () => setVoicingEditIdx((cur) => (cur >= 0 ? cur : resolvedFocus));
+
   const moveVoice = (stepIdx: number, voiceIdx: number, dir: 1 | -1) => {
     const step = steps[stepIdx];
     if (!step) return;
@@ -268,6 +290,24 @@ export default function ChordExplorer() {
     stopPlay();
     setSteps((prev) => prev.map((s, i) => (i === stepIdx ? { ...s, pitches: shifted } : s)));
     void playNotes(shifted, 1);
+  };
+
+  const setVoicing = (stepIdx: number, pitches: number[]) => {
+    stopPlay();
+    setSteps((prev) => prev.map((s, i) => (i === stepIdx ? { ...s, pitches } : s)));
+    void playNotes(pitches, 1);
+  };
+
+  const setStepChord = (stepIdx: number, chord: ChordSymbol) => {
+    stopPlay();
+    setSteps((prev) =>
+      prev.map((s, i) => {
+        if (i !== stepIdx) return s;
+        const pitches = voiceChord(chord);
+        void playNotes(pitches, 1);
+        return { ...s, chord, pitches };
+      }),
+    );
   };
 
   const reorderSteps = useCallback(
@@ -453,6 +493,25 @@ export default function ChordExplorer() {
                       }}
                     />
                   </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft">
+                      Instrument
+                    </div>
+                    <div className="flex">
+                      {(["piano", "guitar"] as const).map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRangeMode(r)}
+                          className={`h-7 flex-1 text-xs font-semibold ${
+                            r === "piano" ? "rounded-l-md" : "rounded-r-md"
+                          } ${rangeMode === r ? "btn-sculpt-amber" : "btn-sculpt-cream"}`}
+                        >
+                          {r === "piano" ? "Piano" : "Guitar"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -536,6 +595,30 @@ export default function ChordExplorer() {
             enableDefaultSensors={false}
             sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
           >
+            <div className="flex gap-1.5">
+              {([
+                { n: 1, label: "Build the Backbone Arc" },
+                { n: 2, label: "Prune & Weave Voices" },
+              ] as const).map((s) => {
+                const active = (voicingEditIdx >= 0 ? 2 : 1) === s.n;
+                return (
+                  <button
+                    key={s.n}
+                    type="button"
+                    onClick={() => (s.n === 1 ? goToStep1() : goToStep2())}
+                    className={`flex flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold ${
+                      active ? "btn-sculpt-amber" : "btn-sculpt-cream"
+                    }`}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--paper)] text-[11px] font-bold text-ink">
+                      {s.n}
+                    </span>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <section className={voicingEditIdx >= 0 ? "snap-start" : "snap-start scroll-mt-16"}>
               {voicingEditIdx >= 0 ? (
                 <VoicingEditor
@@ -543,9 +626,12 @@ export default function ChordExplorer() {
                   keyRoot={keyRoot}
                   mode={mode}
                   editIdx={voicingEditIdx}
+                  guitarMode={rangeMode === "guitar"}
                   onChangeEditIdx={changeEditIdx}
                   onMoveVoice={moveVoice}
                   onShiftChordOctave={shiftChordOctave}
+                  onSetVoicing={setVoicing}
+                  onSetStepChord={setStepChord}
                   onClose={toggleVoicingEdit}
                 />
               ) : (
@@ -555,6 +641,7 @@ export default function ChordExplorer() {
                   mode={mode}
                   focusIdx={resolvedFocus}
                   playIndex={playIndex}
+                  guitarMode={rangeMode === "guitar"}
                   canEdit={hasChords}
                   onToggleEdit={toggleVoicingEdit}
                   onFocus={focusStep}
@@ -562,20 +649,25 @@ export default function ChordExplorer() {
                   onRemove={removeStep}
                   onSetExtension={setExtension}
                   onAddTyped={addTyped}
+                  onInsertPassing={insertStep}
                 />
               )}
             </section>
 
-            <section className="snap-start scroll-mt-16">
-              <SuggestionPalette
-                steps={steps}
-                keyRoot={keyRoot}
-                mode={mode}
-                focusIdx={resolvedFocus}
-                onAddCandidate={addCandidate}
-                onAddStarter={addStarter}
-              />
-            </section>
+            {voicingEditIdx < 0 && (
+              <section className="snap-start scroll-mt-16">
+                <SuggestionPalette
+                  steps={steps}
+                  keyRoot={keyRoot}
+                  mode={mode}
+                  focusIdx={resolvedFocus}
+                  afterGate={afterGate}
+                  guitarMode={rangeMode === "guitar"}
+                  onAddCandidate={addCandidate}
+                  onAddStarter={addStarter}
+                />
+              </section>
+            )}
           </DragDropContext>
         )}
 
