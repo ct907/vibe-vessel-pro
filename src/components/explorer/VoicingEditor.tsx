@@ -252,7 +252,7 @@ function SectionPanel({
 
       <div
         ref={gridWrapRef}
-        className={`relative grid gap-x-3 ${rightStep ? "grid-cols-2" : "grid-cols-1"}`}
+        className={`relative flex ${rightStep ? "items-stretch" : "justify-center"}`}
       >
         {rightStep && svgSize.w > 0 && (
           <svg
@@ -283,27 +283,34 @@ function SectionPanel({
             ))}
           </svg>
         )}
-        <VoiceColumn
-          step={leftStep!}
-          stepIdx={i}
-          editable={editableIsLeft}
-          useFlat={useFlat}
-          onMoveVoice={onMoveVoice}
-          rowRef={(el, v) => {
-            leftRowRefs.current[v] = el;
-          }}
-        />
-        {rightStep && (
+        <div style={{ flex: rightStep ? "0 0 20%" : "0 0 auto" }}>
           <VoiceColumn
-            step={rightStep}
+            step={leftStep!}
             stepIdx={i}
-            editable={!editableIsLeft}
+            editable={editableIsLeft}
             useFlat={useFlat}
             onMoveVoice={onMoveVoice}
             rowRef={(el, v) => {
-              rightRowRefs.current[v] = el;
+              leftRowRefs.current[v] = el;
             }}
           />
+        </div>
+        {rightStep && (
+          <>
+            <div style={{ flex: "1 1 auto" }} aria-hidden="true" />
+            <div style={{ flex: "0 0 20%" }}>
+              <VoiceColumn
+                step={rightStep}
+                stepIdx={i}
+                editable={!editableIsLeft}
+                useFlat={useFlat}
+                onMoveVoice={onMoveVoice}
+                rowRef={(el, v) => {
+                  rightRowRefs.current[v] = el;
+                }}
+              />
+            </div>
+          </>
         )}
       </div>
 
