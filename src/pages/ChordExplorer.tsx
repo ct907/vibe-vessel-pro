@@ -131,14 +131,22 @@ export default function ChordExplorer() {
     pitches: voiceChord(chord),
   });
 
+  const auditionTonic = (root: string, m: ExplorerMode) => {
+    const chord = parseChord(root + (m === "min" ? "m" : ""));
+    if (!chord) return;
+    void playNotes(voiceChord(chord), 1);
+  };
+
   const changeKey = (k: string) => {
     stopPlay();
     setKeyRoot(k);
+    if (!hasChords) auditionTonic(k, mode);
   };
 
   const changeMode = (m: ExplorerMode) => {
     stopPlay();
     setMode(m);
+    if (!hasChords) auditionTonic(keyRoot, m);
   };
 
   const handleBack = () => {
