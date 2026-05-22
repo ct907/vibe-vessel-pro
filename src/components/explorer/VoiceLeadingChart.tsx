@@ -131,7 +131,24 @@ export default function VoiceLeadingChart({
     return () => obs.disconnect();
   }, [steps, onScrollFocus]);
 
-  if (steps.length === 0) return null;
+  if (steps.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-[var(--paper-card)] p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+            Voice Leading
+          </h2>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] italic text-ink-soft">
+          <span>Type a chord or pick one below to begin.</span>
+        </div>
+        <div className="mt-2 max-w-[160px]">
+          <ChordInput onAdd={onAddTyped} />
+        </div>
+      </div>
+    );
+  }
+
 
   const { xs, contentW, footerW, yFor } = layout;
   const hiker = hikerColors(keyRoot);
