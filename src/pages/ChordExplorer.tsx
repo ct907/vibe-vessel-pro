@@ -93,6 +93,7 @@ export default function ChordExplorer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [voicingEditIdx, setVoicingEditIdx] = useState(-1);
   const [sendOpen, setSendOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const [semis, setSemis] = useState(0);
 
   const playTimer = useRef<number | null>(null);
