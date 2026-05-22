@@ -438,7 +438,7 @@ export default function ChordExplorer() {
           )}
         </div>
 
-        {!hasChords && (
+        {!hasChords && !started && (
           <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
