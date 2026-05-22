@@ -196,7 +196,7 @@ function SectionPanel({
   return (
     <section
       ref={onPanelRef}
-      className="flex w-full shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
+      className="flex h-full w-full shrink-0 snap-center flex-col gap-2 overflow-y-auto p-3"
     >
       <div className="flex items-baseline justify-between gap-2">
         <div>
@@ -339,21 +339,17 @@ export default function VoicingEditor({
 
   const goTo = useCallback(
     (idx: number) => {
-      if (idx < 0 || idx >= steps.length) return;
-      panelRefs.current[idx]?.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
+      const strip = stripRef.current;
+      if (idx < 0 || idx >= steps.length || !strip) return;
+      strip.scrollTo({ left: idx * strip.clientWidth, behavior: "smooth" });
     },
     [steps.length],
   );
 
   useLayoutEffect(() => {
-    panelRefs.current[editIdxRef.current]?.scrollIntoView({
-      inline: "center",
-      block: "nearest",
-    });
+    const strip = stripRef.current;
+    if (!strip || editIdxRef.current < 0) return;
+    strip.scrollLeft = editIdxRef.current * strip.clientWidth;
   }, []);
 
   useEffect(() => {
@@ -410,7 +406,7 @@ export default function VoicingEditor({
 
       <div
         ref={stripRef}
-        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
       >
         {steps.map((editStep, i) => (
           <SectionPanel
