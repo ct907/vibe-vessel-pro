@@ -87,7 +87,7 @@ export default function ChordExplorer() {
   const [mode, setMode] = useState<ExplorerMode>("maj");
   const [bpm, setLocalBpm] = useState(100);
   const [steps, setSteps] = useState<ExplorerStep[]>([]);
-  const [started, setStarted] = useState(false);
+  const [phase, setPhase] = useState<"start" | "progression">("start");
   const [focusIdx, setFocusIdx] = useState(-1);
   const [playIndex, setPlayIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
