@@ -276,7 +276,6 @@ function traitFor(
 
 export interface CandidateOptions {
   firstChord?: { chord: ChordSymbol; pitches: number[] } | null;
-  isLastSlot?: boolean;
 }
 
 export function getCandidates(
@@ -332,7 +331,7 @@ export function getCandidates(
     else if (raw.isDiatonic) category = raw.family === 0 ? "linger" : "push";
     else category = "drift";
     let loopSmooth = false;
-    if (opts.isLastSlot && opts.firstChord) {
+    if (opts.firstChord) {
       loopSmooth = voiceDistance(pitches, opts.firstChord.pitches).score <= 4;
     }
     cats[category].push({

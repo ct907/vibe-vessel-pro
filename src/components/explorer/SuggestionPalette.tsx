@@ -21,7 +21,6 @@ interface SuggestionPaletteProps {
   keyRoot: string;
   mode: ExplorerMode;
   focusIdx: number;
-  slots: number;
   onAddCandidate: (c: Candidate) => void;
   onAddStarter: (root: string, quality: "maj" | "min" | "dim") => void;
 }
@@ -50,7 +49,6 @@ export default function SuggestionPalette({
   keyRoot,
   mode,
   focusIdx,
-  slots,
   onAddCandidate,
   onAddStarter,
 }: SuggestionPaletteProps) {
@@ -103,10 +101,8 @@ export default function SuggestionPalette({
   }
 
   const focus = steps[focusIdx] ?? steps[steps.length - 1];
-  const isLastSlot = steps.length === slots - 1;
   const cands = getCandidates(focus.chord, focus.pitches, keyRoot, mode, {
     firstChord: { chord: steps[0].chord, pitches: steps[0].pitches },
-    isLastSlot,
   });
   const ctx = activeKeyContext(focus.chord, keyRoot, mode);
   const ctxChanged = ctx.keyRoot !== keyRoot || ctx.mode !== mode;
