@@ -14,7 +14,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
-import { pcToName } from "@/lib/music/chords";
+import { pcToName, type ChordSymbol } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
 import {
   VOICE_COLORS,
@@ -28,15 +28,19 @@ import {
 } from "@/lib/music/explorerEngine";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ChordDescription from "./ChordDescription";
+import VoiceTrajectorySheet from "./VoiceTrajectorySheet";
 
 interface VoicingEditorProps {
   steps: ExplorerStep[];
   keyRoot: string;
   mode: ExplorerMode;
   editIdx: number;
+  guitarMode: boolean;
   onChangeEditIdx: (idx: number) => void;
   onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
   onShiftChordOctave: (stepIdx: number, dir: 1 | -1) => void;
+  onSetVoicing: (stepIdx: number, pitches: number[]) => void;
+  onSetStepChord: (stepIdx: number, chord: ChordSymbol) => void;
   onClose: () => void;
 }
 
@@ -46,6 +50,7 @@ function VoiceColumn({
   editable,
   useFlat,
   onMoveVoice,
+  onSelectVoice,
   rowRef,
 }: {
   step: ExplorerStep;
@@ -53,6 +58,7 @@ function VoiceColumn({
   editable: boolean;
   useFlat: boolean;
   onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
+  onSelectVoice?: (stepIdx: number, voiceIdx: number) => void;
   rowRef?: (el: HTMLDivElement | null, v: number) => void;
 }) {
   return (
@@ -75,9 +81,16 @@ function VoiceColumn({
             </span>
             <button
               type="button"
-              onClick={() => void playNotes([pitch], 0.5)}
-              aria-label={`Play ${name}${octave}`}
-              className="font-mono-chord rounded px-1 text-base font-bold text-ink hover:bg-[var(--paper-shade)]"
+              onClick={() => {
+                void playNotes([pitch], 0.5);
+                if (editable) onSelectVoice?.(stepIdx, v);
+              }}
+              aria-label={
+                editable ? `Edit ${name}${octave} line` : `Play ${name}${octave}`
+              }
+              className={`font-mono-chord rounded px-1 text-base font-bold text-ink hover:bg-[var(--paper-shade)] ${
+                editable ? "underline decoration-dotted underline-offset-4" : ""
+              }`}
             >
               {name}
               <sub className="ml-0.5 align-baseline text-[10px] font-semibold text-ink-soft">
@@ -131,6 +144,7 @@ function SectionPanel({
   useFlat,
   onMoveVoice,
   onShiftChordOctave,
+  onSelectVoice,
   onPanelRef,
 }: {
   editStep: ExplorerStep;
@@ -141,6 +155,7 @@ function SectionPanel({
   useFlat: boolean;
   onMoveVoice: (stepIdx: number, voiceIdx: number, dir: 1 | -1) => void;
   onShiftChordOctave: (stepIdx: number, dir: 1 | -1) => void;
+  onSelectVoice: (stepIdx: number, voiceIdx: number) => void;
   onPanelRef: (el: HTMLElement | null) => void;
 }) {
   const isFirst = i === 0;
@@ -290,6 +305,7 @@ function SectionPanel({
             editable={editableIsLeft}
             useFlat={useFlat}
             onMoveVoice={onMoveVoice}
+            onSelectVoice={onSelectVoice}
             rowRef={(el, v) => {
               leftRowRefs.current[v] = el;
             }}
@@ -305,6 +321,7 @@ function SectionPanel({
                 editable={!editableIsLeft}
                 useFlat={useFlat}
                 onMoveVoice={onMoveVoice}
+                onSelectVoice={onSelectVoice}
                 rowRef={(el, v) => {
                   rightRowRefs.current[v] = el;
                 }}
@@ -351,13 +368,19 @@ export default function VoicingEditor({
   keyRoot,
   mode,
   editIdx,
+  guitarMode,
   onChangeEditIdx,
   onMoveVoice,
   onShiftChordOctave,
+  onSetVoicing,
+  onSetStepChord,
   onClose,
 }: VoicingEditorProps) {
   const isMobile = useIsMobile();
   const useFlat = keyUsesFlat(keyRoot);
+  const [sheetVoice, setSheetVoice] = useState<
+    { stepIdx: number; voiceIdx: number } | null
+  >(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const editIdxRef = useRef(editIdx);
@@ -445,6 +468,7 @@ export default function VoicingEditor({
             useFlat={useFlat}
             onMoveVoice={onMoveVoice}
             onShiftChordOctave={onShiftChordOctave}
+            onSelectVoice={(stepIdx, voiceIdx) => setSheetVoice({ stepIdx, voiceIdx })}
             onPanelRef={(el) => {
               panelRefs.current[i] = el;
             }}
@@ -515,6 +539,22 @@ export default function VoicingEditor({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
+      <VoiceTrajectorySheet
+        step={sheetVoice ? steps[sheetVoice.stepIdx] ?? null : null}
+        voiceIdx={sheetVoice?.voiceIdx ?? 0}
+        guitarMode={guitarMode}
+        useFlat={useFlat}
+        onClose={() => setSheetVoice(null)}
+        onCommitVoicing={(pitches) => {
+          if (sheetVoice) onSetVoicing(sheetVoice.stepIdx, pitches);
+          setSheetVoice(null);
+        }}
+        onCommitChord={(chord) => {
+          if (sheetVoice) onSetStepChord(sheetVoice.stepIdx, chord);
+          setSheetVoice(null);
+        }}
+      />
     </div>
   );
 }

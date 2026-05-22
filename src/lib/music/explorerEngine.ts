@@ -373,6 +373,102 @@ export function passingChords(
   ];
 }
 
+// A voicing is guitar-playable when bass-to-melody span fits two octaves and
+// it has no impossible three-note cluster within a whole step.
+export function isGuitarPlayable(pitches: number[]): boolean {
+  if (pitches.length === 0) return true;
+  const sorted = [...pitches].sort((a, b) => a - b);
+  if (sorted[sorted.length - 1] - sorted[0] > 24) return false;
+  for (let i = 0; i + 2 < sorted.length; i++) {
+    if (sorted[i + 2] - sorted[i] <= 2) return false;
+  }
+  return true;
+}
+
+export interface VoicingAlternative {
+  pitches: number[];
+  delta: number;
+  label: string;
+}
+
+export interface TrajectoryTiers {
+  hold: VoicingAlternative[];
+  stable: VoicingAlternative[];
+  dramatic: VoicingAlternative[];
+}
+
+function midiLabel(midi: number): string {
+  return pitchName(midi, false) + (Math.floor(midi / 12) - 1);
+}
+
+// Alternative voicings of a chord, bucketed by how far the selected voice
+// travels: Hold (drone, 0), Stable (1-2 semitones), Dramatic (>2).
+export function lineTrajectories(
+  step: ExplorerStep,
+  voiceIdx: number,
+  guitarMode: boolean,
+): TrajectoryTiers {
+  const tiers: TrajectoryTiers = { hold: [], stable: [], dramatic: [] };
+  const cur = step.pitches[voiceIdx];
+  if (cur == null) return tiers;
+
+  const tones = new Set(chordToMidi(step.chord).map((m) => ((m % 12) + 12) % 12));
+  const seen = new Set<string>();
+  const curKey = [...step.pitches].sort((a, b) => a - b).join(",");
+
+  const push = (pitches: number[], delta: number, label: string) => {
+    const sorted = [...pitches].sort((a, b) => a - b);
+    const key = sorted.join(",");
+    if (key === curKey || seen.has(key)) return;
+    if (guitarMode && !isGuitarPlayable(sorted)) return;
+    seen.add(key);
+    const tier = delta === 0 ? tiers.hold : delta <= 2 ? tiers.stable : tiers.dramatic;
+    if (tier.length < 4) tier.push({ pitches: sorted, delta, label });
+  };
+
+  for (let j = 0; j < step.pitches.length; j++) {
+    if (j === voiceIdx) continue;
+    for (const dir of [12, -12]) {
+      const moved = step.pitches[j] + dir;
+      if (moved < 24 || moved > 96) continue;
+      const v = [...step.pitches];
+      v[j] = moved;
+      push(v, 0, `Drone · ${midiLabel(step.pitches[j])} ${dir > 0 ? "↑" : "↓"}8ve`);
+    }
+  }
+
+  for (let target = Math.max(24, cur - 14); target <= Math.min(96, cur + 14); target++) {
+    if (!tones.has(((target % 12) + 12) % 12)) continue;
+    const delta = Math.abs(target - cur);
+    if (delta === 0) continue;
+    const v = [...step.pitches];
+    v[voiceIdx] = target;
+    push(v, delta, `${midiLabel(cur)} → ${midiLabel(target)}`);
+  }
+
+  return tiers;
+}
+
+// Root / third / fifth in the bass — slash-chord inversions of a chord.
+export function bassInversions(chord: ChordSymbol): ChordSymbol[] {
+  const base = baseQuality(chord.quality);
+  const third = base === "min" || base === "dim" ? 3 : 4;
+  const fifth = base === "dim" ? 6 : 7;
+  const rootPc = rootToPc(chord.root);
+  const useFlat = keyUsesFlat(chord.root);
+  const make = (bass?: string): ChordSymbol => ({
+    root: chord.root,
+    quality: chord.quality,
+    bass,
+    display: chord.root + QUALITY_PRETTY[chord.quality] + (bass ? `/${bass}` : ""),
+  });
+  return [
+    make(undefined),
+    make(pcToName((rootPc + third) % 12, useFlat)),
+    make(pcToName((rootPc + fifth) % 12, useFlat)),
+  ];
+}
+
 export function getCandidates(
   focusChord: ChordSymbol,
   focusPitches: number[],

@@ -291,6 +291,24 @@ export default function ChordExplorer() {
     void playNotes(shifted, 1);
   };
 
+  const setVoicing = (stepIdx: number, pitches: number[]) => {
+    stopPlay();
+    setSteps((prev) => prev.map((s, i) => (i === stepIdx ? { ...s, pitches } : s)));
+    void playNotes(pitches, 1);
+  };
+
+  const setStepChord = (stepIdx: number, chord: ChordSymbol) => {
+    stopPlay();
+    setSteps((prev) =>
+      prev.map((s, i) => {
+        if (i !== stepIdx) return s;
+        const pitches = voiceChord(chord);
+        void playNotes(pitches, 1);
+        return { ...s, chord, pitches };
+      }),
+    );
+  };
+
   const reorderSteps = useCallback(
     (from: number, to: number) => {
       stopPlay();
@@ -588,9 +606,12 @@ export default function ChordExplorer() {
                   keyRoot={keyRoot}
                   mode={mode}
                   editIdx={voicingEditIdx}
+                  guitarMode={false}
                   onChangeEditIdx={changeEditIdx}
                   onMoveVoice={moveVoice}
                   onShiftChordOctave={shiftChordOctave}
+                  onSetVoicing={setVoicing}
+                  onSetStepChord={setStepChord}
                   onClose={toggleVoicingEdit}
                 />
               ) : (
