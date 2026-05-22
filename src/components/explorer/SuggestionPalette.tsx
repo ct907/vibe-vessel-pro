@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Repeat, Volume2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseChord } from "@/lib/music/chords";
