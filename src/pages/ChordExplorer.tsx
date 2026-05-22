@@ -86,6 +86,7 @@ export default function ChordExplorer() {
   const [mode, setMode] = useState<ExplorerMode>("maj");
   const [bpm, setLocalBpm] = useState(100);
   const [steps, setSteps] = useState<ExplorerStep[]>([]);
+  const [started, setStarted] = useState(false);
   const [focusIdx, setFocusIdx] = useState(-1);
   const [playIndex, setPlayIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -150,9 +151,10 @@ export default function ChordExplorer() {
   };
 
   const handleBack = () => {
-    if (hasChords) {
+    if (hasChords || started) {
       stopPlay();
       setSteps([]);
+      setStarted(false);
       setFocusIdx(-1);
       setVoicingEditIdx(-1);
     } else {
@@ -167,6 +169,14 @@ export default function ChordExplorer() {
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
     void playNotes(step.pitches, 1);
+  };
+
+  const pickQuality = (quality: "maj" | "min" | "dim") => {
+    stopPlay();
+    setMode(quality === "maj" ? "maj" : "min");
+    setStarted(true);
+    setFocusIdx(-1);
+    setVoicingEditIdx(-1);
   };
 
   const addStarter = (root: string, quality: "maj" | "min" | "dim") => {
@@ -428,7 +438,7 @@ export default function ChordExplorer() {
           )}
         </div>
 
-        {!hasChords && (
+        {!hasChords && !started && (
           <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
@@ -493,9 +503,11 @@ export default function ChordExplorer() {
               steps={steps}
               keyRoot={keyRoot}
               mode={mode}
+              started={started}
               focusIdx={resolvedFocus}
               onAddCandidate={addCandidate}
               onAddStarter={addStarter}
+              onPickQuality={pickQuality}
             />
           </section>
         </DragDropContext>
