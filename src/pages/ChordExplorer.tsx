@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Play, Plus, Send, Square } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -28,11 +29,35 @@ import {
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
 import { useSongStore } from "@/store/song";
-import ProgressionTimeline from "@/components/explorer/ProgressionTimeline";
 import VoiceLeadingChart from "@/components/explorer/VoiceLeadingChart";
 import SuggestionPalette from "@/components/explorer/SuggestionPalette";
 
 const BEATS_PER_CHORD = 4;
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: ExplorerMode;
+  onChange: (m: ExplorerMode) => void;
+}) {
+  return (
+    <div className="flex">
+      {(["maj", "min"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          className={`h-7 px-2.5 text-xs font-semibold ${
+            m === "maj" ? "rounded-l-md" : "rounded-r-md"
+          } ${mode === m ? "btn-sculpt-amber" : "btn-sculpt-cream"}`}
+        >
+          {m === "maj" ? "Maj" : "Min"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function ChordExplorer() {
   const navigate = useNavigate();
@@ -43,7 +68,6 @@ export default function ChordExplorer() {
 
   const [keyRoot, setKeyRoot] = useState("C");
   const [mode, setMode] = useState<ExplorerMode>("maj");
-  const [slots, setSlots] = useState(4);
   const [bpm, setLocalBpm] = useState(100);
   const [steps, setSteps] = useState<ExplorerStep[]>([]);
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -71,6 +95,7 @@ export default function ChordExplorer() {
     };
   }, []);
 
+  const hasChords = steps.length > 0;
   const resolvedFocus =
     steps.length === 0
       ? -1
@@ -90,6 +115,27 @@ export default function ChordExplorer() {
     pitches: voiceChord(chord),
   });
 
+  const changeKey = (k: string) => {
+    stopPlay();
+    setKeyRoot(k);
+  };
+
+  const changeMode = (m: ExplorerMode) => {
+    stopPlay();
+    setMode(m);
+  };
+
+  const handleBack = () => {
+    if (hasChords) {
+      stopPlay();
+      setSteps([]);
+      setFocusIdx(-1);
+      setVoicingEditIdx(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   const addCandidate = (c: Candidate) => {
     stopPlay();
     const step = makeStep(c.chord, c.category, c.trait?.tag ?? null);
@@ -101,8 +147,6 @@ export default function ChordExplorer() {
 
   const addStarter = (root: string, quality: "maj" | "min" | "dim") => {
     stopPlay();
-    setKeyRoot(root);
-    setMode(quality === "min" ? "min" : "maj");
     const suffix = quality === "min" ? "m" : quality === "dim" ? "dim" : "";
     const chord = parseChord(root + suffix)!;
     const step = makeStep(chord, "starter", null);
@@ -233,7 +277,6 @@ export default function ChordExplorer() {
     navigate("/app");
   };
 
-  const hasChords = steps.length > 0;
   const pattern = hasChords
     ? steps.map((s) => nashvilleNumeral(s.chord, keyRoot, mode)).join(" – ")
     : "—";
@@ -241,122 +284,122 @@ export default function ChordExplorer() {
   return (
     <div className="min-h-dvh bg-paper text-ink">
       <div className="mx-auto flex max-w-[880px] flex-col gap-3 px-4 pb-20 pt-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Link
-              to="/"
-              aria-label="Back to home"
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label="Back"
               className="btn-sculpt-cream inline-flex h-8 w-8 items-center justify-center rounded-full"
             >
               <ArrowLeft className="h-4 w-4" />
-            </Link>
+            </button>
             <span className="font-display text-xl font-bold text-ink-soft">Chord Explorer</span>
           </div>
           {hasChords && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-ink-soft">
-                <span>Slots</span>
-                <input
-                  type="number"
-                  min={2}
-                  max={16}
-                  value={slots}
-                  onChange={(e) => {
-                    stopPlay();
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v)) setSlots(Math.max(2, Math.min(16, v)));
-                  }}
-                  className="h-7 w-12 rounded-md border border-border bg-[var(--paper-card)] text-center font-mono-chord text-xs"
-                />
-              </div>
-              <select
-                value={keyRoot}
-                onChange={(e) => {
-                  stopPlay();
-                  setKeyRoot(e.target.value);
-                }}
-                className="h-7 rounded-md border border-border bg-[var(--paper-card)] px-1.5 text-xs font-semibold"
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePlay}
+                className="btn-sculpt-amber inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold"
               >
-                {NOTES_SHARP.map((k) => (
-                  <option key={k} value={k}>
-                    {k}
-                  </option>
-                ))}
-              </select>
-              <div className="flex">
-                {(["maj", "min"] as const).map((m) => (
+                {isPlaying ? (
+                  <Square className="h-4 w-4 fill-current" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+                {isPlaying ? "Stop" : "Play"}
+              </button>
+              <Popover>
+                <PopoverTrigger asChild>
                   <button
-                    key={m}
                     type="button"
-                    onClick={() => {
-                      stopPlay();
-                      setMode(m);
-                    }}
-                    className={`h-7 px-2.5 text-xs font-semibold ${
-                      m === "maj" ? "rounded-l-md" : "rounded-r-md"
-                    } ${
-                      mode === m
-                        ? "btn-sculpt-amber"
-                        : "btn-sculpt-cream"
-                    }`}
+                    aria-label="Key, mode and tempo settings"
+                    className="btn-sculpt-cream inline-flex h-10 w-10 items-center justify-center rounded-lg"
                   >
-                    {m === "maj" ? "Maj" : "Min"}
+                    <SlidersHorizontal className="h-4 w-4" />
                   </button>
-                ))}
-              </div>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 space-y-3">
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft">
+                      Key
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={keyRoot}
+                        onChange={(e) => changeKey(e.target.value)}
+                        className="h-7 flex-1 rounded-md border border-border bg-[var(--paper-card)] px-1.5 text-xs font-semibold"
+                      >
+                        {NOTES_SHARP.map((k) => (
+                          <option key={k} value={k}>
+                            {k}
+                          </option>
+                        ))}
+                      </select>
+                      <ModeToggle mode={mode} onChange={changeMode} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-soft">
+                      {bpm} BPM
+                    </div>
+                    <Slider
+                      value={[bpm]}
+                      min={40}
+                      max={200}
+                      step={1}
+                      onValueChange={([v]) => {
+                        stopPlay();
+                        setLocalBpm(v);
+                      }}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
         </div>
 
-        {hasChords && (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-[var(--paper-card)] p-3">
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="btn-sculpt-amber inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold"
-            >
-              {isPlaying ? (
-                <Square className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4 fill-current" />
-              )}
-              {isPlaying ? "Stop" : "Play"}
-            </button>
-            <span className="w-16 text-sm font-semibold text-ink-soft">{bpm} BPM</span>
-            <Slider
-              value={[bpm]}
-              min={40}
-              max={200}
-              step={1}
-              onValueChange={([v]) => {
-                stopPlay();
-                setLocalBpm(v);
-              }}
-            />
+        {!hasChords && (
+          <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                Starting Key
+              </h2>
+              <ModeToggle mode={mode} onChange={changeMode} />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {NOTES_SHARP.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => changeKey(k)}
+                  className={`h-11 w-12 rounded-md text-base font-bold ${
+                    k === keyRoot ? "btn-sculpt-amber" : "btn-sculpt-cream"
+                  }`}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        <ProgressionTimeline
+        <VoiceLeadingChart
           steps={steps}
           keyRoot={keyRoot}
           mode={mode}
           focusIdx={resolvedFocus}
           playIndex={playIndex}
+          voicingEditIdx={voicingEditIdx}
+          canEdit={hasChords}
+          onToggleEdit={toggleVoicingEdit}
+          onMoveVoice={moveVoice}
           onFocus={focusStep}
           onRemove={removeStep}
           onSetExtension={setExtension}
           onAddTyped={addTyped}
-        />
-
-        <VoiceLeadingChart
-          steps={steps}
-          focusIdx={resolvedFocus}
-          playIndex={playIndex}
-          voicingEditIdx={voicingEditIdx}
-          keyRoot={keyRoot}
-          canEdit={hasChords}
-          onToggleEdit={toggleVoicingEdit}
-          onMoveVoice={moveVoice}
         />
 
         <SuggestionPalette
@@ -364,7 +407,6 @@ export default function ChordExplorer() {
           keyRoot={keyRoot}
           mode={mode}
           focusIdx={resolvedFocus}
-          slots={slots}
           onAddCandidate={addCandidate}
           onAddStarter={addStarter}
         />
