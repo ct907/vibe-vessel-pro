@@ -2,7 +2,7 @@
 // Pure functions over ChordSymbol + MIDI voicings; no React, no audio.
 
 import {
-  ChordSymbol, Quality, chordToMidi, nashvilleLadder, pcToName, rootToPc,
+  ChordSymbol, QUALITY_PRETTY, Quality, chordToMidi, nashvilleLadder, pcToName, rootToPc,
 } from "./chords";
 import { secondaryDominantOf } from "./suggestions";
 
@@ -281,6 +281,96 @@ function traitFor(
 
 export interface CandidateOptions {
   firstChord?: { chord: ChordSymbol; pitches: number[] } | null;
+  suggestLoop?: boolean;
+}
+
+export interface LoopGate {
+  stepIndex: number;
+  family: number;
+}
+
+// A tonic-family chord landing on a phrase boundary (every 4th step) resolves
+// the local arc — a "basecamp" the tension map rebases from.
+export function findLoopGates(
+  steps: ExplorerStep[],
+  keyRoot: string,
+  mode: ExplorerMode,
+): LoopGate[] {
+  const dia = diatonicChords(keyRoot, mode);
+  const gates: LoopGate[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    if ((i + 1) % 4 !== 0) continue;
+    const ch = steps[i].chord;
+    const base = baseQuality(ch.quality);
+    const match = dia.find(
+      (d) =>
+        rootToPc(d.chord.root) === rootToPc(ch.root) &&
+        baseQuality(d.chord.quality) === base,
+    );
+    if (match && match.family === 0) gates.push({ stepIndex: i, family: 0 });
+  }
+  return gates;
+}
+
+// Top-note elevation per step, rebased to the most recent basecamp so each
+// phrase visually "returns to ground" after a cadence resolves.
+export function tensionElevations(steps: ExplorerStep[], gates: LoopGate[]): number[] {
+  const gateIdx = new Set(gates.map((g) => g.stepIndex));
+  const topNote = (s: ExplorerStep) => Math.max(...s.pitches);
+  let baseline = steps.length > 0 ? topNote(steps[0]) : 0;
+  const out: number[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    out.push(topNote(steps[i]) - baseline);
+    if (gateIdx.has(i)) baseline = topNote(steps[i]);
+  }
+  return out;
+}
+
+export interface PassingChord {
+  kind: "dim7" | "secondaryDom" | "chromatic";
+  label: string;
+  chord: ChordSymbol;
+}
+
+// Passing-chord options for two structural chords a whole step apart.
+export function passingChords(
+  a: ChordSymbol,
+  b: ChordSymbol,
+  keyRoot: string,
+  mode: ExplorerMode,
+): PassingChord[] {
+  const pcA = rootToPc(a.root);
+  const pcB = rootToPc(b.root);
+  const diff = (((pcB - pcA) % 12) + 12) % 12;
+  if (diff !== 2 && diff !== 10) return [];
+  const useFlat = keyUsesFlat(keyRoot);
+  const dir = diff === 2 ? 1 : -1;
+
+  const dimRoot = pcToName((pcA + dir + 12) % 12, useFlat);
+  const secDom = secondaryDominantOf(b, useFlat);
+  const chromRoot = pcToName((pcB - 1 + 12) % 12, useFlat);
+
+  return [
+    {
+      kind: "dim7",
+      label: `${dimRoot}°7`,
+      chord: { root: dimRoot, quality: "dim7", display: dimRoot + QUALITY_PRETTY.dim7 },
+    },
+    {
+      kind: "secondaryDom",
+      label: `${secDom.display}→${b.display}`,
+      chord: secDom,
+    },
+    {
+      kind: "chromatic",
+      label: `${chromRoot}${QUALITY_PRETTY[b.quality]} slide`,
+      chord: {
+        root: chromRoot,
+        quality: b.quality,
+        display: chromRoot + QUALITY_PRETTY[b.quality],
+      },
+    },
+  ];
 }
 
 export function getCandidates(
@@ -363,6 +453,9 @@ export function getCandidates(
   for (const cat of CATEGORY_ORDER) {
     cats[cat].sort((a, b) => {
       if (a.inKey !== b.inKey) return a.inKey ? -1 : 1;
+      if (opts.suggestLoop && a.loopSmooth !== b.loopSmooth) {
+        return a.loopSmooth ? -1 : 1;
+      }
       return a.voiceDist.score - b.voiceDist.score;
     });
     cats[cat] = cats[cat].slice(0, 8);

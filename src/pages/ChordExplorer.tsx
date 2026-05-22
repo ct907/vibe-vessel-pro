@@ -19,10 +19,12 @@ import {
   parseChord,
   transposeChord,
   transposeKey,
+  type ChordSymbol,
   type Quality,
 } from "@/lib/music/chords";
 import { playNotes, stopProgression } from "@/lib/music/audio";
 import {
+  findLoopGates,
   nashvilleNumeral,
   voiceChord,
   type Candidate,
@@ -122,6 +124,9 @@ export default function ChordExplorer() {
       : focusIdx >= 0 && focusIdx < steps.length
         ? focusIdx
         : steps.length - 1;
+  const afterGate = findLoopGates(steps, keyRoot, mode).some(
+    (g) => g.stepIndex === resolvedFocus,
+  );
 
   const makeStep = (
     chord: ExplorerStep["chord"],
@@ -219,6 +224,19 @@ export default function ChordExplorer() {
     setSteps((prev) => prev.filter((_, i) => i !== idx));
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
+  };
+
+  const insertStep = (afterIndex: number, chord: ChordSymbol) => {
+    stopPlay();
+    const step = makeStep(chord, "typed", null);
+    setSteps((prev) => {
+      const next = [...prev];
+      next.splice(afterIndex + 1, 0, step);
+      return next;
+    });
+    setFocusIdx(-1);
+    setVoicingEditIdx(-1);
+    void playNotes(step.pitches, 1);
   };
 
   const setExtension = (idx: number, quality: Quality) => {
@@ -589,6 +607,7 @@ export default function ChordExplorer() {
                   onRemove={removeStep}
                   onSetExtension={setExtension}
                   onAddTyped={addTyped}
+                  onInsertPassing={insertStep}
                 />
               )}
             </section>
@@ -600,6 +619,7 @@ export default function ChordExplorer() {
                   keyRoot={keyRoot}
                   mode={mode}
                   focusIdx={resolvedFocus}
+                  afterGate={afterGate}
                   onAddCandidate={addCandidate}
                   onAddStarter={addStarter}
                 />

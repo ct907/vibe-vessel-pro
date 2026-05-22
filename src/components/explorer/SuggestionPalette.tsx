@@ -14,6 +14,7 @@ import {
   nashvilleNumeral,
   voiceChord,
   type Candidate,
+  type ExplorerCategory,
   type ExplorerMode,
   type ExplorerStep,
 } from "@/lib/music/explorerEngine";
@@ -24,6 +25,7 @@ interface SuggestionPaletteProps {
   keyRoot: string;
   mode: ExplorerMode;
   focusIdx: number;
+  afterGate?: boolean;
   onAddCandidate: (c: Candidate) => void;
   onAddStarter: (root: string, quality: "maj" | "min" | "dim") => void;
 }
@@ -52,6 +54,7 @@ export default function SuggestionPalette({
   keyRoot,
   mode,
   focusIdx,
+  afterGate = false,
   onAddCandidate,
   onAddStarter,
 }: SuggestionPaletteProps) {
@@ -95,7 +98,11 @@ export default function SuggestionPalette({
   const focus = steps[focusIdx] ?? steps[steps.length - 1];
   const cands = getCandidates(focus.chord, focus.pitches, keyRoot, mode, {
     firstChord: { chord: steps[0].chord, pitches: steps[0].pitches },
+    suggestLoop: steps.length >= 3,
   });
+  const order: ExplorerCategory[] = afterGate
+    ? ["push", "glide", "linger", "drift"]
+    : CATEGORY_ORDER;
   const ctx = activeKeyContext(focus.chord, keyRoot, mode);
   const ctxChanged = ctx.keyRoot !== keyRoot || ctx.mode !== mode;
 
@@ -116,14 +123,23 @@ export default function SuggestionPalette({
         </span>
       </div>
 
+      {afterGate && (
+        <div className="mb-2 rounded-md bg-[var(--primary-halo)] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+          Basecamp reached — open a fresh climb.
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
-        {CATEGORY_ORDER.map((cat) => {
+        {order.map((cat) => {
           const meta = CATEGORY_META[cat];
           const items = cands[cat];
+          const opening = afterGate && (cat === "push" || cat === "glide");
           return (
             <div
               key={cat}
-              className="flex flex-col gap-2 rounded-lg border border-border bg-[var(--paper)] p-2.5 sm:flex-row sm:items-start"
+              className={`flex flex-col gap-2 rounded-lg border bg-[var(--paper)] p-2.5 sm:flex-row sm:items-start ${
+                opening ? "border-[var(--primary)]" : "border-border"
+              }`}
             >
               <div className="w-full flex-shrink-0 sm:w-[116px]">
                 <div
@@ -165,7 +181,9 @@ export default function SuggestionPalette({
                         title={isPrimed ? "Tap again to add" : "Tap to audition"}
                         className={`relative flex min-w-[58px] flex-col items-center rounded-md border bg-[var(--paper-card)] px-2 py-1.5 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)] ${
                           c.isDiatonic ? "border-border" : "border-dashed border-border"
-                        } ${isPrimed ? "ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--paper)]" : ""}`}
+                        } ${isPrimed ? "ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--paper)]" : ""} ${
+                          c.loopSmooth && !isPrimed ? "shadow-[0_0_0_2px_var(--primary-halo)]" : ""
+                        }`}
                         style={{ borderLeft: c.inKey ? `2px solid ${meta.tint}` : undefined }}
                       >
                         {c.loopSmooth && (
