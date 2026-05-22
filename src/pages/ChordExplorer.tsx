@@ -247,6 +247,9 @@ export default function ChordExplorer() {
     setVoicingEditIdx((cur) => (cur >= 0 ? -1 : resolvedFocus));
   };
 
+  const goToStep1 = () => setVoicingEditIdx(-1);
+  const goToStep2 = () => setVoicingEditIdx((cur) => (cur >= 0 ? cur : resolvedFocus));
+
   const moveVoice = (stepIdx: number, voiceIdx: number, dir: 1 | -1) => {
     const step = steps[stepIdx];
     if (!step) return;
@@ -536,6 +539,30 @@ export default function ChordExplorer() {
             enableDefaultSensors={false}
             sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
           >
+            <div className="flex gap-1.5">
+              {([
+                { n: 1, label: "Build the Backbone Arc" },
+                { n: 2, label: "Prune & Weave Voices" },
+              ] as const).map((s) => {
+                const active = (voicingEditIdx >= 0 ? 2 : 1) === s.n;
+                return (
+                  <button
+                    key={s.n}
+                    type="button"
+                    onClick={() => (s.n === 1 ? goToStep1() : goToStep2())}
+                    className={`flex flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold ${
+                      active ? "btn-sculpt-amber" : "btn-sculpt-cream"
+                    }`}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--paper)] text-[11px] font-bold text-ink">
+                      {s.n}
+                    </span>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <section className={voicingEditIdx >= 0 ? "snap-start" : "snap-start scroll-mt-16"}>
               {voicingEditIdx >= 0 ? (
                 <VoicingEditor
@@ -566,16 +593,18 @@ export default function ChordExplorer() {
               )}
             </section>
 
-            <section className="snap-start scroll-mt-16">
-              <SuggestionPalette
-                steps={steps}
-                keyRoot={keyRoot}
-                mode={mode}
-                focusIdx={resolvedFocus}
-                onAddCandidate={addCandidate}
-                onAddStarter={addStarter}
-              />
-            </section>
+            {voicingEditIdx < 0 && (
+              <section className="snap-start scroll-mt-16">
+                <SuggestionPalette
+                  steps={steps}
+                  keyRoot={keyRoot}
+                  mode={mode}
+                  focusIdx={resolvedFocus}
+                  onAddCandidate={addCandidate}
+                  onAddStarter={addStarter}
+                />
+              </section>
+            )}
           </DragDropContext>
         )}
 

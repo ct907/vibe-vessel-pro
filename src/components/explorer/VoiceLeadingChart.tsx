@@ -176,7 +176,7 @@ export default function VoiceLeadingChart({
             className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-semibold disabled:opacity-40"
           >
             <Pencil className="h-3 w-3" />
-            Edit Voicing
+            Step 2 · Voicings
           </button>
         </div>
       </div>
