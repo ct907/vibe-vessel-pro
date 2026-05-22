@@ -149,7 +149,7 @@ interface DiatonicChord {
   family: number;
 }
 
-function diatonicChords(keyRoot: string, mode: ExplorerMode): DiatonicChord[] {
+export function diatonicChords(keyRoot: string, mode: ExplorerMode): DiatonicChord[] {
   return nashvilleLadder(keyRoot, mode).map((d, i) => ({
     chord: d.chord,
     numeral: d.numeral,
