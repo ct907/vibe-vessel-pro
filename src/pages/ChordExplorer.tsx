@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square, Music2 } from "lucide-react";
+import { ArrowLeft, Minus, Play, Plus, Send, SlidersHorizontal, Square, Music2, Volume2 } from "lucide-react";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
@@ -87,7 +87,7 @@ export default function ChordExplorer() {
   const [mode, setMode] = useState<ExplorerMode>("maj");
   const [bpm, setLocalBpm] = useState(100);
   const [steps, setSteps] = useState<ExplorerStep[]>([]);
-  const [started, setStarted] = useState(false);
+  const [phase, setPhase] = useState<"start" | "progression">("start");
   const [focusIdx, setFocusIdx] = useState(-1);
   const [playIndex, setPlayIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -153,10 +153,10 @@ export default function ChordExplorer() {
   };
 
   const handleBack = () => {
-    if (hasChords || started) {
+    if (phase === "progression") {
       stopPlay();
       setSteps([]);
-      setStarted(false);
+      setPhase("start");
       setFocusIdx(-1);
       setVoicingEditIdx(-1);
     } else {
@@ -176,10 +176,17 @@ export default function ChordExplorer() {
   const pickQuality = (quality: "maj" | "min" | "dim") => {
     stopPlay();
     setMode(quality === "maj" ? "maj" : "min");
-    setStarted(true);
+    setPhase("progression");
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
   };
+
+  const previewQuality = (suffix: string) => {
+    const chord = parseChord(keyRoot + suffix);
+    if (!chord) return;
+    void playNotes(voiceChord(chord), 1);
+  };
+
 
   const addStarter = (root: string, quality: "maj" | "min" | "dim") => {
     stopPlay();
@@ -451,79 +458,122 @@ export default function ChordExplorer() {
         </div>
 
 
-        {!hasChords && !started && (
-          <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-                Starting Key
+        {phase === "start" && (
+          <>
+            <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                  Starting Key
+                </h2>
+                <ModeToggle mode={mode} onChange={changeMode} />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {NOTES_SHARP.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => changeKey(k)}
+                    className={`h-11 w-12 rounded-md text-base font-bold ${
+                      k === keyRoot ? "btn-sculpt-amber" : "btn-sculpt-cream"
+                    }`}
+                  >
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
+              <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                Pick a quality for {keyRoot}
               </h2>
-              <ModeToggle mode={mode} onChange={changeMode} />
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { q: "maj", label: "Major", suffix: "", display: "" },
+                  { q: "min", label: "Minor", suffix: "m", display: "m" },
+                  { q: "dim", label: "Dim", suffix: "dim", display: "°" },
+                ] as const).map((x) => (
+                  <div
+                    key={x.q}
+                    className="btn-sculpt-cream flex min-w-[110px] items-center gap-1.5 rounded-lg px-2 py-2"
+                  >
+                    <button
+                      type="button"
+                      aria-label={`Preview ${keyRoot}${x.suffix}`}
+                      onClick={() => previewQuality(x.suffix)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft hover:bg-[var(--paper-shade)] hover:text-ink"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pickQuality(x.q)}
+                      className="flex flex-1 flex-col items-center"
+                    >
+                      <span className="font-mono-chord text-lg font-bold">
+                        {keyRoot}
+                        {x.display}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wide text-ink-soft">
+                        {x.label}
+                      </span>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {NOTES_SHARP.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => changeKey(k)}
-                  className={`h-11 w-12 rounded-md text-base font-bold ${
-                    k === keyRoot ? "btn-sculpt-amber" : "btn-sculpt-cream"
-                  }`}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-          </div>
+          </>
         )}
 
-        <DragDropContext
-          onDragEnd={onDragEnd}
-          enableDefaultSensors={false}
-          sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
-        >
-          <section className={voicingEditIdx >= 0 ? "snap-start" : "snap-start scroll-mt-16"}>
-            {voicingEditIdx >= 0 ? (
-              <VoicingEditor
-                steps={steps}
-                keyRoot={keyRoot}
-                mode={mode}
-                editIdx={voicingEditIdx}
-                onChangeEditIdx={changeEditIdx}
-                onMoveVoice={moveVoice}
-                onShiftChordOctave={shiftChordOctave}
-                onClose={toggleVoicingEdit}
-              />
-            ) : (
-              <VoiceLeadingChart
+        {phase === "progression" && (
+          <DragDropContext
+            onDragEnd={onDragEnd}
+            enableDefaultSensors={false}
+            sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
+          >
+            <section className={voicingEditIdx >= 0 ? "snap-start" : "snap-start scroll-mt-16"}>
+              {voicingEditIdx >= 0 ? (
+                <VoicingEditor
+                  steps={steps}
+                  keyRoot={keyRoot}
+                  mode={mode}
+                  editIdx={voicingEditIdx}
+                  onChangeEditIdx={changeEditIdx}
+                  onMoveVoice={moveVoice}
+                  onShiftChordOctave={shiftChordOctave}
+                  onClose={toggleVoicingEdit}
+                />
+              ) : (
+                <VoiceLeadingChart
+                  steps={steps}
+                  keyRoot={keyRoot}
+                  mode={mode}
+                  focusIdx={resolvedFocus}
+                  playIndex={playIndex}
+                  canEdit={hasChords}
+                  onToggleEdit={toggleVoicingEdit}
+                  onFocus={focusStep}
+                  onScrollFocus={setScrollFocus}
+                  onRemove={removeStep}
+                  onSetExtension={setExtension}
+                  onAddTyped={addTyped}
+                />
+              )}
+            </section>
+
+            <section className="snap-start scroll-mt-16">
+              <SuggestionPalette
                 steps={steps}
                 keyRoot={keyRoot}
                 mode={mode}
                 focusIdx={resolvedFocus}
-                playIndex={playIndex}
-                canEdit={hasChords}
-                onToggleEdit={toggleVoicingEdit}
-                onFocus={focusStep}
-                onScrollFocus={setScrollFocus}
-                onRemove={removeStep}
-                onSetExtension={setExtension}
-                onAddTyped={addTyped}
+                onAddCandidate={addCandidate}
+                onAddStarter={addStarter}
               />
-            )}
-          </section>
+            </section>
+          </DragDropContext>
+        )}
 
-          <section className="snap-start scroll-mt-16">
-            <SuggestionPalette
-              steps={steps}
-              keyRoot={keyRoot}
-              mode={mode}
-              started={started}
-              focusIdx={resolvedFocus}
-              onAddCandidate={addCandidate}
-              onAddStarter={addStarter}
-              onPickQuality={pickQuality}
-            />
-          </section>
-        </DragDropContext>
 
         <div className="flex gap-5 px-1 text-[10px] uppercase tracking-[0.12em] text-ink-soft">
           <div>
