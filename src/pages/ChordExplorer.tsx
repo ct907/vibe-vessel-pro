@@ -185,7 +185,6 @@ export default function ChordExplorer() {
   const pickQuality = (quality: "maj" | "min" | "dim") => {
     stopPlay();
     setMode(quality === "maj" ? "maj" : "min");
-    setPhase("progression");
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
   };
@@ -205,6 +204,7 @@ export default function ChordExplorer() {
     setSteps([step]);
     setFocusIdx(-1);
     setVoicingEditIdx(-1);
+    if (phase === "start") setPhase("progression");
     void playNotes(step.pitches, 1);
   };
 
@@ -546,45 +546,57 @@ export default function ChordExplorer() {
             </div>
 
             {qualityVisible && (
-            <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
-              <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-                Pick a Quality for {keyRoot}
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { q: "maj", label: "Major", suffix: "", display: "" },
-                  { q: "min", label: "Minor", suffix: "m", display: "m" },
-                  { q: "dim", label: "Dim", suffix: "dim", display: "°" },
-                ] as const).map((x) => (
-                  <div
-                    key={x.q}
-                    className="btn-sculpt-cream flex min-w-[110px] items-center gap-1.5 rounded-lg px-2 py-2"
-                  >
-                    <button
-                      type="button"
-                      aria-label={`Preview ${keyRoot}${x.suffix}`}
-                      onClick={() => previewQuality(x.suffix)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft hover:bg-[var(--paper-shade)] hover:text-ink"
-                    >
-                      <Volume2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => pickQuality(x.q)}
-                      className="flex flex-1 flex-col items-center"
-                    >
-                      <span className="font-mono-chord text-lg font-bold">
-                        {keyRoot}
-                        {x.display}
-                      </span>
-                      <span className="text-[9px] uppercase tracking-wide text-ink-soft">
-                        {x.label}
-                      </span>
-                    </button>
+              <>
+                <div className="rounded-xl border border-border bg-[var(--paper-card)] p-4">
+                  <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                    Pick a Quality for {keyRoot}
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { q: "maj", label: "Major", suffix: "", display: "" },
+                      { q: "min", label: "Minor", suffix: "m", display: "m" },
+                      { q: "dim", label: "Dim", suffix: "dim", display: "°" },
+                    ] as const).map((x) => (
+                      <div
+                        key={x.q}
+                        className="btn-sculpt-cream flex min-w-[110px] items-center gap-1.5 rounded-lg px-2 py-2"
+                      >
+                        <button
+                          type="button"
+                          aria-label={`Preview ${keyRoot}${x.suffix}`}
+                          onClick={() => previewQuality(x.suffix)}
+                          className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft hover:bg-[var(--paper-shade)] hover:text-ink"
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => pickQuality(x.q)}
+                          className="flex flex-1 flex-col items-center"
+                        >
+                          <span className="font-mono-chord text-lg font-bold">
+                            {keyRoot}
+                            {x.display}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-wide text-ink-soft">
+                            {x.label}
+                          </span>
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+                <SuggestionPalette
+                  steps={steps}
+                  keyRoot={keyRoot}
+                  mode={mode}
+                  focusIdx={resolvedFocus}
+                  afterGate={afterGate}
+                  guitarMode={rangeMode === "guitar"}
+                  onAddCandidate={addCandidate}
+                  onAddStarter={addStarter}
+                />
+              </>
             )}
           </>
         )}
@@ -672,34 +684,38 @@ export default function ChordExplorer() {
         )}
 
 
-        <div className="flex gap-5 px-1 text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-          <div>
-            Chords <span className="font-bold text-ink">{steps.length}</span>
-          </div>
-          <div className="min-w-0 truncate">
-            Pattern <span className="font-mono-chord font-bold text-ink">{pattern}</span>
-          </div>
-        </div>
+        {phase === "progression" && (
+          <>
+            <div className="flex gap-5 px-1 text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+              <div>
+                Chords <span className="font-bold text-ink">{steps.length}</span>
+              </div>
+              <div className="min-w-0 truncate">
+                Pattern <span className="font-mono-chord font-bold text-ink">{pattern}</span>
+              </div>
+            </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleDone}
-            disabled={!hasChords}
-            className="btn-sculpt-cream inline-flex h-10 flex-1 items-center justify-center rounded-lg px-3 text-sm font-semibold disabled:opacity-40"
-          >
-            Done · Copy Journal
-          </button>
-          <button
-            type="button"
-            onClick={openSend}
-            disabled={!hasChords}
-            className="btn-sculpt-amber inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-40"
-          >
-            <Send className="h-4 w-4" />
-            Send to Song
-          </button>
-        </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleDone}
+                disabled={!hasChords}
+                className="btn-sculpt-cream inline-flex h-10 flex-1 items-center justify-center rounded-lg px-3 text-sm font-semibold disabled:opacity-40"
+              >
+                Done · Copy Journal
+              </button>
+              <button
+                type="button"
+                onClick={openSend}
+                disabled={!hasChords}
+                className="btn-sculpt-amber inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-40"
+              >
+                <Send className="h-4 w-4" />
+                Send to Song
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
