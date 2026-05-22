@@ -1,92 +1,49 @@
-# In-App User Manual ("Help" Page)
+# Add relative minor chords to Choose Your Path
 
-A beginner-focused Help page built into the app, accessible from the header, with captured screenshots and concise step-by-step instructions.
+## Goal
+In the Chord Explorer's "Choose Your Path" suggestions, include chords drawn from the **relative minor of the current key** (or relative major if the key is minor). Placement into Linger / Push / Glide / Drift is decided by the existing voice-leading logic — no new category.
 
-## Structure
+## Where the change lives
+Single file: `src/lib/music/explorerEngine.ts`, function `getCandidates`.
 
-A new route `/help` rendered as a single scrollable page with a sticky left-side table of contents (collapses to a top dropdown on mobile). Reuses existing design tokens (`paper-card`, `ink`, `font-display`, `font-mono-chord`) so it feels native to the app.
+Today the candidate pool is built from:
+1. Diatonic chords of the current key
+2. Diatonic chords of the **parallel** mode (C maj ↔ C min)
+3. Secondary dominants of each diatonic chord
+4. Chromatic-mediant maj/min triads a 3rd/6th away from the focus
 
-### Entry points
-- Add a "Help" item to the menu in `TransportHeader` (existing `Menu` icon dropdown) → links to `/help`.
-- Also link from the Landing page footer.
+We will add a 5th source: diatonic chords of the **relative** key.
 
-## Sections
+## Relative-key rule
+- `maj` key at root R → relative is `min` at root `pc(R) − 3` (e.g. C maj → A min)
+- `min` key at root R → relative is `maj` at root `pc(R) + 3` (e.g. A min → C maj)
 
-Each section: short intro → numbered steps → screenshot with callout → "Tip" callout where helpful.
+Use `pcToName(..., keyUsesFlat(keyRoot))` for the relative root so accidentals match the key.
 
-1. **Welcome & Overview of the Three Tabs**
-   - What Lyrics, Chords, and Progressions tabs are for, and how they work together (chords picked in the Chord tab flow into the basket; the basket feeds Lyrics and Progressions).
+## Implementation sketch
+In `getCandidates`, after the parallel-mode loop, add:
 
-2. **Adding a Chord in the Lyrics Tab**
-   - Tap a word → ChordPickerSheet (mobile) / FocusedChordEditor opens → pick root, quality, octave → Close to save.
-   - Mention drag-from-basket alternative.
+```ts
+const relRoot = pcToName(
+  (rootToPc(keyRoot) + (mode === "maj" ? 9 : 3)) % 12,
+  useFlat,
+);
+const relMode: ExplorerMode = mode === "maj" ? "min" : "maj";
+for (const d of diatonicChords(relRoot, relMode)) {
+  add(d.chord, false, -1, "");
+}
+```
 
-3. **Writing Lyrics & Creating New Lines**
-   - Type into the lyric line field; press Enter/Return to create a new line below; Backspace on empty line removes it.
+Notes:
+- `isDiatonic: false` — these aren't in the active key, so the existing categorizer will treat them as `drift` unless their voice-leading score qualifies them for `glide`. That matches "Auto (by voice distance)".
+- The `seen` set already de-duplicates anything that overlaps with the current key or parallel mode (natural-minor relative shares most pitch classes, so often only the harmonic-minor V — e.g. E major in A minor — surfaces as new). Harmonic-minor V is produced because `nashvilleLadder` for minor returns a major V; this is the musically interesting addition.
+- `inKey` continues to be computed against the active key, so the left-edge tint and ordering stay correct.
 
-4. **Browsing Chords & the Basket Bar**
-   - Filter by Nashville numeral; tap to audition; checkbox to multi-select; "Add to basket".
-   - The Basket Bar (bottom): drag chips into Lyrics or Progressions, or use "Send to" buttons.
-
-5. **Adding a Chord in the Progressions Tab**
-   - Tap an empty slot in a pattern block → picker opens → pick chord and octave → Close.
-   - Drag from basket as alternative.
-
-6. **How Pattern Blocks Work**
-   - A pattern block = a repeating chord progression with N bars. Add multiple blocks per section. Patterns drive playback and bar count.
-
-7. **Adjusting the Bar Length of a Chord**
-   - Each chord chip in a pattern shows a duration handle; drag to extend/shorten across bars.
-
-8. **Adjusting Pattern Block Length**
-   - Use the bar-count control on the pattern header (+/− or stepper) to change total bars.
-
-9. **Adjusting Sounds**
-   - Open Sound Panel from TransportHeader → choose preset (Rhodes, DX Keys, Juno, …) → tweak Timbre, ADSR, EQ, FX. Volume in header.
-
-10. **Saving Your Progress**
-    - Autosave is on by default (saves to your browser).
-    - "Save" button in the header menu → downloads a `.json` project file.
-    - "Open" lets you reload a `.json` file.
-
-### Brief one-liner mentions (per user request)
-- Exporting lyrics (ExportLyricsSheet)
-- Changing key/mode (header dropdown)
-- Sort/reorder mode for sections
-- Sound presets quick reference
-
-## Technical Details
-
-**New files**
-- `src/pages/Help.tsx` — main page
-- `src/components/help/HelpSection.tsx` — section wrapper (heading + body + screenshot slot)
-- `src/components/help/HelpToc.tsx` — sticky TOC / mobile dropdown
-- `src/assets/help/*.png` — screenshots (captured from live preview at `/index`)
-
-**Modified files**
-- `src/App.tsx` — register `/help` route
-- `src/components/header/TransportHeader.tsx` — add "Help" link in menu
-- `src/pages/Landing.tsx` — add Help link in footer (small)
-
-**Screenshot pipeline** (during build only, not runtime):
-- Use browser tool to navigate the preview at relevant states (lyrics tab with a picker open, chords tab with basket, progressions tab with a pattern block, sound panel open).
-- Save to `src/assets/help/` and import as ES6 modules.
-- Add red-circle/arrow callouts via simple absolute-positioned overlay divs in `HelpSection` (no image editing needed).
-
-**Styling**
-- Page uses `bg-paper`, `font-display` for h1/h2, `font-nunito` for body.
-- Screenshots in rounded `paper-card` containers with `shadow-card`.
-- Numbered steps as `<ol>` with custom marker styling matching the app's amber accent.
-
-**Accessibility/SEO**
-- Single H1 ("Help & User Manual"), H2 per section, anchor IDs for TOC links.
-- `<title>` and `<meta description>` set via `<Helmet>` if available, else direct `document.title` effect.
-- Alt text on every screenshot describing what it shows.
+## Verification
+- `npx tsc --noEmit`
+- Manually: in C Major, the palette should start surfacing chords like **E** (V of relative minor) and **A min** family members under Glide / Drift based on voice distance from the focus.
+- No UI changes needed; `SuggestionPalette` already renders whatever `getCandidates` returns.
 
 ## Out of scope
-- No video tutorials.
-- No backend storage of help-read state.
-- No i18n (English only for v1).
-
-## Open question
-Confirm the menu placement for the Help link — top of the header dropdown, or under a new "?" icon button next to the menu? I'll default to the dropdown unless you prefer the icon.
+- No new category, no label changes, no styling changes.
+- No change to secondary-dominant logic or chromatic-mediant logic.

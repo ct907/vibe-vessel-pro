@@ -312,6 +312,13 @@ export function getCandidates(
   for (const d of diatonicChords(keyRoot, mode === "maj" ? "min" : "maj")) {
     add(d.chord, false, -1, "");
   }
+  const relRoot = pcToName(
+    (rootToPc(keyRoot) + (mode === "maj" ? 9 : 3)) % 12,
+    useFlat,
+  );
+  for (const d of diatonicChords(relRoot, mode === "maj" ? "min" : "maj")) {
+    add(d.chord, false, -1, "");
+  }
   for (const d of diatonic) {
     if (d.chord.quality === "dim") continue;
     add(secondaryDominantOf(d.chord, useFlat), false, -1, `V/${d.numeral}`);
