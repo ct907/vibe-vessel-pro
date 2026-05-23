@@ -12,6 +12,7 @@ import type { ChordSymbol } from "@/lib/music/chords";
 interface Props {
   pattern: PatternBlock;
   activeChordId: string | null;
+  onAuditionChange?: (chords: ChordSymbol[] | null) => void;
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
@@ -30,7 +31,7 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
   break_pattern: "💥",
 };
 
-export function SpicePanel({ pattern, activeChordId }: Props) {
+export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) {
   const meta = useSongStore((s) => s.meta);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
@@ -76,12 +77,14 @@ export function SpicePanel({ pattern, activeChordId }: Props) {
   const stopPreview = () => {
     stopProgression();
     setPlayingId(null);
+    onAuditionChange?.(null);
   };
 
   const playSuggestion = async (s: SpiceSuggestion) => {
     if (playingId === s.id) { stopPreview(); return; }
     stopProgression();
     await ensureAudio();
+    onAuditionChange?.(s.chords);
     let cursor = 0;
     const events: ScheduledChord[] = s.chords.map((c, i) => {
       const len = s.suggestedDurations?.[i] ?? sortedChords[i]?.lengthBeats ?? 2;
@@ -92,7 +95,10 @@ export function SpicePanel({ pattern, activeChordId }: Props) {
     setPlayingId(s.id);
     await playProgression(events, meta.bpm, {
       loopBeats: cursor,
-      onEnd: () => setPlayingId((id) => (id === s.id ? null : id)),
+      onEnd: () => {
+        setPlayingId((id) => (id === s.id ? null : id));
+        onAuditionChange?.(null);
+      },
     });
   };
 

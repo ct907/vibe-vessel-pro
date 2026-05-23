@@ -8,6 +8,7 @@ import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
 import { PresetBrowser } from "@/components/progressions/PresetBrowser";
+import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +147,7 @@ function PatternBlock({
     replacePatternChords,
   } = useSongStore();
   const [presetBrowserOpen, setPresetBrowserOpen] = useState(false);
+  const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -804,7 +806,17 @@ function PatternBlock({
         </div>
       )}
 
-      <SpicePanel pattern={pattern} activeChordId={activeChordId} />
+      <VoiceLeadingRibbon
+        originalChords={sortedChords.map((c) => c.chord)}
+        spicedChords={previewingSpiceChords}
+        isVisible={!!previewingSpiceChords && sortedChords.length >= 2}
+      />
+
+      <SpicePanel
+        pattern={pattern}
+        activeChordId={activeChordId}
+        onAuditionChange={setPreviewingSpiceChords}
+      />
 
       <PresetBrowser
         open={presetBrowserOpen}
