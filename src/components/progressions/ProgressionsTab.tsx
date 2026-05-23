@@ -6,7 +6,7 @@ import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
-import { SuggestionsPanel } from "@/components/progressions/SuggestionsPanel";
+import { SpicePanel } from "@/components/progressions/SpicePanel";
 import { PresetBrowser } from "@/components/progressions/PresetBrowser";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
@@ -804,7 +804,7 @@ function PatternBlock({
         </div>
       )}
 
-      <SuggestionsPanel pattern={pattern} />
+      <SpicePanel pattern={pattern} activeChordId={activeChordId} />
 
       <PresetBrowser
         open={presetBrowserOpen}
