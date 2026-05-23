@@ -9,6 +9,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
 import { PresetBrowser } from "@/components/progressions/PresetBrowser";
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
+import { ChordChip } from "@/components/chord/ChordChip";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1148,6 +1149,16 @@ function SectionGroup({
         )}
       </div>
 
+      {collapsed && section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0) && (
+        <div className="flex flex-wrap gap-1 px-3 pb-1">
+          {blocks.flatMap((b) =>
+            getPatternChordsViaSSOT(section, b).map((pc) => (
+              <ChordChip key={pc.id} chord={pc.chord} variant="ink" size="sm" audition={false} />
+            )),
+          )}
+        </div>
+      )}
+
       {/* Pattern blocks within this section. Pattern-block reordering is
           intentionally NOT exposed: the lyrics tab's chord row order is
           driven by the same SSOT, and re-arranging blocks here would
@@ -1462,35 +1473,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   };
 
   const onDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId } = result;
+    const { destination } = result;
     if (!destination) return;
     const dst = destination.droppableId.split(":");
-
     if (dst[0] !== "pattern") return;
-    let toId = dst[1];
-    let toSlot = Number(dst[2]);
-
-    // Item 4 — edge drop strips: redirect to the previous/next pattern block.
-    const state = useSongStore.getState();
     if (dst[2] === "edge-left" || dst[2] === "edge-right") {
-      const idx = state.progression.findIndex((p) => p.id === toId);
+      const state = useSongStore.getState();
+      const idx = state.progression.findIndex((p) => p.id === dst[1]);
       if (idx < 0) return;
       const neighborIdx = dst[2] === "edge-left" ? idx - 1 : idx + 1;
-      const neighbor = state.progression[neighborIdx];
-      if (!neighbor) {
+      if (!state.progression[neighborIdx]) {
         toast({ title: "No adjacent block", description: "There's no neighboring pattern block to move into.", variant: "destructive" });
-        return;
       }
-      toId = neighbor.id;
-      const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
-      // Append at the next free slot in the neighbor (rounded down to a beat).
-      toSlot = Math.floor(neighborUsed);
     }
-
-    if (!toId || Number.isNaN(toSlot)) return;
-
-    if (draggableId.startsWith("basket:")) return;
-
   };
 
   const requestDeleteSection = (sectionId: string) => removeSection(sectionId);

@@ -24,8 +24,8 @@ const SECTIONS: Section[] = [
       "SongNote has three tabs that work together. Pick chords in the Chords tab, attach them to lyrics in the Lyrics tab, then arrange them into looping patterns in the Progressions tab.",
     steps: [
       "Lyrics — write words and pin chords to the syllables you sing them on.",
-      "Chords — browse every chord in your song's key, audition them, and send your favourites to the basket.",
-      "Progressions — build looping bar-by-bar chord patterns for each section (verse, chorus, etc.).",
+      "Chords — browse every chord in your song's key, tap to audition, and tap again to see which classic progressions use it.",
+      "Progressions — build looping bar-by-bar chord patterns for each section (verse, chorus, etc.) and remix them with Add Spice.",
     ],
     tip: "Anything you do in one tab updates the others instantly. They share the same song.",
     image: lyricsImg,
@@ -43,7 +43,7 @@ const SECTIONS: Section[] = [
       "Pick an octave (3, 4 or 5). Tap the chord to hear it.",
       "Press Close. The chord is saved and appears above your lyric.",
     ],
-    tip: "You can also drag a chord chip from the basket bar at the bottom directly onto a lyric word.",
+    tip: "Open a section's three-dot menu in the Progressions tab to copy or paste chord sequences between sections.",
   },
   {
     id: "write-lyrics",
@@ -59,15 +59,14 @@ const SECTIONS: Section[] = [
   },
   {
     id: "browse-chords",
-    title: "4. Browsing chords & the Basket bar",
+    title: "4. Browsing chords — the Chord Encyclopedia",
     intro:
-      "The Chords tab shows every chord in your key, grouped by scale degree (I, ii, iii, IV, V, vi, vii°).",
+      "The Chords tab is an encyclopedia. Every chord in your key is grouped by scale degree (I, ii, iii, IV, V, vi, vii°).",
     steps: [
       "Tap the Roman numeral chips at the top to filter the rows.",
-      "Tap any chord to audition it — hold to sustain.",
-      "Tick the checkbox next to a chord to add it to your selection.",
-      "Press \"Add N to basket\" at the bottom right. The chords drop into the Basket bar.",
-      "From the Basket bar at the bottom, drag a chip into the Lyrics or Progressions tab — or use the \"Send to\" buttons.",
+      "Tap any chord to audition it (hold to sustain) — a detail sheet slides up with what the chord does in your key.",
+      "Inside the sheet, see two or three classic progressions that use this chord, audition them, and send any to the Progressions tab.",
+      "Tap \"Add to song\" to drop the chord straight into the first pattern block with space.",
     ],
     tip: "Use the Octave selector in the toolbar to change which octave the audition plays in.",
     image: chordsImg,
@@ -89,8 +88,22 @@ const SECTIONS: Section[] = [
     imageAlt: "A pattern block in the Progressions tab with empty bar cells ready to receive chords.",
   },
   {
+    id: "presets-and-spice",
+    title: "6. Browse progressions & Add Spice",
+    intro:
+      "Two shortcuts inside every pattern block — start from a curated progression, then remix it with mood-based harmony moves.",
+    steps: [
+      "Tap the music-note icon on a block header (or \"Browse progressions\" in an empty block) to open the preset gallery — Royal Road, Doo-Wop, Axis, etc., realised in your current key.",
+      "Tap ▷ on a preset to loop it, then \"Use\" to drop it into the block.",
+      "Tap \"✧ Add Spice\" on any block with at least two chords to see categorised variations: Dramatic shift, Bittersweet color, Tension gateway, Smooth bridge, and more.",
+      "Click ▷ on a Spice card to audition; the voice-leading ribbon above the panel shows how the inner voices move. Click ✓ to commit.",
+      "Every commit shows an Undo toast for five seconds so nothing's irreversible.",
+    ],
+    tip: "Tap a single chord first to scope Spice to just that chord; tap the background again to spice the whole chain.",
+  },
+  {
     id: "pattern-blocks",
-    title: "6. How pattern blocks work",
+    title: "7. How pattern blocks work",
     intro:
       "A pattern block is one looping chord pattern. A section can hold several blocks that play one after another.",
     steps: [
@@ -102,7 +115,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "chord-bar-length",
-    title: "7. Adjusting the bar length of a chord",
+    title: "8. Adjusting the bar length of a chord",
     intro:
       "Each chord in a pattern takes up a number of beats. You can stretch or shrink it.",
     steps: [
@@ -114,7 +127,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "block-bar-length",
-    title: "8. Adjusting the bar length of a pattern block",
+    title: "9. Adjusting the bar length of a pattern block",
     intro: "Each block can be any number of bars — short loops or long phrases.",
     steps: [
       "Click the number in the \"Bars\" field on the block header.",
@@ -124,7 +137,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "sounds",
-    title: "9. Adjusting sounds",
+    title: "10. Adjusting sounds",
     intro:
       "SongNote has several built-in instrument presets so playback never sounds the same twice.",
     steps: [
@@ -139,7 +152,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "save",
-    title: "10. Saving your progress",
+    title: "11. Saving your progress",
     intro:
       "Your song saves to this browser automatically. For backups or to move it to another device, export the project file.",
     steps: [
