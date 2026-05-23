@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
-import { useBasketSelectionStore } from "@/store/basket-selection";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
@@ -51,6 +50,7 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { parseChordTextStrict } from "@/lib/music/chordClipboard";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
@@ -832,6 +832,7 @@ function SectionGroup({
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
   const setSectionComment = useSongStore((s) => s.setSectionComment);
+  const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
   const collapsed = !!section?.collapsed;
@@ -982,6 +983,57 @@ function SectionGroup({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
                   <Copy className="h-4 w-4" /> Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    if (!section) return;
+                    const text = blocks
+                      .flatMap((b) => getPatternChordsViaSSOT(section, b))
+                      .map((c) => c.chord.display)
+                      .join(" ");
+                    if (!text) {
+                      toast({ title: "No chords to copy", description: "This section has no chords yet." });
+                      return;
+                    }
+                    try {
+                      await navigator.clipboard.writeText(text);
+                      toast({ title: "Chords copied to clipboard", description: text });
+                    } catch {
+                      toast({ title: "Copy failed", description: "Clipboard access was blocked.", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copy chords
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    const firstBlock = blocks[0];
+                    if (!firstBlock) return;
+                    let text = "";
+                    try {
+                      text = await navigator.clipboard.readText();
+                    } catch {
+                      toast({ title: "Paste failed", description: "Clipboard access was blocked.", variant: "destructive" });
+                      return;
+                    }
+                    const { clips, invalidTokens, totalTokens } = parseChordTextStrict(text);
+                    if (totalTokens === 0) {
+                      toast({ title: "Clipboard is empty" });
+                      return;
+                    }
+                    if (invalidTokens.length > 0) {
+                      toast({
+                        title: "Unparseable chord tokens",
+                        description: invalidTokens.join(", "),
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    replacePatternChords(firstBlock.id, clips.map((c) => c.chord));
+                    toast({ title: `Pasted ${clips.length} chord${clips.length === 1 ? "" : "s"}` });
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Paste chords
                 </DropdownMenuItem>
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
@@ -1195,7 +1247,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     sections,
     addSection,
     updatePatternChord,
-    basket,
     moveSection,
     removeSection,
     removePatternBlock,
@@ -1342,12 +1393,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     }))
     .filter((g) => g.blocks.length > 0);
 
-  useEffect(() => {
-    if (basket.length > 0 && picker) setPicker(null);
-  }, [basket.length, picker]);
-
   const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
-    if (basket.length > 0) return;
     if (isMobile && !replaceChordId) {
       const pat = progression.find((p) => p.id === patternId);
       if (pat) {
@@ -1401,22 +1447,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
     if (!toId || Number.isNaN(toSlot)) return;
 
-    // Basket → pattern block: COPY chord(s) at the target slot. Original
-    // chips stay in basket so the user can drop the same chord multiple
-    // times. If the dragged chip is part of a multi-selection, every
-    // selected chord is appended sequentially starting at the drop slot.
-    if (draggableId.startsWith("basket:")) {
-      const basketItemId = draggableId.slice("basket:".length);
-      const { resolveDragIds, clear: clearBasketSelection } =
-        useBasketSelectionStore.getState();
-      const ids = resolveDragIds(basketItemId);
-      const ordered = state.basket.filter((b) => ids.includes(b.id));
-      ordered.forEach((b, i) =>
-        state.addChordToPatternSlot(toId, b.chord, toSlot + i),
-      );
-      clearBasketSelection();
-      return;
-    }
+    if (draggableId.startsWith("basket:")) return;
 
   };
 

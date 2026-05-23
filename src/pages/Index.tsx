@@ -13,7 +13,6 @@ import { SongTitleHeader } from "@/components/song/SongTitleHeader";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
-import { BasketBar } from "@/components/basket/BasketBar";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
@@ -127,14 +126,6 @@ const Index = () => {
           </Tabs>
         </main>
 
-        {/* Basket lives at the layout level — single instance shared across
-            tabs, sibling of <main> inside the same DragDropContext so drops
-            from the basket land in either lyrics or progression destinations. */}
-        <BasketBar
-          draggable
-          onSendToLyrics={tab !== "lyrics" ? () => setTab("lyrics") : undefined}
-          onSendToProgressions={tab !== "progressions" ? () => setTab("progressions") : undefined}
-        />
       </DragDropContext>
     </div>
   );
