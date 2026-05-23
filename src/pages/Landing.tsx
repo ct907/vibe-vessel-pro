@@ -190,13 +190,6 @@ export default function Landing() {
           Start Writing
         </button>
 
-        <Link
-          to="/chord-explorer"
-          className="btn-sculpt-cream mt-3 inline-flex items-center justify-center rounded-lg h-9 px-5 text-sm font-semibold"
-        >
-          Chord Sketchpad
-        </Link>
-
         <section className="mt-32 w-full max-w-md" aria-label="Recent projects">
           <button
             type="button"

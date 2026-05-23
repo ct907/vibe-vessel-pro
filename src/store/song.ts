@@ -239,9 +239,12 @@ export interface SongState {
     anchorIds: string[], direction: -1 | 1,
   ) => { moved: boolean; createdBlock: boolean; movedIds: string[]; targetSectionId?: string; targetLineId?: string };
 
-  // ---- basket ----
+  // ---- basket (deprecated: superseded by preset browser + copy/paste chords) ----
+  /** @deprecated basket UI was retired; field retained for transitive references. */
   addToBasket: (chords: ChordSymbol[]) => void;
+  /** @deprecated */
   removeFromBasket: (id: string) => void;
+  /** @deprecated */
   clearBasket: () => void;
 
   // ---- progression (binding-aware) ----
