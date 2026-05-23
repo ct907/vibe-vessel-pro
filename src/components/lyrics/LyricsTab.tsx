@@ -75,7 +75,6 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
-import { useBasketSelectionStore } from "@/store/basket-selection";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
@@ -650,7 +649,6 @@ function SectionCard({
     duplicateSection,
     toggleSectionCollapsed,
     upsertChordAt,
-    basket,
     setSectionComment,
     setSectionColor,
     setSectionArpArmed,
@@ -1064,7 +1062,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     upsertChordAt,
     addSection,
     moveSection,
-    basket,
     moveChordToSlot,
     setLineText,
     placeChordInSlot,
@@ -1140,14 +1137,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const justDraggedAtRef = useRef<number>(0);
 
   const openPicker = (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => {
-    if (basket.length > 0) return;
     if (Date.now() - justDraggedAtRef.current < 350) return;
     setPicker({ sectionId, lineId, slotIndex, anchorId });
   };
-
-  useEffect(() => {
-    if (basket.length > 0 && picker) setPicker(null);
-  }, [basket.length, picker]);
 
   // Auto-layout watchdog: when a section's chord count grows, debounce a
   // viewport-aware reflow so the user sees them spread out cleanly.
@@ -1358,29 +1350,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     );
   };
 
-  // ---- Drag handlers (basket → slot only; chord chips are no longer draggable) ----
-  const onDragEnd = (result: DropResult) => {
+  // Basket drag-source was retired in the Spice/Preset overhaul; no draggables target lyrics slots now.
+  const onDragEnd = (_result: DropResult) => {
     justDraggedAtRef.current = Date.now();
-    if (!result.destination) return;
-    const { destination, draggableId } = result;
-    const dstParts = destination.droppableId.split(":");
-    if (dstParts[0] !== "slot") return;
-    const toSectionId = dstParts[1];
-    const toLineId = dstParts[2];
-    const toSlot = Number(dstParts[3]);
-    if (Number.isNaN(toSlot)) return;
-
-    if (!draggableId.startsWith("basket:")) return;
-    const basketItemId = draggableId.slice("basket:".length);
-    const basketState = useSongStore.getState().basket;
-    const { resolveDragIds, clear: clearBasketSelection } =
-      useBasketSelectionStore.getState();
-    const ids = resolveDragIds(basketItemId);
-    const ordered = basketState.filter((b) => ids.includes(b.id));
-    ordered.forEach((b, i) =>
-      placeChordInSlot(toSectionId, toLineId, toSlot + i, b.chord),
-    );
-    clearBasketSelection();
   };
 
   // Register tab-level handlers with the global DnD store. We use refs so the
