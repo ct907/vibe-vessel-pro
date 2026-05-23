@@ -1,23 +1,48 @@
 import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { useTheme } from "@/hooks/use-theme";
-import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES } from "@/lib/music/chords";
+import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Music } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Music, Play, Square } from "lucide-react";
+import { getChordColorClasses } from "@/lib/music/chordColor";
+import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
+import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
+import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const qualitySuffix = (q: Quality): string => (q === "maj" ? "" : q === "min" ? "m" : q);
+
+const QUALITY_LABEL: Record<Quality, string> = {
+  maj: "Major", min: "Minor", dim: "Diminished", aug: "Augmented",
+  sus2: "Suspended 2", sus4: "Suspended 4",
+  maj7: "Major 7th", min7: "Minor 7th", "7": "Dominant 7th",
+  dim7: "Diminished 7th", m7b5: "Half-diminished", minMaj7: "Minor-Major 7th",
+  maj9: "Major 9th", min9: "Minor 9th", "9": "Dominant 9th",
+  "6": "Major 6th", min6: "Minor 6th", add9: "Add 9",
+  "5": "Power", "7alt": "Altered Dominant",
+  "7#5": "Dominant 7 ♯5", "7b9": "Dominant 7 ♭9", "7#9": "Dominant 7 ♯9",
+  maj11: "Major 11th", maj13: "Major 13th",
+  min11: "Minor 11th", min13: "Minor 13th",
+  add11: "Add 11", "6/9": "6 / 9",
+};
 
 interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
+export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const { theme } = useTheme();
   const meta = useSongStore((s) => s.meta);
+  const progression = useSongStore((s) => s.progression);
+  const addChordToPattern = useSongStore((s) => s.addChordToPattern);
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
   const [octave, setOctave] = useState<number>(4);
+  const [detailChord, setDetailChord] = useState<ChordSymbol | null>(null);
+  const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
 
   const grid = useMemo(() => {
     return ladder.map((deg) => {
@@ -50,6 +75,89 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
 
   const keySuffix =
     isMinorMode(meta.keyMode) && meta.keyMode !== "blues" && meta.keyMode !== "pentatonic-min" ? "m" : "";
+
+  // Detail sheet derivations
+  const detailAnalysis = useMemo(() => {
+    if (!detailChord) return null;
+    const a = analyzeProgression([detailChord], meta.keyRoot, meta.keyMode);
+    return a.chords[0];
+  }, [detailChord, meta.keyRoot, meta.keyMode]);
+
+  const detailExplainer = useMemo(() => {
+    if (!detailChord || !detailAnalysis) return "";
+    return describeChordFunction(detailAnalysis, meta.keyRoot, meta.keyMode);
+  }, [detailChord, detailAnalysis, meta.keyRoot, meta.keyMode]);
+
+  const matchingPresets = useMemo(() => {
+    if (!detailChord) return [];
+    const chordPc = rootToPc(detailChord.root);
+    const keyPc = rootToPc(meta.keyRoot);
+    const targetInterval = (chordPc - keyPc + 12) % 12;
+    const matches: Array<{ preset: ProgressionPreset; chords: ChordSymbol[]; hitIndex: number }> = [];
+    for (const preset of PROGRESSION_PRESETS) {
+      const hitIndex = preset.degrees.findIndex((d) => d.interval === targetInterval);
+      if (hitIndex < 0) continue;
+      const chords = realizePreset(preset, meta.keyRoot, meta.keyMode);
+      matches.push({ preset, chords, hitIndex });
+      if (matches.length >= 3) break;
+    }
+    return matches;
+  }, [detailChord, meta.keyRoot, meta.keyMode]);
+
+  const closeDetail = () => {
+    stopProgression();
+    setPlayingPresetId(null);
+    setDetailChord(null);
+  };
+
+  const playPreset = async (preset: ProgressionPreset, chords: ChordSymbol[]) => {
+    if (playingPresetId === preset.id) {
+      stopProgression();
+      setPlayingPresetId(null);
+      return;
+    }
+    stopProgression();
+    await ensureAudio();
+    const events = chords.map((c, i) => ({ chord: c, startBeat: i * 2, lengthBeats: 2 }));
+    setPlayingPresetId(preset.id);
+    await playProgression(events, meta.bpm, {
+      loopBeats: events.length * 2,
+      onEnd: () => setPlayingPresetId((id) => (id === preset.id ? null : id)),
+    });
+  };
+
+  const findFirstAvailablePattern = () => {
+    for (const p of progression) {
+      const used = p.chords.reduce((s, c) => s + c.lengthBeats, 0);
+      if (used < p.bars * p.beatsPerBar) return { pattern: p, used };
+    }
+    return progression[0] ? { pattern: progression[0], used: 0 } : null;
+  };
+
+  const addChordToSong = (chord: ChordSymbol) => {
+    const target = findFirstAvailablePattern();
+    if (!target) {
+      toast({ title: "No pattern blocks available", variant: "destructive" });
+      return;
+    }
+    const remaining = target.pattern.bars * target.pattern.beatsPerBar - target.used;
+    const len = Math.min(2, Math.max(0.5, remaining));
+    addChordToPattern(target.pattern.id, chord, target.used, len);
+    toast({ title: `Added ${chord.display} to ${target.pattern.label || "pattern"}` });
+    if (onSwitchTab) onSwitchTab("progressions");
+  };
+
+  const sendPresetToProgressions = (chords: ChordSymbol[], presetName: string) => {
+    const target = progression[0];
+    if (!target) {
+      toast({ title: "No pattern blocks available", variant: "destructive" });
+      return;
+    }
+    useSongStore.getState().replacePatternChords(target.id, chords);
+    toast({ title: `Sent "${presetName}" to Progressions` });
+    closeDetail();
+    if (onSwitchTab) onSwitchTab("progressions");
+  };
 
   return (
     <div className="space-y-5">
@@ -105,7 +213,7 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
                 }}
               >
                 <div className="font-mono-chord" style={{ fontSize: "1.18rem", color: labelColor }}>{d.numeral}</div>
-                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} />
+                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} audition={false} onClick={() => setDetailChord(d.chord)} />
               </button>
             );
           })}
@@ -129,7 +237,7 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
           </Select>
         </label>
         <span className="ml-auto text-xs text-muted-foreground">
-          Tap to audition · Hold to sustain
+          Tap to learn · Hold to sustain
         </span>
       </div>
 
@@ -148,13 +256,99 @@ export function ChordsTab({ onSwitchTab: _onSwitchTab }: ChordsTabProps = {}) {
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => (
                 <div key={c.display} className="group relative flex items-center rounded-md px-2 py-1.5">
-                  <ChordChip chord={c} variant="ink" octave={octave} />
+                  <ChordChip chord={c} variant="ink" octave={octave} onClick={() => setDetailChord(c)} />
                 </div>
               ))}
             </div>
           </div>
         ))}
       </div>
+
+      <Sheet open={!!detailChord} onOpenChange={(o) => { if (!o) closeDetail(); }}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          {detailChord && (
+            <>
+              <SheetHeader>
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    ...getChordColorClasses(detailChord).style,
+                  }}
+                >
+                  <div className="font-mono-chord text-3xl font-bold leading-none">{detailChord.display}</div>
+                  <div className="text-xs mt-1 opacity-80">{QUALITY_LABEL[detailChord.quality]}</div>
+                </div>
+                <SheetTitle className="sr-only">{detailChord.display}</SheetTitle>
+              </SheetHeader>
+
+              <div className="mt-4 space-y-4 pb-6">
+                {detailExplainer && (
+                  <p className="text-sm leading-relaxed text-foreground">{detailExplainer}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { addChordToSong(detailChord); closeDetail(); }}
+                    className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-10 px-4 text-sm font-semibold"
+                  >
+                    Add to song
+                  </button>
+                </div>
+
+                {matchingPresets.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="font-display text-base font-bold">Used in these progressions</h3>
+                    {matchingPresets.map(({ preset, chords, hitIndex }) => {
+                      const isPlaying = playingPresetId === preset.id;
+                      return (
+                        <div
+                          key={preset.id}
+                          className="rounded-lg p-3"
+                          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+                        >
+                          <div className="flex items-baseline gap-2 flex-wrap mb-1">
+                            <span className="font-display font-semibold text-sm">{preset.name}</span>
+                            <span className="font-mono-chord text-[10px] text-muted-foreground">{preset.formula}</span>
+                          </div>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{preset.tag}</div>
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {chords.map((c, i) => (
+                              <span
+                                key={i}
+                                className={cn("rounded", i === hitIndex && "ring-2 ring-primary")}
+                              >
+                                <ChordChip chord={c} variant="ink" size="sm" audition={false} />
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => playPreset(preset, chords)}
+                              className="btn-sculpt-cream inline-flex items-center justify-center gap-1.5 rounded-md h-8 px-3 text-xs font-semibold"
+                            >
+                              {isPlaying ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                              {isPlaying ? "Stop" : "Play"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => sendPresetToProgressions(chords, preset.name)}
+                              className="btn-sculpt-amber inline-flex items-center justify-center rounded-md h-8 px-3 text-xs font-semibold"
+                            >
+                              Send to Progressions
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
