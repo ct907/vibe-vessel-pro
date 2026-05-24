@@ -147,7 +147,7 @@ function PatternBlock({
     bulkSetChordOctave,
     replacePatternChords,
   } = useSongStore();
-  const [presetBrowserOpen, setPresetBrowserOpen] = useState(false);
+  
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
