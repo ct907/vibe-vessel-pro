@@ -97,6 +97,38 @@ function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) =
   );
 }
 
+/** Beats number input (allows empty while typing, commits valid integers). */
+function BeatsInput({ value, beatsPerBar, onCommit }: { value: number; beatsPerBar: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^0-9]/g, "");
+        setDraft(raw);
+        if (raw === "") return;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= beatsPerBar) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (!draft || !Number.isFinite(n) || n < beatsPerBar) {
+          setDraft(String(beatsPerBar));
+          onCommit(beatsPerBar);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-6 w-12 px-1 text-center text-[11px] font-mono-chord"
+    />
+  );
+}
+
 interface PatternProps {
   pattern: PatternBlockType;
   blockIndex: number;
