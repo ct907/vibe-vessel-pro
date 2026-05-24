@@ -1,40 +1,56 @@
-## What you reported
+## Root cause
 
-After applying a spice variation that changes the chord count, pressing Play shows the orange playhead pinned to the start of one of the spice-added chords and no audio plays. This happens on the very first Play after the spice apply as well as on subsequent ones, and only in the Progressions tab.
+`duplicateSection` in `src/store/song.ts` rebuilds the new section's lyric lines but throws away two pieces of state that the chord-row layout depends on:
 
-## Working hypothesis
+```text
+src/store/song.ts:1372
+  const newLines: LyricLine[] = src.lines.map((l) => ({
+    id: nanoid(),
+    text: l.text,
+    chords: l.chords.map((a) => ({
+      id: newAnchorId,
+      offset: a.offset,        // copied
+      chord: a.chord,          // copied
+      mirrorId: undefined,     // re-linked later
+      // slotIndex, wordIndex, chordCol — DROPPED
+    })),
+    // _isChordOverflow — DROPPED
+  }));
+  const newSection = { …, chords: [] };
+```
 
-`handlePlay` in `src/components/header/TransportHeader.tsx` seeds the playhead via `setCurrent(built.meta[0])` and then calls `playProgression(built.events, ...)`. The playhead therefore renders correctly on whatever `buildPlayback` returns first. The fact that the indicator shows up but no sound plays means `playProgression` is being called with events whose start times never enter the lookahead horizon — most likely because of where spice's `addChordToPattern` ends up placing chords.
+The wrapped `set` then runs `refreshAllSectionChords` → `recomputeSectionChordsFromMirrors`, whose only slot fallback is `slotIndex: a.slotIndex ?? 0`. With `slotIndex` missing on every cloned anchor, all SectionChords in the duplicate collapse to `lyricsPlacement.slotIndex = 0` on whichever line they were copied to. That is exactly what the user sees in step 3 — chords stacked with no spacing between pairs.
 
-Key observations from the code:
+When the user then taps Format Chords, `formatChordsInSong` calls `formatChordsAndLyrics` for every section. For the duplicate it sees:
+- 4 SectionChords all at `slotIndex: 0`.
+- Plus any line that was an `_isChordOverflow` row in the source now appears as a regular (text-empty) lyric line, because the flag wasn't copied. The formatter's "drop pre-existing overflow rows" pass in `chordLayout.ts` (`if (l._isChordOverflow) return`) doesn't kick in, so the row survives as a normal line carrying its own anchors. After autoLayout repacks them, that line renders as the "extra row of the same chord progression" reported in step 5.
 
-- `SpiceSheet.commitSuggestion` (for `countChanged` suggestions) calls `removePatternChordsBatch(pattern.id, oldIds)` and then loops `addChordToPattern(pattern.id, withOctave(c, i), cursor, len)`.
-- `addChordToPattern` (`src/store/song.ts:2551`) **ignores `atBeat`**. It computes the new chord's `startBeat` from `usedInPattern`, and if `free < 0.5` it overflows the chord into a freshly-spawned continuation pattern via `placeSectionChordInProgression`.
-- For an N-chord spice that exceeds the host pattern's beats, spice-added chords end up split across the original pattern and one or more new patterns. `buildPlayback` then walks `sec.chords` in order — but `events[].startBeat` is calculated as `cursorBeat + localOffset + pp.startBeat`, where `cursorBeat` is per-section, and the *new patterns spawned by overflow* are appended to `progression`. If a new pattern lands in a different section group than the loop expects, its `localOffset` may be inconsistent with the order of `sec.chords`, producing events with non-monotonic or negative `startBeat` after a rotation, or a single chord whose `startBeat` is huge relative to `loopBeats`.
-- The scheduler in `audio.ts` advances `schedNextIdx` strictly forward and only schedules events whose `eventAt < horizon`. If `events[0].startBeat` is far beyond the loop, nothing ever gets queued; the seeded playhead remains visually pinned to `meta[0]` and no voices spawn — matching the reported symptom exactly.
+So both symptoms trace back to the same lossy clone in `duplicateSection`.
 
-## Investigation steps
+## Fix
 
-1. **Reproduce in browser tools.** Load the preview, add ~4 chords, open Spice on a pattern, apply a count-changing suggestion (e.g. a `cinematic` or `step_between` one that produces more chords than the source). Hit Play. Confirm symptom.
-2. **Dump scheduler input.** Temporarily add a `console.log(built.events, built.loopBeats)` in `handlePlay` just before `playProgression(...)` is called. Check:
-   - Are all `startBeat` values inside `[0, loopBeats)`?
-   - Do they sort monotonically?
-   - Is the pattern referenced by `meta[0].patternId` actually rendered?
-3. **Cross-check `addChordToPattern` overflow.** Log `placement.sectionChord.progressionPlacement` whenever the `free < 0.5` branch fires; verify spice-added chords aren't silently being shoved into a continuation block with `startBeat` reset to 0 in a *new* pattern block that buildPlayback then orders unexpectedly.
-4. **Confirm root cause** and choose the smallest fix:
-   - **Option A (most likely fix):** in `commitSuggestion` for `countChanged`, resize/grow the host pattern's `bars` so the spice-added chords always fit instead of spilling into continuation blocks. Use the sum of `durations` to compute required bars rounded up to `beatsPerBar`.
-   - **Option B:** make `addChordToPattern` honour the supplied `atBeat` when called inside a single transactional spice apply so chords land at predictable beats, then fix `buildPlayback` ordering if needed.
-   - **Option C:** if buildPlayback is the actual problem (rotation across overflow patterns), patch the ordering there.
+Preserve the dropped fields when duplicating a section. Minimal change, no API/shape changes:
 
-## Deliverable
+1. In `src/store/song.ts` `duplicateSection` (lines 1372–1388):
+   - Copy `_isChordOverflow` on each cloned `LyricLine`.
+   - Copy `slotIndex`, `wordIndex`, `chordCol` on each cloned `ChordAnchor` (alongside `offset`, `chord`, `mirrorId`).
 
-- Reproduce the bug and identify which of A/B/C matches.
-- Implement the minimum fix.
-- Verify: apply a count-changing spice on a 4-chord block, press Play, expect audible chords with the playhead advancing through all of them.
-- Run `npx tsc --noEmit`.
+That's enough to make `recomputeSectionChordsFromMirrors` reproduce the source's `lyricsPlacement.slotIndex` faithfully, which:
+- restores the original spacing in the duplicated section's chord row (fixes step 3), and
+- ensures Format Chords doesn't see ex-overflow rows as fresh content, so no phantom row is spawned (fixes step 5).
+
+No changes needed to `formatChordsAndLyrics`, `recomputeSectionChordsFromMirrors`, or the wrapped setter — they already do the right thing once the cloned anchors carry their slot info.
+
+## Verification
+
+- `npx tsc --noEmit`.
+- Manual repro of the exact steps in the report:
+  1. Add a 4-chord progression in LyricsTab via FocusedChordEditor.
+  2. Duplicate the section — chord row in the copy should have the same spacing as the original.
+  3. Press Format Chords — duplicated section's chord row stays a single row (or splits only when total width genuinely exceeds the viewport, matching the original section's behavior).
 
 ## Out of scope
 
-- No design changes to the Spice sheet UI.
-- No changes to the global playback store shape.
-- No changes to the chord detail sheet work from earlier turns.
+- No changes to FocusedChordEditor, formatter, or progression code.
+- No design or UI tweaks.
+- Earlier playback / spice work untouched.

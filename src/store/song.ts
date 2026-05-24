@@ -1372,10 +1372,19 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const newLines: LyricLine[] = src.lines.map((l) => ({
       id: nanoid(),
       text: l.text,
+      _isChordOverflow: l._isChordOverflow,
       chords: l.chords.map((a) => {
         const newAnchorId = nanoid();
         idMap.set(a.id, newAnchorId);
-        return { id: newAnchorId, offset: a.offset, chord: a.chord, mirrorId: undefined };
+        return {
+          id: newAnchorId,
+          offset: a.offset,
+          slotIndex: a.slotIndex,
+          wordIndex: a.wordIndex,
+          chordCol: a.chordCol,
+          chord: a.chord,
+          mirrorId: undefined,
+        };
       }),
     }));
     const newSection: Section = {
