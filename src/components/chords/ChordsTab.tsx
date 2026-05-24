@@ -89,6 +89,11 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     return describeChordFunction(detailAnalysis, meta.keyRoot, meta.keyMode);
   }, [detailChord, detailAnalysis, meta.keyRoot, meta.keyMode]);
 
+  const detailSuggestions = useMemo(() => {
+    if (!detailChord) return [];
+    return getChordProgressionSuggestions(detailChord, meta.keyRoot, meta.keyMode);
+  }, [detailChord, meta.keyRoot, meta.keyMode]);
+
   const matchingPresets = useMemo(() => {
     if (!detailChord) return [];
     const chordPc = rootToPc(detailChord.root);
