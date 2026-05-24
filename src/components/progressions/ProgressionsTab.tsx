@@ -43,6 +43,8 @@ import {
   Pencil,
   MessageSquare,
   KeyRound,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
