@@ -309,7 +309,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Bossa Nova Drift",
     featuredQualities: ["maj7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "maj7", romanNumeral: "Imaj7" },
       { interval: 5, quality: "maj7", romanNumeral: "IVmaj7" },
     ],
