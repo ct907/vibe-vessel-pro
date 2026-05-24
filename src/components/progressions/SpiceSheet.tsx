@@ -49,6 +49,7 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
   const sectionLabel = ownerSection ? getSectionDisplayName(sections, sectionId) : "Section";
 
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [playingStep, setPlayingStep] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpiceCategory | "all">("all");
   const [overlayOpenIds, setOverlayOpenIds] = useState<Set<string>>(new Set());
 
