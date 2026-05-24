@@ -21,7 +21,7 @@ interface Props {
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
-  "cinematic", "espionage", "cosmic_drift", "gateway",
+  "cinematic", "espionage", "cosmic_drift", "borrowed_colour", "gateway",
   "step_between", "hypnotic_drone", "amplify", "break_pattern",
 ];
 
@@ -34,7 +34,9 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
   hypnotic_drone: "🧘",
   amplify: "🔥",
   break_pattern: "💥",
+  borrowed_colour: "🎨",
 };
+
 
 export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChordId, onAuditionChange }: Props) {
   const meta = useSongStore((s) => s.meta);
