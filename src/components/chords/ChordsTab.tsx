@@ -112,7 +112,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       const hitIndex = preset.degrees.findIndex((d) => d.interval === targetInterval);
       if (hitIndex < 0) continue;
       const chords = realizePreset(preset, meta.keyRoot, meta.keyMode).map((c) =>
-        rootToPc(c.root) === chordPc ? detailChord : c,
+        applyFamilyQuality(c, detailChord),
       );
       matches.push({ preset, chords, hitIndex });
       if (matches.length >= 3) break;
