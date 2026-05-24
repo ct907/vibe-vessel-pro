@@ -534,7 +534,7 @@ function PatternBlock({
                                       return;
                                     }
                                     onSetActiveChordId(null);
-                                    useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
+                                    onEditChordOpen(pattern.id, c.id);
                                   }, 500);
                                 }}
                                 onPointerUp={() => {
