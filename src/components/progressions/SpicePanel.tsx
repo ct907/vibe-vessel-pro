@@ -13,6 +13,10 @@ interface Props {
   pattern: PatternBlock;
   activeChordId: string | null;
   onAuditionChange?: (chords: ChordSymbol[] | null) => void;
+  /** When provided, the trigger button is hidden and parent controls open state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
