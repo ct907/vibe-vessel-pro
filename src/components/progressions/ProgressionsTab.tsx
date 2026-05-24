@@ -794,11 +794,6 @@ function PatternBlock({
         onAuditionChange={setPreviewingSpiceChords}
       />
 
-      <PresetBrowser
-        open={presetBrowserOpen}
-        onOpenChange={setPresetBrowserOpen}
-        onUse={(chords) => replacePatternChords(pattern.id, chords)}
-      />
     </div>
   );
 }
