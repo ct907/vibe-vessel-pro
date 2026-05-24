@@ -14,6 +14,7 @@ import { useUIStore } from "@/store/ui";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PresetList } from "@/components/progressions/PresetList";
 
 interface LyricsModeProps {
   mode?: "lyrics";
