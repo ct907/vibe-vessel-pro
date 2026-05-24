@@ -6,7 +6,7 @@ import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
-import { SpicePanel } from "@/components/progressions/SpicePanel";
+import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
@@ -893,13 +893,13 @@ function PatternBlock({
         isVisible={!!previewingSpiceChords && sortedChords.length >= 2}
       />
 
-      <SpicePanel
-        pattern={pattern}
-        activeChordId={activeChordId}
-        onAuditionChange={setPreviewingSpiceChords}
+      <SpiceSheet
         open={spiceOpen}
         onOpenChange={setSpiceOpen}
-        hideTrigger
+        pattern={pattern}
+        blockIndex={blockIndex}
+        activeChordId={activeChordId}
+        onAuditionChange={setPreviewingSpiceChords}
       />
 
     </div>
