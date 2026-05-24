@@ -40,12 +40,14 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const meta = useSongStore((s) => s.meta);
   const progression = useSongStore((s) => s.progression);
   const addChordToPattern = useSongStore((s) => s.addChordToPattern);
+  const setWhyChord = useUIStore((s) => s.setWhyChord);
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
   const [octave, setOctave] = useState<number>(4);
   const [detailChord, setDetailChord] = useState<ChordSymbol | null>(null);
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
   const [playingStep, setPlayingStep] = useState<number | null>(null);
+
 
   const grid = useMemo(() => {
     return ladder.map((deg) => {
