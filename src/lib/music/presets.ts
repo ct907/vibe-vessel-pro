@@ -15,7 +15,10 @@ export interface ProgressionPreset {
   formula: string;
   tag: string;
   degrees: PresetDegree[];
+  featuredQualities?: Quality[];
+  featureIndex?: number;
 }
+
 
 export const PROGRESSION_PRESETS: ProgressionPreset[] = [
   {
