@@ -1167,7 +1167,9 @@ function SectionGroup({
       {!collapsed && (
         <>
         {(() => {
-          const renderBlock = (p: PatternBlockType, i: number, extendBackground = false) => {
+          const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
+          const maxBars = Math.max(1, ...blocks.map((b) => b.bars));
+          const renderBlock = (p: PatternBlockType, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
               .map((q) => {
@@ -1182,54 +1184,91 @@ function SectionGroup({
                   label: `${sectionName}: Block ${blockNum}`,
                 };
               });
+            const widthPct = (p.bars / maxBars) * 100;
             return (
-              <PatternBlock
-                key={p.id}
-                pattern={p}
-                blockIndex={i}
-                blocksInSection={blocks.length}
-                otherPatterns={otherAll}
-                onPickerOpen={onPickerOpen}
-                onRequestDeleteBlock={onRequestDeleteBlock}
-                onEditChordOpen={onEditChordOpen}
-                activeChordId={activeChordId}
-                onSetActiveChordId={onSetActiveChordId}
-                multiSelected={multiSelected}
-                onToggleMultiSelected={onToggleMultiSelected}
-                onClearMultiSelected={onClearMultiSelected}
-                effectiveOffset={effectiveOffset}
-                extendBackground={extendBackground}
-              />
+              <div key={p.id} className="min-w-0" style={{ width: `${widthPct}%` }}>
+                <PatternBlock
+                  pattern={p}
+                  blockIndex={i}
+                  blocksInSection={blocks.length}
+                  otherPatterns={otherAll}
+                  onPickerOpen={onPickerOpen}
+                  onRequestDeleteBlock={onRequestDeleteBlock}
+                  onEditChordOpen={onEditChordOpen}
+                  activeChordId={activeChordId}
+                  onSetActiveChordId={onSetActiveChordId}
+                  multiSelected={multiSelected}
+                  onToggleMultiSelected={onToggleMultiSelected}
+                  onClearMultiSelected={onClearMultiSelected}
+                  effectiveOffset={effectiveOffset}
+                />
+              </div>
             );
           };
-          const addButton = (
+          const addChordsPlaceholder = (
             <button
               type="button"
-              onClick={() => addPatternToSection(sectionId)}
-              className="w-full h-full rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[50px] md:min-h-[100px] transition-colors"
+              onClick={() => {
+                let firstBlock = blocks[0];
+                if (!firstBlock) {
+                  addPatternToSection(sectionId);
+                  const fresh = useSongStore.getState().progression.filter(
+                    (p) => (p.sectionId ?? p.id) === sectionId,
+                  );
+                  firstBlock = fresh[0];
+                }
+                if (firstBlock) onPickerOpen(firstBlock.id, 0);
+              }}
+              className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
             >
-              <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
+              <Plus className="h-4 w-4" />
+              <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
             </button>
           );
-          return isMobile ? (
-            <div className="flex flex-col gap-3">
-              {blocks.length === 0 && <div className="flex">{addButton}</div>}
-              {blocks.map((p, i) => {
-                const isLast = i === blocks.length - 1;
-                return isLast ? (
-                  <div key={p.id} className="flex items-stretch gap-2">
-                    <div className="basis-[85%] shrink-0 min-w-0">{renderBlock(p, i)}</div>
-                    <div className="flex-1 min-w-0">{addButton}</div>
-                  </div>
-                ) : (
-                  <div key={p.id} className="w-full min-w-0">{renderBlock(p, i, true)}</div>
-                );
-              })}
+          const addBlockRow = (
+            <div className="flex items-stretch gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => addPatternToSection(sectionId)}
+                className="flex-1 rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-xs font-display uppercase tracking-wide">Add block</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommentOpen((o) => !o)}
+                className="relative h-10 w-10 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label={hasComment ? "View comment" : "Add comment"}
+                title={hasComment ? "View comment" : "Add comment"}
+              >
+                <MessageSquare className="h-4 w-4" />
+                {hasComment && (
+                  <span aria-hidden className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {blocks.map((p, i) => renderBlock(p, i))}
-              {addButton}
+          );
+          if (!sectionHasChords) {
+            return (
+              <div>
+                {addChordsPlaceholder}
+                {addBlockRow}
+              </div>
+            );
+          }
+          return (
+            <div>
+              {isMobile ? (
+                <div className="flex flex-col gap-3">
+                  {blocks.map((p, i) => renderBlock(p, i))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {blocks.map((p, i) => renderBlock(p, i))}
+                </div>
+              )}
+              {addBlockRow}
             </div>
           );
         })()}
