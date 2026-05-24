@@ -34,6 +34,14 @@ interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
+function applyFamilyQuality(c: ChordSymbol, tapped: ChordSymbol): ChordSymbol {
+  if (rootToPc(c.root) === rootToPc(tapped.root)) return tapped;
+  if (QUALITY_FAMILY[c.quality] === QUALITY_FAMILY[tapped.quality]) {
+    return { ...c, quality: tapped.quality, display: c.root + QUALITY_PRETTY[tapped.quality] };
+  }
+  return c;
+}
+
 export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const { theme } = useTheme();
   const meta = useSongStore((s) => s.meta);
