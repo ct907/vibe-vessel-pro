@@ -216,6 +216,80 @@ export function generateProgressionSuggestions(
 }
 
 /**
+ * Suggest 4–6 chords that pair naturally with the given chord in the key.
+ * Preserves the input chord's quality family (e.g. Cm7 → other m7 suggestions).
+ */
+export function getChordProgressionSuggestions(
+  chord: ChordSymbol,
+  keyRoot: string,
+  mode: Mode,
+): ChordSymbol[] {
+  const useFlat = keyRoot.includes("b") || ["F", "Bb", "Eb", "Ab", "Db", "Gb"].includes(keyRoot);
+  const deg = degreeOf(chord, keyRoot, mode);
+
+  const SUCCESSORS: Record<number, number[]> = {
+    0: [3, 4, 5, 1],
+    1: [4, 3, 0, 6],
+    2: [5, 3, 0, 4],
+    3: [0, 4, 1, 6],
+    4: [0, 5, 3, 1],
+    5: [3, 1, 4, 0],
+    6: [0, 4, 5, 3],
+  };
+
+  const familyFor = (q: Quality): QualityFamily | null => {
+    if (FAMILY_MEMBERS.maj.includes(q)) return "maj";
+    if (FAMILY_MEMBERS.min.includes(q)) return "min";
+    if (FAMILY_MEMBERS.dom.includes(q)) return "dom";
+    return null;
+  };
+
+  const inheritOrBase = (base: ChordSymbol): ChordSymbol => {
+    const fam = familyFor(base.quality);
+    if (fam && FAMILY_MEMBERS[fam].includes(chord.quality)) {
+      return buildChordLike(rootToPc(base.root), chord.quality, fam, useFlat);
+    }
+    return base;
+  };
+
+  const out: ChordSymbol[] = [];
+  const seen = new Set<string>([chord.display]);
+  const push = (c: ChordSymbol) => {
+    if (seen.has(c.display)) return;
+    seen.add(c.display);
+    out.push(c);
+  };
+
+  if (deg >= 0) {
+    for (const d of SUCCESSORS[deg] ?? []) {
+      push(inheritOrBase(diatonicAt(d, keyRoot, mode, useFlat)));
+    }
+  } else {
+    const domSource: ChordSymbol = isDominant(chord)
+      ? chord
+      : { ...chord, quality: "7", display: chord.root + QUALITY_PRETTY["7"] };
+    push(tritoneSub(domSource, useFlat));
+    push(secondaryDominantOf(chord, useFlat));
+    const rootPc = rootToPc(chord.root);
+    const scale = mode === "maj" ? MAJOR_SCALE : MINOR_SCALE;
+    const keyPc = rootToPc(keyRoot);
+    const ranked = [0, 1, 2, 3, 4, 5, 6]
+      .map((d) => {
+        const pc = (keyPc + scale[d]) % 12;
+        const dist = Math.min((pc - rootPc + 12) % 12, (rootPc - pc + 12) % 12);
+        return { d, dist };
+      })
+      .sort((a, b) => a.dist - b.dist);
+    for (const { d } of ranked) {
+      if (out.length >= 6) break;
+      push(inheritOrBase(diatonicAt(d, keyRoot, mode, useFlat)));
+    }
+  }
+
+  return out.slice(0, 6);
+}
+
+/**
  * Build a Google search URL for "similar chord progression" fallback when
  * the rule-based generator finds no variations.
  */
