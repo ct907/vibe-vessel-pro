@@ -257,6 +257,34 @@ export function FocusedChordEditor(props: Props) {
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
+  const handlePresetUse = (chords: ChordSymbol[]) => {
+    if (chords.length === 0) return;
+    if (isProgressionAdd || isProgression) {
+      const patternId = (props as ProgressionModeProps | ProgressionAddModeProps).patternId;
+      const startBeat = isProgressionAdd ? (props as ProgressionAddModeProps).atBeat : 0;
+      if (isProgression) {
+        const existingIds = progPattern?.chords.map((c) => c.id) ?? [];
+        if (existingIds.length > 0) removePatternChordsBatch(patternId, existingIds);
+      }
+      chords.forEach((chord, i) => {
+        addChordToPatternSlot(patternId, { ...toStorage(chord), octave }, startBeat + i * 4, 4);
+      });
+      props.onClose();
+      return;
+    }
+    if (!line) return;
+    const placements: { chord: ChordSymbol; s: number }[] = [];
+    let cur = slot;
+    for (const chord of chords) {
+      placements.push({ chord, s: cur });
+      cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
+    }
+    for (const { chord: ch, s } of [...placements].reverse()) {
+      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
+    }
+    props.onClose();
+  };
+
 
   if (!isProgression && !isProgressionAdd && !line) return null;
   if (isProgression && (!progPattern || !progChord)) return null;
