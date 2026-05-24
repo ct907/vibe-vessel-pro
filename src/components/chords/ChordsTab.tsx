@@ -147,6 +147,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const closeDetail = () => {
     stopProgression();
     setPlayingPresetId(null);
+    setPlayingStep(null);
     setDetailChord(null);
   };
 
@@ -154,6 +155,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     if (playingPresetId === preset.id) {
       stopProgression();
       setPlayingPresetId(null);
+      setPlayingStep(null);
       return;
     }
     stopProgression();
@@ -161,9 +163,14 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     const beats = preset.beatsPerChord ?? 2;
     const events = chords.map((c, i) => ({ chord: c, startBeat: i * beats, lengthBeats: beats }));
     setPlayingPresetId(preset.id);
+    setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: events.length * beats,
-      onEnd: () => setPlayingPresetId((id) => (id === preset.id ? null : id)),
+      onChordStart: (idx) => setPlayingStep(idx),
+      onEnd: () => {
+        setPlayingPresetId((id) => (id === preset.id ? null : id));
+        setPlayingStep(null);
+      },
     });
   };
 
