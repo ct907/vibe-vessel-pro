@@ -983,8 +983,8 @@ function SectionGroup({
     >
       {/* Section header */}
       <div
-        className="flex items-center gap-2 px-3 h-12 rounded-full"
-        style={{ background: "var(--pill-rest-bg)", color: "var(--pill-rest-fg)" }}
+        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4]"
+        style={{ color: "var(--pill-rest-fg)" }}
       >
         <Select
           value={section?.type ?? "verse"}
