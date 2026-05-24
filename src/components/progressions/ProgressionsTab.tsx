@@ -997,15 +997,21 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setCommentOpen((o) => !o)}
-              className="relative h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label={hasComment ? "View comment" : "Add comment"}
+              onClick={() => { /* voice-leading UI deferred to next phase */ }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Voice leading lines (coming soon)"
+              title="Voice leading (coming soon)"
             >
-              <Plus className="h-3 w-3 absolute top-1.5 left-1.5" />
-              <MessageSquare className="h-3.5 w-3.5" />
-              {hasComment && (
-                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
+              <Activity className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => duplicateSection(sectionId)}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Duplicate section"
+              title="Duplicate section"
+            >
+              <Copy className="h-4 w-4" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1014,9 +1020,6 @@ function SectionGroup({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
-                  <Copy className="h-4 w-4" /> Duplicate
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
                     if (!section) return;
