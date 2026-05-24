@@ -55,7 +55,7 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { parseChordTextStrict } from "@/lib/music/chordClipboard";
+
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
