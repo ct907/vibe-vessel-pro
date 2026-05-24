@@ -296,19 +296,6 @@ function PatternBlock({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 ml-auto text-muted-foreground hover:text-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPresetBrowserOpen(true);
-          }}
-          title="Browse presets"
-          aria-label="Browse progression presets"
-        >
-          <Music2 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
           className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
           onClick={(e) => {
             e.stopPropagation();
