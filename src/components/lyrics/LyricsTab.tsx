@@ -971,7 +971,7 @@ function SectionCard({
             </div>
           )}
         </>
-      )}
+
 
       {/* Custom name dialog */}
       <Dialog
