@@ -262,7 +262,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                 }}
               >
                 <div className="font-mono-chord" style={{ fontSize: "1.18rem", color: labelColor }}>{d.numeral}</div>
-                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} audition={false} onClick={() => setDetailChord(d.chord)} />
+                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} audition={false} onClick={() => setWhyChord({ chord: d.chord })} />
               </button>
             );
           })}
