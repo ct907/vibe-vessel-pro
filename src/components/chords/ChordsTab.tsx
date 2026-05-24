@@ -305,7 +305,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => (
                 <div key={c.display} className="group relative flex items-center rounded-md px-2 py-1.5">
-                  <ChordChip chord={c} variant="ink" octave={octave} onClick={() => setDetailChord(c)} />
+                  <ChordChip chord={c} variant="ink" octave={octave} onClick={() => setWhyChord({ chord: c })} />
                 </div>
               ))}
             </div>
