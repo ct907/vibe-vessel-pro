@@ -117,14 +117,18 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
       return ev;
     });
     setPlayingId(s.id);
+    setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: cursor,
+      onChordStart: (idx) => setPlayingStep(idx),
       onEnd: () => {
         setPlayingId((id) => (id === s.id ? null : id));
+        setPlayingStep(null);
         onAuditionChange?.(null);
       },
     });
   };
+
 
   const commitSuggestion = (s: SpiceSuggestion) => {
     const previousChords = sortedChords.map((c) => c.chord);
