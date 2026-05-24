@@ -289,76 +289,80 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
             </p>
           )}
 
-          {isMobile ? (
-            <div
-              className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden -mx-1 px-1"
-              style={{ maxHeight: `${gridMaxHeight}px` }}
-            >
-              <div className="flex gap-2 w-max pb-2">
-                {suggestions.map((s) => {
-                  const colors = getChordColorClasses(s.symbol);
-                  return (
-                    <button
-                      key={s.symbol.display}
-                      style={colors.style}
-                      className={cn(
-                        colors.className,
-                        "noise-texture-chip group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
-                      )}
-                      onClick={() => handlePick(s.symbol)}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <span className="font-mono-chord font-semibold">{s.symbol.display}</span>
+          {query.trim() && (
+            isMobile ? (
+              <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 shrink-0">
+                <div className="flex gap-2 w-max pb-2">
+                  {suggestions.map((s) => {
+                    const colors = getChordColorClasses(s.symbol);
+                    return (
+                      <button
+                        key={s.symbol.display}
+                        style={colors.style}
+                        className={cn(
+                          colors.className,
+                          "noise-texture-chip group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
+                        )}
+                        onClick={() => handlePick(s.symbol)}
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="font-mono-chord font-semibold">{s.symbol.display}</span>
+                          <span
+                            role="button"
+                            aria-label={`Preview ${s.symbol.display}`}
+                            onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
+                            className="ml-auto rounded-full p-1 bg-black/10 hover:bg-black/20"
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                        <div className="text-[10px] opacity-80 truncate w-full">{s.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="-mx-1 px-1 shrink-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {suggestions.map((s) => {
+                    const colors = getChordColorClasses(s.symbol);
+                    return (
+                      <button
+                        key={s.symbol.display}
+                        style={colors.style}
+                        className={cn(
+                          colors.className,
+                          "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
+                        )}
+                        onClick={() => handlePick(s.symbol)}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
+                          <div className="text-xs opacity-80 truncate">{s.label}</div>
+                        </div>
                         <span
                           role="button"
                           aria-label={`Preview ${s.symbol.display}`}
                           onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                          className="ml-auto rounded-full p-1 bg-black/10 hover:bg-black/20"
+                          className="rounded-full p-1.5 bg-black/10 hover:bg-black/20"
                         >
-                          <Play className="h-3.5 w-3.5" />
+                          <Play className="h-4 w-4" />
                         </span>
-                      </div>
-                      <div className="text-[10px] opacity-80 truncate w-full">{s.label}</div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="overflow-y-auto -mx-1 px-1 flex-1 min-h-0" style={{ maxHeight: `${gridMaxHeight}px` }}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {suggestions.map((s) => {
-                  const colors = getChordColorClasses(s.symbol);
-                  return (
-                    <button
-                      key={s.symbol.display}
-                      style={colors.style}
-                      className={cn(
-                        colors.className,
-                        "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
-                      )}
-                      onClick={() => handlePick(s.symbol)}
-                    >
-                      <div className="min-w-0">
-                        <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
-                        <div className="text-xs opacity-80 truncate">{s.label}</div>
-                      </div>
-                      <span
-                        role="button"
-                        aria-label={`Preview ${s.symbol.display}`}
-                        onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                        className="rounded-full p-1.5 bg-black/10 hover:bg-black/20"
-                      >
-                        <Play className="h-4 w-4" />
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )
           )}
 
+          <div className="pt-3 mt-1 shrink-0" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+            <PresetList onUse={handlePresetUse} />
+          </div>
+
         </div>
+
       </SheetContent>
     </Sheet>
   );
