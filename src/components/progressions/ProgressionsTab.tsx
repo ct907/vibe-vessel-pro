@@ -781,18 +781,6 @@ function PatternBlock({
         </div>
       )}
 
-      {sortedChords.length === 0 && (
-        <div className="mt-3 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setPresetBrowserOpen(true)}
-            className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-10 px-4 text-sm font-semibold"
-          >
-            <Music2 className="h-4 w-4" />
-            Browse progressions
-          </button>
-        </div>
-      )}
 
       <VoiceLeadingRibbon
         originalChords={sortedChords.map((c) => c.chord)}
