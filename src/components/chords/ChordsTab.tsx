@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
+import { useUIStore } from "@/store/ui";
+import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc, QUALITY_FAMILY, QUALITY_PRETTY } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
