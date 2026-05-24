@@ -174,20 +174,22 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange, open: ope
   if (sortedChords.length < 2) return null;
 
   return (
-    <div className="mt-2 pt-2">
-      <button
-        type="button"
-        onClick={() => {
-          const next = !open;
-          setOpen(next);
-          if (!next) stopPreview();
-        }}
-        className="inline-flex items-center gap-1.5 font-display text-sm text-foreground hover:text-primary transition-colors py-1 px-2 rounded-md"
-        style={{ color: open ? "var(--primary-strong)" : undefined }}
-      >
-        <Sparkles className="h-4 w-4" style={{ color: "var(--primary)" }} />
-        ✧ Add Spice
-      </button>
+    <div className={hideTrigger ? "" : "mt-2 pt-2"}>
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            if (!next) stopPreview();
+          }}
+          className="inline-flex items-center gap-1.5 font-display text-sm text-foreground hover:text-primary transition-colors py-1 px-2 rounded-md"
+          style={{ color: open ? "var(--primary-strong)" : undefined }}
+        >
+          <Sparkles className="h-4 w-4" style={{ color: "var(--primary)" }} />
+          ✧ Add Spice
+        </button>
+      )}
 
       {open && (
         <div className="mt-2 space-y-3">
