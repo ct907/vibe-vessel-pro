@@ -9,6 +9,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
 
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
+import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
@@ -185,6 +186,7 @@ function PatternBlock({
   
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const [spiceOpen, setSpiceOpen] = useState(false);
+  const [voiceLinesOpen, setVoiceLinesOpen] = useState(false);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -373,11 +375,14 @@ function PatternBlock({
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={() => { /* voice-leading UI deferred */ }}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
-            style={{ background: "var(--paper-shade)" }}
-            aria-label="Voice leading lines (coming soon)"
-            title="Voice leading (coming soon)"
+            onClick={(e) => {
+              e.stopPropagation();
+              setVoiceLinesOpen((v) => !v);
+            }}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors"
+            style={{ background: "var(--paper-shade)", color: voiceLinesOpen ? "var(--primary-strong)" : undefined }}
+            aria-label="Voice leading lines"
+            title="Voice leading lines"
           >
             <Activity className="h-4 w-4" />
           </button>
@@ -402,6 +407,13 @@ function PatternBlock({
       </div>
 
       {/* Toolbar moved below the pattern grid (#7). */}
+
+      <VoiceLeadingLinesPanel
+        chords={sortedChords.map((c) => c.chord)}
+        isVisible={voiceLinesOpen && sortedChords.length >= 1}
+      />
+
+
 
       <div className="relative">
         {(() => {
