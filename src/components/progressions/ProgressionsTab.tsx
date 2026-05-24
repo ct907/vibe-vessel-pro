@@ -151,6 +151,7 @@ function PatternBlock({
   } = useSongStore();
   
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
+  const [spiceOpen, setSpiceOpen] = useState(false);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
