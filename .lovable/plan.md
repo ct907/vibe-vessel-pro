@@ -1,66 +1,52 @@
 ## Scope
 
-All changes are in `src/components/progressions/ProgressionsTab.tsx`, plus small tweaks to `SpicePanel.tsx`, `SongAttributesMenu.tsx`, and the section header. No store changes.
+Three files: `src/components/progressions/ProgressionsTab.tsx`, `src/components/lyrics/LyricsTab.tsx`, `src/components/lyrics/FocusedChordEditor.tsx`. No store changes.
 
-## 1. Section header (`SectionGroup`)
+## 1. ProgressionsTab — clean up section options menu
 
-Right-side cluster, in order:
-`[voice-leading toggle (stub)] [duplicate] [section options menu] [collapse/expand]`
+In the section options dropdown (`SectionGroup`, around lines 1022–1073):
+- Remove the **Copy chords** `DropdownMenuItem`.
+- Remove the **Paste chords** `DropdownMenuItem`.
+- Drop the now-unused `parseChordTextStrict` import and `replacePatternChords` from the destructured store call if no longer referenced.
 
-- Add a "Voice leading lines" ghost icon button (lucide `Activity`). For this phase it's a stub that toggles a local `voiceLeadingOpen` boolean and renders nothing — UI deferred to next phase. Tooltip: "Voice leading (coming soon)".
-- Surface duplicate as a top-level ghost icon button (`Copy`) calling `duplicateSection(sectionId)`. Remove the "Duplicate" item from the options dropdown.
-- Keep "Delete section" inside the options dropdown (`MoreVertical`). Remove any inline section-delete buttons surfaced elsewhere.
+## 2. ProgressionsTab — remove section expand/collapse button
 
-## 2. Song attributes pill
+Remove the chevron toggle around lines 1140–1147 (the `<button>` that calls `updateSection(sectionId, { collapsed: !collapsed })`). Section bodies always render expanded. Keep the `collapsed` field intact in the store (still used by sort mode + the global "Collapse all" header button); just stop rendering the per-section toggle and the `{collapsed && …}` mini-preview block (lines ~1153–1166). The `{!collapsed && (` wrapper around the body becomes unconditional.
 
-In `SongAttributesMenu.tsx`, give the "C Major | 4/4 | 100 bpm" trigger a filled background using a paper-shade pill style (rounded-full, `bg-[var(--paper-shade)]`, small horizontal padding) so it reads as a pill. Keep chevron + click behavior unchanged.
+## 3. ProgressionsTab — beat selector becomes typing input with steppers
 
-## 3. Block header row
-
-Row becomes: `BLOCK {n} · [beats dropdown]                    [✧ Spice]`
-
-- Remove `BarsInput` and "Bars" label.
-- Replace `{usedBeats} / {totalBeats} beats` text with a `Select` whose options are `4, 8, 12, 16, 20, 24, 32, 48, 64` beats. On change: `updatePattern(pattern.id, { bars: Math.max(1, Math.round(value / pattern.beatsPerBar)) })`. Trigger label: `{usedBeats} / {value} beats`.
-- Remove per-block trash button. Block removal moves into a "Delete last block" item appended to the section options dropdown when `blocks.length > 1`.
-- Move the spice trigger into this header (right-aligned). Implementation: refactor `SpicePanel` to accept `open` + `onOpenChange` props and render its body only (no built-in trigger), OR export the trigger as a small subcomponent. Render the toggle button in the block header; the suggestions panel still expands below the chord grid.
-
-## 4. Spice opens preset progressions
-
-Behavioral change deferred. For this phase, clicking Spice still opens the existing suggestions list below the grid (only the trigger location changes).
-
-## 5. Add Block button placement (single layout for all viewports)
-
-After the last block of a section, render one row:
+Replace the `<Select>` in the block header (lines 287–306) with an inline group:
 
 ```text
-[ + Add block (flex-1, dashed) ]   [ 💬 comment icon ]
+[ − ] [  16  ] / 16 beats · 4 bars   [ + ]
 ```
 
-This replaces both the mobile-only last-block button and the desktop grid's add-block tile. Empty-section case shows the dashed "+ Add chords" placeholder (see §7) followed by this same add-block/comment row.
+- Editable number input (`Input type="text" inputMode="numeric"`, similar to the existing `BarsInput` helper) bound to `totalBeats`. Commit on change/blur via `updatePattern(pattern.id, { bars: Math.max(1, Math.round(value / pattern.beatsPerBar)) })`.
+- `−` / `+` buttons step by `pattern.beatsPerBar` (one bar at a time), clamped to ≥ `pattern.beatsPerBar`.
+- Static suffix label: `/ {totalBeats} beats · {pattern.bars} bar(s)` using `·` (U+00B7) as separator.
+- Show the `usedBeats` count as the existing `{formatBeats(usedBeats)} /` prefix before the input.
 
-## 6. Block layout & variable widths
+## 4. FocusedChordEditor — progression preview becomes scrollable chord row
 
-Layout container per section:
+In the `isProgression && progChord` branch (lines ~426–445), replace the single "Current chord" chip with a preview row matching the lyrics preview (lines 365–423):
 
-- **Mobile (`<md`)**: blocks stacked vertically, one per row, full width. Within each row, the block's inner content takes `(bars / maxBarsInSection) * 100%` width, left-aligned.
-- **Desktop (`md+`)**: blocks rendered in a 2-column grid (`grid grid-cols-2 gap-3`). If a section has only one block, it occupies one column (half width). With N blocks, layout is a `ceil(N/2) × 2` grid. Within each cell, the block's inner content uses `(bars / maxBarsInSection) * 100%` width, left-aligned (so a 2-bar block beside a 4-bar block visually shows as half-filled).
+- Build `progSortedChords = getPatternChordsViaSSOT(ownerSection, progPattern)` (or reuse the same SSOT helper already imported in this file; if not imported, import from `@/store/song`).
+- Render a horizontally-scrolling `flex` row of compact chord tiles (one per chord, no empty slot tiles — chords are contiguous in pattern SSOT order). Each tile shows `toSounding(c.chord).display` in `font-mono-chord`.
+- Highlight the tile whose `id === props.chordId` with the same primary inset shadow used for the current slot in lyrics preview.
+- Eyebrow text: "Preview · scroll horizontally to see full row".
+- Keep the existing "Reorder this chord" row below; its arrow buttons already call `movePatternChord(patternId, chordId, ±1)` over the SSOT-ordered list, which inherently ignores empty beat slots and swaps with the next chord.
 
-Drop the existing `extendBackground` / `pr-[15%]` hack — no longer needed.
+## 5. LyricsTab — surface Duplicate as a top-level icon button
 
-The add-block/comment row from §5 sits below the grid spanning full width on desktop (`col-span-2`) and as its own row on mobile.
+In the section header (around lines 880–920), add a `Copy` ghost icon button immediately before the `DropdownMenuTrigger` (`MoreVertical`), calling `duplicateSection(section.id)`. Remove the existing **Duplicate** `DropdownMenuItem` (lines 885–887) from the menu.
 
-## 7. Empty-section "Add chords" placeholder
+## 6. LyricsTab — remove section expand/collapse button
 
-When a section has no chords (zero blocks, or all blocks empty in the initial empty state), render one full-width dashed card "+ Add chords". Click → ensure a block exists (`addPatternToSection` if needed) and open the chord picker at slot 0 of the first block. Matches PRECHORUS 2 in the reference screenshot. Beats dropdown stays hidden until chords exist.
-
-## 8. Voice-leading section button
-
-Stub only (see §1). No rendered panel this phase.
+Remove the chevron toggle at lines 923–931 (the `<button>` that calls `toggleSectionCollapsed(section.id)`). Make the `{!section.collapsed && (` body wrapper (line 935) unconditional. Keep `toggleSectionCollapsed` in the store untouched (still used by sort mode plumbing).
 
 ## Verification
 
 - `npx tsc --noEmit`
-- Mobile (390w): section header shows `[VL] [duplicate] [options]`; block row shows beats dropdown + spice; add-block + comment sit in one row under blocks; PRECHORUS 2 shows dashed "+ Add chords".
-- Desktop (≥md): blocks render in a 2-column grid; a lone block takes half width; mixed-bar blocks fill proportionally within their cell.
-- Beats dropdown resizes the pattern.
-- Song meta pill visibly filled.
+- Progressions: options menu shows only Add Key Change / Arpeggiator / Section color / Delete section / Delete last block. Sections always render expanded. Block header shows `n / N beats · M bars` with working −/+ steppers and editable input.
+- Progressions FocusedChordEditor: tapping a chord in a pattern opens the editor; preview is a horizontal scroll row of all chords in that block with the active chord highlighted; left/right reorder arrows swap with the next chord.
+- Lyrics: each section header shows a `Copy` icon button next to the options menu; no expand/collapse chevron; section bodies always visible.
