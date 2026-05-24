@@ -45,6 +45,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const [octave, setOctave] = useState<number>(4);
   const [detailChord, setDetailChord] = useState<ChordSymbol | null>(null);
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
+  const [playingStep, setPlayingStep] = useState<number | null>(null);
 
   const grid = useMemo(() => {
     return ladder.map((deg) => {
