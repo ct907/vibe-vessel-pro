@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { useTheme } from "@/hooks/use-theme";
-import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc } from "@/lib/music/chords";
+import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc, QUALITY_FAMILY, QUALITY_PRETTY } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -32,6 +32,14 @@ const QUALITY_LABEL: Record<Quality, string> = {
 
 interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
+}
+
+function applyFamilyQuality(c: ChordSymbol, tapped: ChordSymbol): ChordSymbol {
+  if (rootToPc(c.root) === rootToPc(tapped.root)) return tapped;
+  if (QUALITY_FAMILY[c.quality] === QUALITY_FAMILY[tapped.quality]) {
+    return { ...c, quality: tapped.quality, display: c.root + QUALITY_PRETTY[tapped.quality] };
+  }
+  return c;
 }
 
 export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
@@ -104,7 +112,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       const hitIndex = preset.degrees.findIndex((d) => d.interval === targetInterval);
       if (hitIndex < 0) continue;
       const chords = realizePreset(preset, meta.keyRoot, meta.keyMode).map((c) =>
-        rootToPc(c.root) === chordPc ? detailChord : c,
+        applyFamilyQuality(c, detailChord),
       );
       matches.push({ preset, chords, hitIndex });
       if (matches.length >= 3) break;
