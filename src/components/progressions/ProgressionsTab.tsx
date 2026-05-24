@@ -1189,23 +1189,35 @@ function SectionGroup({
                 };
               });
             const widthPct = (p.bars / maxBars) * 100;
+            const blockHasChords = section ? getPatternChordsViaSSOT(section, p).length > 0 : false;
             return (
               <div key={p.id} className="min-w-0" style={{ width: `${widthPct}%` }}>
-                <PatternBlock
-                  pattern={p}
-                  blockIndex={i}
-                  blocksInSection={blocks.length}
-                  otherPatterns={otherAll}
-                  onPickerOpen={onPickerOpen}
-                  onRequestDeleteBlock={onRequestDeleteBlock}
-                  onEditChordOpen={onEditChordOpen}
-                  activeChordId={activeChordId}
-                  onSetActiveChordId={onSetActiveChordId}
-                  multiSelected={multiSelected}
-                  onToggleMultiSelected={onToggleMultiSelected}
-                  onClearMultiSelected={onClearMultiSelected}
-                  effectiveOffset={effectiveOffset}
-                />
+                {blockHasChords ? (
+                  <PatternBlock
+                    pattern={p}
+                    blockIndex={i}
+                    blocksInSection={blocks.length}
+                    otherPatterns={otherAll}
+                    onPickerOpen={onPickerOpen}
+                    onRequestDeleteBlock={onRequestDeleteBlock}
+                    onEditChordOpen={onEditChordOpen}
+                    activeChordId={activeChordId}
+                    onSetActiveChordId={onSetActiveChordId}
+                    multiSelected={multiSelected}
+                    onToggleMultiSelected={onToggleMultiSelected}
+                    onClearMultiSelected={onClearMultiSelected}
+                    effectiveOffset={effectiveOffset}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onPickerOpen(p.id, 0)}
+                    className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+                  </button>
+                )}
               </div>
             );
           };
