@@ -31,6 +31,32 @@ function buildChord(rootPc: number, quality: Quality, useFlat: boolean): ChordSy
   return { root, quality, display: root + QUALITY_PRETTY[quality] };
 }
 
+type QualityFamily = "maj" | "min" | "dom";
+
+const FAMILY_MEMBERS: Record<QualityFamily, Quality[]> = {
+  maj: ["maj", "maj7", "maj9", "maj11", "maj13", "6", "6/9", "add9", "add11"],
+  min: ["min", "min7", "min9", "min11", "min13", "min6", "minMaj7"],
+  dom: ["7", "9", "7alt", "7#5", "7b9", "7#9"],
+};
+
+const FAMILY_BASE: Record<QualityFamily, Quality> = {
+  maj: "maj",
+  min: "min",
+  dom: "7",
+};
+
+function buildChordLike(
+  rootPc: number,
+  sourceQuality: Quality,
+  targetFamily: QualityFamily,
+  useFlat: boolean,
+): ChordSymbol {
+  const quality = FAMILY_MEMBERS[targetFamily].includes(sourceQuality)
+    ? sourceQuality
+    : FAMILY_BASE[targetFamily];
+  return buildChord(rootPc, quality, useFlat);
+}
+
 /** Get the diatonic degree (0-6) of a chord in the given key, or -1. */
 function degreeOf(chord: ChordSymbol, keyRoot: string, mode: Mode): number {
   const scale = mode === "maj" ? MAJOR_SCALE : MINOR_SCALE;
@@ -50,20 +76,18 @@ function diatonicAt(degree: number, keyRoot: string, mode: Mode, useFlat: boolea
 
 /** Is this a dominant-quality chord? */
 function isDominant(c: ChordSymbol): boolean {
-  return c.quality === "7" || c.quality === "9";
+  return FAMILY_MEMBERS.dom.includes(c.quality);
 }
 
-/** Convert a triad chord to its relative (maj↔min). vi in major or III in minor. */
+/** Convert a chord to its relative (maj↔min), preserving extended quality when family-compatible. */
 function relativeSwap(c: ChordSymbol, useFlat: boolean): ChordSymbol | null {
-  if (c.quality === "maj") {
-    // Relative minor: down a minor 3rd, minor quality.
+  if (FAMILY_MEMBERS.maj.includes(c.quality)) {
     const pc = (rootToPc(c.root) + 9) % 12;
-    return buildChord(pc, "min", useFlat);
+    return buildChordLike(pc, c.quality, "min", useFlat);
   }
-  if (c.quality === "min") {
-    // Relative major: up a minor 3rd, major quality.
+  if (FAMILY_MEMBERS.min.includes(c.quality)) {
     const pc = (rootToPc(c.root) + 3) % 12;
-    return buildChord(pc, "maj", useFlat);
+    return buildChordLike(pc, c.quality, "maj", useFlat);
   }
   return null;
 }
@@ -71,8 +95,9 @@ function relativeSwap(c: ChordSymbol, useFlat: boolean): ChordSymbol | null {
 /** Tritone substitution: bII7 of the dominant. */
 function tritoneSub(c: ChordSymbol, useFlat: boolean): ChordSymbol {
   const pc = (rootToPc(c.root) + 6) % 12;
-  return buildChord(pc, "7", useFlat);
+  return buildChordLike(pc, c.quality, "dom", useFlat);
 }
+
 
 /** Secondary dominant: V7 of the next chord (perfect-fifth-up to next root). */
 export function secondaryDominantOf(next: ChordSymbol, useFlat: boolean): ChordSymbol {
