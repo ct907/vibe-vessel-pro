@@ -284,26 +284,43 @@ function PatternBlock({
           Block {blockIndex + 1}
         </span>
         <span className="text-xs text-muted-foreground">·</span>
-        <Select
-          value={String(totalBeats)}
-          onValueChange={(v) => {
-            const beats = Number(v);
-            if (!Number.isFinite(beats) || beats <= 0) return;
-            const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-            updatePattern(pattern.id, { bars });
-          }}
-        >
-          <SelectTrigger className="h-7 w-auto gap-1 px-2 text-[11px] text-muted-foreground border-0 bg-transparent shadow-none focus:ring-0">
-            <SelectValue>{formatBeats(usedBeats)} / {totalBeats} beats</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {[4, 8, 12, 16, 20, 24, 32, 48, 64].map((n) => (
-              <SelectItem key={n} value={String(n)} className="text-xs">
-                {n} beats
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="font-mono-chord">{formatBeats(usedBeats)} /</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
+              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+            }}
+            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+            disabled={pattern.bars <= 1}
+            aria-label="Decrease beats"
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          <BeatsInput
+            value={totalBeats}
+            beatsPerBar={pattern.beatsPerBar}
+            onCommit={(beats) => {
+              const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
+              updatePattern(pattern.id, { bars });
+            }}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = totalBeats + pattern.beatsPerBar;
+              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+            }}
+            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+            aria-label="Increase beats"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+        </div>
         <div className="ml-auto flex items-center gap-1">
           {sortedChords.length >= 2 && (
             <button
