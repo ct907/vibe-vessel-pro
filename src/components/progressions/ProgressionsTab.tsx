@@ -296,7 +296,7 @@ function PatternBlock({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
+          className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
           onClick={(e) => {
             e.stopPropagation();
             onRequestDeleteBlock(pattern.id);
