@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { chordToMidi, NOTES_SHARP, type ChordSymbol } from "@/lib/music/chords";
 
 interface Props {
