@@ -893,13 +893,13 @@ function PatternBlock({
         isVisible={!!previewingSpiceChords && sortedChords.length >= 2}
       />
 
-      <SpicePanel
-        pattern={pattern}
-        activeChordId={activeChordId}
-        onAuditionChange={setPreviewingSpiceChords}
+      <SpiceSheet
         open={spiceOpen}
         onOpenChange={setSpiceOpen}
-        hideTrigger
+        pattern={pattern}
+        blockIndex={blockIndex}
+        activeChordId={activeChordId}
+        onAuditionChange={setPreviewingSpiceChords}
       />
 
     </div>
