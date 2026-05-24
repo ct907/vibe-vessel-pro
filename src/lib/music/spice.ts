@@ -2,6 +2,11 @@ import {
   ChordSymbol, Mode, Quality, QUALITY_PRETTY, rootToPc, pcToName, isMinorMode,
 } from "./chords";
 import { analyzeProgression } from "./harmony";
+import {
+  MODE_CHARACTER, ADVANCED_SCALE_DEFS, getQualityAtDegree, getNumeralAtDegree,
+  modeDisplayName, type AnyMode,
+} from "./modes";
+
 
 export type SpiceCategory =
   | "cinematic"
@@ -11,7 +16,9 @@ export type SpiceCategory =
   | "step_between"
   | "hypnotic_drone"
   | "amplify"
-  | "break_pattern";
+  | "break_pattern"
+  | "borrowed_colour";
+
 
 export interface SpiceSuggestion {
   id: string;
@@ -361,6 +368,71 @@ function breakPatternSuggestions(
   return out;
 }
 
+// ----- Borrowed colour: modal interchange from any parallel mode -----
+function borrowedColourSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+}> {
+  const out: Array<{
+    chords: ChordSymbol[];
+    changedIndices: number[];
+    emotiveLabel: string;
+    theoryLabel: string;
+  }> = [];
+  const useFlat = useFlatFor(keyRoot);
+  const keyPc = rootToPc(keyRoot);
+  const existingDisplays = new Set(chords.map((c) => c.display));
+  const candidateModes = (Object.keys(MODE_CHARACTER) as AnyMode[]).filter(
+    (m) => m !== (mode as AnyMode),
+  );
+
+  for (let i = 0; i < chords.length; i++) {
+    const src = chords[i];
+    const degree = (rootToPc(src.root) - keyPc + 12) % 12;
+    const currentQuality: Quality = isMajorish(src.quality)
+      ? "maj"
+      : isMinorish(src.quality)
+        ? "min"
+        : isDimish(src.quality)
+          ? "dim"
+          : src.quality;
+
+    for (const candMode of candidateModes) {
+      const q = getQualityAtDegree(candMode, degree);
+      if (!q) continue;
+      if (q === currentQuality) continue;
+      const swapped = buildChord(rootToPc(src.root), q, useFlat);
+      if (swapped.display === src.display) continue;
+      if (existingDisplays.has(swapped.display)) continue;
+
+      const char = MODE_CHARACTER[candMode];
+      const numeral = getNumeralAtDegree(candMode, degree) ?? "?";
+      const isExotic = candMode in ADVANCED_SCALE_DEFS;
+      const moodWord = char.mood.split(",")[0].trim();
+      const emotive = `${char.borrowLabel} — ${moodWord.toLowerCase()}`;
+      const theoryBase = `Borrowed ${numeral} from ${modeDisplayName(candMode)}`;
+      const theory = isExotic ? `Exotic: ${theoryBase}` : theoryBase;
+
+      const next = chords.slice();
+      next[i] = swapped;
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        emotiveLabel: emotive,
+        theoryLabel: theory,
+      });
+    }
+  }
+  return out;
+}
+
+
 const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; theory: string; description: string }> = {
   cinematic: {
     emoji: "🎬",
@@ -410,7 +482,14 @@ const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; the
     theory: "Disrupt",
     description: "Cuts against the grain of the current progression to wake up the ear.",
   },
+  borrowed_colour: {
+    emoji: "🎨",
+    emotive: "Borrowed colour",
+    theory: "Modal interchange",
+    description: "Swaps one chord for its shade from a parallel mode — fresh colour without leaving the key root.",
+  },
 };
+
 
 function makeSuggestion(
   category: SpiceCategory,
@@ -510,6 +589,25 @@ export function generateSpiceSuggestions(
         raw.push(makeSuggestion("break_pattern", i, s.chords, chords.length, s.changedIndices, null, s.label));
       });
   }
+
+  // Borrowed colour: rank candidates by frictionDelta, take top 3
+  {
+    const candidates = borrowedColourSuggestions(chords, keyRoot, mode)
+      .filter((s) => focusedIndex < 0 || s.changedIndices.includes(focusedIndex))
+      .map((s) => {
+        const a = analyzeProgression(s.chords, keyRoot, mode);
+        return { s, friction: a.averageFriction - baseFriction };
+      })
+      .sort((a, b) => a.friction - b.friction)
+      .slice(0, 3);
+    candidates.forEach(({ s }, i) => {
+      const base = makeSuggestion(
+        "borrowed_colour", i, s.chords, chords.length, s.changedIndices, null, s.theoryLabel,
+      );
+      raw.push({ ...base, emotiveLabel: s.emotiveLabel });
+    });
+  }
+
 
   // Deduplicate by chord-display sequence
   const seen = new Set<string>();
