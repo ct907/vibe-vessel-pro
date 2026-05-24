@@ -1142,8 +1142,8 @@ function SectionGroup({
           intentionally NOT exposed: the lyrics tab's chord row order is
           driven by the same SSOT, and re-arranging blocks here would
           desync the two surfaces. Blocks are now plain children. */}
-      {true && (
-        <>
+      <>
+
 
         {(() => {
           const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
