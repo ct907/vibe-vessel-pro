@@ -1901,6 +1901,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           if (id) removePatternBlock(id);
         }}
       />
+      <WhyThisChordSheet />
     </div>
   );
 }
