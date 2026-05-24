@@ -1262,7 +1262,8 @@ function SectionGroup({
           </div>
         )}
         </>
-      )}
+
+
 
       <Dialog
         open={customRenameOpen}
