@@ -534,7 +534,7 @@ function PatternBlock({
                                       return;
                                     }
                                     onSetActiveChordId(null);
-                                    useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
+                                    onEditChordOpen(pattern.id, c.id);
                                   }, 500);
                                 }}
                                 onPointerUp={() => {
@@ -561,7 +561,7 @@ function PatternBlock({
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
                                   if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
                                   onSetActiveChordId(null);
-                                  useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
+                                  onEditChordOpen(pattern.id, c.id);
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
