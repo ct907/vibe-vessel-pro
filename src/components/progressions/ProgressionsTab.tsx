@@ -560,7 +560,7 @@ function PatternBlock({
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
                                   if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
                                   onSetActiveChordId(null);
-                                  onEditChordOpen(pattern.id, c.id);
+                                  useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
