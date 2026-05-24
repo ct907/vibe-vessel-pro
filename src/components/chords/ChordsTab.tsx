@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
 import { useTheme } from "@/hooks/use-theme";
-import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc } from "@/lib/music/chords";
+import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc, QUALITY_FAMILY, QUALITY_PRETTY } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
