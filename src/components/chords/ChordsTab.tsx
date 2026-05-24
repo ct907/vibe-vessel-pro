@@ -379,14 +379,21 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                           </div>
                           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{preset.tag}</div>
                           <div className="flex flex-wrap gap-1.5 mb-2">
-                            {chords.map((c, i) => (
-                              <span
-                                key={i}
-                                className={cn("rounded", i === hitIndex && "ring-2 ring-primary")}
-                              >
-                                <ChordChip chord={c} variant="ink" size="sm" audition={false} />
-                              </span>
-                            ))}
+                            {chords.map((c, i) => {
+                              const isPlayhead = isPlaying && i === playingStep;
+                              return (
+                                <span
+                                  key={i}
+                                  className={cn(
+                                    "rounded transition-shadow",
+                                    i === hitIndex && "ring-2 ring-primary",
+                                    isPlayhead && "ring-2 ring-primary shadow-[0_0_0_3px_var(--primary-halo)]",
+                                  )}
+                                >
+                                  <ChordChip chord={c} variant="ink" size="sm" audition={false} />
+                                </span>
+                              );
+                            })}
                           </div>
                           <div className="flex gap-2">
                             <button
