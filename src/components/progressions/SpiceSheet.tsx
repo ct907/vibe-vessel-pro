@@ -90,8 +90,10 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
   const stopPreview = () => {
     stopProgression();
     setPlayingId(null);
+    setPlayingStep(null);
     onAuditionChange?.(null);
   };
+
 
   const octaveFor = (i: number): number => {
     for (let k = Math.min(i, sortedChords.length - 1); k >= 0; k--) {
