@@ -7,7 +7,7 @@ import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
-import { PresetBrowser } from "@/components/progressions/PresetBrowser";
+
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -147,7 +147,7 @@ function PatternBlock({
     bulkSetChordOctave,
     replacePatternChords,
   } = useSongStore();
-  const [presetBrowserOpen, setPresetBrowserOpen] = useState(false);
+  
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
@@ -296,20 +296,7 @@ function PatternBlock({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 ml-auto text-muted-foreground hover:text-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPresetBrowserOpen(true);
-          }}
-          title="Browse presets"
-          aria-label="Browse progression presets"
-        >
-          <Music2 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
+          className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
           onClick={(e) => {
             e.stopPropagation();
             onRequestDeleteBlock(pattern.id);
@@ -794,18 +781,6 @@ function PatternBlock({
         </div>
       )}
 
-      {sortedChords.length === 0 && (
-        <div className="mt-3 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setPresetBrowserOpen(true)}
-            className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-10 px-4 text-sm font-semibold"
-          >
-            <Music2 className="h-4 w-4" />
-            Browse progressions
-          </button>
-        </div>
-      )}
 
       <VoiceLeadingRibbon
         originalChords={sortedChords.map((c) => c.chord)}
@@ -819,11 +794,6 @@ function PatternBlock({
         onAuditionChange={setPreviewingSpiceChords}
       />
 
-      <PresetBrowser
-        open={presetBrowserOpen}
-        onOpenChange={setPresetBrowserOpen}
-        onUse={(chords) => replacePatternChords(pattern.id, chords)}
-      />
     </div>
   );
 }

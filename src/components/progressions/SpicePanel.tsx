@@ -80,6 +80,16 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) 
     onAuditionChange?.(null);
   };
 
+  const octaveFor = (i: number): number => {
+    for (let k = Math.min(i, sortedChords.length - 1); k >= 0; k--) {
+      const o = sortedChords[k]?.chord.octave;
+      if (typeof o === "number") return o;
+    }
+    return 4;
+  };
+
+  const withOctave = (c: ChordSymbol, i: number): ChordSymbol => ({ ...c, octave: octaveFor(i) });
+
   const playSuggestion = async (s: SpiceSuggestion) => {
     if (playingId === s.id) { stopPreview(); return; }
     stopProgression();
@@ -88,7 +98,7 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) 
     let cursor = 0;
     const events: ScheduledChord[] = s.chords.map((c, i) => {
       const len = s.suggestedDurations?.[i] ?? sortedChords[i]?.lengthBeats ?? 2;
-      const ev: ScheduledChord = { chord: c, startBeat: cursor, lengthBeats: len };
+      const ev: ScheduledChord = { chord: withOctave(c, i), startBeat: cursor, lengthBeats: len };
       cursor += len;
       return ev;
     });
@@ -108,19 +118,19 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) 
     if (playingId === s.id) stopPreview();
 
     if (s.countChanged) {
-      // Rebuild: drop existing, add new in order with suggested durations.
       const ids = sortedChords.map((c) => c.id);
       if (ids.length > 0) removePatternChordsBatch(pattern.id, ids);
       let cursor = 0;
       const durations = s.suggestedDurations ?? s.chords.map(() => 2);
       s.chords.forEach((c, i) => {
         const len = durations[i] ?? 2;
-        addChordToPattern(pattern.id, c, cursor, len);
+        addChordToPattern(pattern.id, withOctave(c, i), cursor, len);
         cursor += len;
       });
     } else {
-      replacePatternChords(pattern.id, s.chords);
+      replacePatternChords(pattern.id, s.chords.map((c, i) => withOctave(c, i)));
     }
+
 
     toast({
       title: `Applied "${CATEGORY_EMOJI[s.category]} ${s.emotiveLabel}"`,

@@ -14,6 +14,7 @@ import { useUIStore } from "@/store/ui";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PresetList } from "@/components/progressions/PresetList";
 
 interface LyricsModeProps {
   mode?: "lyrics";
@@ -76,6 +77,7 @@ export function FocusedChordEditor(props: Props) {
   const upsertChordAt = useSongStore((s) => s.upsertChordAt);
   const updatePatternChord = useSongStore((s) => s.updatePatternChord);
   const addChordToPatternSlot = useSongStore((s) => s.addChordToPatternSlot);
+  const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
   const progression = useSongStore((s) => s.progression);
 
   const isProgression = props.mode === "progression";
@@ -255,6 +257,34 @@ export function FocusedChordEditor(props: Props) {
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
+  const handlePresetUse = (chords: ChordSymbol[]) => {
+    if (chords.length === 0) return;
+    if (isProgressionAdd || isProgression) {
+      const patternId = (props as ProgressionModeProps | ProgressionAddModeProps).patternId;
+      const startBeat = isProgressionAdd ? (props as ProgressionAddModeProps).atBeat : 0;
+      if (isProgression) {
+        const existingIds = progPattern?.chords.map((c) => c.id) ?? [];
+        if (existingIds.length > 0) removePatternChordsBatch(patternId, existingIds);
+      }
+      chords.forEach((chord, i) => {
+        addChordToPatternSlot(patternId, { ...toStorage(chord), octave }, startBeat + i * 4, 4);
+      });
+      props.onClose();
+      return;
+    }
+    if (!line) return;
+    const placements: { chord: ChordSymbol; s: number }[] = [];
+    let cur = slot;
+    for (const chord of chords) {
+      placements.push({ chord, s: cur });
+      cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
+    }
+    for (const { chord: ch, s } of [...placements].reverse()) {
+      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
+    }
+    props.onClose();
+  };
+
 
   if (!isProgression && !isProgressionAdd && !line) return null;
   if (isProgression && (!progPattern || !progChord)) return null;
@@ -610,6 +640,9 @@ export function FocusedChordEditor(props: Props) {
                 </button>
               );
             })}
+          </div>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+            <PresetList onUse={handlePresetUse} />
           </div>
         </div>
       </div>
