@@ -77,6 +77,7 @@ export function FocusedChordEditor(props: Props) {
   const upsertChordAt = useSongStore((s) => s.upsertChordAt);
   const updatePatternChord = useSongStore((s) => s.updatePatternChord);
   const addChordToPatternSlot = useSongStore((s) => s.addChordToPatternSlot);
+  const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
   const progression = useSongStore((s) => s.progression);
 
   const isProgression = props.mode === "progression";
