@@ -148,24 +148,37 @@ export function VoiceLeadingOverlay({ originalChords, spicedChords, isVisible }:
         >
           Original → Spiced
         </div>
-        <div
-          className="absolute top-1.5 right-2 flex items-center gap-2 text-[9px] font-semibold pointer-events-none"
-          style={{ color: "var(--ink-soft)" }}
-        >
-          <span className="flex items-center gap-1">
-            <svg width="14" height="4"><line x1="0" y1="2" x2="14" y2="2" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" /></svg>
-            ORIG
-          </span>
-          <span className="flex items-center gap-1">
-            <svg width="14" height="4"><line x1="0" y1="2" x2="14" y2="2" stroke="currentColor" strokeWidth="2" /></svg>
-            SPICE
-          </span>
+        <div className="absolute top-1 right-1.5 flex items-center gap-0.5 pointer-events-auto z-10">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFocus("original"); }}
+            className={cn(
+              "h-5 px-2 rounded-full text-[9px] font-display font-semibold transition-colors",
+              focus === "original" ? "btn-sculpt-amber" : "btn-sculpt-cream",
+            )}
+          >
+            Original
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFocus("spiced"); }}
+            className={cn(
+              "h-5 px-2 rounded-full text-[9px] font-display font-semibold transition-colors",
+              focus === "spiced" ? "btn-sculpt-amber" : "btn-sculpt-cream",
+            )}
+          >
+            Spiced
+          </button>
         </div>
         {width > 0 && n > 0 && (() => {
           const colX = Array.from({ length: n }, (_, i) => (i + 0.5) * (width / n));
-          return (
-            <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }}>
-              {/* Original lines (dashed, faded) */}
+          const origOnTop = focus === "original";
+          const origOpacity = origOnTop ? 1 : 0.35;
+          const spiceOpacity = origOnTop ? 0.35 : 1;
+          const origFaded = !origOnTop;
+          const spiceFaded = origOnTop;
+          const origGroup = (
+            <g key="orig-group" opacity={origOpacity}>
               {[0, 1, 2, 3].map((vi) => {
                 const segs: JSX.Element[] = [];
                 for (let i = 0; i < origCols.length - 1; i++) {
@@ -175,14 +188,21 @@ export function VoiceLeadingOverlay({ originalChords, spicedChords, isVisible }:
                     <line
                       key={`o-${vi}-${i}`}
                       x1={colX[i]} y1={a.y} x2={colX[i + 1]} y2={b.y}
-                      stroke={VOICE_COLORS[vi]} strokeWidth={1.2}
-                      strokeDasharray="4 4" strokeLinecap="round" opacity={0.5}
+                      stroke={VOICE_COLORS[vi]} strokeWidth={origOnTop ? 2.4 : 1.2}
+                      strokeDasharray={origOnTop ? undefined : "4 4"}
+                      strokeLinecap="round"
                     />,
                   );
                 }
                 return <g key={`og-${vi}`}>{segs}</g>;
               })}
-              {/* Spiced lines (solid, smoothness-based thickness) */}
+              {origCols.map((col, i) => col.map((nn, vi) => (
+                <Marker key={`om-${i}-${vi}`} x={colX[i]} y={nn.y} voiceIdx={vi} label={nn.label} faded={origFaded} />
+              )))}
+            </g>
+          );
+          const spiceGroup = (
+            <g key="spice-group" opacity={spiceOpacity}>
               {[0, 1, 2, 3].map((vi) => {
                 const segs: JSX.Element[] = [];
                 for (let i = 0; i < spiceCols.length - 1; i++) {
@@ -193,24 +213,26 @@ export function VoiceLeadingOverlay({ originalChords, spicedChords, isVisible }:
                     <line
                       key={`s-${vi}-${i}`}
                       x1={colX[i]} y1={a.y} x2={colX[i + 1]} y2={b.y}
-                      stroke={VOICE_COLORS[vi]} strokeWidth={smooth ? 3 : 1.2}
+                      stroke={VOICE_COLORS[vi]} strokeWidth={!origOnTop ? (smooth ? 3 : 1.2) : 1.2}
+                      strokeDasharray={origOnTop ? "4 4" : undefined}
                       strokeLinecap="round"
                     />,
                   );
                 }
                 return <g key={`sg-${vi}`}>{segs}</g>;
               })}
-              {/* Original markers (faded) */}
-              {origCols.map((col, i) => col.map((nn, vi) => (
-                <Marker key={`om-${i}-${vi}`} x={colX[i]} y={nn.y} voiceIdx={vi} label={nn.label} faded />
-              )))}
-              {/* Spiced markers */}
               {spiceCols.map((col, i) => col.map((nn, vi) => (
-                <Marker key={`sm-${i}-${vi}`} x={colX[i]} y={nn.y} voiceIdx={vi} label={nn.label} />
+                <Marker key={`sm-${i}-${vi}`} x={colX[i]} y={nn.y} voiceIdx={vi} label={nn.label} faded={spiceFaded} />
               )))}
+            </g>
+          );
+          return (
+            <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }}>
+              {origOnTop ? <>{spiceGroup}{origGroup}</> : <>{origGroup}{spiceGroup}</>}
             </svg>
           );
         })()}
+
       </div>
     </div>
   );
