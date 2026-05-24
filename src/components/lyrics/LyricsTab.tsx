@@ -926,20 +926,11 @@ function SectionCard({
           </div>
         )}
 
-        {!sortMode && (
-          <button
-            onClick={() => toggleSectionCollapsed(section.id)}
-            className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-            aria-label={section.collapsed ? "Expand section" : "Collapse section"}
-          >
-            {section.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        )}
       </div>
 
       {/* Body */}
-      {!section.collapsed && (
-        <>
+      <>
+
           <div className="space-y-1">
             {section.lines.map((line, i) => (
               <LineRow
