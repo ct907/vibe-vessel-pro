@@ -55,11 +55,11 @@ function buildChord(rootPc: number, quality: Quality, useFlat: boolean): ChordSy
 
 function relativeSwap(c: ChordSymbol, useFlat: boolean): ChordSymbol | null {
   const fam = QUALITY_FAMILY[c.quality];
-  if (fam === "maj") {
+  if (fam === "major") {
     const pc = (rootToPc(c.root) + 9) % 12;
     return buildChord(pc, c.quality === "maj" ? "min" : c.quality, useFlat);
   }
-  if (fam === "min") {
+  if (fam === "minor") {
     const pc = (rootToPc(c.root) + 3) % 12;
     return buildChord(pc, c.quality === "min" ? "maj" : c.quality, useFlat);
   }
