@@ -641,6 +641,9 @@ export function FocusedChordEditor(props: Props) {
               );
             })}
           </div>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+            <PresetList onUse={handlePresetUse} />
+          </div>
         </div>
       </div>
     </div>
