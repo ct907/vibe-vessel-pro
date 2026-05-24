@@ -449,7 +449,7 @@ export function generateSpiceSuggestions(
 
   let raw: Array<Omit<SpiceSuggestion, "frictionDelta">> = [];
 
-  const cap = (xs: unknown[], n: number) => xs.slice(0, n);
+  const cap = <T>(xs: T[], n: number): T[] => xs.slice(0, n);
 
   // Cinematic
   cap(cinematicSuggestions(chords, keyRoot, mode), 2)
