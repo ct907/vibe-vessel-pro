@@ -590,6 +590,25 @@ export function generateSpiceSuggestions(
       });
   }
 
+  // Borrowed colour: rank candidates by frictionDelta, take top 3
+  {
+    const candidates = borrowedColourSuggestions(chords, keyRoot, mode)
+      .filter((s) => focusedIndex < 0 || s.changedIndices.includes(focusedIndex))
+      .map((s) => {
+        const a = analyzeProgression(s.chords, keyRoot, mode);
+        return { s, friction: a.averageFriction - baseFriction };
+      })
+      .sort((a, b) => a.friction - b.friction)
+      .slice(0, 3);
+    candidates.forEach(({ s }, i) => {
+      const base = makeSuggestion(
+        "borrowed_colour", i, s.chords, chords.length, s.changedIndices, null, s.theoryLabel,
+      );
+      raw.push({ ...base, emotiveLabel: s.emotiveLabel });
+    });
+  }
+
+
   // Deduplicate by chord-display sequence
   const seen = new Set<string>();
   const deduped = raw.filter((s) => {
