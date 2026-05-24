@@ -363,7 +363,72 @@ function breakPatternSuggestions(
         changedIndices: diffIndices(chords, next),
         label: `Inject ${next[Math.min(1, next.length - 1)].display} (♭II)`,
       });
+}
+
+// ----- Borrowed colour: modal interchange from any parallel mode -----
+function borrowedColourSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+}> {
+  const out: Array<{
+    chords: ChordSymbol[];
+    changedIndices: number[];
+    emotiveLabel: string;
+    theoryLabel: string;
+  }> = [];
+  const useFlat = useFlatFor(keyRoot);
+  const keyPc = rootToPc(keyRoot);
+  const existingDisplays = new Set(chords.map((c) => c.display));
+  const candidateModes = (Object.keys(MODE_CHARACTER) as AnyMode[]).filter(
+    (m) => m !== (mode as AnyMode),
+  );
+
+  for (let i = 0; i < chords.length; i++) {
+    const src = chords[i];
+    const degree = (rootToPc(src.root) - keyPc + 12) % 12;
+    const currentQuality: Quality = isMajorish(src.quality)
+      ? "maj"
+      : isMinorish(src.quality)
+        ? "min"
+        : isDimish(src.quality)
+          ? "dim"
+          : src.quality;
+
+    for (const candMode of candidateModes) {
+      const q = getQualityAtDegree(candMode, degree);
+      if (!q) continue;
+      if (q === currentQuality) continue;
+      const swapped = buildChord(rootToPc(src.root), q, useFlat);
+      if (swapped.display === src.display) continue;
+      if (existingDisplays.has(swapped.display)) continue;
+
+      const char = MODE_CHARACTER[candMode];
+      const numeral = getNumeralAtDegree(candMode, degree) ?? "?";
+      const isExotic = candMode in ADVANCED_SCALE_DEFS;
+      const moodWord = char.mood.split(",")[0].trim();
+      const emotive = `${char.borrowLabel} — ${moodWord.toLowerCase()}`;
+      const theoryBase = `Borrowed ${numeral} from ${modeDisplayName(candMode)}`;
+      const theory = isExotic ? `Exotic: ${theoryBase}` : theoryBase;
+
+      const next = chords.slice();
+      next[i] = swapped;
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        emotiveLabel: emotive,
+        theoryLabel: theory,
+      });
     }
+  }
+  return out;
+}
+
   }
   return out;
 }
