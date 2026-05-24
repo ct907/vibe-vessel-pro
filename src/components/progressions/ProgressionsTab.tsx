@@ -1007,8 +1007,8 @@ function SectionGroup({
             style={{
               padding: "5px 12px",
               borderRadius: "var(--pill-radius, 8px)",
-              background: "var(--pill-rest-bg)",
-              color: "var(--pill-rest-fg)",
+              background: "transparent",
+              color: "inherit",
               fontFamily: "'Nunito', system-ui, sans-serif",
               fontWeight: 700,
               fontSize: 12,
