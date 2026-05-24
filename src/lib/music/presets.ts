@@ -324,7 +324,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Dorian Groove",
     featuredQualities: ["min7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "min7", romanNumeral: "i7" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
       { interval: 5, quality: "maj", romanNumeral: "IV" },
