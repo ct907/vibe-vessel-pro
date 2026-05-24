@@ -302,6 +302,24 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                   </button>
                 </div>
 
+                {detailSuggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="font-display text-base font-bold">Works well with</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {detailSuggestions.map((c) => (
+                        <ChordChip
+                          key={c.display}
+                          chord={c}
+                          variant="ink"
+                          octave={octave}
+                          onClick={() => addChordToSong(c)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+
                 {matchingPresets.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="font-display text-base font-bold">Used in these progressions</h3>
