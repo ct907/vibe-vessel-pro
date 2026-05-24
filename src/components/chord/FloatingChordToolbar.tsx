@@ -131,7 +131,7 @@ export function FloatingChordToolbar({
         style={ANIM_STYLE}
         className={cn(
           "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
-          "h-7 w-7 rounded-full flex items-center justify-center btn-sculpt-amber",
+          "h-10 w-10 rounded-full flex items-center justify-center btn-sculpt-amber",
           expanded ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100",
         )}
       >

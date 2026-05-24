@@ -64,7 +64,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
               <Brush className="h-4 w-4" /> Format chords
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={activeTab !== "lyrics"}
+              disabled={activeTab !== "lyrics" && activeTab !== "progressions"}
               onClick={() => setAllSectionsCollapsed(!allCollapsed)}
             >
               {allCollapsed ? (
