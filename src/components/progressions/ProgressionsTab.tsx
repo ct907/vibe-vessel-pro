@@ -9,6 +9,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
 
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
+import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
