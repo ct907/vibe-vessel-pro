@@ -211,8 +211,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
-        <div className="space-y-3 flex-1 min-h-0 flex flex-col">
-          <div className="flex items-stretch gap-1.5">
+        <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
+          <div className="flex items-stretch gap-1.5 shrink-0">
+
             <input
               ref={inputRef}
               data-chord-picker-input
