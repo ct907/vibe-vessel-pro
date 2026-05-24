@@ -14,6 +14,7 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -316,44 +317,70 @@ function PatternBlock({
           Block {blockIndex + 1}
         </span>
         <span className="text-xs text-muted-foreground">·</span>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <span className="font-mono-chord">{formatBeats(usedBeats)} /</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
-              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-            }}
-            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
-            disabled={pattern.bars <= 1}
-            aria-label="Decrease beats"
-          >
-            <Minus className="h-3 w-3" />
-          </button>
-          <BeatsInput
-            value={totalBeats}
-            beatsPerBar={pattern.beatsPerBar}
-            onCommit={(beats) => {
-              const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-              updatePattern(pattern.id, { bars });
-            }}
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = totalBeats + pattern.beatsPerBar;
-              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-            }}
-            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
-            aria-label="Increase beats"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-          <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-3 py-0.5 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full"
+              style={{ background: "var(--paper-shade)" }}
+              aria-label="Edit beats"
+            >
+              <span className="font-mono-chord">{formatBeats(usedBeats)}/{totalBeats}</span>
+              <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+              <ChevronDown className="h-3 w-3 opacity-70" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-2">
+            <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
+                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                }}
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+                disabled={pattern.bars <= 1}
+                aria-label="Decrease beats"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <BeatsInput
+                value={totalBeats}
+                beatsPerBar={pattern.beatsPerBar}
+                onCommit={(beats) => {
+                  const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
+                  updatePattern(pattern.id, { bars });
+                }}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = totalBeats + pattern.beatsPerBar;
+                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                }}
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                aria-label="Increase beats"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => { /* voice-leading UI deferred */ }}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            style={{ background: "var(--paper-shade)" }}
+            aria-label="Voice leading lines (coming soon)"
+            title="Voice leading (coming soon)"
+          >
+            <Activity className="h-4 w-4" />
+          </button>
           {sortedChords.length >= 2 && (
             <button
               type="button"
@@ -363,8 +390,8 @@ function PatternBlock({
                 setSpiceOpen(next);
                 if (!next) setPreviewingSpiceChords(null);
               }}
-              className="inline-flex items-center gap-1 h-8 px-2 rounded-md font-display text-sm hover:bg-accent transition-colors"
-              style={{ color: spiceOpen ? "var(--primary-strong)" : undefined }}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors"
+              style={{ background: "var(--paper-shade)", color: spiceOpen ? "var(--primary-strong)" : undefined }}
               aria-label="Add spice"
               title="Add spice"
             >
@@ -955,7 +982,10 @@ function SectionGroup({
       className={cn("noise-texture-surface rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2 px-3 h-12 rounded-full"
+        style={{ background: "var(--pill-rest-bg)", color: "var(--pill-rest-fg)" }}
+      >
         <Select
           value={section?.type ?? "verse"}
           onValueChange={(v) => {
@@ -977,8 +1007,8 @@ function SectionGroup({
             style={{
               padding: "5px 12px",
               borderRadius: "var(--pill-radius, 8px)",
-              background: "var(--pill-rest-bg)",
-              color: "var(--pill-rest-fg)",
+              background: "transparent",
+              color: "inherit",
               fontFamily: "'Nunito', system-ui, sans-serif",
               fontWeight: 700,
               fontSize: 12,
@@ -1046,17 +1076,9 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              onClick={() => { /* voice-leading UI deferred to next phase */ }}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Voice leading lines (coming soon)"
-              title="Voice leading (coming soon)"
-            >
-              <Activity className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => duplicateSection(sectionId)}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+              style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
               aria-label="Duplicate section"
               title="Duplicate section"
             >
@@ -1064,9 +1086,14 @@ function SectionGroup({
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <button
+                  type="button"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+                  style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
+                  aria-label="Section options"
+                >
                   <MoreVertical className="h-4 w-4" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {effectiveOffset === 0 && (
@@ -1209,7 +1236,8 @@ function SectionGroup({
               <button
                 type="button"
                 onClick={() => addPatternToSection(sectionId)}
-                className="flex-1 rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
+                style={{ width: "40%" }}
+                className="mr-auto rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
               >
                 <Plus className="h-4 w-4" />
                 <span className="text-xs font-display uppercase tracking-wide">Add block</span>
