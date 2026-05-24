@@ -164,10 +164,10 @@ export function WhyThisChordSheet() {
 
     // (c) borrowed counterpart (parallel mode)
     const fam = QUALITY_FAMILY[chord.quality];
-    if (fam === "maj") {
+    if (fam === "major") {
       const swap = parseChord(chord.root + "m");
       push(swap ?? undefined);
-    } else if (fam === "min") {
+    } else if (fam === "minor") {
       const swap = parseChord(chord.root);
       push(swap ?? undefined);
     }
