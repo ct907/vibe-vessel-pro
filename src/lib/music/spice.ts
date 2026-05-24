@@ -417,7 +417,14 @@ const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; the
     theory: "Disrupt",
     description: "Cuts against the grain of the current progression to wake up the ear.",
   },
+  borrowed_colour: {
+    emoji: "🎨",
+    emotive: "Borrowed colour",
+    theory: "Modal interchange",
+    description: "Swaps one chord for its shade from a parallel mode — fresh colour without leaving the key root.",
+  },
 };
+
 
 function makeSuggestion(
   category: SpiceCategory,
