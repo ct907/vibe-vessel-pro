@@ -363,6 +363,9 @@ function breakPatternSuggestions(
         changedIndices: diffIndices(chords, next),
         label: `Inject ${next[Math.min(1, next.length - 1)].display} (♭II)`,
       });
+    }
+  }
+  return out;
 }
 
 // ----- Borrowed colour: modal interchange from any parallel mode -----
@@ -429,9 +432,6 @@ function borrowedColourSuggestions(
   return out;
 }
 
-  }
-  return out;
-}
 
 const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; theory: string; description: string }> = {
   cinematic: {
