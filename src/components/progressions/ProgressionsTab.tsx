@@ -1132,31 +1132,11 @@ function SectionGroup({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            {!sortMode && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground"
-                onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
-                aria-label={collapsed ? "Expand section" : "Collapse section"}
-                title={collapsed ? "Expand section" : "Collapse section"}
-              >
-                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-            )}
           </div>
         )}
       </div>
 
-      {collapsed && section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0) && (
-        <div className="flex flex-wrap gap-1 px-3 pb-1">
-          {blocks.flatMap((b) =>
-            getPatternChordsViaSSOT(section, b).map((pc) => (
-              <ChordChip key={pc.id} chord={pc.chord} variant="ink" size="sm" audition={false} />
-            )),
-          )}
-        </div>
-      )}
+
 
       {/* Pattern blocks within this section. Pattern-block reordering is
           intentionally NOT exposed: the lyrics tab's chord row order is
