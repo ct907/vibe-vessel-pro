@@ -1236,7 +1236,8 @@ function SectionGroup({
               <button
                 type="button"
                 onClick={() => addPatternToSection(sectionId)}
-                className="flex-1 rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
+                style={{ width: "40%" }}
+                className="mr-auto rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
               >
                 <Plus className="h-4 w-4" />
                 <span className="text-xs font-display uppercase tracking-wide">Add block</span>
