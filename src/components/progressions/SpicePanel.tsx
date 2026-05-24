@@ -35,7 +35,7 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
   break_pattern: "💥",
 };
 
-export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) {
+export function SpicePanel({ pattern, activeChordId, onAuditionChange, open: openProp, onOpenChange, hideTrigger }: Props) {
   const meta = useSongStore((s) => s.meta);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
@@ -43,7 +43,12 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange }: Props) 
   const ownerSection = useSongStore((s) =>
     s.sections.find((sec) => sec.id === (pattern.sectionId ?? pattern.id)),
   );
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = (v: boolean) => {
+    if (onOpenChange) onOpenChange(v);
+    else setOpenInternal(v);
+  };
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   const sortedChords = useMemo(
