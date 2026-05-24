@@ -408,6 +408,13 @@ function PatternBlock({
 
       {/* Toolbar moved below the pattern grid (#7). */}
 
+      <VoiceLeadingLinesPanel
+        chords={sortedChords.map((c) => c.chord)}
+        isVisible={voiceLinesOpen && sortedChords.length >= 1}
+      />
+
+
+
       <div className="relative">
         {(() => {
           const slotCount = Math.max(1, pattern.bars * pattern.beatsPerBar);
