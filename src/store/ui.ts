@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { ChordSymbol } from "@/lib/music/chords";
 
 /**
  * Lightweight global UI state. Tracks whether the FocusedChordEditor
@@ -7,6 +8,13 @@ import { create } from "zustand";
  * floating chord toolbar is expanded so the tab switcher can block tab
  * changes while the user is mid-edit.
  */
+export interface WhyChordRequest {
+  chord: ChordSymbol;
+  /** When present, the sheet's "Replace in song" action targets this chord. */
+  patternId?: string;
+  chordId?: string;
+}
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
@@ -14,6 +22,8 @@ interface UIState {
   setToolbarExpanded: (open: boolean) => void;
   multiSelectMode: boolean;
   setMultiSelectMode: (v: boolean) => void;
+  whyChord: WhyChordRequest | null;
+  setWhyChord: (req: WhyChordRequest | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -23,4 +33,7 @@ export const useUIStore = create<UIState>((set) => ({
   setToolbarExpanded: (open) => set({ toolbarExpanded: open }),
   multiSelectMode: false,
   setMultiSelectMode: (v) => set({ multiSelectMode: v }),
+  whyChord: null,
+  setWhyChord: (req) => set({ whyChord: req }),
 }));
+
