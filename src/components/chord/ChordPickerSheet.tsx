@@ -11,6 +11,7 @@ import { playChord } from "@/lib/music/audio";
 import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { PresetList } from "@/components/progressions/PresetList";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
 
