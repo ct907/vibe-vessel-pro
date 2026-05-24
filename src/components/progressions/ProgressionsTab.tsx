@@ -55,7 +55,7 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { parseChordTextStrict } from "@/lib/music/chordClipboard";
+
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
@@ -93,6 +93,38 @@ function BarsInput({ value, onCommit }: { value: number; onCommit: (n: number) =
       }}
       onClick={(e) => e.stopPropagation()}
       className="h-7 w-14 font-mono-chord"
+    />
+  );
+}
+
+/** Beats number input (allows empty while typing, commits valid integers). */
+function BeatsInput({ value, beatsPerBar, onCommit }: { value: number; beatsPerBar: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^0-9]/g, "");
+        setDraft(raw);
+        if (raw === "") return;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= beatsPerBar) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (!draft || !Number.isFinite(n) || n < beatsPerBar) {
+          setDraft(String(beatsPerBar));
+          onCommit(beatsPerBar);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-6 w-12 px-1 text-center text-[11px] font-mono-chord"
     />
   );
 }
@@ -284,26 +316,43 @@ function PatternBlock({
           Block {blockIndex + 1}
         </span>
         <span className="text-xs text-muted-foreground">·</span>
-        <Select
-          value={String(totalBeats)}
-          onValueChange={(v) => {
-            const beats = Number(v);
-            if (!Number.isFinite(beats) || beats <= 0) return;
-            const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-            updatePattern(pattern.id, { bars });
-          }}
-        >
-          <SelectTrigger className="h-7 w-auto gap-1 px-2 text-[11px] text-muted-foreground border-0 bg-transparent shadow-none focus:ring-0">
-            <SelectValue>{formatBeats(usedBeats)} / {totalBeats} beats</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {[4, 8, 12, 16, 20, 24, 32, 48, 64].map((n) => (
-              <SelectItem key={n} value={String(n)} className="text-xs">
-                {n} beats
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="font-mono-chord">{formatBeats(usedBeats)} /</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
+              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+            }}
+            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+            disabled={pattern.bars <= 1}
+            aria-label="Decrease beats"
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          <BeatsInput
+            value={totalBeats}
+            beatsPerBar={pattern.beatsPerBar}
+            onCommit={(beats) => {
+              const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
+              updatePattern(pattern.id, { bars });
+            }}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = totalBeats + pattern.beatsPerBar;
+              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+            }}
+            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+            aria-label="Increase beats"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+        </div>
         <div className="ml-auto flex items-center gap-1">
           {sortedChords.length >= 2 && (
             <button
@@ -1020,57 +1069,6 @@ function SectionGroup({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={async () => {
-                    if (!section) return;
-                    const text = blocks
-                      .flatMap((b) => getPatternChordsViaSSOT(section, b))
-                      .map((c) => c.chord.display)
-                      .join(" ");
-                    if (!text) {
-                      toast({ title: "No chords to copy", description: "This section has no chords yet." });
-                      return;
-                    }
-                    try {
-                      await navigator.clipboard.writeText(text);
-                      toast({ title: "Chords copied to clipboard", description: text });
-                    } catch {
-                      toast({ title: "Copy failed", description: "Clipboard access was blocked.", variant: "destructive" });
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> Copy chords
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={async () => {
-                    const firstBlock = blocks[0];
-                    if (!firstBlock) return;
-                    let text = "";
-                    try {
-                      text = await navigator.clipboard.readText();
-                    } catch {
-                      toast({ title: "Paste failed", description: "Clipboard access was blocked.", variant: "destructive" });
-                      return;
-                    }
-                    const { clips, invalidTokens, totalTokens } = parseChordTextStrict(text);
-                    if (totalTokens === 0) {
-                      toast({ title: "Clipboard is empty" });
-                      return;
-                    }
-                    if (invalidTokens.length > 0) {
-                      toast({
-                        title: "Unparseable chord tokens",
-                        description: invalidTokens.join(", "),
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    replacePatternChords(firstBlock.id, clips.map((c) => c.chord));
-                    toast({ title: `Pasted ${clips.length} chord${clips.length === 1 ? "" : "s"}` });
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> Paste chords
-                </DropdownMenuItem>
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
                     onClick={() => setPendingKeyChange(true)}
@@ -1134,38 +1132,19 @@ function SectionGroup({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            {!sortMode && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground"
-                onClick={() => updateSection(sectionId, { collapsed: !collapsed })}
-                aria-label={collapsed ? "Expand section" : "Collapse section"}
-                title={collapsed ? "Expand section" : "Collapse section"}
-              >
-                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-            )}
           </div>
         )}
       </div>
 
-      {collapsed && section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0) && (
-        <div className="flex flex-wrap gap-1 px-3 pb-1">
-          {blocks.flatMap((b) =>
-            getPatternChordsViaSSOT(section, b).map((pc) => (
-              <ChordChip key={pc.id} chord={pc.chord} variant="ink" size="sm" audition={false} />
-            )),
-          )}
-        </div>
-      )}
+
 
       {/* Pattern blocks within this section. Pattern-block reordering is
           intentionally NOT exposed: the lyrics tab's chord row order is
           driven by the same SSOT, and re-arranging blocks here would
           desync the two surfaces. Blocks are now plain children. */}
-      {!collapsed && (
-        <>
+      <>
+
+
         {(() => {
           const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
           const maxBars = Math.max(1, ...blocks.map((b) => b.bars));
@@ -1283,7 +1262,8 @@ function SectionGroup({
           </div>
         )}
         </>
-      )}
+
+
 
       <Dialog
         open={customRenameOpen}
