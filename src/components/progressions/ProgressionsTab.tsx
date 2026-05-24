@@ -375,11 +375,14 @@ function PatternBlock({
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={() => { /* voice-leading UI deferred */ }}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
-            style={{ background: "var(--paper-shade)" }}
-            aria-label="Voice leading lines (coming soon)"
-            title="Voice leading (coming soon)"
+            onClick={(e) => {
+              e.stopPropagation();
+              setVoiceLinesOpen((v) => !v);
+            }}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors"
+            style={{ background: "var(--paper-shade)", color: voiceLinesOpen ? "var(--primary-strong)" : undefined }}
+            aria-label="Voice leading lines"
+            title="Voice leading lines"
           >
             <Activity className="h-4 w-4" />
           </button>
