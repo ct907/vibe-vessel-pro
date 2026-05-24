@@ -7,7 +7,7 @@ import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpicePanel } from "@/components/progressions/SpicePanel";
-import { PresetBrowser } from "@/components/progressions/PresetBrowser";
+
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
