@@ -17,7 +17,9 @@ export interface ProgressionPreset {
   degrees: PresetDegree[];
   featuredQualities?: Quality[];
   featureIndex?: number;
+  beatsPerChord?: number;
 }
+
 
 
 export const PROGRESSION_PRESETS: ProgressionPreset[] = [
