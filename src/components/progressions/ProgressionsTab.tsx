@@ -1073,17 +1073,9 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              onClick={() => { /* voice-leading UI deferred to next phase */ }}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Voice leading lines (coming soon)"
-              title="Voice leading (coming soon)"
-            >
-              <Activity className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => duplicateSection(sectionId)}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+              style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
               aria-label="Duplicate section"
               title="Duplicate section"
             >
@@ -1091,9 +1083,14 @@ function SectionGroup({
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <button
+                  type="button"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+                  style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
+                  aria-label="Section options"
+                >
                   <MoreVertical className="h-4 w-4" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {effectiveOffset === 0 && (
