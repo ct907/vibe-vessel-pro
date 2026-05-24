@@ -1069,57 +1069,6 @@ function SectionGroup({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={async () => {
-                    if (!section) return;
-                    const text = blocks
-                      .flatMap((b) => getPatternChordsViaSSOT(section, b))
-                      .map((c) => c.chord.display)
-                      .join(" ");
-                    if (!text) {
-                      toast({ title: "No chords to copy", description: "This section has no chords yet." });
-                      return;
-                    }
-                    try {
-                      await navigator.clipboard.writeText(text);
-                      toast({ title: "Chords copied to clipboard", description: text });
-                    } catch {
-                      toast({ title: "Copy failed", description: "Clipboard access was blocked.", variant: "destructive" });
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> Copy chords
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={async () => {
-                    const firstBlock = blocks[0];
-                    if (!firstBlock) return;
-                    let text = "";
-                    try {
-                      text = await navigator.clipboard.readText();
-                    } catch {
-                      toast({ title: "Paste failed", description: "Clipboard access was blocked.", variant: "destructive" });
-                      return;
-                    }
-                    const { clips, invalidTokens, totalTokens } = parseChordTextStrict(text);
-                    if (totalTokens === 0) {
-                      toast({ title: "Clipboard is empty" });
-                      return;
-                    }
-                    if (invalidTokens.length > 0) {
-                      toast({
-                        title: "Unparseable chord tokens",
-                        description: invalidTokens.join(", "),
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    replacePatternChords(firstBlock.id, clips.map((c) => c.chord));
-                    toast({ title: `Pasted ${clips.length} chord${clips.length === 1 ? "" : "s"}` });
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> Paste chords
-                </DropdownMenuItem>
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
                     onClick={() => setPendingKeyChange(true)}
