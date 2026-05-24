@@ -317,44 +317,70 @@ function PatternBlock({
           Block {blockIndex + 1}
         </span>
         <span className="text-xs text-muted-foreground">·</span>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <span className="font-mono-chord">{formatBeats(usedBeats)} /</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
-              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-            }}
-            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
-            disabled={pattern.bars <= 1}
-            aria-label="Decrease beats"
-          >
-            <Minus className="h-3 w-3" />
-          </button>
-          <BeatsInput
-            value={totalBeats}
-            beatsPerBar={pattern.beatsPerBar}
-            onCommit={(beats) => {
-              const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-              updatePattern(pattern.id, { bars });
-            }}
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = totalBeats + pattern.beatsPerBar;
-              updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-            }}
-            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
-            aria-label="Increase beats"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-          <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-3 py-0.5 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full"
+              style={{ background: "var(--paper-shade)" }}
+              aria-label="Edit beats"
+            >
+              <span className="font-mono-chord">{formatBeats(usedBeats)}/{totalBeats}</span>
+              <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+              <ChevronDown className="h-3 w-3 opacity-70" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-2">
+            <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
+                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                }}
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+                disabled={pattern.bars <= 1}
+                aria-label="Decrease beats"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <BeatsInput
+                value={totalBeats}
+                beatsPerBar={pattern.beatsPerBar}
+                onCommit={(beats) => {
+                  const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
+                  updatePattern(pattern.id, { bars });
+                }}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = totalBeats + pattern.beatsPerBar;
+                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                }}
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                aria-label="Increase beats"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => { /* voice-leading UI deferred */ }}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            style={{ background: "var(--paper-shade)" }}
+            aria-label="Voice leading lines (coming soon)"
+            title="Voice leading (coming soon)"
+          >
+            <Activity className="h-4 w-4" />
+          </button>
           {sortedChords.length >= 2 && (
             <button
               type="button"
@@ -364,8 +390,8 @@ function PatternBlock({
                 setSpiceOpen(next);
                 if (!next) setPreviewingSpiceChords(null);
               }}
-              className="inline-flex items-center gap-1 h-8 px-2 rounded-md font-display text-sm hover:bg-accent transition-colors"
-              style={{ color: spiceOpen ? "var(--primary-strong)" : undefined }}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors"
+              style={{ background: "var(--paper-shade)", color: spiceOpen ? "var(--primary-strong)" : undefined }}
               aria-label="Add spice"
               title="Add spice"
             >
