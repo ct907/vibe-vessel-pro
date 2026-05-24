@@ -10,6 +10,7 @@ import { getChordColorClasses } from "@/lib/music/chordColor";
 import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
 import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
 import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
+import { getChordProgressionSuggestions } from "@/lib/music/suggestions";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
