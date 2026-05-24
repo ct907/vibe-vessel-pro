@@ -1116,6 +1116,14 @@ function SectionGroup({
                   </button>
                 </div>
                 <DropdownMenuSeparator />
+                {blocks.length > 1 && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onRequestDeleteBlock(blocks[blocks.length - 1].id)}
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete last block
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => onRequestDeleteSection(sectionId)}
