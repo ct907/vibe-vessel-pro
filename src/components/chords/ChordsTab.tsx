@@ -347,7 +347,6 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                           chord={c}
                           variant="ink"
                           octave={octave}
-                          onClick={() => addChordToSong(c)}
                         />
                       ))}
                     </div>
