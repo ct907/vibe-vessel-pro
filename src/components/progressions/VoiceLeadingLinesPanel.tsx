@@ -153,6 +153,7 @@ export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
       aria-hidden={!isVisible}
     >
       <div
+        ref={containerRef}
         className="relative rounded-lg"
         style={{
           background: "var(--paper-shade-soft, var(--paper-shade))",
@@ -166,52 +167,51 @@ export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
         >
           Voice Leading Lines
         </div>
-        <svg
-          width="100%"
-          height={height}
-          viewBox={`0 0 ${Math.max(n, 1) * 100} ${height}`}
-          preserveAspectRatio="none"
-          style={{ display: "block" }}
-        >
-          {/* Lines per voice */}
-          {[0, 1, 2, 3].map((vi) => {
-            const segs: JSX.Element[] = [];
-            for (let i = 0; i < n - 1; i++) {
-              const a = cols[i][vi];
-              const b = cols[i + 1][vi];
-              if (!a || !b) continue;
-              const smooth = Math.abs(b.midi - a.midi) <= 2;
-              const x1 = i * 100 + 50;
-              const x2 = (i + 1) * 100 + 50;
-              segs.push(
-                <line
-                  key={`${vi}-${i}`}
-                  x1={x1}
-                  y1={a.y}
-                  x2={x2}
-                  y2={b.y}
-                  stroke={VOICE_COLORS[vi]}
-                  strokeWidth={smooth ? 3 : 1.2}
-                  strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke"
-                />,
-              );
-            }
-            return <g key={vi}>{segs}</g>;
-          })}
-          {/* Markers */}
-          {cols.map((col, i) =>
-            col.map((n2, vi) => (
-              <Marker
-                key={`m-${i}-${vi}`}
-                x={i * 100 + 50}
-                y={n2.y}
-                voiceIdx={vi}
-                label={n2.label}
-              />
-            )),
-          )}
-        </svg>
+        {width > 0 && (() => {
+          const colX = Array.from({ length: n }, (_, i) => (i + 0.5) * (width / n));
+          return (
+            <svg
+              width={width}
+              height={height}
+              viewBox={`0 0 ${width} ${height}`}
+              style={{ display: "block" }}
+            >
+              {[0, 1, 2, 3].map((vi) => {
+                const segs: JSX.Element[] = [];
+                for (let i = 0; i < n - 1; i++) {
+                  const a = cols[i][vi];
+                  const b = cols[i + 1][vi];
+                  if (!a || !b) continue;
+                  const smooth = Math.abs(b.midi - a.midi) <= 2;
+                  segs.push(
+                    <line
+                      key={`${vi}-${i}`}
+                      x1={colX[i]}
+                      y1={a.y}
+                      x2={colX[i + 1]}
+                      y2={b.y}
+                      stroke={VOICE_COLORS[vi]}
+                      strokeWidth={smooth ? 3 : 1.2}
+                      strokeLinecap="round"
+                    />,
+                  );
+                }
+                return <g key={vi}>{segs}</g>;
+              })}
+              {cols.map((col, i) =>
+                col.map((n2, vi) => (
+                  <Marker
+                    key={`m-${i}-${vi}`}
+                    x={colX[i]}
+                    y={n2.y}
+                    voiceIdx={vi}
+                    label={n2.label}
+                  />
+                )),
+              )}
+            </svg>
+          );
+        })()}
       </div>
     </div>
   );
