@@ -68,6 +68,7 @@ function Marker({
 export function VoiceLeadingOverlay({ originalChords, spicedChords, isVisible }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
+  const [focus, setFocus] = useState<"original" | "spiced">("spiced");
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -77,6 +78,7 @@ export function VoiceLeadingOverlay({ originalChords, spicedChords, isVisible }:
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
 
   const layout = useMemo(() => {
     if (originalChords.length === 0 && spicedChords.length === 0) return null;
