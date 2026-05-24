@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Music, Play, Square } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, realizePresetAnchored, type ProgressionPreset } from "@/lib/music/presets";
+import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
 import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
 import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { getChordProgressionSuggestions } from "@/lib/music/suggestions";
@@ -34,13 +34,6 @@ interface ChordsTabProps {
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
 }
 
-function applyFamilyQuality(c: ChordSymbol, tapped: ChordSymbol): ChordSymbol {
-  if (rootToPc(c.root) === rootToPc(tapped.root)) return tapped;
-  if (QUALITY_FAMILY[c.quality] === QUALITY_FAMILY[tapped.quality]) {
-    return { ...c, quality: tapped.quality, display: c.root + QUALITY_PRETTY[tapped.quality] };
-  }
-  return c;
-}
 
 export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const { theme } = useTheme();
@@ -107,33 +100,46 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     const matches: Array<{ preset: ProgressionPreset; chords: ChordSymbol[]; hitIndex: number }> = [];
     const usedIds = new Set<string>();
 
+    const chordPc = rootToPc(detailChord.root);
+    const keyPc = rootToPc(meta.keyRoot);
+    const targetInterval = (chordPc - keyPc + 12) % 12;
+    const detailFamily = QUALITY_FAMILY[detailChord.quality];
+
+    const swapAt = (chords: ChordSymbol[], i: number): ChordSymbol[] =>
+      chords.map((c, idx) =>
+        idx === i
+          ? { ...c, quality: detailChord.quality, display: c.root + QUALITY_PRETTY[detailChord.quality] }
+          : c,
+      );
+
     for (const preset of QUALITY_PROGRESSION_PRESETS) {
       if (!preset.featuredQualities?.includes(detailChord.quality)) continue;
-      const anchorIndex = preset.featureIndex ?? preset.degrees.findIndex((d) => d.quality === detailChord.quality);
-      if (anchorIndex < 0) continue;
-      const chords = realizePresetAnchored(preset, detailChord.root, anchorIndex);
-      matches.push({ preset, chords, hitIndex: anchorIndex });
+      const featIdx = preset.featureIndex ?? preset.degrees.findIndex((d) => d.quality === detailChord.quality);
+      if (featIdx < 0) continue;
+      const slot = preset.degrees[featIdx];
+      if (slot.interval !== targetInterval) continue;
+      if (QUALITY_FAMILY[slot.quality] !== detailFamily) continue;
+      const chords = swapAt(realizePreset(preset, meta.keyRoot, meta.keyMode), featIdx);
+      matches.push({ preset, chords, hitIndex: featIdx });
       usedIds.add(preset.id);
       if (matches.length >= 3) break;
     }
 
     if (matches.length < 3) {
-      const chordPc = rootToPc(detailChord.root);
-      const keyPc = rootToPc(meta.keyRoot);
-      const targetInterval = (chordPc - keyPc + 12) % 12;
       for (const preset of PROGRESSION_PRESETS) {
         if (usedIds.has(preset.id)) continue;
-        const hitIndex = preset.degrees.findIndex((d) => d.interval === targetInterval);
-        if (hitIndex < 0) continue;
-        const chords = realizePreset(preset, meta.keyRoot, meta.keyMode).map((c) =>
-          applyFamilyQuality(c, detailChord),
+        const hitIndex = preset.degrees.findIndex(
+          (d) => d.interval === targetInterval && QUALITY_FAMILY[d.quality] === detailFamily,
         );
+        if (hitIndex < 0) continue;
+        const chords = swapAt(realizePreset(preset, meta.keyRoot, meta.keyMode), hitIndex);
         matches.push({ preset, chords, hitIndex });
         if (matches.length >= 3) break;
       }
     }
     return matches;
   }, [detailChord, meta.keyRoot, meta.keyMode]);
+
 
 
 
@@ -151,13 +157,15 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     }
     stopProgression();
     await ensureAudio();
-    const events = chords.map((c, i) => ({ chord: c, startBeat: i * 2, lengthBeats: 2 }));
+    const beats = preset.beatsPerChord ?? 2;
+    const events = chords.map((c, i) => ({ chord: c, startBeat: i * beats, lengthBeats: beats }));
     setPlayingPresetId(preset.id);
     await playProgression(events, meta.bpm, {
-      loopBeats: events.length * 2,
+      loopBeats: events.length * beats,
       onEnd: () => setPlayingPresetId((id) => (id === preset.id ? null : id)),
     });
   };
+
 
   const findFirstAvailablePattern = () => {
     for (const p of progression) {

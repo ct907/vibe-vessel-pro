@@ -17,7 +17,9 @@ export interface ProgressionPreset {
   degrees: PresetDegree[];
   featuredQualities?: Quality[];
   featureIndex?: number;
+  beatsPerChord?: number;
 }
+
 
 
 export const PROGRESSION_PRESETS: ProgressionPreset[] = [
@@ -155,7 +157,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Smoky & Suspenseful",
     featuredQualities: ["minMaj7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
       { interval: 5, quality: "min", romanNumeral: "iv" },
       { interval: 0, quality: "min", romanNumeral: "i" },
@@ -307,7 +311,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Bossa Nova Drift",
     featuredQualities: ["maj7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "maj7", romanNumeral: "Imaj7" },
       { interval: 5, quality: "maj7", romanNumeral: "IVmaj7" },
     ],
@@ -320,7 +326,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Dorian Groove",
     featuredQualities: ["min7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "min7", romanNumeral: "i7" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
       { interval: 5, quality: "maj", romanNumeral: "IV" },
