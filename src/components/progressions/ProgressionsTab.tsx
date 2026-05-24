@@ -43,6 +43,8 @@ import {
   Pencil,
   MessageSquare,
   KeyRound,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -149,6 +151,7 @@ function PatternBlock({
   } = useSongStore();
   
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
+  const [spiceOpen, setSpiceOpen] = useState(false);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -269,7 +272,7 @@ function PatternBlock({
     <div
       ref={blockRef}
       data-pattern-block={pattern.id}
-      className={cn("rounded-lg p-3 transition-shadow", extendBackground && "pr-[15%]")}
+      className={cn("rounded-lg p-3 transition-shadow")}
       style={{
         background: "var(--paper-card)",
         boxShadow:
@@ -281,31 +284,45 @@ function PatternBlock({
           Block {blockIndex + 1}
         </span>
         <span className="text-xs text-muted-foreground">·</span>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          Bars
-          <BarsInput
-            value={pattern.bars}
-            onCommit={(n) => updatePattern(pattern.id, { bars: Math.max(1, Math.min(32, n)) })}
-          />
-        </div>
-        <span className="text-[11px] text-muted-foreground">
-          {formatBeats(usedBeats)} / {totalBeats} beats
-        </span>
-        {/* Per-block pencil removed — section pencil in SectionGroup
-            header now toggles edit mode for every block in the section. */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 ml-auto text-muted-foreground hover:text-destructive disabled:opacity-30"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRequestDeleteBlock(pattern.id);
+        <Select
+          value={String(totalBeats)}
+          onValueChange={(v) => {
+            const beats = Number(v);
+            if (!Number.isFinite(beats) || beats <= 0) return;
+            const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
+            updatePattern(pattern.id, { bars });
           }}
-          disabled={!canDeleteThisBlock}
-          title={canDeleteThisBlock ? "Delete pattern block" : "Cannot delete the last remaining block in the song"}
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <SelectTrigger className="h-7 w-auto gap-1 px-2 text-[11px] text-muted-foreground border-0 bg-transparent shadow-none focus:ring-0">
+            <SelectValue>{formatBeats(usedBeats)} / {totalBeats} beats</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {[4, 8, 12, 16, 20, 24, 32, 48, 64].map((n) => (
+              <SelectItem key={n} value={String(n)} className="text-xs">
+                {n} beats
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex items-center gap-1">
+          {sortedChords.length >= 2 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const next = !spiceOpen;
+                setSpiceOpen(next);
+                if (!next) setPreviewingSpiceChords(null);
+              }}
+              className="inline-flex items-center gap-1 h-8 px-2 rounded-md font-display text-sm hover:bg-accent transition-colors"
+              style={{ color: spiceOpen ? "var(--primary-strong)" : undefined }}
+              aria-label="Add spice"
+              title="Add spice"
+            >
+              <Sparkles className="h-4 w-4" style={{ color: "var(--primary)" }} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Toolbar moved below the pattern grid (#7). */}
@@ -792,6 +809,9 @@ function PatternBlock({
         pattern={pattern}
         activeChordId={activeChordId}
         onAuditionChange={setPreviewingSpiceChords}
+        open={spiceOpen}
+        onOpenChange={setSpiceOpen}
+        hideTrigger
       />
 
     </div>
@@ -977,15 +997,21 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setCommentOpen((o) => !o)}
-              className="relative h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label={hasComment ? "View comment" : "Add comment"}
+              onClick={() => { /* voice-leading UI deferred to next phase */ }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Voice leading lines (coming soon)"
+              title="Voice leading (coming soon)"
             >
-              <Plus className="h-3 w-3 absolute top-1.5 left-1.5" />
-              <MessageSquare className="h-3.5 w-3.5" />
-              {hasComment && (
-                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
+              <Activity className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => duplicateSection(sectionId)}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Duplicate section"
+              title="Duplicate section"
+            >
+              <Copy className="h-4 w-4" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -994,9 +1020,6 @@ function SectionGroup({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
-                  <Copy className="h-4 w-4" /> Duplicate
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
                     if (!section) return;
@@ -1093,6 +1116,14 @@ function SectionGroup({
                   </button>
                 </div>
                 <DropdownMenuSeparator />
+                {blocks.length > 1 && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onRequestDeleteBlock(blocks[blocks.length - 1].id)}
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete last block
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => onRequestDeleteSection(sectionId)}
@@ -1136,7 +1167,9 @@ function SectionGroup({
       {!collapsed && (
         <>
         {(() => {
-          const renderBlock = (p: PatternBlockType, i: number, extendBackground = false) => {
+          const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
+          const maxBars = Math.max(1, ...blocks.map((b) => b.bars));
+          const renderBlock = (p: PatternBlockType, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
               .map((q) => {
@@ -1151,54 +1184,91 @@ function SectionGroup({
                   label: `${sectionName}: Block ${blockNum}`,
                 };
               });
+            const widthPct = (p.bars / maxBars) * 100;
             return (
-              <PatternBlock
-                key={p.id}
-                pattern={p}
-                blockIndex={i}
-                blocksInSection={blocks.length}
-                otherPatterns={otherAll}
-                onPickerOpen={onPickerOpen}
-                onRequestDeleteBlock={onRequestDeleteBlock}
-                onEditChordOpen={onEditChordOpen}
-                activeChordId={activeChordId}
-                onSetActiveChordId={onSetActiveChordId}
-                multiSelected={multiSelected}
-                onToggleMultiSelected={onToggleMultiSelected}
-                onClearMultiSelected={onClearMultiSelected}
-                effectiveOffset={effectiveOffset}
-                extendBackground={extendBackground}
-              />
+              <div key={p.id} className="min-w-0" style={{ width: `${widthPct}%` }}>
+                <PatternBlock
+                  pattern={p}
+                  blockIndex={i}
+                  blocksInSection={blocks.length}
+                  otherPatterns={otherAll}
+                  onPickerOpen={onPickerOpen}
+                  onRequestDeleteBlock={onRequestDeleteBlock}
+                  onEditChordOpen={onEditChordOpen}
+                  activeChordId={activeChordId}
+                  onSetActiveChordId={onSetActiveChordId}
+                  multiSelected={multiSelected}
+                  onToggleMultiSelected={onToggleMultiSelected}
+                  onClearMultiSelected={onClearMultiSelected}
+                  effectiveOffset={effectiveOffset}
+                />
+              </div>
             );
           };
-          const addButton = (
+          const addChordsPlaceholder = (
             <button
               type="button"
-              onClick={() => addPatternToSection(sectionId)}
-              className="w-full h-full rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[50px] md:min-h-[100px] transition-colors"
+              onClick={() => {
+                let firstBlock = blocks[0];
+                if (!firstBlock) {
+                  addPatternToSection(sectionId);
+                  const fresh = useSongStore.getState().progression.filter(
+                    (p) => (p.sectionId ?? p.id) === sectionId,
+                  );
+                  firstBlock = fresh[0];
+                }
+                if (firstBlock) onPickerOpen(firstBlock.id, 0);
+              }}
+              className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
             >
-              <Plus className="h-6 w-6 md:h-16 md:w-16" strokeWidth={2} />
+              <Plus className="h-4 w-4" />
+              <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
             </button>
           );
-          return isMobile ? (
-            <div className="flex flex-col gap-3">
-              {blocks.length === 0 && <div className="flex">{addButton}</div>}
-              {blocks.map((p, i) => {
-                const isLast = i === blocks.length - 1;
-                return isLast ? (
-                  <div key={p.id} className="flex items-stretch gap-2">
-                    <div className="basis-[85%] shrink-0 min-w-0">{renderBlock(p, i)}</div>
-                    <div className="flex-1 min-w-0">{addButton}</div>
-                  </div>
-                ) : (
-                  <div key={p.id} className="w-full min-w-0">{renderBlock(p, i, true)}</div>
-                );
-              })}
+          const addBlockRow = (
+            <div className="flex items-stretch gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => addPatternToSection(sectionId)}
+                className="flex-1 rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-xs font-display uppercase tracking-wide">Add block</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommentOpen((o) => !o)}
+                className="relative h-10 w-10 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label={hasComment ? "View comment" : "Add comment"}
+                title={hasComment ? "View comment" : "Add comment"}
+              >
+                <MessageSquare className="h-4 w-4" />
+                {hasComment && (
+                  <span aria-hidden className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {blocks.map((p, i) => renderBlock(p, i))}
-              {addButton}
+          );
+          if (!sectionHasChords) {
+            return (
+              <div>
+                {addChordsPlaceholder}
+                {addBlockRow}
+              </div>
+            );
+          }
+          return (
+            <div>
+              {isMobile ? (
+                <div className="flex flex-col gap-3">
+                  {blocks.map((p, i) => renderBlock(p, i))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {blocks.map((p, i) => renderBlock(p, i))}
+                </div>
+              )}
+              {addBlockRow}
             </div>
           );
         })()}
