@@ -983,8 +983,8 @@ function SectionGroup({
     >
       {/* Section header */}
       <div
-        className="flex items-center gap-2 px-3 h-12 rounded-full"
-        style={{ background: "var(--pill-rest-bg)", color: "var(--pill-rest-fg)" }}
+        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4]"
+        style={{ color: "var(--pill-rest-fg)" }}
       >
         <Select
           value={section?.type ?? "verse"}
@@ -1077,8 +1077,7 @@ function SectionGroup({
             <button
               type="button"
               onClick={() => duplicateSection(sectionId)}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
-              style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
               aria-label="Duplicate section"
               title="Duplicate section"
             >
@@ -1088,8 +1087,7 @@ function SectionGroup({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
-                  style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
                   aria-label="Section options"
                 >
                   <MoreVertical className="h-4 w-4" />
