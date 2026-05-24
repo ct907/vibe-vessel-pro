@@ -426,6 +426,8 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           )}
         </SheetContent>
       </Sheet>
+      <WhyThisChordSheet />
     </div>
   );
 }
+
