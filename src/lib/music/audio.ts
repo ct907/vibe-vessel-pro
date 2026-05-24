@@ -461,10 +461,16 @@ function tick() {
       const arp = useSoundStore.getState().arp;
       const armed = ev.sectionId ? sectionArpArmed(ev.sectionId) : true;
       const useArpPath = armed;
-      if (useArpPath) {
-        spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec, triplet);
-      } else {
-        spawnChord(ev.chord, safeStart, safeStart + durSec, octave);
+      // Per-event try/catch so a single malformed chord doesn't wedge the
+      // scheduler on the same index forever (silently dropping audio).
+      try {
+        if (useArpPath) {
+          spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec, triplet);
+        } else {
+          spawnChord(ev.chord, safeStart, safeStart + durSec, octave);
+        }
+      } catch (err) {
+        console.error("[audio] failed to spawn chord", ev.chord, err);
       }
       if (schedOnChordStart) {
         const idx = schedNextIdx;
@@ -491,9 +497,12 @@ function tick() {
         window.setTimeout(() => cb(), delayMs);
       }
     }
-  } catch { /* audio glitch acceptable; scheduler must survive */ }
+  } catch (err) {
+    console.error("[audio] scheduler tick failed", err);
+  }
   schedulerTimerId = window.setTimeout(tick, LOOKAHEAD_MS);
 }
+
 
 export async function playProgression(
   events: ScheduledChord[],
@@ -525,8 +534,20 @@ export function stopProgression() {
   clearScheduler();
   const ctx = getAudioContext();
   const t = Math.max(0, ctx.currentTime);
-  for (const v of liveVoices) { try { v.release(t); } catch { /* noop */ } }
+  for (const v of liveVoices) {
+    try { v.release(t); } catch { /* noop */ }
+  }
+  // Dispose the released voices shortly after their tails finish so the
+  // liveVoices array doesn't grow unboundedly across stop/play cycles. Stale
+  // refs were never harmful by themselves, but they push reapVoices() past
+  // MAX_VOICES headroom on long sessions, which then steals voices we just
+  // scheduled and leaves the chord output silent.
+  const toDispose = liveVoices.splice(0, liveVoices.length);
+  setTimeout(() => {
+    for (const v of toDispose) { try { v.dispose(); } catch { /* noop */ } }
+  }, 250);
 }
+
 
 /**
  * Swap the live schedule with a fresh event array without restarting playback.
