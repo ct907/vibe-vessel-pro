@@ -45,6 +45,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const [octave, setOctave] = useState<number>(4);
   const [detailChord, setDetailChord] = useState<ChordSymbol | null>(null);
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
+  const [playingStep, setPlayingStep] = useState<number | null>(null);
 
   const grid = useMemo(() => {
     return ladder.map((deg) => {
@@ -146,6 +147,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const closeDetail = () => {
     stopProgression();
     setPlayingPresetId(null);
+    setPlayingStep(null);
     setDetailChord(null);
   };
 
@@ -153,6 +155,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     if (playingPresetId === preset.id) {
       stopProgression();
       setPlayingPresetId(null);
+      setPlayingStep(null);
       return;
     }
     stopProgression();
@@ -160,9 +163,14 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     const beats = preset.beatsPerChord ?? 2;
     const events = chords.map((c, i) => ({ chord: c, startBeat: i * beats, lengthBeats: beats }));
     setPlayingPresetId(preset.id);
+    setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: events.length * beats,
-      onEnd: () => setPlayingPresetId((id) => (id === preset.id ? null : id)),
+      onChordStart: (idx) => setPlayingStep(idx),
+      onEnd: () => {
+        setPlayingPresetId((id) => (id === preset.id ? null : id));
+        setPlayingStep(null);
+      },
     });
   };
 
@@ -347,7 +355,6 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                           chord={c}
                           variant="ink"
                           octave={octave}
-                          onClick={() => addChordToSong(c)}
                         />
                       ))}
                     </div>
@@ -372,14 +379,21 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                           </div>
                           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{preset.tag}</div>
                           <div className="flex flex-wrap gap-1.5 mb-2">
-                            {chords.map((c, i) => (
-                              <span
-                                key={i}
-                                className={cn("rounded", i === hitIndex && "ring-2 ring-primary")}
-                              >
-                                <ChordChip chord={c} variant="ink" size="sm" audition={false} />
-                              </span>
-                            ))}
+                            {chords.map((c, i) => {
+                              const isPlayhead = isPlaying && i === playingStep;
+                              return (
+                                <span
+                                  key={i}
+                                  className={cn(
+                                    "rounded transition-shadow",
+                                    i === hitIndex && "ring-2 ring-primary",
+                                    isPlayhead && "ring-2 ring-primary shadow-[0_0_0_3px_var(--primary-halo)]",
+                                  )}
+                                >
+                                  <ChordChip chord={c} variant="ink" size="sm" audition={false} />
+                                </span>
+                              );
+                            })}
                           </div>
                           <div className="flex gap-2">
                             <button

@@ -49,6 +49,7 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
   const sectionLabel = ownerSection ? getSectionDisplayName(sections, sectionId) : "Section";
 
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [playingStep, setPlayingStep] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpiceCategory | "all">("all");
   const [overlayOpenIds, setOverlayOpenIds] = useState<Set<string>>(new Set());
 
@@ -89,8 +90,10 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
   const stopPreview = () => {
     stopProgression();
     setPlayingId(null);
+    setPlayingStep(null);
     onAuditionChange?.(null);
   };
+
 
   const octaveFor = (i: number): number => {
     for (let k = Math.min(i, sortedChords.length - 1); k >= 0; k--) {
@@ -114,14 +117,18 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
       return ev;
     });
     setPlayingId(s.id);
+    setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: cursor,
+      onChordStart: (idx) => setPlayingStep(idx),
       onEnd: () => {
         setPlayingId((id) => (id === s.id ? null : id));
+        setPlayingStep(null);
         onAuditionChange?.(null);
       },
     });
   };
+
 
   const commitSuggestion = (s: SpiceSuggestion) => {
     const previousChords = sortedChords.map((c) => c.chord);
@@ -202,11 +209,23 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-display text-foreground truncate">
               {s.theoryLabel}
-              {s.frictionDelta !== 0 && (
-                <span className="text-muted-foreground ml-2 text-[10px]">
-                  · friction {s.frictionDelta > 0 ? "+" : ""}{s.frictionDelta.toFixed(1)}
-                </span>
-              )}
+              {(() => {
+                const d = s.frictionDelta;
+                let label = "";
+                if (d <= -1.5) label = "Smoother voice leading";
+                else if (d <= -0.4) label = "A bit smoother";
+                else if (d >= 1.5) label = "Bolder, more movement";
+                else if (d >= 0.4) label = "A bit edgier";
+                else return null;
+                return (
+                  <span
+                    className="text-muted-foreground ml-2 text-[10px]"
+                    title="How smoothly the notes move between chords"
+                  >
+                    · {label}
+                  </span>
+                );
+              })()}
             </p>
           </div>
           <button
@@ -223,18 +242,23 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {s.chords.map((c, i) => (
-            <span
-              key={`${s.id}-${i}`}
-              className={cn(
-                "rounded",
-                s.changedIndices.includes(i) && "ring-1 ring-primary/60",
-              )}
-            >
-              <ChordChip chord={c as ChordSymbol} variant="ink" size="sm" />
-            </span>
-          ))}
-          <div className="ml-auto flex items-center gap-1.5">
+          {s.chords.map((c, i) => {
+            const isPlayhead = isPlaying && i === playingStep;
+            return (
+              <span
+                key={`${s.id}-${i}`}
+                className={cn(
+                  "rounded transition-shadow",
+                  s.changedIndices.includes(i) && "ring-1 ring-primary/60",
+                  isPlayhead && "ring-2 ring-primary shadow-[0_0_0_3px_var(--primary-halo)]",
+                )}
+              >
+                <ChordChip chord={c as ChordSymbol} variant="ink" size="sm" />
+              </span>
+            );
+          })}
+          <div className="ml-auto flex items-center gap-6">
+
             <Button
               size="icon"
               variant={isPlaying ? "secondary" : "outline"}
