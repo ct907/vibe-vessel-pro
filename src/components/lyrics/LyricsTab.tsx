@@ -842,6 +842,15 @@ function SectionCard({
                 />
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => duplicateSection(section.id)}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Duplicate section"
+              title="Duplicate section"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="icon" variant="ghost" className="h-7 w-7">
