@@ -158,6 +158,17 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
+  const handlePresetUse = (chords: ChordSymbol[]) => {
+    if (chords.length === 0) return;
+    const stamped = chords.map((c) => ({ ...toStorage(c), octave }));
+    if (onPickBatch) {
+      onPickBatch(stamped);
+    } else {
+      [...stamped].reverse().forEach((c) => onPick(c));
+    }
+    onOpenChange(false);
+  };
+
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
   const SHEET_CHROME = isMobile ? 160 : 200;
