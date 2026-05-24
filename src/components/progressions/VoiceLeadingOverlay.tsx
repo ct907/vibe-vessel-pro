@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chordToMidi, NOTES_SHARP, type ChordSymbol } from "@/lib/music/chords";
+import { cn } from "@/lib/utils";
+
 
 interface Props {
   originalChords: ChordSymbol[];
