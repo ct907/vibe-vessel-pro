@@ -89,6 +89,18 @@ function Marker({ x, y, voiceIdx, label }: { x: number; y: number; voiceIdx: num
 }
 
 export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const layout = useMemo(() => {
     if (chords.length === 0) return null;
     const voicings = chords.map(voicesTopDown);
