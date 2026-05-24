@@ -60,6 +60,7 @@ import { toast } from "@/hooks/use-toast";
 
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
+import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -533,7 +534,7 @@ function PatternBlock({
                                       return;
                                     }
                                     onSetActiveChordId(null);
-                                    onEditChordOpen(pattern.id, c.id);
+                                    useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
                                   }, 500);
                                 }}
                                 onPointerUp={() => {
@@ -560,7 +561,7 @@ function PatternBlock({
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
                                   if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
                                   onSetActiveChordId(null);
-                                  onEditChordOpen(pattern.id, c.id);
+                                  useUIStore.getState().setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id });
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
@@ -1901,6 +1902,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           if (id) removePatternBlock(id);
         }}
       />
+      <WhyThisChordSheet />
     </div>
   );
 }

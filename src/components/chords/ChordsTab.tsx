@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSongStore } from "@/store/song";
+import { useUIStore } from "@/store/ui";
+import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { ChordSymbol, Quality, nashvilleLadder, parseChord, isMinorMode, COMMON_QUALITIES, rootToPc, QUALITY_FAMILY, QUALITY_PRETTY } from "@/lib/music/chords";
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -40,12 +42,14 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
   const meta = useSongStore((s) => s.meta);
   const progression = useSongStore((s) => s.progression);
   const addChordToPattern = useSongStore((s) => s.addChordToPattern);
+  const setWhyChord = useUIStore((s) => s.setWhyChord);
   const ladder = useMemo(() => nashvilleLadder(meta.keyRoot, meta.keyMode), [meta.keyRoot, meta.keyMode]);
   const [numeralFilter, setNumeralFilter] = useState<Set<string>>(new Set());
   const [octave, setOctave] = useState<number>(4);
   const [detailChord, setDetailChord] = useState<ChordSymbol | null>(null);
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
   const [playingStep, setPlayingStep] = useState<number | null>(null);
+
 
   const grid = useMemo(() => {
     return ladder.map((deg) => {
@@ -262,7 +266,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                 }}
               >
                 <div className="font-mono-chord" style={{ fontSize: "1.18rem", color: labelColor }}>{d.numeral}</div>
-                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} audition={false} onClick={() => setDetailChord(d.chord)} />
+                <ChordChip chord={d.chord} variant="ink" size="sm" octave={octave} audition={false} onClick={() => setWhyChord({ chord: d.chord })} />
               </button>
             );
           })}
@@ -305,7 +309,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
             <div className="flex flex-wrap gap-2">
               {row.variants.map((c) => (
                 <div key={c.display} className="group relative flex items-center rounded-md px-2 py-1.5">
-                  <ChordChip chord={c} variant="ink" octave={octave} onClick={() => setDetailChord(c)} />
+                  <ChordChip chord={c} variant="ink" octave={octave} onClick={() => setWhyChord({ chord: c })} />
                 </div>
               ))}
             </div>
@@ -422,6 +426,8 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
           )}
         </SheetContent>
       </Sheet>
+      <WhyThisChordSheet />
     </div>
   );
 }
+
