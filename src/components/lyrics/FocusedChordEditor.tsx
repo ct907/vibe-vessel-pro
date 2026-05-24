@@ -7,6 +7,7 @@ import {
   useSongStore,
   getSectionDisplayName,
   getLineChordsViaSSOT,
+  getPatternChordsViaSSOT,
   CHORD_ROW_SLOTS,
   type LyricLine,
 } from "@/store/song";
