@@ -461,10 +461,16 @@ function tick() {
       const arp = useSoundStore.getState().arp;
       const armed = ev.sectionId ? sectionArpArmed(ev.sectionId) : true;
       const useArpPath = armed;
-      if (useArpPath) {
-        spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec, triplet);
-      } else {
-        spawnChord(ev.chord, safeStart, safeStart + durSec, octave);
+      // Per-event try/catch so a single malformed chord doesn't wedge the
+      // scheduler on the same index forever (silently dropping audio).
+      try {
+        if (useArpPath) {
+          spawnArpForEvent(ev.chord, safeStart, durSec, octave, arp, beatSec, triplet);
+        } else {
+          spawnChord(ev.chord, safeStart, safeStart + durSec, octave);
+        }
+      } catch (err) {
+        console.error("[audio] failed to spawn chord", ev.chord, err);
       }
       if (schedOnChordStart) {
         const idx = schedNextIdx;
@@ -491,9 +497,12 @@ function tick() {
         window.setTimeout(() => cb(), delayMs);
       }
     }
-  } catch { /* audio glitch acceptable; scheduler must survive */ }
+  } catch (err) {
+    console.error("[audio] scheduler tick failed", err);
+  }
   schedulerTimerId = window.setTimeout(tick, LOOKAHEAD_MS);
 }
+
 
 export async function playProgression(
   events: ScheduledChord[],
