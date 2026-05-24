@@ -408,7 +408,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
         startAt: startAt + attack,
       });
     }
-    console.log("[play-debug] loopBeats=", built.loopBeats, "events=", built.events.map(e => ({sid: e.sectionId, start: e.startBeat, len: e.lengthBeats, chord: e.chord.root + (e.chord.quality ?? "")})));
     await playProgression(built.events, meta.bpm, {
       onChordStart: (idx) => {
         const m = playMetaRef.current;
