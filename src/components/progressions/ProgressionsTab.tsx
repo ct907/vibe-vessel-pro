@@ -809,6 +809,9 @@ function PatternBlock({
         pattern={pattern}
         activeChordId={activeChordId}
         onAuditionChange={setPreviewingSpiceChords}
+        open={spiceOpen}
+        onOpenChange={setSpiceOpen}
+        hideTrigger
       />
 
     </div>
