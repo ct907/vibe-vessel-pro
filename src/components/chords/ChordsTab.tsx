@@ -164,13 +164,15 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     }
     stopProgression();
     await ensureAudio();
-    const events = chords.map((c, i) => ({ chord: c, startBeat: i * 2, lengthBeats: 2 }));
+    const beats = preset.beatsPerChord ?? 2;
+    const events = chords.map((c, i) => ({ chord: c, startBeat: i * beats, lengthBeats: beats }));
     setPlayingPresetId(preset.id);
     await playProgression(events, meta.bpm, {
-      loopBeats: events.length * 2,
+      loopBeats: events.length * beats,
       onEnd: () => setPlayingPresetId((id) => (id === preset.id ? null : id)),
     });
   };
+
 
   const findFirstAvailablePattern = () => {
     for (const p of progression) {
