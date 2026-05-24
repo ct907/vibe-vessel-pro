@@ -157,7 +157,9 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     tag: "Smoky & Suspenseful",
     featuredQualities: ["minMaj7"],
     featureIndex: 0,
+    beatsPerChord: 4,
     degrees: [
+
       { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
       { interval: 5, quality: "min", romanNumeral: "iv" },
       { interval: 0, quality: "min", romanNumeral: "i" },
