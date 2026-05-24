@@ -982,7 +982,10 @@ function SectionGroup({
       className={cn("noise-texture-surface rounded-xl px-2 py-4 space-y-3 transition-shadow")}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2 px-3 h-12 rounded-full"
+        style={{ background: "var(--pill-rest-bg)", color: "var(--pill-rest-fg)" }}
+      >
         <Select
           value={section?.type ?? "verse"}
           onValueChange={(v) => {
