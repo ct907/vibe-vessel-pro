@@ -891,9 +891,6 @@ function SectionCard({
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
-                  <Copy className="h-4 w-4" /> Duplicate
-                </DropdownMenuItem>
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
                     onClick={() => setPendingKeyChange(true)}
