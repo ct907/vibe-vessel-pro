@@ -10,6 +10,7 @@ import { getChordColorClasses } from "@/lib/music/chordColor";
 import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
 import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
 import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
+import { getChordProgressionSuggestions } from "@/lib/music/suggestions";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +88,11 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     if (!detailChord || !detailAnalysis) return "";
     return describeChordFunction(detailAnalysis, meta.keyRoot, meta.keyMode);
   }, [detailChord, detailAnalysis, meta.keyRoot, meta.keyMode]);
+
+  const detailSuggestions = useMemo(() => {
+    if (!detailChord) return [];
+    return getChordProgressionSuggestions(detailChord, meta.keyRoot, meta.keyMode);
+  }, [detailChord, meta.keyRoot, meta.keyMode]);
 
   const matchingPresets = useMemo(() => {
     if (!detailChord) return [];
@@ -295,6 +301,24 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                     Add to song
                   </button>
                 </div>
+
+                {detailSuggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="font-display text-base font-bold">Works well with</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {detailSuggestions.map((c) => (
+                        <ChordChip
+                          key={c.display}
+                          chord={c}
+                          variant="ink"
+                          octave={octave}
+                          onClick={() => addChordToSong(c)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
 
                 {matchingPresets.length > 0 && (
                   <div className="space-y-2">
