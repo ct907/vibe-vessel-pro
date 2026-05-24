@@ -1087,8 +1087,7 @@ function SectionGroup({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
-                  style={{ background: "var(--paper-shade-soft, var(--paper-shade))" }}
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
                   aria-label="Section options"
                 >
                   <MoreVertical className="h-4 w-4" />
