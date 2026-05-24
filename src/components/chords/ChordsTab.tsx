@@ -103,12 +103,15 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     for (const preset of PROGRESSION_PRESETS) {
       const hitIndex = preset.degrees.findIndex((d) => d.interval === targetInterval);
       if (hitIndex < 0) continue;
-      const chords = realizePreset(preset, meta.keyRoot, meta.keyMode);
+      const chords = realizePreset(preset, meta.keyRoot, meta.keyMode).map((c) =>
+        rootToPc(c.root) === chordPc ? detailChord : c,
+      );
       matches.push({ preset, chords, hitIndex });
       if (matches.length >= 3) break;
     }
     return matches;
   }, [detailChord, meta.keyRoot, meta.keyMode]);
+
 
   const closeDetail = () => {
     stopProgression();
