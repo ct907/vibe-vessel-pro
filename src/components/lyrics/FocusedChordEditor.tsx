@@ -423,25 +423,47 @@ export function FocusedChordEditor(props: Props) {
           </div>
         )}
 
-        {isProgression && progChord && (() => {
-          const sounding = toSounding(progChord.chord);
+        {isProgression && progChord && progPattern && (() => {
+          const progSorted = section
+            ? getPatternChordsViaSSOT(section, progPattern)
+            : [...progPattern.chords].sort((a, b) => a.startBeat - b.startBeat);
           return (
-          <div className="px-3 py-3 shrink-0" style={{ background: "var(--paper-shade)" }}>
+          <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
             <p
               className="mb-1"
               style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
             >
-              Current chord
+              Preview · scroll horizontally to see full row
             </p>
-            <span
-              className="noise-texture-chip inline-flex items-center rounded-md px-3 py-1.5 font-mono-chord font-semibold text-base"
-              style={{ ...getChordColorClasses(sounding).style, border: "2px solid transparent" }}
+            <div
+              ref={scrollerRef}
+              className="overflow-x-auto rounded-sm"
+              style={{ minHeight: 36, background: "var(--paper-shade)" }}
             >
-              {sounding.display}
-            </span>
+              <div className="flex items-stretch gap-1 py-1">
+                {progSorted.map((c) => {
+                  const isActive = c.id === props.chordId;
+                  const sounding = toSounding(c.chord);
+                  return (
+                    <span
+                      key={c.id}
+                      className="shrink-0 inline-flex items-center justify-center rounded-md px-2 py-1 font-mono-chord text-[12px] font-semibold whitespace-nowrap"
+                      style={{
+                        background: isActive ? "color-mix(in oklch, var(--primary) 18%, transparent)" : "var(--paper-card)",
+                        boxShadow: isActive ? "inset 0 0 0 1px var(--primary-strong)" : undefined,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      {sounding.display}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           </div>
           );
         })()}
+
 
         {/* Reorder controls — operate on the chord currently being edited. */}
         {!isProgressionAdd && (() => {
