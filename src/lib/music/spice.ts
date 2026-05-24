@@ -2,6 +2,11 @@ import {
   ChordSymbol, Mode, Quality, QUALITY_PRETTY, rootToPc, pcToName, isMinorMode,
 } from "./chords";
 import { analyzeProgression } from "./harmony";
+import {
+  MODE_CHARACTER, ADVANCED_SCALE_DEFS, getQualityAtDegree, getNumeralAtDegree,
+  modeDisplayName, type AnyMode,
+} from "./modes";
+
 
 export type SpiceCategory =
   | "cinematic"
@@ -11,7 +16,9 @@ export type SpiceCategory =
   | "step_between"
   | "hypnotic_drone"
   | "amplify"
-  | "break_pattern";
+  | "break_pattern"
+  | "borrowed_colour";
+
 
 export interface SpiceSuggestion {
   id: string;
