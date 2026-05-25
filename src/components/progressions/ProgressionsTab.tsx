@@ -47,7 +47,7 @@ import {
   KeyRound,
   Activity,
   Sparkles,
-  Info,
+  Play,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -643,16 +643,12 @@ function PatternBlock({
                                   onTouchStart={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const idx = sortedChords.findIndex((sc) => sc.id === c.id);
-                                    const nextSc = sortedChords[(idx + 1) % sortedChords.length];
-                                    const nextChord = nextSc && nextSc.id !== c.id
-                                      ? (effectiveOffset ? transposeChord(nextSc.chord, effectiveOffset) : nextSc.chord)
-                                      : undefined;
-                                    setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id, nextChord });
+                                    usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
+                                    window.dispatchEvent(new Event("lovable:request-play"));
                                   }}
-                                  aria-label="Why this chord?"
+                                  aria-label="Play from here"
                                 >
-                                  <Info className="h-3.5 w-3.5" />
+                                  <Play className="h-3.5 w-3.5 fill-current" />
                                 </button>
                               )}
                               {(isActive || isSelected) && (
