@@ -1,31 +1,29 @@
-## Goal
+# Play From Here button on active chord
 
-In `WhyThisChordSheet`, the "Used in these progressions" examples should be transposed so the focused chord literally appears in the example. Currently they're realized in the song's key (`meta.keyRoot`), so opening `Ddim` in C major shows the Lydian Loop with `Bdim` at the hit position instead of `Ddim`.
+Replace the round info button that appears on the active chord chip in the Progressions tab with a play-icon button that anchors the transport playhead to that chord and starts playback. The Stop button in the transport header already clears the start anchor, so the next play after a stop will start from the very first chord of the song — no extra change needed there.
 
-## Fix
+## Changes
 
-`src/lib/music/presets.ts` already exports `realizePresetAnchored(preset, anchorRoot, anchorIndex, useFlatHint?)` which transposes a preset so that the chord at `anchorIndex` has root `anchorRoot`. That's exactly what we need.
+### `src/components/progressions/ProgressionsTab.tsx`
+- Swap the `Info` lucide import for `Play` (keep other icons as-is).
+- In the active-chord overlay button (currently the `-top-1.5 -left-1.5` info button around line 636–656):
+  - Replace `<Info …/>` with `<Play className="h-3.5 w-3.5 fill-current" />`.
+  - Change `aria-label` to `"Play from here"`.
+  - Replace the onClick body with:
+    ```ts
+    e.stopPropagation();
+    usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
+    window.dispatchEvent(new Event("lovable:request-play"));
+    ```
+  - Drop the `setWhyChord(...)` call and the `nextChord` lookup that fed it (only used by this button).
 
-### `src/components/chords/WhyThisChordSheet.tsx`
+No other behaviour touched. `WhyThisChordSheet` access from the Chords tab is untouched; the sheet/state declarations in ProgressionsTab can stay (used by long-press / other flows) — only this one button's handler is rewritten.
 
-1. Add `realizePresetAnchored` to the import from `@/lib/music/presets`.
-2. In the `matchingPresets` memo, replace all three `realizePreset(preset, meta.keyRoot, meta.keyMode)` calls with `realizePresetAnchored(preset, chord.root, hit, useFlat)` so each example is transposed to put the focused chord at the matched degree.
-3. Leave everything else (tier ordering, dedupe, caps, sub-labels, hit-index highlight) untouched. `nashvilleLadder`-based zero-results fallback also stays as-is — it's about the song key, not the preset.
-
-### Notes
-
-- The `_mode` argument was unused by `realizePreset` anyway, so accidental-spelling (sharp/flat) stays consistent via the existing `useFlat` (derived from `meta.keyRoot`). Anchored realization uses the same flat hint, which keeps the rest of the preset's chord names looking native to the current song key while still pinning the focused chord's root letter to the user's actual chord.
-- For Tier 2 ("Also uses [quality]") and Tier 3 ("Borrowed context") matches the anchor will still be the focused chord; the rest of the preset transposes around it. That's the desired behavior — every example shown contains the chord they tapped, spelled the same way.
-- Highlight ring on `hitIndex` already targets the right chord, so no further changes there.
+### `src/components/header/TransportHeader.tsx`
+No change. `handleStop` already calls `usePlaybackStore.getState().setStartFromChord(null, null)`, so pressing Stop and then Play restarts from the first chord of the whole song.
 
 ## Verification
-
 - `npx tsc --noEmit` passes.
-- In C major, open `Ddim` → Lydian Loop now shows `D – E – Ddim – D` (or whichever transposition lands `Ddim` at the `vii°` slot), with the hit chord literally `Ddim`.
-- Open plain `A` major in C major → primary matches now show the preset with `A` at the matched degree instead of the C-major realization. (Acceptable per request: the user wants examples centered on the focused chord.)
-- Specialist fallback hint still fires for genuinely unmatched chords.
-- "Send to Progressions" still inserts the (now anchored) realization into the first pattern block.
-
-## Out of scope
-
-- No preset data changes, no store changes, no other tabs touched.
+- Active chord chip in Progressions shows a play triangle in the top-left badge instead of an info "i".
+- Tapping it starts playback from that chord (transport flips to Playing, orange playhead lands on the tapped chord).
+- Pressing Stop in the transport, then Play, starts from the first chord of the song.
