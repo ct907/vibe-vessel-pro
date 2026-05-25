@@ -21,8 +21,8 @@ export interface ChordColorClasses {
   text: string;
 }
 
-const TEXT_DARK = "oklch(0.25 0.02 260)";
-const TEXT_LIGHT = "oklch(0.95 0.01 80)";
+export const TEXT_DARK = "oklch(0.25 0.02 260)";
+export const TEXT_LIGHT = "oklch(0.95 0.01 80)";
 const HOVER = "transition-opacity hover:opacity-90";
 
 function adaptiveText(bg: string): string {
@@ -33,25 +33,25 @@ function adaptiveText(bg: string): string {
 }
 
 // Pastel palette (hex -> oklch).
-const SOFT_PEACH    = "oklch(0.9294 0.0816 89.78)";   // #FDE6A9
-const POWDER_BLUE   = "oklch(0.9092 0.0316 243.72)";  // #D0E4F5
-const PALE_BUTTER   = "oklch(0.9597 0.0633 94.68)";   // #FFF2C2
-const ICE_BLUE      = "oklch(0.9469 0.0209 236.76)";  // #E1F0FA
-const WARM_SAND     = "oklch(0.9272 0.0651 83.56)";   // #FCE4B6
-const ROSE          = "oklch(0.8689 0.0539 11.07)";   // #F5C6CB
-const SKY_BLUE      = "oklch(0.9046 0.0400 263.66)";  // #D2E0FB
-const LAVENDER      = "oklch(0.8897 0.0407 307.95)";  // #E2D4F0
-const APRICOT       = "oklch(0.9013 0.0465 54.45)";   // #F8D7C2
-const PERIWINKLE    = "oklch(0.8744 0.0387 264.35)";  // #C9D6F0
-const MINT          = "oklch(0.9088 0.0353 150.52)";  // #D1E8D5
-const MUTED_BLUSH   = "oklch(0.8693 0.0443 18.04)";   // #F0C9C9
-const DUSTY_BLUE    = "oklch(0.8626 0.0268 274.07)";  // #CCD1E4
-const LILAC         = "oklch(0.8460 0.0483 311.68)";  // #D7C4E4
-const SOFT_THISTLE  = "oklch(0.8865 0.0337 308.94)";  // #E0D4EB
-const PALE_GOLD     = WARM_SAND;                       // #FCE4B6
-const COTTON_CANDY  = "oklch(0.9065 0.0471 350.82)";  // #FAD4E4
-const PALE_LEMON    = "oklch(0.9565 0.0595 94.86)";   // #FDF1C4
-const BABY_BLUE     = "oklch(0.9265 0.0286 238.25)";  // #D6EAF8
+export const SOFT_PEACH    = "oklch(0.9294 0.0816 89.78)";   // #FDE6A9
+export const POWDER_BLUE   = "oklch(0.9092 0.0316 243.72)";  // #D0E4F5
+export const PALE_BUTTER   = "oklch(0.9597 0.0633 94.68)";   // #FFF2C2
+export const ICE_BLUE      = "oklch(0.9469 0.0209 236.76)";  // #E1F0FA
+export const WARM_SAND     = "oklch(0.9272 0.0651 83.56)";   // #FCE4B6
+export const ROSE          = "oklch(0.8689 0.0539 11.07)";   // #F5C6CB
+export const SKY_BLUE      = "oklch(0.9046 0.0400 263.66)";  // #D2E0FB
+export const LAVENDER      = "oklch(0.8897 0.0407 307.95)";  // #E2D4F0
+export const APRICOT       = "oklch(0.9013 0.0465 54.45)";   // #F8D7C2
+export const PERIWINKLE    = "oklch(0.8744 0.0387 264.35)";  // #C9D6F0
+export const MINT          = "oklch(0.9088 0.0353 150.52)";  // #D1E8D5
+export const MUTED_BLUSH   = "oklch(0.8693 0.0443 18.04)";   // #F0C9C9
+export const DUSTY_BLUE    = "oklch(0.8626 0.0268 274.07)";  // #CCD1E4
+export const LILAC         = "oklch(0.8460 0.0483 311.68)";  // #D7C4E4
+export const SOFT_THISTLE  = "oklch(0.8865 0.0337 308.94)";  // #E0D4EB
+export const PALE_GOLD     = WARM_SAND;                       // #FCE4B6
+export const COTTON_CANDY  = "oklch(0.9065 0.0471 350.82)";  // #FAD4E4
+export const PALE_LEMON    = "oklch(0.9565 0.0595 94.86)";   // #FDF1C4
+export const BABY_BLUE     = "oklch(0.9265 0.0286 238.25)";  // #D6EAF8
 
 const solid = (color: string): CSSProperties => ({ background: color, color: adaptiveText(color) });
 const grad  = (a: string, b: string): CSSProperties => ({
