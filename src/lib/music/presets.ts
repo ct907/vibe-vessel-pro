@@ -2,6 +2,7 @@ import {
   ChordSymbol, Mode, Quality, QUALITY_PRETTY, rootToPc, pcToName,
 } from "./chords";
 import type { CRSpectrum } from "./chordRelationships";
+import type { GenreTag } from "./genreColor";
 
 export type { CRSpectrum };
 
@@ -19,6 +20,7 @@ export interface ProgressionPreset {
   tag: string;
   degrees: PresetDegree[];
   crSpectrums?: CRSpectrum[];
+  genreTags?: GenreTag[];
   featuredQualities?: Quality[];
   featureIndex?: number;
   beatsPerChord?: number;
@@ -257,6 +259,70 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
       { interval: 3, quality: "maj", romanNumeral: "♭III" },
       { interval: 5, quality: "min", romanNumeral: "iv" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
+    ],
+  },
+  {
+    id: "neo-soul-shimmer",
+    name: "Neo Soul Shimmer",
+    formula: "Imaj9 – vim9 – IVmaj9 – V9",
+    tag: "Emotional",
+    genreTags: ["neo_soul"],
+    degrees: [
+      { interval: 0, quality: "maj9", romanNumeral: "Imaj9" },
+      { interval: 9, quality: "min9", romanNumeral: "vim9" },
+      { interval: 5, quality: "maj9", romanNumeral: "IVmaj9" },
+      { interval: 7, quality: "9",    romanNumeral: "V9" },
+    ],
+  },
+  {
+    id: "rnb-late-night",
+    name: "R&B Late Night",
+    formula: "im9 – ♭VIImaj9 – ♭VImaj7 – V9",
+    tag: "Emotional",
+    genreTags: ["rnb", "neo_soul"],
+    degrees: [
+      { interval: 0,  quality: "min9", romanNumeral: "im9" },
+      { interval: 10, quality: "maj9", romanNumeral: "♭VIImaj9" },
+      { interval: 8,  quality: "maj7", romanNumeral: "♭VImaj7" },
+      { interval: 7,  quality: "9",    romanNumeral: "V9" },
+    ],
+  },
+  {
+    id: "jazz-ii-v-i-colour",
+    name: "Jazz ii–V–I with Colour",
+    formula: "iim7 – V7alt – Imaj9",
+    tag: "Dark",
+    genreTags: ["jazz"],
+    degrees: [
+      { interval: 2, quality: "min7",  romanNumeral: "iim7" },
+      { interval: 7, quality: "7alt",  romanNumeral: "V7alt" },
+      { interval: 0, quality: "maj9",  romanNumeral: "Imaj9" },
+    ],
+  },
+  {
+    id: "gospel-warmth",
+    name: "Gospel Warmth",
+    formula: "I6/9 – IVadd9 – vim7 – V9",
+    tag: "Emotional",
+    genreTags: ["gospel"],
+    degrees: [
+      { interval: 0, quality: "6/9",  romanNumeral: "I6/9" },
+      { interval: 5, quality: "add9", romanNumeral: "IVadd9" },
+      { interval: 9, quality: "min7", romanNumeral: "vim7" },
+      { interval: 7, quality: "9",    romanNumeral: "V9" },
+    ],
+  },
+  {
+    id: "cinematic-half-dim-resolve",
+    name: "Cinematic Half-Dim Resolve",
+    formula: "iiø7 – V7♭9 – i(maj7) – IVmaj7",
+    tag: "Dark",
+    genreTags: ["cinematic", "jazz", "classical"],
+    degrees: [
+      { interval: 2, quality: "m7b5",   romanNumeral: "iiø7" },
+      { interval: 7, quality: "7b9",    romanNumeral: "V7♭9" },
+      { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
+      { interval: 5, quality: "maj7",   romanNumeral: "IVmaj7" },
     ],
   },
 ];
