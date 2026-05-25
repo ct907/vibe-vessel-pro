@@ -132,6 +132,53 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
       { interval: 0, quality: "maj", romanNumeral: "I" },
     ],
   },
+  {
+    id: "descending-minor-line-cliche",
+    name: "Descending minor line cliché",
+    formula: "i – i(maj7) – i7 – i6",
+    tag: "Cinematic",
+    degrees: [
+      { interval: 0, quality: "min", romanNumeral: "i" },
+      { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
+      { interval: 0, quality: "min7", romanNumeral: "i7" },
+      { interval: 0, quality: "min6", romanNumeral: "i6" },
+    ],
+  },
+  {
+    id: "half-diminished-bridge",
+    name: "Half-diminished bridge",
+    formula: "iiø7 – V7 – i – ♭VII",
+    tag: "Jazz",
+    degrees: [
+      { interval: 2, quality: "m7b5", romanNumeral: "iiø7" },
+      { interval: 7, quality: "7", romanNumeral: "V7" },
+      { interval: 0, quality: "min", romanNumeral: "i" },
+      { interval: 10, quality: "maj", romanNumeral: "♭VII" },
+    ],
+  },
+  {
+    id: "neapolitan-cadence",
+    name: "Neapolitan cadence",
+    formula: "♭II – V – i",
+    tag: "Classical",
+    degrees: [
+      { interval: 1, quality: "maj", romanNumeral: "♭II" },
+      { interval: 7, quality: "maj", romanNumeral: "V" },
+      { interval: 0, quality: "min", romanNumeral: "i" },
+    ],
+  },
+  {
+    id: "lydian-loop",
+    name: "Lydian loop",
+    formula: "I – II – vii° – I",
+    tag: "Cinematic",
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 2, quality: "maj", romanNumeral: "II" },
+      { interval: 11, quality: "dim", romanNumeral: "vii°" },
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+    ],
+  },
 ];
 
 export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
