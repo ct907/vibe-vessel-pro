@@ -102,7 +102,7 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
       const o = sortedChords[k]?.chord.octave;
       if (typeof o === "number") return o;
     }
-    return 4;
+    return 3;
   };
   const withOctave = (c: ChordSymbol, i: number): ChordSymbol => ({ ...c, octave: octaveFor(i) });
 

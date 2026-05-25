@@ -85,6 +85,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
     setPlayingId(preset.id);
     await playProgression(events, meta.bpm, {
       loopBeats: totalBeats,
+      octave: 3,
       onEnd: () => setPlayingId((id) => (id === preset.id ? null : id)),
     });
   };
@@ -109,7 +110,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
     >
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="font-display text-2xl">Popular Progressions</SheetTitle>
+          <SheetTitle className="font-display text-2xl text-primary">Popular Progressions</SheetTitle>
         </SheetHeader>
 
         {/* Row 1 — Band pills */}
@@ -182,7 +183,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
           })}
         </div>
 
-        <div className="mt-4 space-y-3 pb-6">
+        <div className="mt-4 grid grid-cols-2 gap-3 pb-6">
           {visible.map((preset) => {
             const chords = realizePreset(preset, meta.keyRoot, meta.keyMode);
             const isPlaying = playingId === preset.id;
