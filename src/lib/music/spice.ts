@@ -189,8 +189,8 @@ function cosmicDriftSuggestions(
     : [{ interval: 5, quality: "maj" as Quality }, { interval: 0, quality: "maj" as Quality }];
   for (let i = 0; i < chords.length; i++) {
     const a = analysis.chords[i];
+    if (!a.isInScale) continue;
     if (a.isBorrowed) continue;
-    if (a.degree < 0) continue;
     for (const b of borrows) {
       const newPc = (keyPc + b.interval) % 12;
       // Only suggest if the borrow shares root with this chord (parallel-key equivalent swap)
@@ -208,7 +208,7 @@ function cosmicDriftSuggestions(
   // Also offer direct borrows: replace each diatonic chord with its parallel-key shadow
   for (let i = 0; i < chords.length; i++) {
     const a = analysis.chords[i];
-    if (a.isBorrowed || a.isChromatic) continue;
+    if (!a.isInScale) continue;
     for (const b of borrows) {
       const newPc = (keyPc + b.interval) % 12;
       if (newPc === rootToPc(chords[i].root)) continue;
@@ -327,7 +327,7 @@ function amplifySuggestions(
 ): Array<{ chords: ChordSymbol[]; changedIndices: number[]; label: string }> {
   const out: Array<{ chords: ChordSymbol[]; changedIndices: number[]; label: string }> = [];
   const analysis = analyzeProgression(chords, keyRoot, mode);
-  const allDiatonic = analysis.chords.every((a) => !a.isBorrowed && !a.isChromatic);
+  const allDiatonic = analysis.chords.every((a) => a.isDiatonic);
   if (allDiatonic) {
     // Add 7th extensions to triads
     const next = chords.map((c) => {
@@ -352,7 +352,7 @@ function breakPatternSuggestions(
   const useFlat = useFlatFor(keyRoot);
   const keyPc = rootToPc(keyRoot);
   const analysis = analyzeProgression(chords, keyRoot, mode);
-  const allDiatonic = analysis.chords.every((a) => !a.isBorrowed && !a.isChromatic);
+  const allDiatonic = analysis.chords.every((a) => a.isDiatonic);
   if (allDiatonic && chords.length >= 2) {
     // Inject a ♭II at position 1
     const next = chords.slice();

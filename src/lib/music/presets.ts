@@ -13,17 +13,32 @@ export interface PresetDegree {
   bassInterval?: number;
 }
 
+export type PresetFilter =
+  | { kind: "cr_spectrum"; value: CRSpectrum }
+  | { kind: "genre"; value: GenreTag }
+  | { kind: "vibe"; value: string };
+
 export interface ProgressionPreset {
   id: string;
   name: string;
   formula: string;
-  tag: string;
+  filters: PresetFilter[];
   degrees: PresetDegree[];
-  crSpectrums?: CRSpectrum[];
-  genreTags?: GenreTag[];
   featuredQualities?: Quality[];
   featureIndex?: number;
   beatsPerChord?: number;
+}
+
+export function getPresetCRSpectrums(p: ProgressionPreset): CRSpectrum[] {
+  return p.filters.filter((f): f is Extract<PresetFilter, { kind: "cr_spectrum" }> => f.kind === "cr_spectrum").map((f) => f.value);
+}
+
+export function getPresetGenres(p: ProgressionPreset): GenreTag[] {
+  return p.filters.filter((f): f is Extract<PresetFilter, { kind: "genre" }> => f.kind === "genre").map((f) => f.value);
+}
+
+export function getPresetVibes(p: ProgressionPreset): string[] {
+  return p.filters.filter((f): f is Extract<PresetFilter, { kind: "vibe" }> => f.kind === "vibe").map((f) => f.value);
 }
 
 
@@ -33,8 +48,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "royal-road",
     name: "The Royal Road",
     formula: "IV – V – iii – vi",
-    tag: "Emotional & Driving",
-    crSpectrums: ["fantastical", "romantic", "tragic"],
+    filters: [
+      { kind: "cr_spectrum", value: "fantastical" },
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "cr_spectrum", value: "tragic" },
+      { kind: "vibe", value: "Emotional & Driving" },
+    ],
     degrees: [
       { interval: 5, quality: "maj", romanNumeral: "IV" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -46,8 +65,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "jazz-turnaround",
     name: "The Jazz Turnaround",
     formula: "ii – V – I – vi",
-    tag: "Smooth & Smoky",
-    crSpectrums: ["powerful", "resolution", "romantic"],
+    filters: [
+      { kind: "cr_spectrum", value: "powerful" },
+      { kind: "cr_spectrum", value: "resolution" },
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "vibe", value: "Smooth & Smoky" },
+    ],
     degrees: [
       { interval: 2, quality: "min", romanNumeral: "ii" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -59,8 +82,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "deep-pop-canyon",
     name: "The Deep Pop Canyon",
     formula: "I – V – vi – IV",
-    tag: "Stadium Epic",
-    crSpectrums: ["good_energy", "neutral", "wonder"],
+    filters: [
+      { kind: "cr_spectrum", value: "good_energy" },
+      { kind: "cr_spectrum", value: "neutral" },
+      { kind: "cr_spectrum", value: "wonder" },
+      { kind: "vibe", value: "Stadium Epic" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -72,8 +99,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "cinematic-drift",
     name: "The Cinematic Drift",
     formula: "I – ♭VII – IV – iv",
-    tag: "Nostalgic Sigh",
-    crSpectrums: ["romantic", "good_energy"],
+    filters: [
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "cr_spectrum", value: "good_energy" },
+      { kind: "vibe", value: "Nostalgic Sigh" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
@@ -85,8 +115,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "andalusian",
     name: "The Andalusian Descent",
     formula: "i – ♭VII – ♭VI – V",
-    tag: "Dark & Dramatic",
-    crSpectrums: ["bittersweet", "romantic", "protagonism"],
+    filters: [
+      { kind: "cr_spectrum", value: "bittersweet" },
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "cr_spectrum", value: "protagonism" },
+      { kind: "vibe", value: "Dark & Dramatic" },
+    ],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
@@ -98,8 +132,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "doo-wop",
     name: "The Doo-Wop",
     formula: "I – vi – IV – V",
-    tag: "Classic & Warm",
-    crSpectrums: ["romantic", "wonder", "fantastical"],
+    filters: [
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "cr_spectrum", value: "wonder" },
+      { kind: "cr_spectrum", value: "fantastical" },
+      { kind: "vibe", value: "Classic & Warm" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 9, quality: "min", romanNumeral: "vi" },
@@ -111,8 +149,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "axis",
     name: "The Axis",
     formula: "vi – IV – I – V",
-    tag: "Anthemic & Hopeful",
-    crSpectrums: ["wonder", "good_energy"],
+    filters: [
+      { kind: "cr_spectrum", value: "wonder" },
+      { kind: "cr_spectrum", value: "good_energy" },
+      { kind: "vibe", value: "Anthemic & Hopeful" },
+    ],
     degrees: [
       { interval: 9, quality: "min", romanNumeral: "vi" },
       { interval: 5, quality: "maj", romanNumeral: "IV" },
@@ -124,8 +165,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "minor-drama",
     name: "The Minor Drama",
     formula: "i – iv – v – i",
-    tag: "Brooding & Intimate",
-    crSpectrums: ["tragic", "uneasy"],
+    filters: [
+      { kind: "cr_spectrum", value: "tragic" },
+      { kind: "cr_spectrum", value: "uneasy" },
+      { kind: "vibe", value: "Brooding & Intimate" },
+    ],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 5, quality: "min", romanNumeral: "iv" },
@@ -137,8 +181,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "backdoor",
     name: "The Backdoor",
     formula: "I – vi – iv – ♭VII – I",
-    tag: "Sneaky Resolution",
-    crSpectrums: ["romantic", "mysterious"],
+    filters: [
+      { kind: "cr_spectrum", value: "romantic" },
+      { kind: "cr_spectrum", value: "mysterious" },
+      { kind: "vibe", value: "Sneaky Resolution" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 9, quality: "min", romanNumeral: "vi" },
@@ -151,7 +198,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "descending-minor-line-cliche",
     name: "Descending minor line cliché",
     formula: "i – i(maj7) – i7 – i6",
-    tag: "Cinematic",
+    filters: [{ kind: "vibe", value: "Cinematic" }],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
@@ -163,8 +210,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "half-diminished-bridge",
     name: "Half-diminished bridge",
     formula: "iiø7 – V7 – i – ♭VII",
-    tag: "Jazz",
-    crSpectrums: ["bittersweet"],
+    filters: [
+      { kind: "cr_spectrum", value: "bittersweet" },
+      { kind: "vibe", value: "Jazz" },
+    ],
     degrees: [
       { interval: 2, quality: "m7b5", romanNumeral: "iiø7" },
       { interval: 7, quality: "7", romanNumeral: "V7" },
@@ -176,8 +225,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "neapolitan-cadence",
     name: "Neapolitan cadence",
     formula: "♭II – V – i",
-    tag: "Classical",
-    crSpectrums: ["otherworldly", "dramatic"],
+    filters: [
+      { kind: "cr_spectrum", value: "otherworldly" },
+      { kind: "cr_spectrum", value: "dramatic" },
+      { kind: "vibe", value: "Classical" },
+    ],
     degrees: [
       { interval: 1, quality: "maj", romanNumeral: "♭II" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -188,8 +240,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "lydian-loop",
     name: "Lydian loop",
     formula: "I – II – vii° – I",
-    tag: "Cinematic",
-    crSpectrums: ["fantastical"],
+    filters: [
+      { kind: "cr_spectrum", value: "fantastical" },
+      { kind: "vibe", value: "Cinematic" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 2, quality: "maj", romanNumeral: "II" },
@@ -201,8 +255,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "sad-string-quartet",
     name: "Sad String Quartet",
     formula: "I – iii – IV – V",
-    tag: "Emotional",
-    crSpectrums: ["sad"],
+    filters: [
+      { kind: "cr_spectrum", value: "sad" },
+      { kind: "vibe", value: "Emotional" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 4, quality: "min", romanNumeral: "iii" },
@@ -214,8 +270,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "heroic-anthem",
     name: "Heroic Anthem",
     formula: "I – VI – IV – V",
-    tag: "Epic",
-    crSpectrums: ["heroic"],
+    filters: [
+      { kind: "cr_spectrum", value: "heroic" },
+      { kind: "vibe", value: "Epic" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 9, quality: "maj", romanNumeral: "VI" },
@@ -227,8 +285,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "outer-space",
     name: "Outer Space",
     formula: "I – #IV – I",
-    tag: "Cinematic",
-    crSpectrums: ["otherworldly"],
+    filters: [
+      { kind: "cr_spectrum", value: "otherworldly" },
+      { kind: "vibe", value: "Cinematic" },
+    ],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 6, quality: "maj", romanNumeral: "#IV" },
@@ -239,8 +299,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "bittersweet-resolve",
     name: "Bittersweet Resolve",
     formula: "i – v – ♭VI – ♭VII",
-    tag: "Emotional",
-    crSpectrums: ["bittersweet"],
+    filters: [
+      { kind: "cr_spectrum", value: "bittersweet" },
+      { kind: "vibe", value: "Emotional" },
+    ],
     degrees: [
       { interval: 0,  quality: "min", romanNumeral: "i" },
       { interval: 7,  quality: "min", romanNumeral: "v" },
@@ -252,8 +314,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "rising-tension",
     name: "Rising Tension",
     formula: "i – ♭III – iv – V",
-    tag: "Dark",
-    crSpectrums: ["rising"],
+    filters: [
+      { kind: "cr_spectrum", value: "rising" },
+      { kind: "vibe", value: "Dark" },
+    ],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 3, quality: "maj", romanNumeral: "♭III" },
@@ -265,8 +329,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "neo-soul-shimmer",
     name: "Neo Soul Shimmer",
     formula: "Imaj9 – vim9 – IVmaj9 – V9",
-    tag: "Emotional",
-    genreTags: ["neo_soul"],
+    filters: [
+      { kind: "genre", value: "neo_soul" },
+      { kind: "vibe", value: "Emotional" },
+    ],
     degrees: [
       { interval: 0, quality: "maj9", romanNumeral: "Imaj9" },
       { interval: 9, quality: "min9", romanNumeral: "vim9" },
@@ -278,8 +344,11 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "rnb-late-night",
     name: "R&B Late Night",
     formula: "im9 – ♭VIImaj9 – ♭VImaj7 – V9",
-    tag: "Emotional",
-    genreTags: ["rnb", "neo_soul"],
+    filters: [
+      { kind: "genre", value: "rnb" },
+      { kind: "genre", value: "neo_soul" },
+      { kind: "vibe", value: "Emotional" },
+    ],
     degrees: [
       { interval: 0,  quality: "min9", romanNumeral: "im9" },
       { interval: 10, quality: "maj9", romanNumeral: "♭VIImaj9" },
@@ -291,8 +360,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "jazz-ii-v-i-colour",
     name: "Jazz ii–V–I with Colour",
     formula: "iim7 – V7alt – Imaj9",
-    tag: "Dark",
-    genreTags: ["jazz"],
+    filters: [
+      { kind: "genre", value: "jazz" },
+      { kind: "vibe", value: "Dark" },
+    ],
     degrees: [
       { interval: 2, quality: "min7",  romanNumeral: "iim7" },
       { interval: 7, quality: "7alt",  romanNumeral: "V7alt" },
@@ -303,8 +374,10 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "gospel-warmth",
     name: "Gospel Warmth",
     formula: "I6/9 – IVadd9 – vim7 – V9",
-    tag: "Emotional",
-    genreTags: ["gospel"],
+    filters: [
+      { kind: "genre", value: "gospel" },
+      { kind: "vibe", value: "Emotional" },
+    ],
     degrees: [
       { interval: 0, quality: "6/9",  romanNumeral: "I6/9" },
       { interval: 5, quality: "add9", romanNumeral: "IVadd9" },
@@ -316,8 +389,12 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "cinematic-half-dim-resolve",
     name: "Cinematic Half-Dim Resolve",
     formula: "iiø7 – V7♭9 – i(maj7) – IVmaj7",
-    tag: "Dark",
-    genreTags: ["cinematic", "jazz", "classical"],
+    filters: [
+      { kind: "genre", value: "cinematic" },
+      { kind: "genre", value: "jazz" },
+      { kind: "genre", value: "classical" },
+      { kind: "vibe", value: "Dark" },
+    ],
     degrees: [
       { interval: 2, quality: "m7b5",   romanNumeral: "iiø7" },
       { interval: 7, quality: "7b9",    romanNumeral: "V7♭9" },
@@ -333,7 +410,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "bond-line-cliche",
     name: "James Bond Line Cliché",
     formula: "i – i(maj7) – i7 – i6",
-    tag: "Cinematic & Mysterious",
+    filters: [{ kind: "vibe", value: "Cinematic & Mysterious" }],
     featuredQualities: ["minMaj7"],
     featureIndex: 1,
     degrees: [
@@ -347,7 +424,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "bond-minor-plagal",
     name: "Bond Minor Plagal",
     formula: "i(maj7) – iv – i",
-    tag: "Smoky & Suspenseful",
+    filters: [{ kind: "vibe", value: "Smoky & Suspenseful" }],
     featuredQualities: ["minMaj7"],
     featureIndex: 0,
     beatsPerChord: 4,
@@ -363,7 +440,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "minor-ii-v-i",
     name: "Minor ii–V–i",
     formula: "iiø7 – V7♭9 – i",
-    tag: "Classic Jazz Cadence",
+    filters: [{ kind: "vibe", value: "Classic Jazz Cadence" }],
     featuredQualities: ["m7b5"],
     featureIndex: 0,
     degrees: [
@@ -376,7 +453,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "half-dim-approach",
     name: "Half-Diminished Approach",
     formula: "viiø7 – iii7 – vi",
-    tag: "Brooding & Smooth",
+    filters: [{ kind: "vibe", value: "Brooding & Smooth" }],
     featuredQualities: ["m7b5"],
     featureIndex: 0,
     degrees: [
@@ -390,7 +467,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "chromatic-passing-dim",
     name: "Chromatic Passing Diminished",
     formula: "I – #i°7 – ii7 – V7",
-    tag: "Sophisticated Walk-up",
+    filters: [{ kind: "vibe", value: "Sophisticated Walk-up" }],
     featuredQualities: ["dim7", "dim"],
     featureIndex: 1,
     degrees: [
@@ -404,7 +481,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "dim-turnaround",
     name: "Diminished Turnaround",
     formula: "Imaj7 – ♭iii°7 – ii7 – V7",
-    tag: "Bebop Color",
+    filters: [{ kind: "vibe", value: "Bebop Color" }],
     featuredQualities: ["dim7", "dim"],
     featureIndex: 1,
     degrees: [
@@ -419,7 +496,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "ii-v-i-major",
     name: "ii–V–I",
     formula: "ii7 – V7 – Imaj7",
-    tag: "The Jazz Cadence",
+    filters: [{ kind: "vibe", value: "The Jazz Cadence" }],
     featuredQualities: ["7"],
     featureIndex: 1,
     degrees: [
@@ -432,7 +509,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "backdoor-ii-v",
     name: "Backdoor ii–V",
     formula: "iv7 – ♭VII7 – Imaj7",
-    tag: "Sneaky Resolution",
+    filters: [{ kind: "vibe", value: "Sneaky Resolution" }],
     featuredQualities: ["7"],
     featureIndex: 1,
     degrees: [
@@ -445,7 +522,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "blues-turnaround",
     name: "Blues Turnaround",
     formula: "I7 – VI7 – ii7 – V7",
-    tag: "Rhythm Changes",
+    filters: [{ kind: "vibe", value: "Rhythm Changes" }],
     featuredQualities: ["7"],
     featureIndex: 0,
     degrees: [
@@ -460,7 +537,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "altered-v-to-i",
     name: "Altered V → i",
     formula: "iiø7 – V7alt – i(maj7)",
-    tag: "Dark Jazz Resolution",
+    filters: [{ kind: "vibe", value: "Dark Jazz Resolution" }],
     featuredQualities: ["7alt", "7b9", "7#9", "7#5"],
     featureIndex: 1,
     degrees: [
@@ -473,7 +550,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "hendrix-7sharp9",
     name: "Hendrix",
     formula: "I7#9 – IV7 – ♭III7",
-    tag: "Funky & Bluesy",
+    filters: [{ kind: "vibe", value: "Funky & Bluesy" }],
     featuredQualities: ["7#9", "7alt"],
     featureIndex: 0,
     degrees: [
@@ -487,7 +564,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "jazz-i-vi-ii-v",
     name: "Jazz I–vi–ii–V",
     formula: "Imaj7 – vi7 – ii7 – V7",
-    tag: "Standards Turnaround",
+    filters: [{ kind: "vibe", value: "Standards Turnaround" }],
     featuredQualities: ["maj7"],
     featureIndex: 0,
     degrees: [
@@ -501,7 +578,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "bossa-i-iv",
     name: "Bossa I–IV",
     formula: "Imaj7 – IVmaj7",
-    tag: "Bossa Nova Drift",
+    filters: [{ kind: "vibe", value: "Bossa Nova Drift" }],
     featuredQualities: ["maj7"],
     featureIndex: 0,
     beatsPerChord: 4,
@@ -516,7 +593,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "modal-vamp",
     name: "Modal Vamp",
     formula: "i7 – ♭VII – IV",
-    tag: "Dorian Groove",
+    filters: [{ kind: "vibe", value: "Dorian Groove" }],
     featuredQualities: ["min7"],
     featureIndex: 0,
     beatsPerChord: 4,
@@ -531,7 +608,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "smooth-minor-ii-v-i",
     name: "Smooth Minor ii–V–i",
     formula: "i7 – iv7 – ♭VII7 – ♭IIImaj7",
-    tag: "Mellow Modal Cycle",
+    filters: [{ kind: "vibe", value: "Mellow Modal Cycle" }],
     featuredQualities: ["min7"],
     featureIndex: 0,
     degrees: [
@@ -546,7 +623,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "lush-bossa",
     name: "Lush Bossa",
     formula: "Imaj9 – IV6/9 – iimin9 – V13",
-    tag: "Velvet & Warm",
+    filters: [{ kind: "vibe", value: "Velvet & Warm" }],
     featuredQualities: ["maj9", "maj13", "6/9"],
     featureIndex: 0,
     degrees: [
@@ -560,7 +637,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "mellow-loop",
     name: "Mellow Loop",
     formula: "Imaj9 – iiimin9 – vi9 – IVmaj9",
-    tag: "Lo-fi & Floating",
+    filters: [{ kind: "vibe", value: "Lo-fi & Floating" }],
     featuredQualities: ["maj9", "min9"],
     featureIndex: 0,
     degrees: [
@@ -575,7 +652,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "sus-suspension",
     name: "Sus Suspension",
     formula: "Vsus4 – V – I",
-    tag: "Classic Suspension",
+    filters: [{ kind: "vibe", value: "Classic Suspension" }],
     featuredQualities: ["sus4", "sus2"],
     featureIndex: 0,
     degrees: [
@@ -588,7 +665,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "open-drone",
     name: "Open Drone",
     formula: "Isus2 – V – Isus4 – I",
-    tag: "Folk & Open",
+    filters: [{ kind: "vibe", value: "Folk & Open" }],
     featuredQualities: ["sus2", "sus4"],
     featureIndex: 0,
     degrees: [
@@ -603,7 +680,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "neo-soul-loop",
     name: "Neo-Soul Loop",
     formula: "imin9 – iv11 – ♭VIImaj7 – ♭VImaj7",
-    tag: "Silky & Modern",
+    filters: [{ kind: "vibe", value: "Silky & Modern" }],
     featuredQualities: ["min9", "min11", "min13"],
     featureIndex: 0,
     degrees: [
@@ -618,7 +695,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "modern-pop-loop-add9",
     name: "Modern Pop Loop",
     formula: "Iadd9 – Vadd9 – vi – IVadd9",
-    tag: "Sparkly Pop",
+    filters: [{ kind: "vibe", value: "Sparkly Pop" }],
     featuredQualities: ["add9", "add11"],
     featureIndex: 0,
     degrees: [
@@ -633,7 +710,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "whole-tone-rise",
     name: "Whole-Tone Rise",
     formula: "I – I+ – I6 – I7",
-    tag: "Old Hollywood",
+    filters: [{ kind: "vibe", value: "Old Hollywood" }],
     featuredQualities: ["aug"],
     featureIndex: 1,
     degrees: [
@@ -647,7 +724,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "augmented-bridge",
     name: "Augmented Bridge",
     formula: "I – III+ – vi – IV",
-    tag: "Lift & Lean",
+    filters: [{ kind: "vibe", value: "Lift & Lean" }],
     featuredQualities: ["aug"],
     featureIndex: 1,
     degrees: [
@@ -662,7 +739,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "power-rock",
     name: "Power Rock",
     formula: "I5 – ♭VII5 – IV5",
-    tag: "Riff Driver",
+    filters: [{ kind: "vibe", value: "Riff Driver" }],
     featuredQualities: ["5"],
     featureIndex: 0,
     degrees: [
@@ -675,7 +752,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "punk-i-iv-v",
     name: "Punk I–IV–V",
     formula: "I5 – IV5 – V5",
-    tag: "Three-Chord Wall",
+    filters: [{ kind: "vibe", value: "Three-Chord Wall" }],
     featuredQualities: ["5"],
     featureIndex: 0,
     degrees: [
@@ -689,7 +766,7 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
     id: "swing-i-vi-ii-v-6",
     name: "Swing I6",
     formula: "I6 – vi7 – ii7 – V7",
-    tag: "Vintage Swing",
+    filters: [{ kind: "vibe", value: "Vintage Swing" }],
     featuredQualities: ["6", "min6"],
     featureIndex: 0,
     degrees: [
