@@ -181,7 +181,7 @@ export function WhyThisChordSheet() {
             (d) => d.quality === focusedQuality && d.interval === focusedDegree,
           );
           if (hit < 0) continue;
-          const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+          const realized = realizePresetAnchored(preset, chord.root, hit, useFlat);
           push({
             preset,
             chords: realized,
