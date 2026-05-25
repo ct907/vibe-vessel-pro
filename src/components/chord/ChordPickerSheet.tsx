@@ -152,7 +152,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     if (onPickBatch) {
       onPickBatch(stamped);
     } else {
-      [...stamped].reverse().forEach((c) => onPick(c));
+      stamped.forEach((c) => onPick(c));
     }
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
@@ -164,7 +164,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     if (onPickBatch) {
       onPickBatch(stamped);
     } else {
-      [...stamped].reverse().forEach((c) => onPick(c));
+      stamped.forEach((c) => onPick(c));
     }
     onOpenChange(false);
   };

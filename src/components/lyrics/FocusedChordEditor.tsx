@@ -199,20 +199,16 @@ export function FocusedChordEditor(props: Props) {
     if (anchorId && chords[0]) {
       upsertChordAt(props.sectionId, lyricsLineId, slot, { ...toStorage(chords[0]), octave }, anchorId);
       setAnchorId(undefined);
+      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + chordSlotWidth(chords[0].display) + 1));
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
     }
-    // Pre-compute slot positions in forward order, then insert in reverse
-    // so placeChordInSlot's prepend behavior results in correct SSOT order.
-    const placements: { chord: ChordSymbol; s: number }[] = [];
+    // Insert in forward order; insertSectionChordAtSlot keeps SSOT sorted by slot.
     let cur = slot;
     for (const chord of chords) {
-      placements.push({ chord, s: cur });
+      placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...toStorage(chord), octave });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
-    }
-    for (const { chord: ch, s } of [...placements].reverse()) {
-      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
     }
     setSlot(cur);
     setQuery("");
@@ -237,6 +233,7 @@ export function FocusedChordEditor(props: Props) {
     if (anchorId) {
       upsertChordAt(props.sectionId, lyricsLineId, slot, chordWithOctave, anchorId);
       setAnchorId(undefined);
+      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + chordSlotWidth(chord.display) + 1));
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
@@ -280,7 +277,7 @@ export function FocusedChordEditor(props: Props) {
       placements.push({ chord, s: cur });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
     }
-    for (const { chord: ch, s } of [...placements].reverse()) {
+    for (const { chord: ch, s } of placements) {
       placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
     }
     props.onClose();

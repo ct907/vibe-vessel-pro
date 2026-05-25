@@ -1,29 +1,27 @@
-# Play From Here button on active chord
+## Fix chord insertion order in ChordPickerSheet and FocusedChordEditor
 
-Replace the round info button that appears on the active chord chip in the Progressions tab with a play-icon button that anchors the transport playhead to that chord and starts playback. The Stop button in the transport header already clears the start anchor, so the next play after a stop will start from the very first chord of the song — no extra change needed there.
+### Problem
+When typing chords sequentially in both the ChordPickerSheet (desktop) and FocusedChordEditor (mobile), chords accumulate right-to-left instead of left-to-right. Example: typing C, F, Em, Gm11 shows Gm11 Em F C.
 
-## Changes
+### Root causes found
 
-### `src/components/progressions/ProgressionsTab.tsx`
-- Swap the `Info` lucide import for `Play` (keep other icons as-is).
-- In the active-chord overlay button (currently the `-top-1.5 -left-1.5` info button around line 636–656):
-  - Replace `<Info …/>` with `<Play className="h-3.5 w-3.5 fill-current" />`.
-  - Change `aria-label` to `"Play from here"`.
-  - Replace the onClick body with:
-    ```ts
-    e.stopPropagation();
-    usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
-    window.dispatchEvent(new Event("lovable:request-play"));
-    ```
-  - Drop the `setWhyChord(...)` call and the `nextChord` lookup that fed it (only used by this button).
+1. **ChordPickerSheet batch reversal** — In `handlePickNashville` and `handlePresetUse`, when `onPickBatch` is omitted (LyricsTab usage), chords are explicitly reversed before calling `onPick` one-by-one: `[...stamped].reverse().forEach((c) => onPick(c))`. Even for single-chord Nashville matches, this logic path can fire and the reversal logic was added as a reflow workaround that is no longer correct.
 
-No other behaviour touched. `WhyThisChordSheet` access from the Chords tab is untouched; the sheet/state declarations in ProgressionsTab can stay (used by long-press / other flows) — only this one button's handler is rewritten.
+2. **FocusedChordEditor slot not advanced after upsert** — When `anchorId` is set (user tapped an existing chord to edit), `upsertChordAt` replaces the chord but `slot` is NOT incremented. The next typed chord calls `placeChordInSlot` at the SAME slot, pushing the previous chord to the right. Result: newest chord appears on the left, older chords shift right — a right-to-left accumulation.
 
-### `src/components/header/TransportHeader.tsx`
-No change. `handleStop` already calls `usePlaybackStore.getState().setStartFromChord(null, null)`, so pressing Stop and then Play restarts from the first chord of the whole song.
+### Changes
 
-## Verification
-- `npx tsc --noEmit` passes.
-- Active chord chip in Progressions shows a play triangle in the top-left badge instead of an info "i".
-- Tapping it starts playback from that chord (transport flips to Playing, orange playhead lands on the tapped chord).
-- Pressing Stop in the transport, then Play, starts from the first chord of the song.
+**File: `src/components/chord/ChordPickerSheet.tsx`**
+- Remove `.reverse()` from the `handlePickNashville` fallback (lines ~155).
+- Remove `.reverse()` from the `handlePresetUse` fallback (lines ~167).
+- Keep `onPickBatch` forward-order path unchanged.
+
+**File: `src/components/lyrics/FocusedChordEditor.tsx`**
+- In `handlePick`, after `upsertChordAt` (the `anchorId` branch), advance `slot` by `chordSlotWidth(chord.display) + 1` so subsequent inserts land to the right, not on top of the replaced chord.
+- In `handlePickNashville` and `handlePresetUse`, remove the `[...placements].reverse()` loops. Insert in forward order since `placeChordInSlot` + `insertSectionChordAtSlot` already maintain correct slot-sorted SSOT order.
+
+**Verification**
+- Run `npx tsc --noEmit`.
+- In browser: tap an existing chord, type C → Enter → F → Enter → Em → Enter → Gm11 → Enter. Verify visual order is C F Em Gm11 left-to-right.
+- Test Nashville batch (e.g. "2 5 1") in both components. Verify forward order.
+- Test preset insertion. Verify forward order.
