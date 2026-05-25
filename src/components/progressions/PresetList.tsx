@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
+import { PROGRESSION_PRESETS, realizePreset, getPresetVibes, type ProgressionPreset } from "@/lib/music/presets";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { playProgression, stopProgression } from "@/lib/music/audio";
@@ -94,7 +94,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
               </div>
               <div className="mb-2">
                 <span className="inline-block rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground" style={{ background: "var(--paper-shade-soft)" }}>
-                  {preset.tag}
+                  {getPresetVibes(preset)[0] ?? ""}
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 mb-3">

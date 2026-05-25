@@ -4,8 +4,9 @@
 // offline — no AI, no network calls.
 
 import {
-  ChordSymbol, Mode, Quality, parseChord, rootToPc, pcToName, transposeChord,
+  ChordSymbol, Mode, Quality, rootToPc, pcToName,
 } from "./chords";
+import { analyzeChord } from "./analyzeChord";
 
 export interface ProgressionSuggestion {
   label: string;
@@ -57,14 +58,6 @@ function buildChordLike(
   return buildChord(rootPc, quality, useFlat);
 }
 
-/** Get the diatonic degree (0-6) of a chord in the given key, or -1. */
-function degreeOf(chord: ChordSymbol, keyRoot: string, mode: Mode): number {
-  const scale = mode === "maj" ? MAJOR_SCALE : MINOR_SCALE;
-  const keyPc = rootToPc(keyRoot);
-  const interval = (rootToPc(chord.root) - keyPc + 12) % 12;
-  return scale.indexOf(interval);
-}
-
 function diatonicAt(degree: number, keyRoot: string, mode: Mode, useFlat: boolean): ChordSymbol {
   const scale = mode === "maj" ? MAJOR_SCALE : MINOR_SCALE;
   const qualities = mode === "maj" ? MAJOR_DEGREE_QUALITY : MINOR_DEGREE_QUALITY;
@@ -72,11 +65,6 @@ function diatonicAt(degree: number, keyRoot: string, mode: Mode, useFlat: boolea
   const idx = ((degree % 7) + 7) % 7;
   const pc = (keyPc + scale[idx]) % 12;
   return buildChord(pc, qualities[idx], useFlat);
-}
-
-/** Is this a dominant-quality chord? */
-function isDominant(c: ChordSymbol): boolean {
-  return FAMILY_MEMBERS.dom.includes(c.quality);
 }
 
 /** Convert a chord to its relative (maj↔min), preserving extended quality when family-compatible. */
@@ -138,7 +126,7 @@ export function generateProgressionSuggestions(
 
   // 2. Replace IV with ii (or ii with IV) where it appears.
   const iv2ii = chords.map((c) => {
-    const deg = degreeOf(c, keyRoot, mode);
+    const deg = analyzeChord(c, keyRoot, mode).degreeIndex;
     if (deg === 3) return diatonicAt(1, keyRoot, mode, useFlat); // IV → ii
     if (deg === 1) return diatonicAt(3, keyRoot, mode, useFlat); // ii → IV
     return c;
@@ -148,10 +136,11 @@ export function generateProgressionSuggestions(
   }
 
   // 3. Tritone sub on dominants (or convert V triad → V7 → tritone sub).
-  const tritone = chords.map((c, i) => {
-    const isV = degreeOf(c, keyRoot, mode) === 4;
-    if (isDominant(c) || isV) {
-      const dom: ChordSymbol = isDominant(c)
+  const tritone = chords.map((c) => {
+    const a = analyzeChord(c, keyRoot, mode);
+    const isDom = FAMILY_MEMBERS.dom.includes(c.quality);
+    if (a.function === "dominant" || isDom) {
+      const dom: ChordSymbol = isDom
         ? c
         : { ...c, quality: "7", display: c.root + QUALITY_PRETTY["7"] };
       return tritoneSub(dom, useFlat);
@@ -182,9 +171,9 @@ export function generateProgressionSuggestions(
   const deceptive = chords.slice();
   let deceptiveChanged = false;
   for (let i = 0; i < chords.length - 1; i++) {
-    const a = chords[i];
-    const b = chords[i + 1];
-    if ((isDominant(a) || degreeOf(a, keyRoot, mode) === 4) && degreeOf(b, keyRoot, mode) === 0) {
+    const a = analyzeChord(chords[i], keyRoot, mode);
+    const b = analyzeChord(chords[i + 1], keyRoot, mode);
+    if (a.function === "dominant" && b.degreeIndex === 0) {
       deceptive[i + 1] = diatonicAt(5, keyRoot, mode, useFlat);
       deceptiveChanged = true;
     }
@@ -194,7 +183,7 @@ export function generateProgressionSuggestions(
   // 6. Modal interchange: borrow bVI / bVII from parallel minor in major keys.
   if (mode === "maj") {
     const borrowed = chords.map((c) => {
-      const deg = degreeOf(c, keyRoot, mode);
+      const deg = analyzeChord(c, keyRoot, mode).degreeIndex;
       if (deg === 5) {
         // vi → bVI (major)
         const pc = (rootToPc(keyRoot) + 8) % 12;
@@ -225,7 +214,7 @@ export function getChordProgressionSuggestions(
   mode: Mode,
 ): ChordSymbol[] {
   const useFlat = keyRoot.includes("b") || ["F", "Bb", "Eb", "Ab", "Db", "Gb"].includes(keyRoot);
-  const deg = degreeOf(chord, keyRoot, mode);
+  const deg = analyzeChord(chord, keyRoot, mode).degreeIndex;
 
   const SUCCESSORS: Record<number, number[]> = {
     0: [3, 4, 5, 1],
@@ -265,7 +254,8 @@ export function getChordProgressionSuggestions(
       push(inheritOrBase(diatonicAt(d, keyRoot, mode, useFlat)));
     }
   } else {
-    const domSource: ChordSymbol = isDominant(chord)
+    const isDom = FAMILY_MEMBERS.dom.includes(chord.quality);
+    const domSource: ChordSymbol = isDom
       ? chord
       : { ...chord, quality: "7", display: chord.root + QUALITY_PRETTY["7"] };
     push(tritoneSub(domSource, useFlat));

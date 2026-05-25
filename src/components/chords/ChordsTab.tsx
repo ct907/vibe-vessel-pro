@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Music, Play, Square } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
+import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, getPresetVibes, type ProgressionPreset } from "@/lib/music/presets";
 import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
 import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { getChordProgressionSuggestions } from "@/lib/music/suggestions";
@@ -92,8 +92,8 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
 
   const detailExplainer = useMemo(() => {
     if (!detailChord || !detailAnalysis) return "";
-    return describeChordFunction(detailAnalysis, meta.keyRoot, meta.keyMode);
-  }, [detailChord, detailAnalysis, meta.keyRoot, meta.keyMode]);
+    return describeChordFunction(detailAnalysis);
+  }, [detailChord, detailAnalysis]);
 
   const detailSuggestions = useMemo(() => {
     if (!detailChord) return [];
@@ -381,7 +381,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                             <span className="font-display font-semibold text-sm">{preset.name}</span>
                             <span className="font-mono-chord text-[10px] text-muted-foreground">{preset.formula}</span>
                           </div>
-                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{preset.tag}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{getPresetVibes(preset)[0] ?? ""}</div>
                           <div className="flex flex-wrap gap-1.5 mb-2">
                             {chords.map((c, i) => {
                               const isPlayhead = isPlaying && i === playingStep;

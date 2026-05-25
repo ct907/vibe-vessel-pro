@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
+import {
+  PROGRESSION_PRESETS, realizePreset, type ProgressionPreset, type PresetFilter,
+  getPresetCRSpectrums, getPresetGenres, getPresetVibes,
+} from "@/lib/music/presets";
 import { CR_BANDS, CR_SPECTRUM_LABEL, type CRSpectrum } from "@/lib/music/chordRelationships";
 import { GENRE_LABEL, GENRE_COLOR, type GenreTag } from "@/lib/music/genreColor";
 import { useSongStore } from "@/store/song";
@@ -28,45 +31,69 @@ const GENRE_FILTER_TAGS: GenreTag[] = ["neo_soul", "jazz", "gospel", "rnb", "cin
 export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps) {
   const meta = useSongStore((s) => s.meta);
   const [activeBand, setActiveBand] = useState<keyof typeof CR_BANDS | null>(null);
-  const [activeSpectrum, setActiveSpectrum] = useState<CRSpectrum | null>(null);
-  const [activeGenres, setActiveGenres] = useState<GenreTag[]>([]);
+  const [activeFilters, setActiveFilters] = useState<PresetFilter[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const toggleGenre = (g: GenreTag) => {
-    setActiveGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
+  const activeSpectrum = useMemo<CRSpectrum | null>(() => {
+    const f = activeFilters.find((x) => x.kind === "cr_spectrum");
+    return f && f.kind === "cr_spectrum" ? f.value : null;
+  }, [activeFilters]);
+
+  const activeGenres = useMemo<GenreTag[]>(
+    () => activeFilters.filter((f): f is Extract<PresetFilter, { kind: "genre" }> => f.kind === "genre").map((f) => f.value),
+    [activeFilters],
+  );
+
+  const toggleFilter = (f: PresetFilter) => {
+    setActiveFilters((prev) => {
+      const existing = prev.findIndex((x) => x.kind === f.kind && x.value === f.value);
+      if (existing >= 0) return prev.filter((_, i) => i !== existing);
+      // Spectrum is single-select: clear any prior spectrum filter first
+      const cleared = f.kind === "cr_spectrum" ? prev.filter((x) => x.kind !== "cr_spectrum") : prev;
+      return [...cleared, f];
+    });
+  };
+
+  const toggleGenre = (g: GenreTag) => toggleFilter({ kind: "genre", value: g });
+
+  const setSpectrum = (s: CRSpectrum | null) => {
+    setActiveFilters((prev) => {
+      const cleared = prev.filter((x) => x.kind !== "cr_spectrum");
+      return s ? [...cleared, { kind: "cr_spectrum", value: s }] : cleared;
+    });
   };
 
   const visible = useMemo(() => {
     const hasBand = !!activeBand || !!activeSpectrum;
     const hasGenre = activeGenres.length > 0;
-
     if (!hasBand && !hasGenre) return PROGRESSION_PRESETS;
 
     return PROGRESSION_PRESETS.filter((p) => {
+      const spectrums = getPresetCRSpectrums(p);
+      const genres = getPresetGenres(p);
+      const vibes = getPresetVibes(p);
+
       let bandMatch = true;
       let genreMatch = true;
 
       if (hasBand) {
-        const spectrums = p.crSpectrums;
         if (activeSpectrum) {
-          bandMatch = !!(spectrums?.includes(activeSpectrum) ||
-            (!spectrums && p.tag.toLowerCase().includes(activeSpectrum)));
+          bandMatch = spectrums.includes(activeSpectrum) ||
+            (spectrums.length === 0 && vibes.some((v) => v.toLowerCase().includes(activeSpectrum)));
         } else {
-          if (spectrums) {
+          if (spectrums.length > 0) {
             const bandSpectrums = CR_BANDS[activeBand!] as readonly string[];
             bandMatch = spectrums.some((s) => bandSpectrums.includes(s));
           } else {
             const bandLabel =
               activeBand === "dark" ? "Dark" : activeBand === "neutral" ? "Cinematic" : "Epic";
-            bandMatch = p.tag.includes(bandLabel);
+            bandMatch = vibes.some((v) => v.includes(bandLabel));
           }
         }
       }
 
       if (hasGenre) {
-        genreMatch = !!(p.genreTags?.some((g) => activeGenres.includes(g)));
+        genreMatch = genres.some((g) => activeGenres.includes(g));
       }
 
       return bandMatch && genreMatch;
@@ -121,7 +148,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
               type="button"
               onClick={() => {
                 setActiveBand(key);
-                setActiveSpectrum(null);
+                setSpectrum(null);
               }}
               className={cn(
                 "rounded-lg px-3 py-1 text-xs font-semibold transition-colors",
@@ -142,7 +169,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setActiveSpectrum(isActive ? null : s)}
+                  onClick={() => setSpectrum(isActive ? null : s)}
                   className={cn(
                     "shrink-0 rounded-md px-2.5 py-0.5 text-[10px] font-semibold transition-colors",
                     isActive ? "btn-sculpt-cocoa" : "btn-sculpt-cream",
@@ -187,7 +214,9 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
           {visible.map((preset) => {
             const chords = realizePreset(preset, meta.keyRoot, meta.keyMode);
             const isPlaying = playingId === preset.id;
-            const showGenreBadges = (preset.genreTags?.length ?? 0) > 0;
+            const presetGenres = getPresetGenres(preset);
+            const presetVibe = getPresetVibes(preset)[0];
+            const showGenreBadges = presetGenres.length > 0;
             return (
               <div
                 key={preset.id}
@@ -199,10 +228,12 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
                   <span className="font-mono-chord text-xs text-muted-foreground">{preset.formula}</span>
                 </div>
                 <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-block rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground" style={{ background: "var(--paper-shade-soft)" }}>
-                    {preset.tag}
-                  </span>
-                  {showGenreBadges && preset.genreTags!.map((g) => {
+                  {presetVibe && (
+                    <span className="inline-block rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground" style={{ background: "var(--paper-shade-soft)" }}>
+                      {presetVibe}
+                    </span>
+                  )}
+                  {showGenreBadges && presetGenres.map((g) => {
                     const isHighlighted = activeGenres.length > 0 && activeGenres.includes(g);
                     return (
                       <span

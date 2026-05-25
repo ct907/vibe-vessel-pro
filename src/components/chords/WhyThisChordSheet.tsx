@@ -16,10 +16,10 @@ import {
   MODE_LABEL,
 } from "@/lib/music/chords";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
+import { analyzeChord, analyzeTransition } from "@/lib/music/analyzeChord";
+import { describeChordFunction } from "@/lib/music/harmony";
 import {
   MODE_CHARACTER,
-  findParallelModesContaining,
   getNumeralAtDegree,
   modeDisplayName,
   type AnyMode,
@@ -29,8 +29,7 @@ import {
   realizePreset,
   type ProgressionPreset,
 } from "@/lib/music/presets";
-import { getCR } from "@/lib/music/chordRelationships";
-import { getGenreTags, GENRE_LABEL, GENRE_COLOR, getGenreContextLine } from "@/lib/music/genreColor";
+import { GENRE_LABEL, GENRE_COLOR, getGenreContextLine } from "@/lib/music/genreColor";
 import { playChord, playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -97,26 +96,27 @@ export function WhyThisChordSheet() {
   // ----- Analysis -----
   const analysis = useMemo(() => {
     if (!chord) return null;
-    return analyzeProgression([chord], meta.keyRoot, meta.keyMode).chords[0];
+    return analyzeChord(chord, meta.keyRoot, meta.keyMode);
   }, [chord, meta.keyRoot, meta.keyMode]);
+
+  const transition = useMemo(() => {
+    const nextChord = req?.nextChord;
+    if (!chord || !nextChord) return null;
+    return analyzeTransition(chord, nextChord, meta.keyRoot, meta.keyMode);
+  }, [chord, req?.nextChord, meta.keyRoot, meta.keyMode]);
 
   const explainer = useMemo(() => {
     if (!chord || !analysis) return "";
-    return describeChordFunction(analysis, meta.keyRoot, meta.keyMode);
-  }, [chord, analysis, meta.keyRoot, meta.keyMode]);
+    return describeChordFunction(analysis);
+  }, [chord, analysis]);
 
-  const interval = useMemo(() => {
-    if (!chord) return 0;
-    return ((rootToPc(chord.root) - rootToPc(meta.keyRoot)) % 12 + 12) % 12;
-  }, [chord, meta.keyRoot]);
+  const interval = analysis?.degreeOffset ?? 0;
 
   // ----- Borrowed-from modes -----
   const parallelModes = useMemo<AnyMode[]>(() => {
-    if (!chord) return [];
     if (!analysis?.isBorrowed) return [];
-    return findParallelModesContaining(interval, chord.quality)
-      .filter((m) => m !== meta.keyMode);
-  }, [chord, analysis, interval, meta.keyMode]);
+    return analysis.borrowedFrom;
+  }, [analysis]);
 
   // ----- Matching presets: primary → secondary → borrowed (cap 3) -----
   type MatchKind = "primary" | "secondary" | "borrowed";
@@ -172,8 +172,7 @@ export function WhyThisChordSheet() {
 
     // Tier 3 — borrowed: parallel-mode aware
     if (out.length < 3) {
-      const modes = findParallelModesContaining(focusedDegree, focusedQuality)
-        .filter((m) => m !== meta.keyMode);
+      const modes = analysis?.borrowedFrom ?? [];
       for (const m of modes) {
         for (const preset of PROGRESSION_PRESETS) {
           const hit = preset.degrees.findIndex(
@@ -194,7 +193,7 @@ export function WhyThisChordSheet() {
     }
 
     return out;
-  }, [chord, meta.keyRoot, meta.keyMode, interval]);
+  }, [chord, meta.keyRoot, meta.keyMode, interval, analysis]);
 
   // ----- Specialist context (zero results fallback) -----
   const specialistContext = useMemo<{ prev: ChordSymbol; next: ChordSymbol } | null>(() => {
@@ -380,7 +379,7 @@ export function WhyThisChordSheet() {
               {QUALITY_LABEL[chord.quality] ?? chord.quality} · in {keyLabel}
             </div>
             {(() => {
-              const genres = getGenreTags(chord.quality).slice(0, 3);
+              const genres = (analysis?.genreTags ?? []).slice(0, 3);
               if (genres.length === 0) return null;
               return (
                 <div className="flex flex-wrap gap-1 mt-2">
@@ -429,10 +428,11 @@ export function WhyThisChordSheet() {
           {/* 2b. Transition feel */}
           {(() => {
             const nextChord = req?.nextChord;
-            if (!nextChord || !chord) return null;
-            const cr = getCR(chord, nextChord);
-            if (!cr) return null;
-            const reverseCr = getCR(nextChord, chord);
+            if (!nextChord || !chord || !transition?.crEmotion) return null;
+            const reverse = nextChord
+              ? analyzeTransition(nextChord, chord, meta.keyRoot, meta.keyMode)
+              : null;
+            const reverseEmotion = reverse?.crEmotion ?? null;
             return (
               <section className="space-y-1.5">
                 <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -441,13 +441,13 @@ export function WhyThisChordSheet() {
                 <p className="text-sm leading-relaxed text-foreground">
                   Moving from <span className="font-mono-chord">{chord.display}</span> to{" "}
                   <span className="font-mono-chord">{nextChord.display}</span> has a{" "}
-                  <strong>{cr.emotion.toLowerCase()}</strong> sound.
+                  <strong>{transition.crEmotion.toLowerCase()}</strong> sound.
                 </p>
-                {reverseCr && reverseCr !== cr && (
+                {reverseEmotion && reverseEmotion !== transition.crEmotion && (
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     The reverse — <span className="font-mono-chord">{nextChord.display}</span>{" "}
                     → <span className="font-mono-chord">{chord.display}</span> — sounds{" "}
-                    <strong>{reverseCr.emotion.toLowerCase()}</strong>.
+                    <strong>{reverseEmotion.toLowerCase()}</strong>.
                   </p>
                 )}
               </section>
