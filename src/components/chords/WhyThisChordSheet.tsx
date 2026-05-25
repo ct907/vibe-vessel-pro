@@ -421,12 +421,12 @@ export function WhyThisChordSheet() {
           )}
 
           {/* 4. Used in these progressions */}
-          {matchingPresets.length > 0 && (
+          {(matchingPresets.length > 0 || specialistHint) && (
             <section className="space-y-2">
               <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Used in these progressions
               </h3>
-              {matchingPresets.map(({ preset, chords, hitIndex }) => {
+              {matchingPresets.map(({ preset, chords, hitIndex, subLabel }) => {
                 const isPlaying = playingPresetId === preset.id;
                 return (
                   <div
@@ -434,6 +434,11 @@ export function WhyThisChordSheet() {
                     className="rounded-lg p-3 space-y-2"
                     style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
                   >
+                    {subLabel && (
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-display">
+                        {subLabel}
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="font-display font-semibold text-sm">{preset.name}</span>
                       <span className="font-mono-chord text-[10px] text-muted-foreground">
@@ -478,8 +483,17 @@ export function WhyThisChordSheet() {
                   </div>
                 );
               })}
+              {specialistHint && (
+                <div
+                  className="rounded-lg p-3 text-sm text-foreground leading-relaxed"
+                  style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+                >
+                  {specialistHint}
+                </div>
+              )}
             </section>
           )}
+
 
           {/* 5. Try a related chord */}
           {relatedChords.length > 0 && (
