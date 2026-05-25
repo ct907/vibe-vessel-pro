@@ -30,6 +30,7 @@ import {
   type ProgressionPreset,
 } from "@/lib/music/presets";
 import { getCR } from "@/lib/music/chordRelationships";
+import { getGenreTags, GENRE_LABEL, GENRE_COLOR, getGenreContextLine } from "@/lib/music/genreColor";
 import { playChord, playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -357,6 +358,23 @@ export function WhyThisChordSheet() {
             <div className="text-xs mt-1 opacity-80 font-display">
               {QUALITY_LABEL[chord.quality] ?? chord.quality} · in {keyLabel}
             </div>
+            {(() => {
+              const genres = getGenreTags(chord.quality).slice(0, 3);
+              if (genres.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {genres.map((g) => (
+                    <span
+                      key={g}
+                      className="inline-block rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-semibold"
+                      style={{ background: GENRE_COLOR[g], color: "oklch(0.25 0.02 260)" }}
+                    >
+                      {GENRE_LABEL[g]}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <button
             type="button"
@@ -380,6 +398,11 @@ export function WhyThisChordSheet() {
               Role in this key
             </h3>
             <p className="text-sm leading-relaxed text-foreground">{roleSentence}</p>
+            {(() => {
+              const line = getGenreContextLine(chord.quality);
+              if (!line) return null;
+              return <p className="text-sm leading-relaxed text-muted-foreground">{line}</p>;
+            })()}
           </section>
 
           {/* 2b. Transition feel */}
