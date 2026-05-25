@@ -233,6 +233,7 @@ export function FocusedChordEditor(props: Props) {
     if (anchorId) {
       upsertChordAt(props.sectionId, lyricsLineId, slot, chordWithOctave, anchorId);
       setAnchorId(undefined);
+      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + chordSlotWidth(chord.display) + 1));
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
