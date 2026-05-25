@@ -227,7 +227,7 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
                   <span className="font-display text-lg font-bold">{preset.name}</span>
                   <span className="font-mono-chord text-xs text-muted-foreground">{preset.formula}</span>
                 </div>
-                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   {presetVibe && (
                     <span className="inline-block rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground" style={{ background: "var(--paper-shade-soft)" }}>
                       {presetVibe}
@@ -251,6 +251,11 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
                     );
                   })}
                 </div>
+                {preset.mood && (
+                  <p className="mb-2 text-[11px] leading-snug text-muted-foreground italic">
+                    {preset.mood}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {chords.map((c, i) => (
                     <ChordChip key={`${preset.id}-${i}`} chord={c} variant="ink" size="sm" />

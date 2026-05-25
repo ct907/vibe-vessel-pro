@@ -23,6 +23,7 @@ export interface ProgressionPreset {
   name: string;
   formula: string;
   filters: PresetFilter[];
+  mood?: string;
   degrees: PresetDegree[];
   featuredQualities?: Quality[];
   featureIndex?: number;
@@ -331,8 +332,9 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     formula: "Imaj9 – vim9 – IVmaj9 – V9",
     filters: [
       { kind: "genre", value: "neo_soul" },
-      { kind: "vibe", value: "Emotional" },
+      { kind: "genre", value: "rnb" },
     ],
+    mood: "Smooth, layered warmth",
     degrees: [
       { interval: 0, quality: "maj9", romanNumeral: "Imaj9" },
       { interval: 9, quality: "min9", romanNumeral: "vim9" },
@@ -347,8 +349,8 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     filters: [
       { kind: "genre", value: "rnb" },
       { kind: "genre", value: "neo_soul" },
-      { kind: "vibe", value: "Emotional" },
     ],
+    mood: "Moody, late-night groove",
     degrees: [
       { interval: 0,  quality: "min9", romanNumeral: "im9" },
       { interval: 10, quality: "maj9", romanNumeral: "♭VIImaj9" },
@@ -378,6 +380,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
       { kind: "genre", value: "gospel" },
       { kind: "vibe", value: "Emotional" },
     ],
+    mood: "Uplifting, lush",
     degrees: [
       { interval: 0, quality: "6/9",  romanNumeral: "I6/9" },
       { interval: 5, quality: "add9", romanNumeral: "IVadd9" },
@@ -400,6 +403,262 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
       { interval: 7, quality: "7b9",    romanNumeral: "V7♭9" },
       { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
       { interval: 5, quality: "maj7",   romanNumeral: "IVmaj7" },
+    ],
+  },
+  // ── Suspended ─────────────────────────────────────────────────────────
+  {
+    id: "suspended-anthem",
+    name: "Suspended anthem",
+    formula: "Isus2 – V – IVsus4 – IV",
+    filters: [
+      { kind: "vibe", value: "Emotional" },
+      { kind: "genre", value: "pop" },
+    ],
+    mood: "Open, ringing — the Coldplay/U2 sound",
+    degrees: [
+      { interval: 0, quality: "sus2", romanNumeral: "Isus2" },
+      { interval: 7, quality: "maj",  romanNumeral: "V" },
+      { interval: 5, quality: "sus4", romanNumeral: "IVsus4" },
+      { interval: 5, quality: "maj",  romanNumeral: "IV" },
+    ],
+  },
+  {
+    id: "gospel-sus-resolution",
+    name: "Gospel sus resolution",
+    formula: "Isus4 – I – IVsus2 – IV – V – I",
+    filters: [
+      { kind: "genre", value: "gospel" },
+      { kind: "vibe", value: "Emotional" },
+    ],
+    mood: "Uplifting, breath before the landing",
+    degrees: [
+      { interval: 0, quality: "sus4", romanNumeral: "Isus4" },
+      { interval: 0, quality: "maj",  romanNumeral: "I" },
+      { interval: 5, quality: "sus2", romanNumeral: "IVsus2" },
+      { interval: 5, quality: "maj",  romanNumeral: "IV" },
+      { interval: 7, quality: "maj",  romanNumeral: "V" },
+      { interval: 0, quality: "maj",  romanNumeral: "I" },
+    ],
+  },
+  {
+    id: "sus4-rock-descent",
+    name: "Sus4 rock descent",
+    formula: "Isus4 – I – ♭VIIsus4 – ♭VII – IVsus4 – IV",
+    filters: [
+      { kind: "vibe", value: "Epic" },
+      { kind: "genre", value: "rock" },
+    ],
+    mood: "Arena rock — The Who meets U2",
+    degrees: [
+      { interval: 0,  quality: "sus4", romanNumeral: "Isus4" },
+      { interval: 0,  quality: "maj",  romanNumeral: "I" },
+      { interval: 10, quality: "sus4", romanNumeral: "♭VIIsus4" },
+      { interval: 10, quality: "maj",  romanNumeral: "♭VII" },
+      { interval: 5,  quality: "sus4", romanNumeral: "IVsus4" },
+      { interval: 5,  quality: "maj",  romanNumeral: "IV" },
+    ],
+  },
+  // ── Line cliché ───────────────────────────────────────────────────────
+  {
+    id: "minor-line-cliche",
+    name: "Minor line cliché",
+    formula: "i – imaj7 – im7 – im6",
+    filters: [
+      { kind: "vibe", value: "Emotional" },
+      { kind: "genre", value: "cinematic" },
+      { kind: "cr_spectrum", value: "sad" },
+    ],
+    mood: "Aching, cinematic descent — Stairway / Bond",
+    degrees: [
+      { interval: 0, quality: "min",     romanNumeral: "i" },
+      { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
+      { interval: 0, quality: "min7",    romanNumeral: "i7" },
+      { interval: 0, quality: "min6",    romanNumeral: "i6" },
+    ],
+  },
+  {
+    id: "major-descending-cliche",
+    name: "Major descending cliché",
+    formula: "I – Imaj7 – I7 – I6 – IV",
+    filters: [
+      { kind: "vibe", value: "Emotional" },
+      { kind: "genre", value: "pop" },
+    ],
+    mood: "Gentle, nostalgic descent — Something by The Beatles",
+    degrees: [
+      { interval: 0, quality: "maj",  romanNumeral: "I" },
+      { interval: 0, quality: "maj7", romanNumeral: "Imaj7" },
+      { interval: 0, quality: "7",    romanNumeral: "I7" },
+      { interval: 0, quality: "6",    romanNumeral: "I6" },
+      { interval: 5, quality: "maj",  romanNumeral: "IV" },
+    ],
+  },
+  {
+    id: "augmented-ascending-cliche",
+    name: "Augmented ascending cliché",
+    formula: "I – I+ – vi – IV",
+    filters: [
+      { kind: "genre", value: "pop" },
+      { kind: "cr_spectrum", value: "rising" },
+    ],
+    mood: "Rising shimmer — Oh! Darling chromatic lift",
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 0, quality: "aug", romanNumeral: "I+" },
+      { interval: 9, quality: "min", romanNumeral: "vi" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+    ],
+  },
+  // ── Altered dominant ─────────────────────────────────────────────────
+  {
+    id: "jazz-minor-ii-v-i-7b9",
+    name: "Jazz minor ii-V-i with 7♭9",
+    formula: "iim7♭5 – V7♭9 – i – VII",
+    filters: [
+      { kind: "genre", value: "jazz" },
+      { kind: "cr_spectrum", value: "tragic" },
+    ],
+    mood: "Deep jazz tension and resolution",
+    degrees: [
+      { interval: 2,  quality: "m7b5", romanNumeral: "iiø7" },
+      { interval: 7,  quality: "7b9",  romanNumeral: "V7♭9" },
+      { interval: 0,  quality: "min",  romanNumeral: "i" },
+      { interval: 10, quality: "maj",  romanNumeral: "VII" },
+    ],
+  },
+  {
+    id: "blues-turnaround-7sharp9",
+    name: "Blues turnaround with 7♯9",
+    formula: "I7 – IV7 – I7♯9 – V7♯9",
+    filters: [
+      { kind: "genre", value: "blues" },
+      { kind: "vibe", value: "Dark" },
+    ],
+    mood: "Grinding, unresolved blues edge",
+    degrees: [
+      { interval: 0, quality: "7",   romanNumeral: "I7" },
+      { interval: 5, quality: "7",   romanNumeral: "IV7" },
+      { interval: 0, quality: "7#9", romanNumeral: "I7♯9" },
+      { interval: 7, quality: "7#9", romanNumeral: "V7♯9" },
+    ],
+  },
+  {
+    id: "bossa-altered",
+    name: "Bossa nova altered cadence",
+    formula: "iim7 – V7♭9 – Imaj9 – vim9",
+    filters: [
+      { kind: "genre", value: "jazz" },
+      { kind: "vibe", value: "Smooth" },
+    ],
+    mood: "Silky tension into lush resolution",
+    degrees: [
+      { interval: 2, quality: "min7", romanNumeral: "iim7" },
+      { interval: 7, quality: "7b9",  romanNumeral: "V7♭9" },
+      { interval: 0, quality: "maj9", romanNumeral: "Imaj9" },
+      { interval: 9, quality: "min9", romanNumeral: "vim9" },
+    ],
+  },
+  // ── Augmented ────────────────────────────────────────────────────────
+  {
+    id: "chromatic-walk-up-50s",
+    name: "50s chromatic walk-up",
+    formula: "I – I+ – IV – iv",
+    filters: [
+      { kind: "vibe", value: "Nostalgic" },
+      { kind: "cr_spectrum", value: "bittersweet" },
+    ],
+    mood: "Roy Orbison / early Beatles — ascending then darkening",
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 0, quality: "aug", romanNumeral: "I+" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+      { interval: 5, quality: "min", romanNumeral: "iv" },
+    ],
+  },
+  {
+    id: "augmented-passing-bridge",
+    name: "Augmented passing bridge",
+    formula: "I – I+ – vi – IV – V",
+    filters: [
+      { kind: "genre", value: "pop" },
+      { kind: "cr_spectrum", value: "rising" },
+    ],
+    mood: "Chromatic lift into a familiar cadence",
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 0, quality: "aug", romanNumeral: "I+" },
+      { interval: 9, quality: "min", romanNumeral: "vi" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+      { interval: 7, quality: "maj", romanNumeral: "V" },
+    ],
+  },
+  // ── Power chords ─────────────────────────────────────────────────────
+  {
+    id: "punk-i-iv-v",
+    name: "Punk I-IV-V",
+    formula: "I5 – IV5 – V5 – I5",
+    filters: [
+      { kind: "genre", value: "rock" },
+      { kind: "vibe", value: "Epic" },
+    ],
+    mood: "Three chords, no thirds, all energy",
+    degrees: [
+      { interval: 0, quality: "5", romanNumeral: "I5" },
+      { interval: 5, quality: "5", romanNumeral: "IV5" },
+      { interval: 7, quality: "5", romanNumeral: "V5" },
+      { interval: 0, quality: "5", romanNumeral: "I5" },
+    ],
+  },
+  {
+    id: "rock-bvii-power-drop",
+    name: "Rock ♭VII power drop",
+    formula: "I5 – ♭VII5 – IV5 – I5",
+    filters: [
+      { kind: "genre", value: "rock" },
+      { kind: "vibe", value: "Dark" },
+    ],
+    mood: "Heavy, modal — Sabbath meets Nirvana",
+    degrees: [
+      { interval: 0,  quality: "5", romanNumeral: "I5" },
+      { interval: 10, quality: "5", romanNumeral: "♭VII5" },
+      { interval: 5,  quality: "5", romanNumeral: "IV5" },
+      { interval: 0,  quality: "5", romanNumeral: "I5" },
+    ],
+  },
+  // ── Jazz + line cliché ───────────────────────────────────────────────
+  {
+    id: "jazz-minor-with-cliche",
+    name: "Jazz minor with cliché",
+    formula: "i – imaj7 – im7 – iim7♭5 – V7♭9 – i",
+    filters: [
+      { kind: "genre", value: "jazz" },
+      { kind: "genre", value: "cinematic" },
+      { kind: "cr_spectrum", value: "bittersweet" },
+    ],
+    mood: "Brooding, sophisticated",
+    degrees: [
+      { interval: 0, quality: "min",     romanNumeral: "i" },
+      { interval: 0, quality: "minMaj7", romanNumeral: "i(maj7)" },
+      { interval: 0, quality: "min7",    romanNumeral: "i7" },
+      { interval: 2, quality: "m7b5",    romanNumeral: "iiø7" },
+      { interval: 7, quality: "7b9",     romanNumeral: "V7♭9" },
+      { interval: 0, quality: "min",     romanNumeral: "i" },
+    ],
+  },
+  {
+    id: "cinematic-augmented-dominant",
+    name: "Cinematic augmented dominant",
+    formula: "i – IV – V7♯5 – i",
+    filters: [
+      { kind: "genre", value: "cinematic" },
+      { kind: "cr_spectrum", value: "rising" },
+    ],
+    mood: "Shimmering, upward-pulling drama",
+    degrees: [
+      { interval: 0, quality: "min", romanNumeral: "i" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+      { interval: 7, quality: "7#5", romanNumeral: "V7♯5" },
+      { interval: 0, quality: "min", romanNumeral: "i" },
     ],
   },
 ];
@@ -746,19 +1005,6 @@ export const QUALITY_PROGRESSION_PRESETS: ProgressionPreset[] = [
       { interval: 0, quality: "5", romanNumeral: "I5" },
       { interval: 10, quality: "5", romanNumeral: "♭VII5" },
       { interval: 5, quality: "5", romanNumeral: "IV5" },
-    ],
-  },
-  {
-    id: "punk-i-iv-v",
-    name: "Punk I–IV–V",
-    formula: "I5 – IV5 – V5",
-    filters: [{ kind: "vibe", value: "Three-Chord Wall" }],
-    featuredQualities: ["5"],
-    featureIndex: 0,
-    degrees: [
-      { interval: 0, quality: "5", romanNumeral: "I5" },
-      { interval: 5, quality: "5", romanNumeral: "IV5" },
-      { interval: 7, quality: "5", romanNumeral: "V5" },
     ],
   },
   // 6 / min6
