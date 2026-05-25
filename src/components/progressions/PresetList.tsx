@@ -29,7 +29,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   const visible = useMemo(
-    () => (filter ? PROGRESSION_PRESETS.filter((p) => p.tag.includes(filter)) : PROGRESSION_PRESETS),
+    () => (filter ? PROGRESSION_PRESETS.filter((p) => getPresetVibes(p).some((v) => v.includes(filter))) : PROGRESSION_PRESETS),
     [filter],
   );
 

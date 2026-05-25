@@ -27,6 +27,7 @@ import {
 import {
   PROGRESSION_PRESETS,
   realizePreset,
+  realizePresetAnchored,
   type ProgressionPreset,
 } from "@/lib/music/presets";
 import { GENRE_LABEL, GENRE_COLOR, getGenreContextLine } from "@/lib/music/genreColor";
@@ -148,7 +149,7 @@ export function WhyThisChordSheet() {
         (d) => d.quality === focusedQuality && d.interval === focusedDegree,
       );
       if (hit < 0) continue;
-      const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+      const realized = realizePresetAnchored(preset, chord.root, hit, useFlat);
       push({ preset, chords: realized, hitIndex: hit, matchKind: "primary" });
       if (out.length >= 3) return out;
     }
@@ -159,7 +160,7 @@ export function WhyThisChordSheet() {
       for (const preset of PROGRESSION_PRESETS) {
         const hit = preset.degrees.findIndex((d) => d.quality === focusedQuality);
         if (hit < 0) continue;
-        const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+        const realized = realizePresetAnchored(preset, chord.root, hit, useFlat);
         push({
           preset,
           chords: realized,
@@ -180,7 +181,7 @@ export function WhyThisChordSheet() {
             (d) => d.quality === focusedQuality && d.interval === focusedDegree,
           );
           if (hit < 0) continue;
-          const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+          const realized = realizePresetAnchored(preset, chord.root, hit, useFlat);
           push({
             preset,
             chords: realized,
