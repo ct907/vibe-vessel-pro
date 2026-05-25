@@ -114,27 +114,102 @@ export function WhyThisChordSheet() {
       .filter((m) => m !== meta.keyMode);
   }, [chord, analysis, interval, meta.keyMode]);
 
-  // ----- Matching presets (Phase 6 logic, simplified) -----
-  const matchingPresets = useMemo(() => {
+  // ----- Matching presets: primary → secondary → borrowed (cap 3) -----
+  type MatchKind = "primary" | "secondary" | "borrowed";
+  interface PresetMatch {
+    preset: ProgressionPreset;
+    chords: ChordSymbol[];
+    hitIndex: number;
+    matchKind: MatchKind;
+    subLabel?: string;
+  }
+
+  const matchingPresets = useMemo<PresetMatch[]>(() => {
     if (!chord) return [];
-    const out: Array<{ preset: ProgressionPreset; chords: ChordSymbol[]; hitIndex: number }> = [];
-    const fam = QUALITY_FAMILY[chord.quality];
+    const out: PresetMatch[] = [];
+    const seen = new Set<string>();
+    const focusedQuality = chord.quality;
+    const focusedDegree = interval;
+
+    const push = (m: PresetMatch) => {
+      if (seen.has(m.preset.id) || out.length >= 3) return;
+      seen.add(m.preset.id);
+      out.push(m);
+    };
+
+    // Tier 1 — primary: same quality AND same degree (in current song key)
     for (const preset of PROGRESSION_PRESETS) {
+      const hit = preset.degrees.findIndex(
+        (d) => d.quality === focusedQuality && d.interval === focusedDegree,
+      );
+      if (hit < 0) continue;
       const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
-      const hitIndex = realized.findIndex(
-        (rc) => rc.root === chord.root && QUALITY_FAMILY[rc.quality] === fam,
-      );
-      if (hitIndex < 0) continue;
-      const chords = realized.map((rc, i) =>
-        i === hitIndex
-          ? { ...rc, quality: chord.quality, display: rc.root + QUALITY_PRETTY[chord.quality] }
-          : rc,
-      );
-      out.push({ preset, chords, hitIndex });
-      if (out.length >= 3) break;
+      push({ preset, chords: realized, hitIndex: hit, matchKind: "primary" });
+      if (out.length >= 3) return out;
     }
+
+    // Tier 2 — secondary: same quality anywhere
+    if (out.length < 2) {
+      const qLabel = QUALITY_LABEL[focusedQuality] ?? focusedQuality;
+      for (const preset of PROGRESSION_PRESETS) {
+        const hit = preset.degrees.findIndex((d) => d.quality === focusedQuality);
+        if (hit < 0) continue;
+        const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+        push({
+          preset,
+          chords: realized,
+          hitIndex: hit,
+          matchKind: "secondary",
+          subLabel: `Also uses ${qLabel}`,
+        });
+        if (out.length >= 3) return out;
+      }
+    }
+
+    // Tier 3 — borrowed: parallel-mode aware
+    if (out.length < 3) {
+      const modes = findParallelModesContaining(focusedDegree, focusedQuality)
+        .filter((m) => m !== meta.keyMode);
+      for (const m of modes) {
+        for (const preset of PROGRESSION_PRESETS) {
+          const hit = preset.degrees.findIndex(
+            (d) => d.quality === focusedQuality && d.interval === focusedDegree,
+          );
+          if (hit < 0) continue;
+          const realized = realizePreset(preset, meta.keyRoot, meta.keyMode);
+          push({
+            preset,
+            chords: realized,
+            hitIndex: hit,
+            matchKind: "borrowed",
+            subLabel: `Borrowed context — ${modeDisplayName(m)}`,
+          });
+          if (out.length >= 3) return out;
+        }
+      }
+    }
+
     return out;
-  }, [chord, meta.keyRoot, meta.keyMode]);
+  }, [chord, meta.keyRoot, meta.keyMode, interval]);
+
+  // ----- Specialist hint (zero results fallback) -----
+  const specialistHint = useMemo(() => {
+    if (!chord || matchingPresets.length > 0) return null;
+    const ladder = nashvilleLadder(meta.keyRoot, meta.keyMode);
+    if (ladder.length === 0) return null;
+    const targetPc = rootToPc(chord.root);
+    const withDist = ladder.map((d) => {
+      const pc = rootToPc(d.chord.root);
+      const up = (pc - targetPc + 12) % 12;
+      const down = (targetPc - pc + 12) % 12;
+      return { chord: d.chord, up, down };
+    });
+    const next = [...withDist].sort((a, b) => (a.up || 12) - (b.up || 12))[0]?.chord;
+    const prev = [...withDist].sort((a, b) => (a.down || 12) - (b.down || 12))[0]?.chord;
+    if (!next || !prev) return null;
+    return `${chord.display} is a specialist chord — try it as a passing chord between ${prev.display} and ${next.display}.`;
+  }, [chord, matchingPresets, meta.keyRoot, meta.keyMode]);
+
 
   // ----- Related chords -----
   const relatedChords = useMemo<ChordSymbol[]>(() => {
