@@ -1565,6 +1565,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         picker.atBeat,
         !isDesktop ? 4 : undefined,
       );
+      // Advance the slot so the next chord typed lands to the right of this one
+      // instead of pushing this one rightward.
+      setPicker((p) => (p ? { ...p, atBeat: p.atBeat + 1 } : p));
     }
   };
 
