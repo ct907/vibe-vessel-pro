@@ -30,6 +30,7 @@ import {
   type ProgressionPreset,
 } from "@/lib/music/presets";
 import { GENRE_LABEL, GENRE_COLOR, getGenreContextLine } from "@/lib/music/genreColor";
+import { findSongReferences, shouldShowSongRefs } from "@/lib/music/songReferences";
 import { playChord, playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -608,6 +609,51 @@ export function WhyThisChordSheet() {
             </section>
           )}
 
+          {/* 4b. Heard in */}
+          {shouldShowSongRefs(chord.quality) && (() => {
+            const refs = findSongReferences(chord.quality);
+            if (refs.length === 0) return null;
+            return (
+              <section className="space-y-2">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Heard in
+                </h3>
+                {refs.map((ref) => (
+                  <div
+                    key={`${ref.title}-${ref.artist}`}
+                    className="rounded-lg p-3 space-y-1.5"
+                    style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+                  >
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="font-mono-chord font-semibold text-sm">{ref.title}</span>
+                      <span className="text-xs text-muted-foreground">{ref.artist}</span>
+                      <span
+                        className="inline-block rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-semibold"
+                        style={{ background: "var(--paper-shade-soft)", color: "var(--ink-soft)" }}
+                      >
+                        {ref.genre}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-70">{ref.context}</p>
+                    {ref.progression && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ref.progression.split(/\s*→\s*/).map((sym, i) => {
+                          const parsed = parseChord(sym);
+                          return parsed ? (
+                            <ChordChip key={i} chord={parsed} variant="ink" size="sm" audition={false} />
+                          ) : (
+                            <span key={i} className="font-mono-chord text-xs text-muted-foreground">
+                              {sym}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </section>
+            );
+          })()}
 
           {/* 5. Try a related chord */}
           {relatedChords.length > 0 && matchingPresets.length === 0 && !specialistContext && (

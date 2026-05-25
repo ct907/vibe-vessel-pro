@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { useSongStore, type PatternBlock, getPatternChordsViaSSOT } from "@/store/song";
-import { generateSpiceSuggestions, type SpiceSuggestion, type SpiceCategory } from "@/lib/music/spice";
+import { generateSpiceSuggestions, type SpiceSuggestion, type SpiceCategory, CATEGORY_SECTION } from "@/lib/music/spice";
 import { ensureAudio, playProgression, stopProgression, type ScheduledChord } from "@/lib/music/audio";
 import { ChordChip } from "@/components/chord/ChordChip";
-import { Sparkles, Play, Square, Check } from "lucide-react";
+import { Sparkles, Play, Square, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,10 @@ interface Props {
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
+  "sus_resolution", "line_cliche", "extension_colour",
   "cinematic", "espionage", "cosmic_drift", "borrowed_colour", "gateway",
   "step_between", "hypnotic_drone", "amplify", "break_pattern",
+  "altered_dominant", "passing_augmented", "power_riff",
 ];
 
 const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
@@ -34,6 +36,17 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
   amplify: "🔥",
   break_pattern: "💥",
   borrowed_colour: "🎨",
+  sus_resolution: "🌊",
+  line_cliche: "🎻",
+  extension_colour: "✨",
+  altered_dominant: "⚡",
+  passing_augmented: "🔺",
+  power_riff: "🔌",
+};
+
+const SECTION_LABEL: Record<"texture" | "specialist", string> = {
+  texture: "Texture & Colour",
+  specialist: "Specialist Moves",
 };
 
 
@@ -52,6 +65,10 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange, open: ope
     else setOpenInternal(v);
   };
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [sectionOpen, setSectionOpen] = useState<Record<"texture" | "specialist", boolean>>({
+    texture: false,
+    specialist: true,
+  });
 
   const sortedChords = useMemo(
     () => ownerSection ? getPatternChordsViaSSOT(ownerSection, pattern) : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat),
@@ -205,7 +222,26 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange, open: ope
               No spice ideas for this progression right now.
             </div>
           ) : (
-            CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => {
+            (["texture", "specialist"] as const).map((section) => {
+              const cats = CATEGORY_ORDER.filter(
+                (cat) => grouped.has(cat) && CATEGORY_SECTION[cat] === section,
+              );
+              if (cats.length === 0) return null;
+              const isOpen = sectionOpen[section];
+              return (
+                <div key={section} className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setSectionOpen((s) => ({ ...s, [section]: !s[section] }))}
+                    className="flex items-center gap-1.5 px-1 py-0.5 text-[11px] uppercase tracking-widest font-display font-bold text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {SECTION_LABEL[section]}
+                    <span className="text-[10px] normal-case tracking-normal opacity-60">
+                      ({cats.reduce((sum, c) => sum + (grouped.get(c)?.length ?? 0), 0)})
+                    </span>
+                  </button>
+                  {isOpen && cats.map((cat) => {
               const items = grouped.get(cat)!;
               const first = items[0];
               return (
@@ -273,6 +309,9 @@ export function SpicePanel({ pattern, activeChordId, onAuditionChange, open: ope
                       </div>
                     );
                   })}
+                </div>
+              );
+            })}
                 </div>
               );
             })

@@ -17,7 +17,31 @@ export type SpiceCategory =
   | "hypnotic_drone"
   | "amplify"
   | "break_pattern"
-  | "borrowed_colour";
+  | "borrowed_colour"
+  | "sus_resolution"
+  | "line_cliche"
+  | "extension_colour"
+  | "altered_dominant"
+  | "passing_augmented"
+  | "power_riff";
+
+export const CATEGORY_SECTION: Record<SpiceCategory, "texture" | "specialist"> = {
+  sus_resolution: "texture",
+  line_cliche: "texture",
+  extension_colour: "texture",
+  cinematic: "specialist",
+  espionage: "specialist",
+  cosmic_drift: "specialist",
+  gateway: "specialist",
+  step_between: "specialist",
+  hypnotic_drone: "specialist",
+  amplify: "specialist",
+  break_pattern: "specialist",
+  borrowed_colour: "specialist",
+  altered_dominant: "specialist",
+  passing_augmented: "specialist",
+  power_riff: "specialist",
+};
 
 
 export interface SpiceSuggestion {
@@ -433,6 +457,373 @@ function borrowedColourSuggestions(
 }
 
 
+// ----- Sus resolution: sus4/sus2 delays before tonic/dominant -----
+function susResolutionSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+  durations: number[] | undefined,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  suggestedDurations: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+  label: string;
+}> {
+  const out: Array<{
+    chords: ChordSymbol[];
+    changedIndices: number[];
+    suggestedDurations: number[];
+    emotiveLabel: string;
+    theoryLabel: string;
+    label: string;
+  }> = [];
+  const analysis = analyzeProgression(chords, keyRoot, mode);
+  if (analysis.chords.some((a) => a.isSuspended)) return out;
+
+  let sus4Made = false;
+  let sus2Made = false;
+  for (let i = 0; i < chords.length; i++) {
+    const a = analysis.chords[i];
+    const src = chords[i];
+    const dur = durations?.[i] ?? 4;
+    if (dur < 2) continue;
+    const isTonicOrDominant = a.function === "tonic" || a.function === "dominant";
+    if (!isTonicOrDominant) continue;
+
+    if (!sus4Made) {
+      const sus: ChordSymbol = { root: src.root, quality: "sus4", display: src.root + "sus4" };
+      const next = [...chords.slice(0, i), sus, ...chords.slice(i)];
+      const newDurations = (durations ?? chords.map(() => 4)).slice();
+      newDurations.splice(i, 1, dur / 2, dur / 2);
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        suggestedDurations: newDurations,
+        emotiveLabel: "Suspended moment",
+        theoryLabel: "SUS DELAY → RESOLUTION",
+        label: `${sus.display} → ${src.display}`,
+      });
+      sus4Made = true;
+    }
+
+    if (!sus2Made && a.isDiatonic && a.chordFamily === "major") {
+      const sus: ChordSymbol = { root: src.root, quality: "sus2", display: src.root + "sus2" };
+      const next = [...chords.slice(0, i), sus, ...chords.slice(i)];
+      const newDurations = (durations ?? chords.map(() => 4)).slice();
+      newDurations.splice(i, 1, dur / 2, dur / 2);
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        suggestedDurations: newDurations,
+        emotiveLabel: "Suspended moment",
+        theoryLabel: "SUS DELAY → RESOLUTION",
+        label: `${sus.display} → ${src.display}`,
+      });
+      sus2Made = true;
+    }
+    if (sus4Made && sus2Made) break;
+  }
+
+  // Coldplay stack: 4+ diatonic major chords → sus2 at 0, sus4 at 2
+  const diatonicMajorCount = analysis.chords.filter(
+    (a) => a.isDiatonic && a.chordFamily === "major",
+  ).length;
+  if (diatonicMajorCount >= 4) {
+    const next = chords.slice();
+    if (analysis.chords[0]?.chordFamily === "major") {
+      next[0] = { root: chords[0].root, quality: "sus2", display: chords[0].root + "sus2" };
+    }
+    if (analysis.chords[2]?.chordFamily === "major") {
+      next[2] = { root: chords[2].root, quality: "sus4", display: chords[2].root + "sus4" };
+    }
+    if (next.some((c, i) => c.display !== chords[i].display)) {
+      out.push({
+        chords: next,
+        changedIndices: diffIndices(chords, next),
+        suggestedDurations: (durations ?? chords.map(() => 4)).slice(),
+        emotiveLabel: "Open, ringing",
+        theoryLabel: "SUS STACK",
+        label: "Coldplay sus stack",
+      });
+    }
+  }
+
+  return out;
+}
+
+// ----- Line cliché: descending/ascending inner voice -----
+function lineClicheSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+  durations: number[] | undefined,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  suggestedDurations: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+  label: string;
+}> {
+  const analysis = analyzeProgression(chords, keyRoot, mode);
+  let bestIdx = -1;
+  let bestBeats = -1;
+  for (let i = 0; i < chords.length; i++) {
+    const dur = durations?.[i] ?? 4;
+    const q = chords[i].quality;
+    if (dur < 4) continue;
+    if (q !== "maj" && q !== "min") continue;
+    if (dur > bestBeats) { bestBeats = dur; bestIdx = i; }
+  }
+  if (bestIdx < 0) return [];
+
+  const src = chords[bestIdx];
+  const a = analysis.chords[bestIdx];
+  const dur = durations?.[bestIdx] ?? 4;
+
+  let cliche: ChordSymbol[];
+  let emotive: string;
+  let theory: string;
+  if (src.quality === "min") {
+    cliche = [
+      { root: src.root, quality: "min", display: src.root + "m" },
+      { root: src.root, quality: "minMaj7", display: src.root + "mMaj7" },
+      { root: src.root, quality: "min7", display: src.root + "m7" },
+      { root: src.root, quality: "min6", display: src.root + "m6" },
+    ];
+    emotive = "Aching descent";
+    theory = "LINE CLICHÉ — i → imaj7 → i7 → i6";
+  } else if (a.degreeIndex === 0) {
+    cliche = [
+      { root: src.root, quality: "maj", display: src.root },
+      { root: src.root, quality: "aug", display: src.root + "aug" },
+      { root: src.root, quality: "6", display: src.root + "6" },
+      { root: src.root, quality: "maj", display: src.root },
+    ];
+    emotive = "Rising shimmer";
+    theory = "LINE CLICHÉ — I → I+ → I6 → I";
+  } else {
+    cliche = [
+      { root: src.root, quality: "maj", display: src.root },
+      { root: src.root, quality: "maj7", display: src.root + "maj7" },
+      { root: src.root, quality: "7", display: src.root + "7" },
+      { root: src.root, quality: "6", display: src.root + "6" },
+    ];
+    emotive = "Gentle descent";
+    theory = "LINE CLICHÉ — I → Imaj7 → I7 → I6";
+  }
+
+  const next = [...chords.slice(0, bestIdx), ...cliche, ...chords.slice(bestIdx + 1)];
+  const each = dur / cliche.length;
+  const newDurations = (durations ?? chords.map(() => 4)).slice();
+  newDurations.splice(bestIdx, 1, each, each, each, each);
+  return [{
+    chords: next,
+    changedIndices: [bestIdx, bestIdx + 1, bestIdx + 2, bestIdx + 3],
+    suggestedDurations: newDurations,
+    emotiveLabel: emotive,
+    theoryLabel: theory,
+    label: `Line cliché on ${src.display}`,
+  }];
+}
+
+// ----- Extension colour: step ladder ±1 -----
+const EXT_LADDERS: Record<"maj" | "min" | "dom", Quality[]> = {
+  maj: ["maj", "maj7", "maj9", "maj13", "6/9"],
+  min: ["min", "min7", "min9", "min11", "min13"],
+  dom: ["7", "9"],
+};
+
+function extensionColourSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+): Array<{ chords: ChordSymbol[]; changedIndices: number[]; label: string }> {
+  const out: Array<{ chords: ChordSymbol[]; changedIndices: number[]; label: string }> = [];
+  const analysis = analyzeProgression(chords, keyRoot, mode);
+  const existingQualities = new Set(chords.map((c) => c.quality));
+
+  for (let i = 0; i < chords.length; i++) {
+    const src = chords[i];
+    const a = analysis.chords[i];
+    let ladder: Quality[] | null = null;
+    if (a.chordFamily === "major") ladder = EXT_LADDERS.maj;
+    else if (a.chordFamily === "minor") ladder = EXT_LADDERS.min;
+    else if (a.chordFamily === "dominant") ladder = EXT_LADDERS.dom;
+    if (!ladder) continue;
+
+    const pos = ladder.indexOf(src.quality);
+    const candidates: Quality[] = [];
+    if (pos < 0) {
+      // Plain triad at index 0 — use primaryGenre suggestion
+      const g = a.primaryGenre;
+      if (g === "neo_soul" || g === "rnb") candidates.push(a.chordFamily === "minor" ? "min7" : "maj9");
+      else if (g === "jazz") candidates.push(a.chordFamily === "minor" ? "min7" : "maj7");
+      else candidates.push("add9");
+    } else {
+      if (pos + 1 < ladder.length) candidates.push(ladder[pos + 1]);
+      if (pos - 1 >= 0) candidates.push(ladder[pos - 1]);
+    }
+
+    for (const q of candidates) {
+      if (existingQualities.has(q)) continue;
+      if (q === src.quality) continue;
+      const next = chords.slice();
+      next[i] = { root: src.root, quality: q, display: src.root + QUALITY_PRETTY[q] };
+      const adj = a.primaryGenre === "neo_soul" ? "neo soul warmth"
+        : a.primaryGenre === "jazz" ? "jazz colour"
+        : a.primaryGenre === "gospel" ? "gospel warmth"
+        : a.primaryGenre === "rnb" ? "R&B smoothness"
+        : "richer texture";
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        label: `${src.display} → ${next[i].display} — adds ${adj}`,
+      });
+    }
+  }
+  return out;
+}
+
+// ----- Altered dominant -----
+function alteredDominantSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+}> {
+  const out: Array<{
+    chords: ChordSymbol[];
+    changedIndices: number[];
+    emotiveLabel: string;
+    theoryLabel: string;
+  }> = [];
+  const analysis = analyzeProgression(chords, keyRoot, mode);
+  const ALTS: Array<{ q: Quality; emotive: string; theory: string }> = [
+    { q: "7b9", emotive: "Dark pull",       theory: "V7♭9 — Spanish/jazz tension" },
+    { q: "7#9", emotive: "Grinding edge",   theory: "V7♯9 — The Hendrix chord" },
+    { q: "7#5", emotive: "Upward shimmer",  theory: "V7♯5 — Augmented dominant" },
+  ];
+
+  for (let i = 0; i < chords.length; i++) {
+    const src = chords[i];
+    const a = analysis.chords[i];
+    if (a.isAltered) continue;
+    const isEligible = (a.function === "dominant" || a.degreeIndex === 4)
+      && (src.quality === "maj" || src.quality === "7" || src.quality === "9");
+    if (!isEligible) continue;
+    for (const alt of ALTS) {
+      const next = chords.slice();
+      next[i] = { root: src.root, quality: alt.q, display: src.root + QUALITY_PRETTY[alt.q] };
+      out.push({
+        chords: next,
+        changedIndices: [i],
+        emotiveLabel: alt.emotive,
+        theoryLabel: alt.theory,
+      });
+    }
+  }
+  return out;
+}
+
+// ----- Passing augmented: insert I+ between I and IV/vi -----
+function passingAugmentedSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+  durations: number[] | undefined,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  suggestedDurations: number[];
+  label: string;
+}> {
+  const analysis = analyzeProgression(chords, keyRoot, mode);
+  for (let i = 0; i < chords.length - 1; i++) {
+    const aSrc = analysis.chords[i];
+    if (aSrc.chordFamily !== "major") continue;
+    if (chords[i].quality === "aug") continue;
+    if (chords[i + 1].quality === "aug") continue;
+    const delta = (rootToPc(chords[i + 1].root) - rootToPc(chords[i].root) + 12) % 12;
+    if (delta !== 5 && delta !== 9) continue;
+    const aug: ChordSymbol = { root: chords[i].root, quality: "aug", display: chords[i].root + "aug" };
+    const next = [...chords.slice(0, i + 1), aug, ...chords.slice(i + 1)];
+    const dur = durations?.[i] ?? 4;
+    const newDurations = (durations ?? chords.map(() => 4)).slice();
+    newDurations.splice(i, 1, dur / 2, dur / 2);
+    return [{
+      chords: next,
+      changedIndices: [i + 1],
+      suggestedDurations: newDurations,
+      label: `${aug.display} bridging ${chords[i].display} to ${chords[i + 1].display} — chromatic lift in the fifth`,
+    }];
+  }
+  return [];
+}
+
+// ----- Power riff: strip thirds OR I-bVII-IV power run -----
+function powerRiffSuggestions(
+  chords: ChordSymbol[],
+  keyRoot: string,
+  mode: Mode,
+): Array<{
+  chords: ChordSymbol[];
+  changedIndices: number[];
+  emotiveLabel: string;
+  theoryLabel: string;
+  label: string;
+}> {
+  const out: Array<{
+    chords: ChordSymbol[];
+    changedIndices: number[];
+    emotiveLabel: string;
+    theoryLabel: string;
+    label: string;
+  }> = [];
+
+  // Variant A: strip all thirds (only maj/min keys)
+  if (mode === "maj" || mode === "min") {
+    const allFive = chords.every((c) => c.quality === "5");
+    if (!allFive) {
+      const next = chords.map((c) => ({ root: c.root, quality: "5" as Quality, display: c.root + "5" }));
+      out.push({
+        chords: next,
+        changedIndices: diffIndices(chords, next),
+        emotiveLabel: "Strip to power chords",
+        theoryLabel: "REMOVE ALL THIRDS",
+        label: "All power chords",
+      });
+    }
+  }
+
+  // Variant B: I5-bVII5-IV5-I5 (major key only)
+  if (mode === "maj") {
+    const useFlat = useFlatFor(keyRoot);
+    const keyPc = rootToPc(keyRoot);
+    const i5  = { root: pcToName(keyPc, useFlat),               quality: "5" as Quality, display: pcToName(keyPc, useFlat) + "5" };
+    const b7  = { root: pcToName((keyPc + 10) % 12, useFlat),   quality: "5" as Quality, display: pcToName((keyPc + 10) % 12, useFlat) + "5" };
+    const iv5 = { root: pcToName((keyPc + 5) % 12, useFlat),    quality: "5" as Quality, display: pcToName((keyPc + 5) % 12, useFlat) + "5" };
+    const next = [i5, b7, iv5, i5];
+    if (!chordsEqual(next, chords)) {
+      out.push({
+        chords: next,
+        changedIndices: next.map((_, i) => i),
+        emotiveLabel: "Rock anthem",
+        theoryLabel: "I-♭VII-IV POWER RUN",
+        label: "Classic power riff",
+      });
+    }
+  }
+
+  return out;
+}
+
 const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; theory: string; description: string }> = {
   cinematic: {
     emoji: "🎬",
@@ -487,6 +878,42 @@ const CATEGORY_META: Record<SpiceCategory, { emoji: string; emotive: string; the
     emotive: "Folk/Jazz",
     theory: "Modal interchange",
     description: "Swaps one chord for its shade from a parallel mode — fresh colour without leaving the key root.",
+  },
+  sus_resolution: {
+    emoji: "🌊",
+    emotive: "Suspended moment",
+    theory: "SUS DELAY → RESOLUTION",
+    description: "Delays a chord with a sus4 or sus2 voicing before resolving — that classic ringing release.",
+  },
+  line_cliche: {
+    emoji: "🎻",
+    emotive: "Descending inner voice",
+    theory: "LINE CLICHÉ",
+    description: "Expands one chord into a 4-step cliché — a single inner voice walks while the root holds.",
+  },
+  extension_colour: {
+    emoji: "✨",
+    emotive: "Richer texture",
+    theory: "EXTENSION SWAP",
+    description: "Walks one chord up or down the extension ladder — adds genre-appropriate colour.",
+  },
+  altered_dominant: {
+    emoji: "⚡",
+    emotive: "Maximum tension",
+    theory: "ALTERED DOMINANT",
+    description: "Upgrades the V chord to 7♭9, 7♯9, or 7♯5 — maximum pull into the tonic.",
+  },
+  passing_augmented: {
+    emoji: "🔺",
+    emotive: "Chromatic bridge",
+    theory: "PASSING AUGMENTED",
+    description: "Inserts an augmented triad as a chromatic bridge between I and IV (or I and vi).",
+  },
+  power_riff: {
+    emoji: "🔌",
+    emotive: "Raw, stripped back",
+    theory: "POWER CHORD CONVERSION",
+    description: "Strips every chord to a root-fifth power chord, removing the major/minor flavour.",
   },
 };
 
@@ -587,6 +1014,62 @@ export function generateSpiceSuggestions(
     cap(breakPatternSuggestions(chords, keyRoot, mode), 1)
       .forEach((s, i) => {
         raw.push(makeSuggestion("break_pattern", i, s.chords, chords.length, s.changedIndices, null, s.label));
+      });
+  }
+
+  // Sus resolution
+  cap(susResolutionSuggestions(chords, keyRoot, mode, durations), 3)
+    .forEach((s, i) => {
+      if (focusedIndex >= 0 && !s.changedIndices.includes(focusedIndex)) return;
+      const base = makeSuggestion("sus_resolution", i, s.chords, chords.length, s.changedIndices, s.suggestedDurations, s.theoryLabel);
+      raw.push({ ...base, emotiveLabel: s.emotiveLabel });
+    });
+
+  // Line cliché
+  if (focusedIndex < 0) {
+    cap(lineClicheSuggestions(chords, keyRoot, mode, durations), 1)
+      .forEach((s, i) => {
+        const base = makeSuggestion("line_cliche", i, s.chords, chords.length, s.changedIndices, s.suggestedDurations, s.theoryLabel);
+        raw.push({ ...base, emotiveLabel: s.emotiveLabel });
+      });
+  }
+
+  // Extension colour — rank by friction, top 3
+  {
+    const candidates = extensionColourSuggestions(chords, keyRoot, mode)
+      .filter((s) => focusedIndex < 0 || s.changedIndices.includes(focusedIndex))
+      .map((s) => {
+        const a = analyzeProgression(s.chords, keyRoot, mode);
+        return { s, friction: a.averageFriction - baseFriction };
+      })
+      .sort((a, b) => a.friction - b.friction)
+      .slice(0, 3);
+    candidates.forEach(({ s }, i) => {
+      raw.push(makeSuggestion("extension_colour", i, s.chords, chords.length, s.changedIndices, null, s.label));
+    });
+  }
+
+  // Altered dominant
+  cap(alteredDominantSuggestions(chords, keyRoot, mode), 3)
+    .forEach((s, i) => {
+      if (focusedIndex >= 0 && !s.changedIndices.includes(focusedIndex)) return;
+      const base = makeSuggestion("altered_dominant", i, s.chords, chords.length, s.changedIndices, null, s.theoryLabel);
+      raw.push({ ...base, emotiveLabel: s.emotiveLabel });
+    });
+
+  // Passing augmented
+  cap(passingAugmentedSuggestions(chords, keyRoot, mode, durations), 1)
+    .forEach((s, i) => {
+      if (focusedIndex >= 0 && !s.changedIndices.includes(focusedIndex)) return;
+      raw.push(makeSuggestion("passing_augmented", i, s.chords, chords.length, s.changedIndices, s.suggestedDurations, s.label));
+    });
+
+  // Power riff
+  if (focusedIndex < 0) {
+    cap(powerRiffSuggestions(chords, keyRoot, mode), 2)
+      .forEach((s, i) => {
+        const base = makeSuggestion("power_riff", i, s.chords, chords.length, s.changedIndices, null, s.theoryLabel);
+        raw.push({ ...base, emotiveLabel: s.emotiveLabel });
       });
   }
 
