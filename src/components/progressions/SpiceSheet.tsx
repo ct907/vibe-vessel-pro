@@ -35,6 +35,12 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
   amplify: "🔥",
   break_pattern: "💥",
   borrowed_colour: "🎨",
+  sus_resolution: "🌊",
+  line_cliche: "📉",
+  extension_colour: "🌈",
+  altered_dominant: "⚡",
+  passing_augmented: "🔺",
+  power_riff: "🤘",
 };
 
 
