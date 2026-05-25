@@ -277,7 +277,7 @@ export function FocusedChordEditor(props: Props) {
       placements.push({ chord, s: cur });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
     }
-    for (const { chord: ch, s } of [...placements].reverse()) {
+    for (const { chord: ch, s } of placements) {
       placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
     }
     props.onClose();
