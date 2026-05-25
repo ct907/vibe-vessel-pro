@@ -45,6 +45,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
     setPlayingId(preset.id);
     await playProgression(events, meta.bpm, {
       loopBeats: totalBeats,
+      octave: 3,
       onEnd: () => setPlayingId((id) => (id === preset.id ? null : id)),
     });
   };
@@ -57,7 +58,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
 
   return (
     <div>
-      <h3 className="font-display text-base font-bold mb-2">{heading}</h3>
+      <h3 className="font-display text-base font-bold mb-2 text-primary">{heading}</h3>
       <div className="flex flex-wrap gap-2">
         {FILTER_CHIPS.map((chip) => {
           const active = filter === chip.match;
@@ -77,7 +78,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
         })}
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 grid grid-cols-2 gap-3">
         {visible.map((preset) => {
           const chords = realizePreset(preset, meta.keyRoot, meta.keyMode);
           const isPlaying = playingId === preset.id;
