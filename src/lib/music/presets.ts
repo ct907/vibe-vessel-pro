@@ -1,6 +1,9 @@
 import {
   ChordSymbol, Mode, Quality, QUALITY_PRETTY, rootToPc, pcToName,
 } from "./chords";
+import type { CRSpectrum } from "./chordRelationships";
+
+export type { CRSpectrum };
 
 export interface PresetDegree {
   interval: number;
@@ -15,6 +18,7 @@ export interface ProgressionPreset {
   formula: string;
   tag: string;
   degrees: PresetDegree[];
+  crSpectrums?: CRSpectrum[];
   featuredQualities?: Quality[];
   featureIndex?: number;
   beatsPerChord?: number;
@@ -28,6 +32,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Royal Road",
     formula: "IV – V – iii – vi",
     tag: "Emotional & Driving",
+    crSpectrums: ["fantastical", "romantic", "tragic"],
     degrees: [
       { interval: 5, quality: "maj", romanNumeral: "IV" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -40,6 +45,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Jazz Turnaround",
     formula: "ii – V – I – vi",
     tag: "Smooth & Smoky",
+    crSpectrums: ["powerful", "resolution", "romantic"],
     degrees: [
       { interval: 2, quality: "min", romanNumeral: "ii" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -52,6 +58,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Deep Pop Canyon",
     formula: "I – V – vi – IV",
     tag: "Stadium Epic",
+    crSpectrums: ["good_energy", "neutral", "wonder"],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -64,6 +71,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Cinematic Drift",
     formula: "I – ♭VII – IV – iv",
     tag: "Nostalgic Sigh",
+    crSpectrums: ["romantic", "good_energy"],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
@@ -76,6 +84,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Andalusian Descent",
     formula: "i – ♭VII – ♭VI – V",
     tag: "Dark & Dramatic",
+    crSpectrums: ["bittersweet", "romantic", "protagonism"],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 10, quality: "maj", romanNumeral: "♭VII" },
@@ -88,6 +97,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Doo-Wop",
     formula: "I – vi – IV – V",
     tag: "Classic & Warm",
+    crSpectrums: ["romantic", "wonder", "fantastical"],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 9, quality: "min", romanNumeral: "vi" },
@@ -100,6 +110,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Axis",
     formula: "vi – IV – I – V",
     tag: "Anthemic & Hopeful",
+    crSpectrums: ["wonder", "good_energy"],
     degrees: [
       { interval: 9, quality: "min", romanNumeral: "vi" },
       { interval: 5, quality: "maj", romanNumeral: "IV" },
@@ -112,6 +123,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Minor Drama",
     formula: "i – iv – v – i",
     tag: "Brooding & Intimate",
+    crSpectrums: ["tragic", "uneasy"],
     degrees: [
       { interval: 0, quality: "min", romanNumeral: "i" },
       { interval: 5, quality: "min", romanNumeral: "iv" },
@@ -124,6 +136,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "The Backdoor",
     formula: "I – vi – iv – ♭VII – I",
     tag: "Sneaky Resolution",
+    crSpectrums: ["romantic", "mysterious"],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 9, quality: "min", romanNumeral: "vi" },
@@ -149,6 +162,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "Half-diminished bridge",
     formula: "iiø7 – V7 – i – ♭VII",
     tag: "Jazz",
+    crSpectrums: ["bittersweet"],
     degrees: [
       { interval: 2, quality: "m7b5", romanNumeral: "iiø7" },
       { interval: 7, quality: "7", romanNumeral: "V7" },
@@ -161,6 +175,7 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "Neapolitan cadence",
     formula: "♭II – V – i",
     tag: "Classical",
+    crSpectrums: ["otherworldly", "dramatic"],
     degrees: [
       { interval: 1, quality: "maj", romanNumeral: "♭II" },
       { interval: 7, quality: "maj", romanNumeral: "V" },
@@ -172,11 +187,76 @@ export const PROGRESSION_PRESETS: ProgressionPreset[] = [
     name: "Lydian loop",
     formula: "I – II – vii° – I",
     tag: "Cinematic",
+    crSpectrums: ["fantastical"],
     degrees: [
       { interval: 0, quality: "maj", romanNumeral: "I" },
       { interval: 2, quality: "maj", romanNumeral: "II" },
       { interval: 11, quality: "dim", romanNumeral: "vii°" },
       { interval: 0, quality: "maj", romanNumeral: "I" },
+    ],
+  },
+  {
+    id: "sad-string-quartet",
+    name: "Sad String Quartet",
+    formula: "I – iii – IV – V",
+    tag: "Emotional",
+    crSpectrums: ["sad"],
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 4, quality: "min", romanNumeral: "iii" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+      { interval: 7, quality: "maj", romanNumeral: "V" },
+    ],
+  },
+  {
+    id: "heroic-anthem",
+    name: "Heroic Anthem",
+    formula: "I – VI – IV – V",
+    tag: "Epic",
+    crSpectrums: ["heroic"],
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 9, quality: "maj", romanNumeral: "VI" },
+      { interval: 5, quality: "maj", romanNumeral: "IV" },
+      { interval: 7, quality: "maj", romanNumeral: "V" },
+    ],
+  },
+  {
+    id: "outer-space",
+    name: "Outer Space",
+    formula: "I – #IV – I",
+    tag: "Cinematic",
+    crSpectrums: ["otherworldly"],
+    degrees: [
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+      { interval: 6, quality: "maj", romanNumeral: "#IV" },
+      { interval: 0, quality: "maj", romanNumeral: "I" },
+    ],
+  },
+  {
+    id: "bittersweet-resolve",
+    name: "Bittersweet Resolve",
+    formula: "i – v – ♭VI – ♭VII",
+    tag: "Emotional",
+    crSpectrums: ["bittersweet"],
+    degrees: [
+      { interval: 0,  quality: "min", romanNumeral: "i" },
+      { interval: 7,  quality: "min", romanNumeral: "v" },
+      { interval: 8,  quality: "maj", romanNumeral: "♭VI" },
+      { interval: 10, quality: "maj", romanNumeral: "♭VII" },
+    ],
+  },
+  {
+    id: "rising-tension",
+    name: "Rising Tension",
+    formula: "i – ♭III – iv – V",
+    tag: "Dark",
+    crSpectrums: ["rising"],
+    degrees: [
+      { interval: 0, quality: "min", romanNumeral: "i" },
+      { interval: 3, quality: "maj", romanNumeral: "♭III" },
+      { interval: 5, quality: "min", romanNumeral: "iv" },
+      { interval: 7, quality: "maj", romanNumeral: "V" },
     ],
   },
 ];

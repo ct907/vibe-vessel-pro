@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PROGRESSION_PRESETS, realizePreset, type ProgressionPreset } from "@/lib/music/presets";
+import { CR_BANDS, CR_SPECTRUM_LABEL, type CRSpectrum } from "@/lib/music/chordRelationships";
 import { useSongStore } from "@/store/song";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { playProgression, stopProgression } from "@/lib/music/audio";
@@ -14,25 +15,37 @@ interface PresetBrowserProps {
   onUse: (chords: ChordSymbol[]) => void;
 }
 
-const FILTER_CHIPS: Array<{ label: string; match: string | null }> = [
-  { label: "All", match: null },
-  { label: "Emotional", match: "Emotional" },
-  { label: "Smooth", match: "Smooth" },
-  { label: "Epic", match: "Epic" },
-  { label: "Dark", match: "Dark" },
-  { label: "Nostalgic", match: "Nostalgic" },
-  { label: "Classic", match: "Classic" },
+const BAND_LABELS: Array<{ label: string; key: keyof typeof CR_BANDS | null }> = [
+  { label: "All",     key: null },
+  { label: "Dark",    key: "dark" },
+  { label: "Neutral", key: "neutral" },
+  { label: "Bright",  key: "bright" },
 ];
 
 export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps) {
   const meta = useSongStore((s) => s.meta);
-  const [filter, setFilter] = useState<string | null>(null);
+  const [activeBand, setActiveBand] = useState<keyof typeof CR_BANDS | null>(null);
+  const [activeSpectrum, setActiveSpectrum] = useState<CRSpectrum | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const visible = useMemo(
-    () => (filter ? PROGRESSION_PRESETS.filter((p) => p.tag.includes(filter)) : PROGRESSION_PRESETS),
-    [filter],
-  );
+  const visible = useMemo(() => {
+    if (!activeBand && !activeSpectrum) return PROGRESSION_PRESETS;
+    return PROGRESSION_PRESETS.filter((p) => {
+      const spectrums = p.crSpectrums;
+      if (activeSpectrum) {
+        if (spectrums?.includes(activeSpectrum)) return true;
+        if (!spectrums) return p.tag.toLowerCase().includes(activeSpectrum);
+        return false;
+      }
+      if (spectrums) {
+        const bandSpectrums = CR_BANDS[activeBand!] as readonly string[];
+        return spectrums.some((s) => bandSpectrums.includes(s));
+      }
+      const bandLabel =
+        activeBand === "dark" ? "Dark" : activeBand === "neutral" ? "Cinematic" : "Epic";
+      return p.tag.includes(bandLabel);
+    });
+  }, [activeBand, activeSpectrum]);
 
   const handlePlay = async (preset: ProgressionPreset, chords: ChordSymbol[]) => {
     if (playingId === preset.id) {
@@ -73,24 +86,50 @@ export function PresetBrowser({ open, onOpenChange, onUse }: PresetBrowserProps)
           <SheetTitle className="font-display text-2xl">Popular Progressions</SheetTitle>
         </SheetHeader>
 
+        {/* Row 1 — Band pills */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {FILTER_CHIPS.map((chip) => {
-            const active = filter === chip.match;
+          {BAND_LABELS.map(({ label, key }) => {
+            const active = activeBand === key;
             return (
               <button
-                key={chip.label}
+                key={label}
                 type="button"
-                onClick={() => setFilter(chip.match)}
+                onClick={() => {
+                  setActiveBand(key);
+                  setActiveSpectrum(null);
+                }}
                 className={cn(
                   "rounded-lg px-3 py-1 text-xs font-semibold transition-colors",
                   active ? "btn-sculpt-cocoa" : "btn-sculpt-cream",
                 )}
               >
-                {chip.label}
+                {label}
               </button>
             );
           })}
         </div>
+
+        {/* Row 2 — Spectrum chips (only when a band is selected) */}
+        {activeBand && (
+          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {(CR_BANDS[activeBand] as readonly CRSpectrum[]).map((s) => {
+              const isActive = activeSpectrum === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setActiveSpectrum(isActive ? null : s)}
+                  className={cn(
+                    "shrink-0 rounded-md px-2.5 py-0.5 text-[10px] font-semibold transition-colors",
+                    isActive ? "btn-sculpt-cocoa" : "btn-sculpt-cream",
+                  )}
+                >
+                  {CR_SPECTRUM_LABEL[s]}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-4 space-y-3 pb-6">
           {visible.map((preset) => {
