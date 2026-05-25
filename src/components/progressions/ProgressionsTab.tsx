@@ -47,6 +47,7 @@ import {
   KeyRound,
   Activity,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -200,6 +201,7 @@ function PatternBlock({
   const longPressDidFireRef = useRef(false);
   const isMobile = useIsMobile();
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
+  const setWhyChord = useUIStore((s) => s.setWhyChord);
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
 
@@ -629,6 +631,29 @@ function PatternBlock({
                                     <ArrowDown className="h-3 w-3" strokeWidth={3} style={{ color: "var(--primary-strong)" }} />
                                   )}
                                 </span>
+                              )}
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  className="absolute -top-1.5 -left-1.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
+                                  style={{ touchAction: "manipulation" }}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onPointerUp={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const idx = sortedChords.findIndex((sc) => sc.id === c.id);
+                                    const nextSc = sortedChords[(idx + 1) % sortedChords.length];
+                                    const nextChord = nextSc && nextSc.id !== c.id
+                                      ? (effectiveOffset ? transposeChord(nextSc.chord, effectiveOffset) : nextSc.chord)
+                                      : undefined;
+                                    setWhyChord({ chord: displayChord, patternId: pattern.id, chordId: c.id, nextChord });
+                                  }}
+                                  aria-label="Why this chord?"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </button>
                               )}
                               {(isActive || isSelected) && (
                                 <button

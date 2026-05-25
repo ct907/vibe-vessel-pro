@@ -29,6 +29,7 @@ import {
   realizePreset,
   type ProgressionPreset,
 } from "@/lib/music/presets";
+import { getCR } from "@/lib/music/chordRelationships";
 import { playChord, playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -380,6 +381,34 @@ export function WhyThisChordSheet() {
             </h3>
             <p className="text-sm leading-relaxed text-foreground">{roleSentence}</p>
           </section>
+
+          {/* 2b. Transition feel */}
+          {(() => {
+            const nextChord = req?.nextChord;
+            if (!nextChord || !chord) return null;
+            const cr = getCR(chord, nextChord);
+            if (!cr) return null;
+            const reverseCr = getCR(nextChord, chord);
+            return (
+              <section className="space-y-1.5">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Transition feel
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground">
+                  Moving from <span className="font-mono-chord">{chord.display}</span> to{" "}
+                  <span className="font-mono-chord">{nextChord.display}</span> has a{" "}
+                  <strong>{cr.emotion.toLowerCase()}</strong> sound.
+                </p>
+                {reverseCr && reverseCr !== cr && (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    The reverse — <span className="font-mono-chord">{nextChord.display}</span>{" "}
+                    → <span className="font-mono-chord">{chord.display}</span> — sounds{" "}
+                    <strong>{reverseCr.emotion.toLowerCase()}</strong>.
+                  </p>
+                )}
+              </section>
+            );
+          })()}
 
           {/* 3. Where it comes from */}
           {showBorrowedSection && (

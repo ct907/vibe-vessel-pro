@@ -13,6 +13,8 @@ export interface WhyChordRequest {
   /** When present, the sheet's "Replace in song" action targets this chord. */
   patternId?: string;
   chordId?: string;
+  /** Next chord in the progression sequence — enables the Transition feel section. */
+  nextChord?: ChordSymbol;
 }
 
 interface UIState {
