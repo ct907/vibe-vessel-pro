@@ -106,6 +106,11 @@ export function FocusedChordEditor(props: Props) {
   const [anchorId, setAnchorId] = useState<string | undefined>(lyricsInitialAnchorId);
   const [query, setQuery] = useState("");
   const [octave, setOctave] = useState(3);
+  // Local cursor for progression-add multi-typed-Enter: starts at props.atBeat,
+  // bumps after each insert so successive chords land left-to-right.
+  const [progAddCursor, setProgAddCursor] = useState(
+    isProgressionAdd ? (props as ProgressionAddModeProps).atBeat : 0,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -185,9 +190,11 @@ export function FocusedChordEditor(props: Props) {
   const handlePickNashville = (chords: ChordSymbol[]) => {
     if (isProgressionAdd) {
       chords.forEach((chord, i) =>
-        addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, props.atBeat + i, 4),
+        addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, progAddCursor + i, 4),
       );
-      props.onClose();
+      setProgAddCursor((c) => c + chords.length);
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
       return;
     }
     if (isProgression) {
@@ -218,8 +225,10 @@ export function FocusedChordEditor(props: Props) {
   const handlePick = (chord: ChordSymbol) => {
     const chordWithOctave = { ...toStorage(chord), octave };
     if (isProgressionAdd) {
-      addChordToPatternSlot(props.patternId, chordWithOctave, props.atBeat, 4);
-      props.onClose();
+      addChordToPatternSlot(props.patternId, chordWithOctave, progAddCursor, 4);
+      setProgAddCursor((c) => c + 1);
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
       return;
     }
     if (isProgression) {
@@ -259,14 +268,15 @@ export function FocusedChordEditor(props: Props) {
     if (chords.length === 0) return;
     if (isProgressionAdd || isProgression) {
       const patternId = (props as ProgressionModeProps | ProgressionAddModeProps).patternId;
-      const startBeat = isProgressionAdd ? (props as ProgressionAddModeProps).atBeat : 0;
+      const startSlot = isProgressionAdd ? progAddCursor : 0;
       if (isProgression) {
         const existingIds = progPattern?.chords.map((c) => c.id) ?? [];
         if (existingIds.length > 0) removePatternChordsBatch(patternId, existingIds);
       }
       chords.forEach((chord, i) => {
-        addChordToPatternSlot(patternId, { ...toStorage(chord), octave }, startBeat + i * 4, 4);
+        addChordToPatternSlot(patternId, { ...toStorage(chord), octave }, startSlot + i, 4);
       });
+      if (isProgressionAdd) setProgAddCursor((c) => c + chords.length);
       props.onClose();
       return;
     }
