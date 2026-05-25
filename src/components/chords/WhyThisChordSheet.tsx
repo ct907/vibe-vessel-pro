@@ -80,6 +80,7 @@ export function WhyThisChordSheet() {
 
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
   const [playingStep, setPlayingStep] = useState<number | null>(null);
+  const [isPlayingContext, setIsPlayingContext] = useState(false);
 
   const open = !!req;
   const chord = req?.chord ?? null;
@@ -89,6 +90,7 @@ export function WhyThisChordSheet() {
     stopProgression();
     setPlayingPresetId(null);
     setPlayingStep(null);
+    setIsPlayingContext(false);
     setWhyChord(null);
   };
 
@@ -194,22 +196,20 @@ export function WhyThisChordSheet() {
     return out;
   }, [chord, meta.keyRoot, meta.keyMode, interval]);
 
-  // ----- Specialist hint (zero results fallback) -----
-  const specialistHint = useMemo(() => {
+  // ----- Specialist context (zero results fallback) -----
+  const specialistContext = useMemo<{ prev: ChordSymbol; next: ChordSymbol } | null>(() => {
     if (!chord || matchingPresets.length > 0) return null;
     const ladder = nashvilleLadder(meta.keyRoot, meta.keyMode);
     if (ladder.length === 0) return null;
     const targetPc = rootToPc(chord.root);
     const withDist = ladder.map((d) => {
       const pc = rootToPc(d.chord.root);
-      const up = (pc - targetPc + 12) % 12;
-      const down = (targetPc - pc + 12) % 12;
-      return { chord: d.chord, up, down };
+      return { chord: d.chord, up: (pc - targetPc + 12) % 12, down: (targetPc - pc + 12) % 12 };
     });
     const next = [...withDist].sort((a, b) => (a.up || 12) - (b.up || 12))[0]?.chord;
     const prev = [...withDist].sort((a, b) => (a.down || 12) - (b.down || 12))[0]?.chord;
     if (!next || !prev) return null;
-    return `${chord.display} is a specialist chord — try it as a passing chord between ${prev.display} and ${next.display}.`;
+    return { prev, next };
   }, [chord, matchingPresets, meta.keyRoot, meta.keyMode]);
 
 
@@ -277,6 +277,27 @@ export function WhyThisChordSheet() {
         setPlayingPresetId((id) => (id === preset.id ? null : id));
         setPlayingStep(null);
       },
+    });
+  };
+
+  const playContext = async () => {
+    if (!chord || !specialistContext) return;
+    if (isPlayingContext) {
+      stopProgression();
+      setIsPlayingContext(false);
+      setPlayingStep(null);
+      return;
+    }
+    stopProgression();
+    await ensureAudio();
+    const contextChords = [specialistContext.prev, chord, specialistContext.next];
+    const events = contextChords.map((c, i) => ({ chord: c, startBeat: i * 2, lengthBeats: 2 }));
+    setIsPlayingContext(true);
+    setPlayingStep(0);
+    await playProgression(events, meta.bpm, {
+      loopBeats: 6,
+      onChordStart: (idx) => setPlayingStep(idx),
+      onEnd: () => { setIsPlayingContext(false); setPlayingStep(null); },
     });
   };
 
@@ -473,7 +494,7 @@ export function WhyThisChordSheet() {
           )}
 
           {/* 4. Used in these progressions */}
-          {(matchingPresets.length > 0 || specialistHint) && (
+          {(matchingPresets.length > 0 || specialistContext) && (
             <section className="space-y-2">
               <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Used in these progressions
@@ -535,20 +556,61 @@ export function WhyThisChordSheet() {
                   </div>
                 );
               })}
-              {specialistHint && (
-                <div
-                  className="rounded-lg p-3 text-sm text-foreground leading-relaxed"
-                  style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
-                >
-                  {specialistHint}
-                </div>
-              )}
+              {specialistContext && (() => {
+                const contextChords = [specialistContext.prev, chord, specialistContext.next];
+                return (
+                  <div
+                    className="rounded-lg p-3 space-y-2"
+                    style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+                  >
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-display">
+                      Specialist context
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {contextChords.map((c, i) => {
+                        const isFocus = i === 1;
+                        const isPlayhead = isPlayingContext && i === playingStep;
+                        return (
+                          <span
+                            key={i}
+                            className={cn(
+                              "rounded transition-shadow",
+                              isFocus && "ring-2 ring-primary",
+                              isPlayhead && "ring-2 ring-primary shadow-[0_0_0_3px_var(--primary-halo)]",
+                            )}
+                          >
+                            <ChordChip chord={c} variant="ink" size="sm" audition={false} />
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={playContext}
+                        className="btn-sculpt-cream inline-flex items-center justify-center gap-1.5 rounded-md h-11 min-w-[44px] px-3 text-xs font-semibold"
+                        aria-label={isPlayingContext ? "Stop loop" : "Play loop"}
+                      >
+                        {isPlayingContext ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                        {isPlayingContext ? "Stop" : "Loop"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => sendPresetToProgressions(contextChords, `${chord.display} in context`)}
+                        className="btn-sculpt-amber inline-flex items-center justify-center rounded-md h-11 px-4 text-xs font-semibold"
+                      >
+                        Send to Progressions
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </section>
           )}
 
 
           {/* 5. Try a related chord */}
-          {relatedChords.length > 0 && (
+          {relatedChords.length > 0 && matchingPresets.length === 0 && !specialistContext && (
             <section className="space-y-2">
               <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Try a related chord
