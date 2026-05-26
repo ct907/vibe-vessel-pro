@@ -123,12 +123,8 @@ export default function Landing() {
     setRecents(listRecent());
   };
   const startWriting = () => {
-    if (recents.length === 0) {
-      resetSong();
-      navigate("/app");
-    } else {
-      openRecent(recents[0]);
-    }
+    resetSong();
+    navigate("/app");
   };
 
   return (
@@ -182,15 +178,24 @@ export default function Landing() {
           <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
         </p>
 
-        <button
-          type="button"
-          onClick={startWriting}
-          className="btn-sculpt-amber mt-12 inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
-        >
-          Start Writing
-        </button>
+        <div className="mt-12 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={startWriting}
+            className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+          >
+            Start Writing
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/app?tab=chords")}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+          >
+            Explore Chords
+          </button>
+        </div>
 
-        <section className="mt-32 w-full max-w-md" aria-label="Recent projects">
+        <section className="mt-20 w-full max-w-md" aria-label="Recent projects">
           <button
             type="button"
             className="w-full text-center font-semibold mb-3 cursor-pointer"

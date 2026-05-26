@@ -1508,13 +1508,16 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     redoStack.length = 0;
     const fresh = makeSection("verse");
     set((s) => ({
-      meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
+      meta: { title: "", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
       sections: [fresh.section],
       progression: [fresh.pattern],
       basket: [],
       inspirationPhotos: [],
       suppressCrossTabDeleteWarning: s.suppressCrossTabDeleteWarning,
     }));
+    useAppTintStore.getState().setTint(null);
+    useAppBackgroundStore.getState().setPattern("none");
+    useAppBackgroundStore.getState().setMask("none");
   },
 
   // ---- lyric lines ----

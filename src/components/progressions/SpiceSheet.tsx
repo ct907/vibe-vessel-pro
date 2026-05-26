@@ -397,7 +397,7 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
                       {CATEGORY_EMOJI[cat]} {first.emotiveLabel}
                     </span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
                     {items.map(renderCard)}
                   </div>
                 </div>

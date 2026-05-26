@@ -78,7 +78,7 @@ import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -822,7 +822,7 @@ function SectionCard({
             </Button>
           </div>
         ) : (
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
             <SectionColorPicker
               value={section.color}
               onChange={(c) => setSectionColor(section.id, c)}
@@ -1075,7 +1075,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const [pickerQuery, setPickerQuery] = useState("");
 
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
     useState<Map<string, { sectionId: string; lineId: string }>>(new Map());
   const lyricMultiSelectedIds = useMemo(
@@ -1312,6 +1314,77 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   }, []);
 
 
+  // Desktop: hold Shift or Ctrl to enter multi-select mode
+  const setMultiSelectMode = useUIStore((s) => s.setMultiSelectMode);
+  useEffect(() => {
+    if (!isDesktop) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "Shift" || e.key === "Control") &&
+          (e.target as HTMLElement)?.tagName !== "INPUT" &&
+          (e.target as HTMLElement)?.tagName !== "TEXTAREA") {
+        setMultiSelectMode(true);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift" || e.key === "Control") setMultiSelectMode(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
+      setMultiSelectMode(false);
+    };
+  }, [isDesktop, setMultiSelectMode]);
+
+  // Desktop: Up/Down arrows move chord selection between chord rows
+  const activeChordIdRef = useRef<string | null>(null);
+  activeChordIdRef.current = activeChordId;
+  useEffect(() => {
+    if (!isDesktop) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const aid = activeChordIdRef.current;
+      if (!aid) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      const { sections: allSections } = useSongStore.getState();
+      let foundSI = -1, foundLI = -1, foundChord: ChordAnchor | null = null;
+      outer: for (let si = 0; si < allSections.length; si++) {
+        for (let li = 0; li < allSections[si].lines.length; li++) {
+          const ch = allSections[si].lines[li].chords.find((c) => c.id === aid);
+          if (ch) { foundSI = si; foundLI = li; foundChord = ch; break outer; }
+        }
+      }
+      if (!foundChord) return;
+      const currentSlot = foundChord.slotIndex ?? 0;
+      const dir = e.key === "ArrowUp" ? -1 : 1;
+      let targetSection: (typeof allSections)[0] | null = null;
+      let targetLineIdx = -1;
+      const nextLI = foundLI + dir;
+      if (nextLI >= 0 && nextLI < allSections[foundSI].lines.length) {
+        targetSection = allSections[foundSI]; targetLineIdx = nextLI;
+      } else if (dir < 0 && foundSI > 0) {
+        const ps = allSections[foundSI - 1];
+        targetSection = ps; targetLineIdx = ps.lines.length - 1;
+      } else if (dir > 0 && foundSI < allSections.length - 1) {
+        targetSection = allSections[foundSI + 1]; targetLineIdx = 0;
+      }
+      if (!targetSection || targetLineIdx < 0) return;
+      const targetLine = targetSection.lines[targetLineIdx];
+      if (!targetLine) return;
+      const targetChords = getLineChordsViaSSOT(targetSection, targetLine.id);
+      if (!targetChords.length) return;
+      const closest = targetChords.reduce((best, c) =>
+        Math.abs((c.slotIndex ?? 0) - currentSlot) < Math.abs((best.slotIndex ?? 0) - currentSlot) ? c : best,
+      );
+      setActiveChordId(closest.id);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isDesktop]);
+
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
   const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
@@ -1451,39 +1524,48 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       ))}
 
 
-      <div
-        className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl pb-[60rem]"
-        style={{ borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)", background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-      >
-        <span
-          className="text-center"
-          style={{
-            fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
-            fontWeight: 700,
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--ink)",
-          }}
-        >
-          Add Section
-        </span>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => addSection(t)}
-              className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
-            >
-              <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
-            </button>
-          ))}
-          <button
-            onClick={() => addSection("custom")}
-            className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+      <div className="sticky bottom-0 z-30">
+        {addSectionOpen && (
+          <div
+            className="px-4 pt-4 pb-4"
+            style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
           >
-            <Plus className="h-3.5 w-3.5" /> Custom…
-          </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { addSection(t); setAddSectionOpen(false); }}
+                  className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
+                </button>
+              ))}
+              <button
+                onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
+                className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Custom…
+              </button>
+            </div>
+          </div>
+        )}
+        <div
+          className="py-3 text-center cursor-pointer"
+          style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+          onClick={() => setAddSectionOpen((o) => !o)}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
+              fontWeight: 700,
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--ink)",
+            }}
+          >
+            Add Section
+          </span>
         </div>
       </div>
 
