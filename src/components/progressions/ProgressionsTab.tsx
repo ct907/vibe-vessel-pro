@@ -645,6 +645,7 @@ function PatternBlock({
                                     e.stopPropagation();
                                     usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
                                     window.dispatchEvent(new Event("lovable:request-play"));
+                                    onSetActiveChordId(null);
                                   }}
                                   aria-label="Play from here"
                                 >
