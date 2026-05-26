@@ -1,20 +1,20 @@
-## Defocus chord chip when "Play from here" is pressed
+## Conditionally hide Popular Progressions in chord editors
 
-### Change
-In `src/components/progressions/ProgressionsTab.tsx`, in the "Play from here" button's `onClick` (around line 644–648), call `onSetActiveChordId(null)` after triggering playback so the chord chip becomes defocused immediately when the button is pressed.
+The Popular Progressions list (`PresetList`) currently always renders inside both `ChordPickerSheet` and `FocusedChordEditor`. We want it shown only when the user is adding a chord into an empty space, and hidden when they're editing an existing chord.
 
-Updated handler:
-```ts
-onClick={(e) => {
-  e.stopPropagation();
-  usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
-  window.dispatchEvent(new Event("lovable:request-play"));
-  onSetActiveChordId(null);
-}}
-```
+### Context distinction
+- **Editing existing chord** → `ChordPickerSheet` is opened with `initialChord` set; `FocusedChordEditor` is opened with `mode="progression"` (has `chordId`) or with `initialAnchorId` set (lyrics mode).
+- **Adding to empty slot** → `ChordPickerSheet` opened with no `initialChord`; `FocusedChordEditor` opened with `mode="progression-add"` (has `atBeat`) or without `initialAnchorId` (lyrics mode).
 
-No other changes. The Play button only renders while `isActive`, so clearing the active id will also hide the button as a side effect (expected — the chip returns to its normal state).
+### Changes
+
+1. **`src/components/chord/ChordPickerSheet.tsx`**
+   - Around line 360–362, wrap the `<PresetList />` block in `{!initialChord && (...)}` so presets only render when no chord is being replaced.
+
+2. **`src/components/lyrics/FocusedChordEditor.tsx`**
+   - Around line 674–676, compute `const showPresets = isProgressionAdd || (props.mode !== "progression" && !anchorId);` and wrap the `<PresetList />` block (plus its separator container) in `{showPresets && (...)}`.
 
 ### Verification
 - `npx tsc --noEmit`
-- In the Progressions tab: tap a chord → press the play-from-here button → chord chip loses its active outline and the play/delete affordances disappear; playback starts from that chord.
+- Progressions tab: tap empty space in pattern → editor shows Popular Progressions. Tap existing chord → editor hides Popular Progressions.
+- Lyrics tab (mobile): tap empty chord slot → presets visible. Tap existing chord chip → presets hidden. Desktop ChordPickerSheet behaves the same way.
