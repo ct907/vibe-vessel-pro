@@ -357,9 +357,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
             )
           )}
 
-          <div className="pt-3 mt-1 shrink-0" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
-            <PresetList onUse={handlePresetUse} />
-          </div>
+          {!initialChord && (
+            <div className="pt-3 mt-1 shrink-0" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+              <PresetList onUse={handlePresetUse} />
+            </div>
+          )}
 
         </div>
 
