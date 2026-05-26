@@ -82,6 +82,7 @@ export function WhyThisChordSheet() {
   const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
   const [playingStep, setPlayingStep] = useState<number | null>(null);
   const [isPlayingContext, setIsPlayingContext] = useState(false);
+  const [playingHeardInKey, setPlayingHeardInKey] = useState<string | null>(null);
 
   const open = !!req;
   const chord = req?.chord ?? null;
@@ -92,6 +93,7 @@ export function WhyThisChordSheet() {
     setPlayingPresetId(null);
     setPlayingStep(null);
     setIsPlayingContext(false);
+    setPlayingHeardInKey(null);
     setWhyChord(null);
   };
 
@@ -273,6 +275,7 @@ export function WhyThisChordSheet() {
     setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: events.length * beats,
+      octave: 3,
       onChordStart: (idx) => setPlayingStep(idx),
       onEnd: () => {
         setPlayingPresetId((id) => (id === preset.id ? null : id));
@@ -297,8 +300,28 @@ export function WhyThisChordSheet() {
     setPlayingStep(0);
     await playProgression(events, meta.bpm, {
       loopBeats: 6,
+      octave: 3,
       onChordStart: (idx) => setPlayingStep(idx),
       onEnd: () => { setIsPlayingContext(false); setPlayingStep(null); },
+    });
+  };
+
+  const playHeardIn = async (refKey: string, chords: ChordSymbol[]) => {
+    if (playingHeardInKey === refKey) {
+      stopProgression();
+      setPlayingHeardInKey(null);
+      return;
+    }
+    if (chords.length === 0) return;
+    stopProgression();
+    await ensureAudio();
+    const beats = 2;
+    const events = chords.map((c, i) => ({ chord: c, startBeat: i * beats, lengthBeats: beats }));
+    setPlayingHeardInKey(refKey);
+    await playProgression(events, meta.bpm, {
+      loopBeats: events.length * beats,
+      octave: 3,
+      onEnd: () => setPlayingHeardInKey((k) => (k === refKey ? null : k)),
     });
   };
 
@@ -619,39 +642,61 @@ export function WhyThisChordSheet() {
                 <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Heard in
                 </h3>
-                {refs.map((ref) => (
-                  <div
-                    key={`${ref.title}-${ref.artist}`}
-                    className="rounded-lg p-3 space-y-1.5"
-                    style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
-                  >
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="font-mono-chord font-semibold text-sm">{ref.title}</span>
-                      <span className="text-xs text-muted-foreground">{ref.artist}</span>
-                      <span
-                        className="inline-block rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-semibold"
-                        style={{ background: "var(--paper-shade-soft)", color: "var(--ink-soft)" }}
-                      >
-                        {ref.genre}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed opacity-70">{ref.context}</p>
-                    {ref.progression && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ref.progression.split(/\s*→\s*/).map((sym, i) => {
-                          const parsed = parseChord(sym);
-                          return parsed ? (
-                            <ChordChip key={i} chord={parsed} variant="ink" size="sm" audition={false} />
-                          ) : (
-                            <span key={i} className="font-mono-chord text-xs text-muted-foreground">
-                              {sym}
-                            </span>
-                          );
-                        })}
+                {refs.map((ref) => {
+                  const refKey = `${ref.title}-${ref.artist}`;
+                  const parsedChords = ref.progression
+                    ? ref.progression
+                        .split(/\s*→\s*/)
+                        .map((sym) => parseChord(sym))
+                        .filter((c): c is ChordSymbol => c !== null)
+                    : [];
+                  const canPlay = parsedChords.length > 0;
+                  const isPlayingHeard = playingHeardInKey === refKey;
+                  return (
+                    <div
+                      key={refKey}
+                      className="rounded-lg p-3 space-y-1.5"
+                      style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+                    >
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-mono-chord font-semibold text-sm">{ref.title}</span>
+                        <span className="text-xs text-muted-foreground">{ref.artist}</span>
+                        <span
+                          className="inline-block rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-semibold"
+                          style={{ background: "var(--paper-shade-soft)", color: "var(--ink-soft)" }}
+                        >
+                          {ref.genre}
+                        </span>
+                        {canPlay && (
+                          <button
+                            type="button"
+                            onClick={() => playHeardIn(refKey, parsedChords)}
+                            className="btn-sculpt-cream ml-auto inline-flex items-center justify-center gap-1 rounded-md h-7 px-2 text-[11px] font-semibold"
+                            aria-label={isPlayingHeard ? "Stop preview" : "Play preview"}
+                          >
+                            {isPlayingHeard ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                            {isPlayingHeard ? "Stop" : "Play"}
+                          </button>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <p className="text-sm leading-relaxed opacity-70">{ref.context}</p>
+                      {ref.progression && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {ref.progression.split(/\s*→\s*/).map((sym, i) => {
+                            const parsed = parseChord(sym);
+                            return parsed ? (
+                              <ChordChip key={i} chord={parsed} variant="ink" size="sm" audition={false} />
+                            ) : (
+                              <span key={i} className="font-mono-chord text-xs text-muted-foreground">
+                                {sym}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </section>
             );
           })()}
