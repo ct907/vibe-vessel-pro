@@ -42,7 +42,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           ref={taRef}
           value={meta.title}
           onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
-          placeholder="Untitled song"
+          placeholder="Song Title"
           rows={1}
           className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-2xl leading-tight text-foreground placeholder:text-muted-foreground/50 px-0 py-1 break-words text-center font-bold mt-1.5"
         />
