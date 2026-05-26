@@ -371,7 +371,7 @@ export function FocusedChordEditor(props: Props) {
         </div>
 
         {/* PREVIEW */}
-        {!isProgression && !isProgressionAdd && (
+        {!isProgression && !isProgressionAdd && liveChords.length > 0 && (
           <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
             <p
               className="mb-1"
@@ -474,7 +474,7 @@ export function FocusedChordEditor(props: Props) {
 
 
         {/* Reorder controls — operate on the chord currently being edited. */}
-        {!isProgressionAdd && (() => {
+        {!isProgressionAdd && (isProgression || liveChords.length > 0) && (() => {
           const moveChordToSlot = useSongStore.getState().moveChordToSlot;
           const movePatternChord = useSongStore.getState().movePatternChord;
           const canReorder = isProgression
@@ -672,7 +672,7 @@ export function FocusedChordEditor(props: Props) {
             })}
           </div>
           {(isProgressionAdd || (!isProgression && !anchorId)) && (
-            <div className="mt-4 pt-4" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+            <div className="mt-4" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
               <PresetList onUse={handlePresetUse} />
             </div>
           )}

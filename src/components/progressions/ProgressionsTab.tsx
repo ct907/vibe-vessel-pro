@@ -948,6 +948,7 @@ interface SectionGroupProps {
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onClearMultiSelected: () => void;
+  onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
 }
 
 function SectionGroup({
@@ -968,6 +969,7 @@ function SectionGroup({
   multiSelected,
   onToggleMultiSelected,
   onClearMultiSelected,
+  onAddNewBlockRequest,
 }: SectionGroupProps) {
   const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
@@ -1108,7 +1110,7 @@ function SectionGroup({
             </Button>
           </div>
         ) : (
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={() => duplicateSection(sectionId)}
@@ -1280,7 +1282,14 @@ function SectionGroup({
             <div className="flex items-stretch gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => addPatternToSection(sectionId)}
+                onClick={() => {
+                  addPatternToSection(sectionId);
+                  const freshBlocks = useSongStore.getState().progression.filter(
+                    (p) => (p.sectionId ?? p.id) === sectionId,
+                  );
+                  const newBlock = freshBlocks[freshBlocks.length - 1];
+                  if (newBlock) onAddNewBlockRequest?.(sectionId, newBlock.id);
+                }}
                 style={{ width: "40%" }}
                 className="mr-auto rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
               >
@@ -1403,6 +1412,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     bulkSetChordOctave,
   } = useSongStore();
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   // Cross-block multi-select: chordId → patternId.
   const [multiSelected, setMultiSelected] = useState<Map<string, string>>(new Map());
@@ -1638,6 +1648,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           multiSelected={multiSelected}
           onToggleMultiSelected={toggleMultiSelected}
           onClearMultiSelected={() => setMultiSelected(new Map())}
+          onAddNewBlockRequest={(sid, patternId) => {
+            if (isDesktop) {
+              setPicker({ patternId, atBeat: 0, replaceChordId: undefined });
+            } else {
+              setPatternAddSlot({ sectionId: sid, patternId, atBeat: 0 });
+            }
+          }}
         />
       ))}
 
@@ -1821,45 +1838,48 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         </div>
       )}
 
-      <div
-        className="flex flex-col gap-3 px-4 pt-4 mt-2 rounded-t-xl"
-        style={{
-          background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)",
-          borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
-          paddingBottom: "60rem",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-        }}
-      >
-        <span
-          className="text-center"
-          style={{
-            fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
-            fontWeight: 700,
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--ink)",
-          }}
-        >
-          Add Section
-        </span>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => addSection(t)}
-              className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
-            >
-              <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
-            </button>
-          ))}
-          <button
-            onClick={() => addSection("custom")}
-            className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+      <div className="sticky bottom-0 z-30">
+        {addSectionOpen && (
+          <div
+            className="px-4 pt-4 pb-4"
+            style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
           >
-            <Plus className="h-3.5 w-3.5" /> Custom…
-          </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { addSection(t); setAddSectionOpen(false); }}
+                  className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
+                </button>
+              ))}
+              <button
+                onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
+                className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Custom…
+              </button>
+            </div>
+          </div>
+        )}
+        <div
+          className="py-3 text-center cursor-pointer"
+          style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+          onClick={() => setAddSectionOpen((o) => !o)}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
+              fontWeight: 700,
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--ink)",
+            }}
+          >
+            Add Section
+          </span>
         </div>
       </div>
 
