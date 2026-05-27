@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
+import { useOnboardingStore } from "@/store/onboarding";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -301,9 +302,10 @@ interface Props {
   setIsPlaying: (b: boolean) => void;
   tab: "lyrics" | "chords" | "progressions";
   setTab: (t: "lyrics" | "chords" | "progressions") => void;
+  onTabSelect?: (t: string) => void;
 }
 
-export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props) {
+export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSelect }: Props) {
   const toolbarExpanded = useUIStore((s) => s.toolbarExpanded);
   const guardedSetTab = (t: "lyrics" | "chords" | "progressions") => {
     if (toolbarExpanded) {
@@ -313,7 +315,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
       });
       return;
     }
-    setTab(t);
+    if (onTabSelect) onTabSelect(t);
+    else setTab(t);
   };
   const {
     meta,
@@ -347,6 +350,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
   const metronome = useMetronomeStore();
   const appTint = useAppTintStore();
   const appBg = useAppBackgroundStore();
+  const onboarding = useOnboardingStore();
   const stopRequestedRef = useRef(false);
   const playMetaRef = useRef<PlaybackMeta[]>([]);
   const startFromChordIdAtPlayRef = useRef<string | null>(null);
@@ -688,6 +692,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
                       Reset delete warnings
                     </Button>
                   )}
+                  {onboarding.enabled && (
+                    <Button
+                      variant="outline"
+                      className="justify-start border border-border"
+                      onClick={() => { onboarding.disable(); toast({ title: "Tutorial disabled" }); setNavOpen(false); }}
+                    >
+                      Turn off Tutorial
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -762,7 +775,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
           >
             {(["lyrics", "progressions"] as const).map((t) => {
               const active = tab === t;
-              const label = t.charAt(0).toUpperCase() + t.slice(1);
+              const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions" };
+              const label = LABEL[t] ?? t;
               return (
                 <button
                   key={t}
@@ -828,6 +842,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab }: Props)
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
               resetSong();
+              if (onboarding.enabled) {
+                onboarding.resetForNewSong();
+                onboarding.incrementNewSong();
+              }
               setConfirmNewSong(false);
               toast({ title: "New song started" });
             }}

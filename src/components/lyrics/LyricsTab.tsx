@@ -81,6 +81,8 @@ import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
+import { useOnboardingStore } from "@/store/onboarding";
+import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -1076,6 +1078,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
+  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
@@ -1406,6 +1409,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     } else {
       // Placing new chord into the requested slot.
       placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
+      if (onboardingEnabled && lyricsStep === 1) setLyricsStep(2);
     }
     setPickerQuery("");
     // Step picker to the next slot for fast successive entry.
@@ -1524,48 +1528,100 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       ))}
 
 
-      <div className="sticky bottom-0 z-30">
-        {addSectionOpen && (
+      {onboardingEnabled && lyricsStep === 1 && (
+        <OnboardingCoachMark
+          step="3/5"
+          message="Add chords and write lyrics here. Press Enter in the lyrics to start a new line."
+        />
+      )}
+      {onboardingEnabled && lyricsStep === 2 && (
+        <OnboardingCoachMark
+          step="4/5"
+          message="Tap and hold or right click to change a chord."
+          onDismiss={() => setLyricsStep(3)}
+        />
+      )}
+      {onboardingEnabled && lyricsStep === 3 && (
+        <OnboardingCoachMark
+          step="5/5"
+          message="Delete chords by tapping on them then pressing delete."
+          onDismiss={() => setLyricsStep(4)}
+        />
+      )}
+
+      {onboardingEnabled && showNewSongPrompt && (
+        <div className="fixed bottom-14 left-0 right-0 z-50">
           <div
-            className="px-4 pt-4 pb-4"
-            style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+            className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4 rounded-t-xl"
+            style={{ background: "var(--paper-card)", borderTop: "1px solid var(--border)", boxShadow: "var(--shadow-card)" }}
           >
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => { addSection(t); setAddSectionOpen(false); }}
-                  className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
-                >
-                  <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
-                </button>
-              ))}
+            <span className="text-sm font-semibold" style={{ color: "var(--ink)", fontFamily: "var(--font-ui, 'Nunito', sans-serif)" }}>
+              You're getting the hang of it! Turn off the tutorial?
+            </span>
+            <div className="flex gap-2 shrink-0">
               <button
-                onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
-                className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+                type="button"
+                className="btn-sculpt-amber inline-flex items-center rounded-lg px-3 h-7 text-xs font-semibold"
+                onClick={() => { disableOnboarding(); dismissNewSongPrompt(); }}
               >
-                <Plus className="h-3.5 w-3.5" /> Custom…
+                Turn off
+              </button>
+              <button
+                type="button"
+                className="btn-sculpt-cream inline-flex items-center rounded-lg px-3 h-7 text-xs font-semibold"
+                onClick={dismissNewSongPrompt}
+              >
+                Keep it on
               </button>
             </div>
           </div>
-        )}
-        <div
-          className="py-3 text-center cursor-pointer"
-          style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-          onClick={() => setAddSectionOpen((o) => !o)}
-        >
-          <span
-            style={{
-              fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
-              fontWeight: 700,
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "var(--ink)",
-            }}
+        </div>
+      )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-30">
+        <div className="max-w-6xl mx-auto">
+          {addSectionOpen && (
+            <div
+              className="px-4 pt-4 pb-4"
+              style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
+            >
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as SectionType[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => { addSection(t); setAddSectionOpen(false); }}
+                    className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
+                  className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Custom…
+                </button>
+              </div>
+            </div>
+          )}
+          <div
+            className="py-3 text-center cursor-pointer"
+            style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+            onClick={() => setAddSectionOpen((o) => !o)}
           >
-            Add Section
-          </span>
+            <span
+              style={{
+                fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
+                fontWeight: 700,
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--ink)",
+              }}
+            >
+              Add Section
+            </span>
+          </div>
         </div>
       </div>
 
