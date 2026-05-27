@@ -855,10 +855,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
               resetSong();
-              if (onboarding.enabled) {
-                onboarding.resetForNewSong();
-                onboarding.incrementNewSong();
-              }
+              onboarding.resetForNewSong();
+              onboarding.incrementNewSong();
               setConfirmNewSong(false);
               toast({ title: "New song started" });
             }}

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSongStore } from "@/store/song";
+import { useOnboardingStore } from "@/store/onboarding";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
@@ -124,6 +125,7 @@ export default function Landing() {
   };
   const startWriting = () => {
     resetSong();
+    useOnboardingStore.getState().resetForNewSong();
     navigate("/app");
   };
 
