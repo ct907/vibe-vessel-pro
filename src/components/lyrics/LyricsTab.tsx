@@ -1082,6 +1082,8 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
+  const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
+  const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1541,21 +1543,44 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       ))}
 
 
-      {canShowCoachMark && lyricsStep >= 1 && lyricsStep <= 3 && (
-        <AnchoredCoachMark
-          anchorRef={lyricsRootRef}
-          viewportBottom={140}
-          step={`${lyricsStep + 2}/5`}
-          message={
-            lyricsStep === 1
-              ? "Tap the + in a chord row to add a chord, then type your lyrics below"
-              : lyricsStep === 2
-              ? "Right click or tap & hold a chord chip to replace it"
-              : "Tap a chord to select it, then press Backspace / Delete to remove it"
-          }
-          arrowSide="bottom"
-        />
-      )}
+      {canShowCoachMark && lyricsStep >= 1 && lyricsStep <= 3 && (() => {
+        const modalOpen = !!picker;
+        const modalHeaderRef = isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef;
+        const isReplaceMode = !!(picker?.anchorId);
+        if (lyricsStep === 3) {
+          return (
+            <AnchoredCoachMark
+              anchorRef={lyricsRootRef}
+              viewportBottom={140}
+              step="5/5"
+              message="Tap a chord to select it, then press Backspace / Delete to remove it"
+              arrowSide="bottom"
+            />
+          );
+        }
+        return modalOpen ? (
+          <AnchoredCoachMark
+            anchorRef={modalHeaderRef}
+            anchorEdge="top"
+            gap={8}
+            step={`${lyricsStep + 2}/5`}
+            message={isReplaceMode ? "Replace with one of these chords!" : "Tap the + in a chord row to add a chord, then type your lyrics below"}
+            arrowSide="bottom"
+          />
+        ) : (
+          <AnchoredCoachMark
+            anchorRef={lyricsRootRef}
+            viewportBottom={140}
+            step={`${lyricsStep + 2}/5`}
+            message={
+              lyricsStep === 1
+                ? "Tap the + in a chord row to add a chord, then type your lyrics below"
+                : "Right click or tap & hold a chord chip to replace it"
+            }
+            arrowSide="bottom"
+          />
+        );
+      })()}
 
       {onboardingEnabled && showNewSongPrompt && (
         <div className="fixed bottom-14 left-0 right-0 z-50">
@@ -1643,6 +1668,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           initialSlot={picker.slotIndex}
           initialAnchorId={picker.anchorId}
           onClose={() => setPicker(null)}
+          headerRef={focusedEditorHeaderRef}
         />
       ) : (
         <ChordPickerSheet
@@ -1650,6 +1676,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           onOpenChange={(o) => {
             if (!o) setPicker(null);
           }}
+          headerRef={chordPickerHeaderRef}
           initialChord={initialChord}
           onPick={handlePick}
           sectionId={picker?.sectionId}
