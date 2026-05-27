@@ -58,7 +58,7 @@ export function PresetList({ onUse, heading = "Popular Progressions" }: PresetLi
 
   return (
     <div>
-      <h3 className="font-display text-base font-bold mb-2 text-primary">{heading}</h3>
+      <h3 className="font-display text-base font-bold mb-2" style={{ color: "var(--paper)" }}>{heading}</h3>
       <div className="flex flex-wrap gap-2">
         {FILTER_CHIPS.map((chip) => {
           const active = filter === chip.match;
