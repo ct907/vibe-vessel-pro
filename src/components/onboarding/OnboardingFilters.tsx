@@ -3,9 +3,9 @@ export function OnboardingFilters() {
     <>
       <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
         <defs>
-          <filter id="onb-paper-noise" x="-5%" y="-5%" width="110%" height="110%">
+          <filter id="onb-paper-noise" x="-10%" y="-10%" width="120%" height="120%">
             <feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="4" />
-            <feDisplacementMap in="SourceGraphic" scale="2" />
+            <feDisplacementMap in="SourceGraphic" scale="5" />
           </filter>
         </defs>
       </svg>
