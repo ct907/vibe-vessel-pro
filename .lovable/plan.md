@@ -1,20 +1,77 @@
-## Conditionally hide Popular Progressions in chord editors
+## Goal
 
-The Popular Progressions list (`PresetList`) currently always renders inside both `ChordPickerSheet` and `FocusedChordEditor`. We want it shown only when the user is adding a chord into an empty space, and hidden when they're editing an existing chord.
+Make the onboarding sequence replay every time the user presses **Start Writing** (Landing) or **Start new song** (TransportHeader), unless the user has explicitly turned the tutorial off via the nav menu's **Disable Tutorial** toggle. That disabled state is the persistent override.
 
-### Context distinction
-- **Editing existing chord** → `ChordPickerSheet` is opened with `initialChord` set; `FocusedChordEditor` is opened with `mode="progression"` (has `chordId`) or with `initialAnchorId` set (lyrics mode).
-- **Adding to empty slot** → `ChordPickerSheet` opened with no `initialChord`; `FocusedChordEditor` opened with `mode="progression-add"` (has `atBeat`) or without `initialAnchorId` (lyrics mode).
+## Behavior
 
-### Changes
+- `enabled` (persisted) is the master override.
+  - When `enabled = true`: every Start Writing / Start new song fully resets onboarding progress so the phase-0 amber coach mark reappears.
+  - When `enabled = false`: Start Writing / Start new song do nothing onboarding-related; no coach marks render.
+- The nav menu's existing **Disable Tutorial** action keeps working; we also keep an **Enable Tutorial** action (already conditional) so the user can flip the override back on.
 
-1. **`src/components/chord/ChordPickerSheet.tsx`**
-   - Around line 360–362, wrap the `<PresetList />` block in `{!initialChord && (...)}` so presets only render when no chord is being replaced.
+## Changes
 
-2. **`src/components/lyrics/FocusedChordEditor.tsx`**
-   - Around line 674–676, compute `const showPresets = isProgressionAdd || (props.mode !== "progression" && !anchorId);` and wrap the `<PresetList />` block (plus its separator container) in `{showPresets && (...)}`.
+### 1. `src/store/onboarding.ts`
 
-### Verification
+Rewrite `resetForNewSong()` to fully restart the tour from the beginning (no `globalPhase >= 2` guard, no dependence on current step):
+
+```ts
+resetForNewSong: () => {
+  if (!get().enabled) return;
+  set({
+    globalPhase: 0,
+    lyricsStep: 0,
+    progressionsStep: 0,
+    showNewSongPrompt: false,
+  });
+},
+```
+
+Rationale: the guard previously prevented first-time runs from re-triggering, and never reset `globalPhase`, so persisted state from prior sessions silently suppressed PR #131's redesigned coach mark.
+
+### 2. `src/pages/Landing.tsx`
+
+`startWriting()` should also restart onboarding:
+
+```ts
+const startWriting = () => {
+  resetSong();
+  useOnboardingStore.getState().resetForNewSong();
+  navigate("/app");
+};
+```
+
+Add the `useOnboardingStore` import.
+
+### 3. `src/components/header/TransportHeader.tsx` (Start new song handler, ~line 856)
+
+Simplify to always call `resetForNewSong()` — it already no-ops when disabled — and drop `incrementNewSong()` from the onboarding-restart path (that counter drives the unrelated `showNewSongPrompt` flow; keep the call only if it is still needed for that prompt). Concretely:
+
+```ts
+resetSong();
+onboarding.resetForNewSong();
+onboarding.incrementNewSong(); // keep — drives the separate save reminder
+setConfirmNewSong(false);
+toast({ title: "New song started" });
+```
+
+(No `if (onboarding.enabled)` wrapper needed — `resetForNewSong` already short-circuits when disabled, and `incrementNewSong` is independent of the tutorial.)
+
+### 4. Persisted-state migration (one-time unblock for existing users)
+
+Bump the persist key so users whose stored `globalPhase` is currently `2` get a clean slate on next load:
+
+```ts
+{ name: "felt:onboarding:v2" }
+```
+
+Without this, returning users (including the current preview session) won't see the redesigned coach mark until they next press Start Writing / Start new song.
+
+## Verification
+
 - `npx tsc --noEmit`
-- Progressions tab: tap empty space in pattern → editor shows Popular Progressions. Tap existing chord → editor hides Popular Progressions.
-- Lyrics tab (mobile): tap empty chord slot → presets visible. Tap existing chord chip → presets hidden. Desktop ChordPickerSheet behaves the same way.
+- Manual: reload preview → amber phase-0 coach mark visible under tab strip (because key bump cleared old state).
+- Press **Start new song** → coach mark reappears.
+- Open nav → **Disable Tutorial** → press **Start new song** → no coach marks.
+- Re-enable tutorial → **Start new song** → coach marks return.
+- From `/` press **Start Writing** → land on `/app` with phase-0 coach mark visible (when enabled).

@@ -40,12 +40,15 @@ export const useOnboardingStore = create<OnboardingState>()(
       },
       dismissNewSongPrompt: () => set({ showNewSongPrompt: false }),
       resetForNewSong: () => {
-        const { globalPhase } = get();
-        if (globalPhase >= 2) {
-          set({ lyricsStep: 1, progressionsStep: 1 });
-        }
+        if (!get().enabled) return;
+        set({
+          globalPhase: 0,
+          lyricsStep: 0,
+          progressionsStep: 0,
+          showNewSongPrompt: false,
+        });
       },
     }),
-    { name: "felt:onboarding:v1" },
+    { name: "felt:onboarding:v2" },
   ),
 );
