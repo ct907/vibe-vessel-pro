@@ -304,27 +304,27 @@
      rather than muddied by the underlying paper hue. Toggled from
      src/store/appTint.ts. */
   .app-tinted {
-    --paper-b: oklch(0.9613 0 none);
-    --paper-shade-b: oklch(0.883 0 none);
-    --paper-shade-soft-b: oklch(0.9234 0 none);
-    --paper-card-b: oklch(0.974 0 none);
-    --popover-b: oklch(0.9803 0 none);
-    --muted-b: oklch(0.915 0 none);
-    --accent-b: oklch(0.9287 0 none);
-    --border-b: oklch(0.819 0 none);
+    --paper:            oklch(from var(--app-tint-raw) 0.9613 calc(c * 0.5)  h);
+    --paper-shade:      oklch(from var(--app-tint-raw) 0.883  calc(c * 0.55) h);
+    --paper-shade-soft: oklch(from var(--app-tint-raw) 0.9234 calc(c * 0.5)  h);
+    --paper-card:       oklch(from var(--app-tint-raw) 0.974  calc(c * 0.4)  h);
+    --popover:          oklch(from var(--app-tint-raw) 0.9803 calc(c * 0.35) h);
+    --muted:            oklch(from var(--app-tint-raw) 0.915  calc(c * 0.5)  h);
+    --accent:           oklch(from var(--app-tint-raw) 0.9287 calc(c * 0.5)  h);
+    --border:           oklch(from var(--app-tint-raw) 0.819  calc(c * 0.6)  h);
   }
 
   .dark.app-tinted {
-    --paper-b: oklch(0.2179 0 none);
-    --paper-shade-b: oklch(0.175 0 none);
-    --paper-shade-soft-b: oklch(0.2499 0 none);
-    --paper-card-b: oklch(0.2499 0 none);
-    --popover-b: oklch(0.2499 0 none);
-    --secondary-b: oklch(0.3229 0 none);
-    --muted-b: oklch(0.3019 0 none);
-    --accent-b: oklch(0.3589 0 none);
-    --border-b: oklch(0.3432 0 none);
-    --pill-hover-bg-b: oklch(0.3 0 none);
+    --paper:            oklch(from var(--app-tint-raw) 0.2179 calc(c * 0.4)  h);
+    --paper-shade:      oklch(from var(--app-tint-raw) 0.175  calc(c * 0.45) h);
+    --paper-shade-soft: oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.4)  h);
+    --paper-card:       oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.35) h);
+    --popover:          oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.35) h);
+    --secondary:        oklch(from var(--app-tint-raw) 0.3229 calc(c * 0.4)  h);
+    --muted:            oklch(from var(--app-tint-raw) 0.3019 calc(c * 0.4)  h);
+    --accent:           oklch(from var(--app-tint-raw) 0.3589 calc(c * 0.4)  h);
+    --border:           oklch(from var(--app-tint-raw) 0.3432 calc(c * 0.5)  h);
+    --pill-hover-bg:    oklch(from var(--app-tint-raw) 0.3    calc(c * 0.4)  h);
   }
 }
 
