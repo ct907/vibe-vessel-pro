@@ -777,7 +777,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               }}
             >
               {(["lyrics", "progressions"] as const).map((t) => {
-                const active = tab === t;
+                const isOnboardingPhase0 = onboarding.enabled && onboarding.globalPhase === 0;
+                const active = !isOnboardingPhase0 && tab === t;
                 const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions" };
                 const label = LABEL[t] ?? t;
                 return (

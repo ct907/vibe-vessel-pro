@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 
 interface Props {
@@ -91,20 +91,26 @@ export function AnchoredCoachMark({
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  useLayoutEffect(() => {
-    const update = () => {
+  useEffect(() => {
+    let raf: number;
+    const measure = () => {
       const el = anchorRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) {
+        raf = requestAnimationFrame(measure);
+        return;
+      }
       const top = anchorEdge === "top" ? r.top + gap : r.bottom + gap;
       setPos({ top, left: r.left + r.width / 2 });
     };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    raf = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
     return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
     };
   }, [anchorRef, gap, anchorEdge]);
 
