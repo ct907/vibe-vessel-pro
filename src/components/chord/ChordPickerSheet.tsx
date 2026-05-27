@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -43,9 +44,11 @@ interface Props {
   onQueryChange?: (q: string) => void;
   /** Live-save hook for octave-only edits (no chord re-pick). */
   onOctaveChange?: (octave: number) => void;
+  /** Ref attached to the topmost input-row container — used by parent to anchor coach marks. */
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange, headerRef }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -212,7 +215,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
         }}
       >
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div className="flex items-stretch gap-1.5 shrink-0">
+          <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
             <input
               ref={inputRef}
