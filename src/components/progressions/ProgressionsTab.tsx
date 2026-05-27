@@ -399,7 +399,7 @@ function PatternBlock({
                 const next = !spiceOpen;
                 setSpiceOpen(next);
                 if (!next) setPreviewingSpiceChords(null);
-                if (next && onboardingEnabled && progressionsStep === 4) setProgressionsStep(5);
+                if (next && onboardingEnabled && progressionsStep === 5) setProgressionsStep(6);
               }}
               className="inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors"
               style={{ background: "var(--paper-shade)", color: spiceOpen ? "var(--primary-strong)" : undefined }}
@@ -1534,12 +1534,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
-    if (onboardingEnabled && progressionsStep === 3 && totalChordCount < totalChordCountRef.current) {
-      setProgressionsStep(4);
-    }
     totalChordCountRef.current = totalChordCount;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalChordCount]);
+
+  useEffect(() => {
+    if (onboardingEnabled && progressionsStep === 3 && picker !== null && !picker.replaceChordId) {
+      setProgressionsStep(4);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picker]);
 
   const openChordEditor = (patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
@@ -1587,7 +1591,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         picker.atBeat,
         !isDesktop ? 4 : undefined,
       );
-      if (onboardingEnabled && progressionsStep === 1) setProgressionsStep(2);
+      if (onboardingEnabled && (progressionsStep === 1 || progressionsStep === 4)) setProgressionsStep(progressionsStep + 1);
       // Advance the slot so the next chord typed lands to the right of this one
       // instead of pushing this one rightward.
       setPicker((p) => (p ? { ...p, atBeat: p.atBeat + 1 } : p));
@@ -1855,20 +1859,30 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         </div>
       )}
 
-      {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 4 && (
+      {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 5 &&
+       !(progressionsStep === 4 && !!picker && !picker?.replaceChordId) && (
         <AnchoredCoachMark
           anchorRef={progressionsRootRef}
           viewportBottom={140}
-          step={`${progressionsStep + 2}/6`}
+          step={`${progressionsStep + 2}/7`}
           message={
             progressionsStep === 1
               ? "Tap the + slot in a pattern block to add a chord"
               : progressionsStep === 2
               ? "Right click or tap & hold a chord chip to replace it"
-              : progressionsStep === 3
-              ? "Tap a chord to select it, then press Backspace / Delete to remove it"
-              : "Press the ✨ Add Spice button to try AI chord variations on this block"
+              : progressionsStep <= 4
+              ? "Tap Add Chords to begin!"
+              : "Press the ✨Add Spice button to try different variations of your chords!"
           }
+          arrowSide="bottom"
+        />
+      )}
+      {onboardingEnabled && progressionsStep === 4 && !!picker && !picker?.replaceChordId && (
+        <AnchoredCoachMark
+          anchorRef={progressionsRootRef}
+          viewportBottom={380}
+          step="6/7"
+          message="Pick a chord or add a progression. Try adding the Royal Road Progression."
           arrowSide="bottom"
         />
       )}
@@ -1959,7 +1973,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           chords.forEach((c, i) =>
             addChordToPatternSlot(picker.patternId, c, picker.atBeat + i, !isDesktop ? 4 : undefined),
           );
-          if (onboardingEnabled && progressionsStep === 1) setProgressionsStep(2);
+          if (onboardingEnabled && (progressionsStep === 1 || progressionsStep === 4)) setProgressionsStep(progressionsStep + 1);
         }}
         sectionId={(() => {
           if (!picker) return undefined;

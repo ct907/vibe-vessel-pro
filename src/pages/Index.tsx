@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 import {
   DragDropContext,
@@ -79,6 +80,10 @@ const Index = () => {
     const t = v as typeof tab;
     if (onboarding.enabled && onboarding.globalPhase === 0) {
       onboarding.setGlobalPhase(1);
+    }
+    if (onboarding.enabled && onboarding.globalPhase >= 2 && t !== tab) {
+      const label = t === "lyrics" ? "Lyrics" : t === "progressions" ? "Chord Progressions" : "Chords";
+      toast(`Switching to ${label} tutorial`);
     }
     setTab(t);
   };

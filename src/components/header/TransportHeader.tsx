@@ -24,7 +24,7 @@ import {
   HelpCircle,
   Compass,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, ScheduledChord } from "@/lib/music/audio";
 import { transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
@@ -353,6 +353,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const appTint = useAppTintStore();
   const appBg = useAppBackgroundStore();
   const onboarding = useOnboardingStore();
+  const location = useLocation();
   const stopRequestedRef = useRef(false);
   const playMetaRef = useRef<PlaybackMeta[]>([]);
   const startFromChordIdAtPlayRef = useRef<string | null>(null);
@@ -809,7 +810,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               })}
             </div>
 
-            {onboarding.enabled && onboarding.globalPhase === 0 && (
+            {onboarding.enabled && onboarding.globalPhase === 0 && location.pathname !== '/' && (
               <AnchoredCoachMark
                 anchorRef={tabsBarRef}
                 step="1/5"
