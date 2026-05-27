@@ -55,6 +55,7 @@ import {
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
+import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -764,45 +765,57 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <div className="flex items-center justify-center gap-3 sm:order-2 sm:justify-start">
 
           {/* Tabs bar — recessed well with cocoa active pill */}
-          <div
-            className="inline-flex items-center gap-1"
-            style={{
-              padding: "7px 5px 7px",
-              background: "var(--paper-shade)",
-              borderRadius: 10,
-              boxShadow: "var(--shadow-recess)",
-            }}
-          >
-            {(["lyrics", "progressions"] as const).map((t) => {
-              const active = tab === t;
-              const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions" };
-              const label = LABEL[t] ?? t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => guardedSetTab(t)}
-                  aria-disabled={toolbarExpanded && !active}
-                  style={{
-                    padding: "7px 14px",
-                    border: 0,
-                    borderRadius: 7.6,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-body, 'Nunito', sans-serif)",
-                    fontWeight: 700,
-                    fontSize: 14,
-                    background: active ? "var(--cocoa)" : "transparent",
-                    color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)",
-                    boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
-                    marginTop: active ? -2 : 0,
-                    marginBottom: active ? 2 : 0,
-                    opacity: toolbarExpanded && !active ? 0.5 : 1,
-                    transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
+          <div className="relative">
+            <div
+              className="inline-flex items-center gap-1"
+              style={{
+                padding: "7px 5px 7px",
+                background: "var(--paper-shade)",
+                borderRadius: 10,
+                boxShadow: "var(--shadow-recess)",
+              }}
+            >
+              {(["lyrics", "progressions"] as const).map((t) => {
+                const active = tab === t;
+                const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions" };
+                const label = LABEL[t] ?? t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => guardedSetTab(t)}
+                    aria-disabled={toolbarExpanded && !active}
+                    style={{
+                      padding: "7px 14px",
+                      border: 0,
+                      borderRadius: 7.6,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-body, 'Nunito', sans-serif)",
+                      fontWeight: 700,
+                      fontSize: 14,
+                      background: active ? "var(--cocoa)" : "transparent",
+                      color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)",
+                      boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
+                      marginTop: active ? -2 : 0,
+                      marginBottom: active ? 2 : 0,
+                      opacity: toolbarExpanded && !active ? 0.5 : 1,
+                      transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {onboarding.enabled && onboarding.globalPhase === 0 && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 pointer-events-none">
+                <OnboardingCoachMark
+                  step="1/5"
+                  message="Write lyrics or build progressions? Tap a tab to begin"
+                  arrowSide="top"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

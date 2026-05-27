@@ -533,3 +533,13 @@
     background-color: #888888;
   }
 }
+
+@keyframes onb-squiggle {
+  0%,  49.9% { filter: url(#onb-squiggly-0); }
+  50%, 100%  { filter: url(#onb-squiggly-1); }
+}
+.onb-squiggly {
+  animation: onb-squiggle 1s linear infinite;
+  font-family: 'Caveat', cursive;
+  font-weight: 400;
+}

@@ -399,6 +399,7 @@ function PatternBlock({
                 const next = !spiceOpen;
                 setSpiceOpen(next);
                 if (!next) setPreviewingSpiceChords(null);
+                if (next && onboardingEnabled && progressionsStep === 4) setProgressionsStep(5);
               }}
               className="inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors"
               style={{ background: "var(--paper-shade)", color: spiceOpen ? "var(--primary-strong)" : undefined }}
@@ -1529,6 +1530,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
+  const totalChordCountRef = useRef(totalChordCount);
+  useEffect(() => {
+    if (onboardingEnabled && progressionsStep === 3 && totalChordCount < totalChordCountRef.current) {
+      setProgressionsStep(4);
+    }
+    totalChordCountRef.current = totalChordCount;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalChordCount]);
 
   const openChordEditor = (patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
@@ -1567,6 +1577,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
     if (!picker) return;
     if (picker.replaceChordId) {
       updatePatternChord(picker.patternId, picker.replaceChordId, { chord });
+      if (onboardingEnabled && progressionsStep === 2) setProgressionsStep(3);
     } else {
       // picker.atBeat is reused as a slot index by the new slot grid.
       useSongStore.getState().addChordToPatternSlot(
@@ -1606,7 +1617,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
 
   return (
     <div
-      className="space-y-4"
+      className="relative space-y-4"
       onClick={(e) => { if (e.target === e.currentTarget) setActiveChordId(null); }}
     >
       <div className="flex items-center gap-2">
@@ -1842,32 +1853,22 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         </div>
       )}
 
-      {onboardingEnabled && progressionsStep === 1 && (
-        <OnboardingCoachMark
-          step="3/5"
-          message="Add chords and change how long they play."
-        />
-      )}
-      {onboardingEnabled && progressionsStep === 2 && (
-        <OnboardingCoachMark
-          step="4/5"
-          message="Tap and hold or right click to change a chord."
-          onDismiss={() => setProgressionsStep(3)}
-        />
-      )}
-      {onboardingEnabled && progressionsStep === 3 && (
-        <OnboardingCoachMark
-          step="5/5"
-          message="Delete chords by tapping on them then pressing delete."
-          onDismiss={() => setProgressionsStep(4)}
-        />
-      )}
-      {onboardingEnabled && progressionsStep === 4 && (
-        <OnboardingCoachMark
-          step="6/6"
-          message="Press Add Spice to enhance your chord progressions with different vibes."
-          onDismiss={() => setProgressionsStep(5)}
-        />
+      {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 4 && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none" style={{ top: 52 }}>
+          <OnboardingCoachMark
+            step={`${progressionsStep + 2}/6`}
+            message={
+              progressionsStep === 1
+                ? "Tap the + slot in a pattern block to add a chord"
+                : progressionsStep === 2
+                ? "Right click or tap & hold a chord chip to replace it"
+                : progressionsStep === 3
+                ? "Tap a chord to select it, then press Backspace / Delete to remove it"
+                : "Press the ✨ Add Spice button to try AI chord variations on this block"
+            }
+            arrowSide="top"
+          />
+        </div>
       )}
 
       {onboardingEnabled && showNewSongPrompt && (
