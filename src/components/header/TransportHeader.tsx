@@ -695,15 +695,21 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       Reset delete warnings
                     </Button>
                   )}
-                  {onboarding.enabled && (
-                    <Button
-                      variant="outline"
-                      className="justify-start border border-border"
-                      onClick={() => { onboarding.disable(); toast({ title: "Tutorial disabled" }); setNavOpen(false); }}
-                    >
-                      Turn off Tutorial
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    className="justify-start border border-border"
+                    onClick={() => {
+                      if (onboarding.enabled) {
+                        onboarding.disable();
+                        toast({ title: "Tutorial disabled" });
+                      } else {
+                        onboarding.enable();
+                        toast({ title: "Tutorial enabled" });
+                      }
+                    }}
+                  >
+                    {onboarding.enabled ? "Turn off Tutorial" : "Turn on Tutorial"}
+                  </Button>
                 </div>
               </div>
 
