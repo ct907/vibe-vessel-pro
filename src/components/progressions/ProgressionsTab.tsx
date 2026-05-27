@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
@@ -64,7 +65,7 @@ import { useUIStore } from "@/store/ui";
 import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
@@ -155,6 +156,9 @@ interface PatternProps {
   effectiveOffset: number;
   /** When true, the card background spans the full row width while content stays in the left ~85% (mobile non-last blocks). */
   extendBackground?: boolean;
+  blockRef?: React.RefObject<HTMLDivElement | null>;
+  spiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  onVariationApplied?: () => void;
 }
 
 function formatBeats(n: number) {
@@ -176,6 +180,9 @@ function PatternBlock({
   onClearMultiSelected,
   effectiveOffset,
   extendBackground = false,
+  blockRef: blockRefProp,
+  spiceButtonRef,
+  onVariationApplied,
 }: PatternProps) {
   const {
     updatePattern,
@@ -195,18 +202,6 @@ function PatternBlock({
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
-  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep } = useOnboardingStore();
-  const sawSpiceOpenAtStep4Ref = useRef(false);
-  useEffect(() => {
-    if (!onboardingEnabled) return;
-    if (progressionsStep === 4 && spiceOpen) {
-      sawSpiceOpenAtStep4Ref.current = true;
-    } else if (!spiceOpen && sawSpiceOpenAtStep4Ref.current && progressionsStep === 4) {
-      sawSpiceOpenAtStep4Ref.current = false;
-      setProgressionsStep(5);
-    }
-  }, [spiceOpen, progressionsStep, onboardingEnabled, setProgressionsStep]);
-
   const blockRef = useRef<HTMLDivElement>(null);
   const justDraggedAtRef = useRef<number>(0);
   const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -321,7 +316,7 @@ function PatternBlock({
 
   return (
     <div
-      ref={blockRef}
+      ref={(el) => { (blockRef as React.MutableRefObject<HTMLDivElement | null>).current = el; if (blockRefProp) (blockRefProp as React.MutableRefObject<HTMLDivElement | null>).current = el; }}
       data-pattern-block={pattern.id}
       className={cn("rounded-lg p-3 transition-shadow")}
       style={{
@@ -404,6 +399,7 @@ function PatternBlock({
           </button>
           {sortedChords.length >= 2 && (
             <button
+              ref={spiceButtonRef}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -936,6 +932,7 @@ function PatternBlock({
         blockIndex={blockIndex}
         activeChordId={activeChordId}
         onAuditionChange={setPreviewingSpiceChords}
+        onVariationApplied={onVariationApplied}
       />
 
     </div>
@@ -963,6 +960,9 @@ interface SectionGroupProps {
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
   addChordsRef?: React.RefObject<HTMLButtonElement | null>;
+  firstBlockRef?: React.RefObject<HTMLDivElement | null>;
+  firstSpiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  onFirstBlockVariationApplied?: () => void;
 }
 
 function SectionGroup({
@@ -985,6 +985,9 @@ function SectionGroup({
   onClearMultiSelected,
   onAddNewBlockRequest,
   addChordsRef,
+  firstBlockRef,
+  firstSpiceButtonRef,
+  onFirstBlockVariationApplied,
 }: SectionGroupProps) {
   const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
@@ -1259,6 +1262,9 @@ function SectionGroup({
                     onToggleMultiSelected={onToggleMultiSelected}
                     onClearMultiSelected={onClearMultiSelected}
                     effectiveOffset={effectiveOffset}
+                    blockRef={i === 0 ? firstBlockRef : undefined}
+                    spiceButtonRef={i === 0 ? firstSpiceButtonRef : undefined}
+                    onVariationApplied={i === 0 ? onFirstBlockVariationApplied : undefined}
                   />
                 ) : (
                   <button
@@ -1548,6 +1554,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
   const addChordsRef = useRef<HTMLButtonElement | null>(null);
+  const firstBlockRef = useRef<HTMLDivElement | null>(null);
+  const spiceButtonRef = useRef<HTMLButtonElement | null>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1620,6 +1628,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     if (!picker) return;
     if (picker.replaceChordId) {
       updatePatternChord(picker.patternId, picker.replaceChordId, { chord });
+      setPicker(null);
     } else {
       // picker.atBeat is reused as a slot index by the new slot grid.
       useSongStore.getState().addChordToPatternSlot(
@@ -1706,6 +1715,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onToggleMultiSelected={toggleMultiSelected}
           onClearMultiSelected={() => setMultiSelected(new Map())}
           addChordsRef={i === 0 ? addChordsRef : undefined}
+          firstBlockRef={i === 0 ? firstBlockRef : undefined}
+          firstSpiceButtonRef={i === 0 ? spiceButtonRef : undefined}
+          onFirstBlockVariationApplied={i === 0 ? () => { if (onboardingEnabled && progressionsStep === 4) setProgressionsStep(5); } : undefined}
           onAddNewBlockRequest={(sid, patternId) => {
             if (isDesktop) {
               setPicker({ patternId, atBeat: 0, replaceChordId: undefined });
@@ -1916,32 +1928,37 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       )}
       {canShowCoachMark && progressionsStep === 3 && (
         <AnchoredCoachMark
-          anchorRef={progressionsRootRef}
-          viewportBottom={140}
+          anchorRef={firstBlockRef}
+          gap={12}
+          anchorEdge="bottom"
           step="5/7"
           message="Right click or tap & hold a chord chip to replace it"
-          arrowSide="bottom"
+          arrowSide="top"
         />
       )}
       {canShowCoachMark && progressionsStep === 4 && (
         <AnchoredCoachMark
-          anchorRef={progressionsRootRef}
-          viewportBottom={140}
+          anchorRef={spiceButtonRef}
+          gap={16}
+          anchorEdge="top"
           step="6/7"
-          message="Press the ✨Add Spice button to try different variations of your chords!"
+          message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
           arrowSide="bottom"
         />
       )}
-      {canShowCoachMark && progressionsStep === 5 && (
-        <AnchoredCoachMark
-          anchorRef={progressionsRootRef}
-          viewportBottom={140}
-          step="7/7"
-          message="That concludes the Progressions tutorial. Check out the Lyrics tutorial by pressing the Lyrics tab here!"
-          arrowSide="bottom"
-          actionLabel="Finish"
-          onAction={() => setProgressionsStep(6)}
-        />
+      {canShowCoachMark && progressionsStep === 5 && createPortal(
+        <div
+          className="pointer-events-auto"
+          style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9999 }}
+        >
+          <OnboardingCoachMark
+            step="7/7"
+            message="That concludes the Progressions tutorial. Check out the Lyrics tutorial by pressing the Lyrics tab here!"
+            actionLabel="Finish"
+            onAction={() => setProgressionsStep(6)}
+          />
+        </div>,
+        document.body,
       )}
 
       {onboardingEnabled && showNewSongPrompt && (
