@@ -813,7 +813,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             {onboarding.enabled && onboarding.globalPhase === 0 && location.pathname !== '/' && (
               <AnchoredCoachMark
                 anchorRef={tabsBarRef}
-                step="1/5"
+                step="1/7"
                 message="Write lyrics or build progressions? Tap a tab to begin"
                 arrowSide="top"
               />
