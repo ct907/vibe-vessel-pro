@@ -241,7 +241,6 @@ export function SongAttributesMenu() {
               Save Settings
             </button>
           </div>
-        </div>
       </DropdownMenuContent>
     </DropdownMenu>
 
