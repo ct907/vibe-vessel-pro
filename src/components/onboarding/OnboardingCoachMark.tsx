@@ -6,6 +6,8 @@ interface Props {
   step: string;
   message: string;
   arrowSide?: "top" | "bottom" | "left" | "right";
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 function arrowStyle(side: NonNullable<Props["arrowSide"]>): CSSProperties {
@@ -27,10 +29,11 @@ function arrowStyle(side: NonNullable<Props["arrowSide"]>): CSSProperties {
   }
 }
 
-export function OnboardingCoachMark({ step, message, arrowSide = "top" }: Props) {
+export function OnboardingCoachMark({ step, message, arrowSide = "top", actionLabel, onAction }: Props) {
+  const interactive = !!actionLabel && !!onAction;
   return (
     <div
-      className="pointer-events-none"
+      className={interactive ? "pointer-events-auto" : "pointer-events-none"}
       style={{ position: "relative", width: "max-content", maxWidth: 360, boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 10 }}
     >
       {/* Arrow */}
@@ -71,6 +74,15 @@ export function OnboardingCoachMark({ step, message, arrowSide = "top" }: Props)
         >
           {message}
         </p>
+        {interactive && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="btn-sculpt-cream inline-flex items-center justify-center self-end rounded-lg px-3 h-7 text-xs font-semibold"
+          >
+            {actionLabel}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -124,9 +136,10 @@ export function AnchoredCoachMark({
   }, [anchorRef, gap, anchorEdge, viewportBottom]);
 
   if (!pos) return null;
+  const interactive = !!markProps.actionLabel && !!markProps.onAction;
   return createPortal(
     <div
-      className="pointer-events-none"
+      className={interactive ? "pointer-events-auto" : "pointer-events-none"}
       style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)", zIndex: 9999 }}
     >
       <OnboardingCoachMark {...markProps} />
