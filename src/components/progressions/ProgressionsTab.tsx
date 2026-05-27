@@ -195,6 +195,7 @@ function PatternBlock({
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
+  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep } = useOnboardingStore();
 
   const blockRef = useRef<HTMLDivElement>(null);
   const justDraggedAtRef = useRef<number>(0);
