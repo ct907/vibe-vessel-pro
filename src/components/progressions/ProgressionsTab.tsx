@@ -1384,6 +1384,7 @@ function SectionGroup({
 interface ProgressionsTabProps {
   sortMode?: boolean;
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
+  showOnboarding?: boolean;
 }
 
 /** Tiny helper that registers the progressions onDragEnd handler with the
@@ -1399,7 +1400,7 @@ function ProgressionsDndRegistrar({ onDragEnd }: { onDragEnd: (r: DropResult) =>
   return null;
 }
 
-export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }: ProgressionsTabProps) {
+export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, showOnboarding = true }: ProgressionsTabProps) {
   const {
     progression,
     sections,
@@ -1530,6 +1531,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
@@ -1859,7 +1861,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
         </div>
       )}
 
-      {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 5 &&
+      {canShowCoachMark && progressionsStep >= 1 && progressionsStep <= 5 &&
        !(progressionsStep === 4 && !!picker && !picker?.replaceChordId) && (
         <AnchoredCoachMark
           anchorRef={progressionsRootRef}
@@ -1877,7 +1879,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           arrowSide="bottom"
         />
       )}
-      {onboardingEnabled && progressionsStep === 4 && !!picker && !picker?.replaceChordId && (
+      {canShowCoachMark && progressionsStep === 4 && !!picker && !picker?.replaceChordId && (
         <AnchoredCoachMark
           anchorRef={progressionsRootRef}
           viewportBottom={380}

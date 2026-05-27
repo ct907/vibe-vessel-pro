@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import {
   DragDropContext,
   useKeyboardSensor,
@@ -24,6 +24,7 @@ import { useOnboardingStore } from "@/store/onboarding";
 const Index = () => {
   const bg = useAppBackgroundStore();
   const { theme } = useTheme();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const initialTab = ((): "lyrics" | "chords" | "progressions" => {
@@ -136,13 +137,13 @@ const Index = () => {
 
           <Tabs value={tab} onValueChange={handleTabSelect} className="w-full mt-4">
             <TabsContent value="lyrics" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} />}
+              {showTabContent && <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} showOnboarding={tab === "lyrics" && location.pathname !== '/'} />}
             </TabsContent>
             <TabsContent value="chords" forceMount className="mt-0 data-[state=inactive]:hidden">
               {showTabContent && <ChordsTab onSwitchTab={setTab} />}
             </TabsContent>
             <TabsContent value="progressions" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} />}
+              {showTabContent && <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} showOnboarding={tab === "progressions" && location.pathname !== '/'} />}
             </TabsContent>
           </Tabs>
         </main>

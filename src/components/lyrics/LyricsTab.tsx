@@ -1053,9 +1053,10 @@ function SectionCard({
 interface LyricsTabProps {
   sortMode?: boolean;
   onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
+  showOnboarding?: boolean;
 }
 
-export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
+export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true }: LyricsTabProps) {
   const {
     sections,
     upsertChordAt,
@@ -1079,6 +1080,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
@@ -1539,7 +1541,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       ))}
 
 
-      {onboardingEnabled && lyricsStep >= 1 && lyricsStep <= 3 && (
+      {canShowCoachMark && lyricsStep >= 1 && lyricsStep <= 3 && (
         <AnchoredCoachMark
           anchorRef={lyricsRootRef}
           viewportBottom={140}
