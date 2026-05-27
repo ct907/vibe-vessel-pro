@@ -83,17 +83,26 @@ export function AnchoredCoachMark({
   anchorRef,
   gap = 8,
   anchorEdge = "bottom",
+  viewportBottom,
   ...markProps
 }: Props & {
   anchorRef: RefObject<HTMLElement | null>;
   gap?: number;
   anchorEdge?: "bottom" | "top";
+  /** When set, position is pinned to the viewport bottom (top = innerHeight - viewportBottom),
+   *  ignoring the anchor's geometry. Useful for content-area coach marks that would otherwise
+   *  overlap dynamic affordances. */
+  viewportBottom?: number;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     let raf: number;
     const measure = () => {
+      if (viewportBottom !== undefined) {
+        setPos({ top: window.innerHeight - viewportBottom, left: window.innerWidth / 2 });
+        return;
+      }
       const el = anchorRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -112,7 +121,7 @@ export function AnchoredCoachMark({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [anchorRef, gap, anchorEdge]);
+  }, [anchorRef, gap, anchorEdge, viewportBottom]);
 
   if (!pos) return null;
   return createPortal(
