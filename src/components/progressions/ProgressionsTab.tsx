@@ -1556,6 +1556,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const addChordsRef = useRef<HTMLButtonElement | null>(null);
   const firstBlockRef = useRef<HTMLDivElement | null>(null);
   const spiceButtonRef = useRef<HTMLButtonElement | null>(null);
+  const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
+  const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1918,24 +1920,57 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         />
       )}
       {canShowCoachMark && progressionsStep === 2 && (
-        <AnchoredCoachMark
-          anchorRef={progressionsRootRef}
-          viewportBottom={380}
-          step="4/7"
-          message="Pick a chord or add a progression. Try adding the Royal Road Progression."
-          arrowSide="bottom"
-        />
+        picker !== null ? (
+          <AnchoredCoachMark
+            anchorRef={chordPickerHeaderRef}
+            anchorEdge="bottom"
+            gap={8}
+            step="4/7"
+            message="Pick a chord or add a progression. Try adding the Royal Road Progression."
+            arrowSide="top"
+          />
+        ) : (patternAddSlot !== null || chordEditor !== null) ? (
+          <AnchoredCoachMark
+            anchorRef={focusedEditorHeaderRef}
+            anchorEdge="bottom"
+            gap={8}
+            step="4/7"
+            message="Pick a chord or add a progression. Try adding the Royal Road Progression."
+            arrowSide="top"
+          />
+        ) : (
+          <AnchoredCoachMark
+            anchorRef={progressionsRootRef}
+            viewportBottom={380}
+            step="4/7"
+            message="Pick a chord or add a progression. Try adding the Royal Road Progression."
+            arrowSide="bottom"
+          />
+        )
       )}
-      {canShowCoachMark && progressionsStep === 3 && (
-        <AnchoredCoachMark
-          anchorRef={firstBlockRef}
-          gap={12}
-          anchorEdge="top"
-          step="5/7"
-          message="Right click or tap & hold a chord chip to replace it"
-          arrowSide="bottom"
-        />
-      )}
+      {canShowCoachMark && progressionsStep === 3 && (() => {
+        const editorOpen = chordEditor !== null || (picker !== null && !!picker.replaceChordId);
+        const modalHeaderRef = chordEditor !== null ? focusedEditorHeaderRef : chordPickerHeaderRef;
+        return editorOpen ? (
+          <AnchoredCoachMark
+            anchorRef={modalHeaderRef}
+            anchorEdge="bottom"
+            gap={8}
+            step="5/7"
+            message="Right click or tap & hold a chord chip to replace it"
+            arrowSide="top"
+          />
+        ) : (
+          <AnchoredCoachMark
+            anchorRef={firstBlockRef}
+            gap={12}
+            anchorEdge="top"
+            step="5/7"
+            message="Right click or tap & hold a chord chip to replace it"
+            arrowSide="bottom"
+          />
+        );
+      })()}
       {canShowCoachMark && progressionsStep === 4 && (
         <AnchoredCoachMark
           anchorRef={spiceButtonRef}
@@ -2041,6 +2076,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         open={!!picker}
         onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); setActiveChordId(null); } }}
         onPick={handlePick}
+        headerRef={chordPickerHeaderRef}
         onPickBatch={(chords) => {
           if (!picker || picker.replaceChordId) return;
           const { addChordToPatternSlot } = useSongStore.getState();
@@ -2075,6 +2111,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           patternId={chordEditor.patternId}
           chordId={chordEditor.chordId}
           onClose={() => { setChordEditor(null); setMultiSelected(new Map()); setActiveChordId(null); }}
+          headerRef={focusedEditorHeaderRef}
         />
       )}
 
@@ -2085,6 +2122,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           patternId={patternAddSlot.patternId}
           atBeat={patternAddSlot.atBeat}
           onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); setActiveChordId(null); }}
+          headerRef={focusedEditorHeaderRef}
         />
       )}
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
@@ -24,6 +25,7 @@ interface LyricsModeProps {
   initialSlot: number;
   initialAnchorId?: string;
   onClose: () => void;
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 interface ProgressionModeProps {
@@ -34,6 +36,7 @@ interface ProgressionModeProps {
   /** SectionChord id (== PatternChord id under SSOT) being edited. */
   chordId: string;
   onClose: () => void;
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 interface ProgressionAddModeProps {
@@ -42,6 +45,7 @@ interface ProgressionAddModeProps {
   patternId: string;
   atBeat: number;
   onClose: () => void;
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 type Props = LyricsModeProps | ProgressionModeProps | ProgressionAddModeProps;
@@ -336,6 +340,7 @@ export function FocusedChordEditor(props: Props) {
       >
         {/* HEADER */}
         <div
+          ref={props.headerRef}
           className="flex items-center gap-2 px-3 py-2 shrink-0"
           style={{ background: "var(--paper-shade)" }}
         >
