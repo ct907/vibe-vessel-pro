@@ -375,6 +375,28 @@ export function FocusedChordEditor(props: Props) {
           </button>
         </div>
 
+        {/* NASHVILLE NUMBERS */}
+        {nashvilleChords && nashvilleChords.length > 0 && (
+          <button
+            type="button"
+            onClick={() => handlePickNashville(nashvilleChords)}
+            className="w-full flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0 hover:brightness-95 active:scale-[0.99] transition-all text-left"
+            style={{ background: "var(--paper-shade)" }}
+          >
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
+            {nashvilleChords.map((c, i) => (
+              <span
+                key={i}
+                className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
+                style={getChordColorClasses(c).style}
+              >
+                {c.display}
+              </span>
+            ))}
+            <span className="text-[10px] text-muted-foreground ml-auto">↩ {(isProgression || (!isProgressionAdd && !!anchorId)) ? "Confirm" : `Add ${nashvilleChords.length}`}</span>
+          </button>
+        )}
+
         {/* PREVIEW */}
         {!isProgression && !isProgressionAdd && liveChords.length > 0 && (
           <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
@@ -617,26 +639,6 @@ export function FocusedChordEditor(props: Props) {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
-          {nashvilleChords && nashvilleChords.length > 0 && (
-            <button
-              type="button"
-              onClick={() => handlePickNashville(nashvilleChords)}
-              className="w-full flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg mb-3 hover:brightness-95 active:scale-[0.99] transition-all text-left"
-              style={{ background: "var(--paper-shade)" }}
-            >
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
-              {nashvilleChords.map((c, i) => (
-                <span
-                  key={i}
-                  className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
-                  style={getChordColorClasses(c).style}
-                >
-                  {c.display}
-                </span>
-              ))}
-              <span className="text-[10px] text-muted-foreground ml-auto">↩ {(isProgression || (!isProgressionAdd && !!anchorId)) ? "Confirm" : `Add ${nashvilleChords.length}`}</span>
-            </button>
-          )}
           {!query.trim() && (
             <p className="text-sm text-muted-foreground mb-3">
               Type a root letter (A–G) for variations, or a full chord like{" "}

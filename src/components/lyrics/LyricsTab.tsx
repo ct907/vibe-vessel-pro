@@ -1080,7 +1080,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -1102,6 +1102,15 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       setLyricsStep(4);
     }
   }, [picker?.anchorId, lyricsStep, onboardingEnabled, setLyricsStep]);
+  const pickerOpenRef = useRef<boolean>(false);
+  useEffect(() => {
+    const wasOpen = pickerOpenRef.current;
+    const isOpen = !!picker;
+    pickerOpenRef.current = isOpen;
+    if (wasOpen && !isOpen && onboardingEnabled && lyricsStep === 2) {
+      setLyricsStep(3);
+    }
+  }, [picker, lyricsStep, onboardingEnabled, setLyricsStep]);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
@@ -1429,16 +1438,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     const line = sec?.lines.find((l) => l.id === picker.lineId);
     if (!sec || !line) return;
     if (picker.anchorId) {
-      // Editing existing chord: keep its slot, swap symbol.
+      // Editing existing chord: keep its slot, swap symbol, then close.
       upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, chord, picker.anchorId);
       if (onboardingEnabled && lyricsStep === 4) setLyricsStep(5);
-    } else {
-      // Placing new chord into the requested slot.
-      placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
-      if (onboardingEnabled && lyricsStep === 2) setLyricsStep(3);
+      setPickerQuery("");
+      setPicker(null);
+      return;
     }
+    // Placing new chord into the requested slot.
+    placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
     setPickerQuery("");
-    // Step picker to the next slot for fast successive entry.
     setPicker((prev) =>
       prev
         ? {
@@ -1631,7 +1640,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             step="7/7"
             message="This is the end of the tutorial! You can press the Chord Progressions here to learn the other side of this app."
             actionLabel="Finish"
-            onAction={() => setLyricsStep(6)}
+            onAction={() => {
+              setLyricsStep(6);
+              if (progressionsStep === 0 || progressionsStep >= 6) setProgressionsStep(1);
+              dismissNewSongPrompt();
+            }}
           />
         </div>,
         document.body,

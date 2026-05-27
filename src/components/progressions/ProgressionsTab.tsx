@@ -1561,7 +1561,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
   const addChordsRef = useRef<HTMLButtonElement | null>(null);
@@ -2016,7 +2016,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="7/7"
             message="That concludes the Progressions tutorial. Check out the Lyrics tutorial by pressing the Lyrics tab here!"
             actionLabel="Finish"
-            onAction={() => setProgressionsStep(6)}
+            onAction={() => {
+              setProgressionsStep(6);
+              if (lyricsStep === 0 || lyricsStep >= 6) setLyricsStep(1);
+              dismissNewSongPrompt();
+            }}
           />
         </div>,
         document.body,
