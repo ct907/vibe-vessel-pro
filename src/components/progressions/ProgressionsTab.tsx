@@ -952,6 +952,7 @@ interface SectionGroupProps {
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
+  addChordsRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 function SectionGroup({
@@ -973,6 +974,7 @@ function SectionGroup({
   onToggleMultiSelected,
   onClearMultiSelected,
   onAddNewBlockRequest,
+  addChordsRef,
 }: SectionGroupProps) {
   const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
@@ -1250,6 +1252,7 @@ function SectionGroup({
                   />
                 ) : (
                   <button
+                    ref={addChordsRef}
                     type="button"
                     onClick={() => onPickerOpen(p.id, 0)}
                     className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
@@ -1263,6 +1266,7 @@ function SectionGroup({
           };
           const addChordsPlaceholder = (
             <button
+              ref={addChordsRef}
               type="button"
               onClick={() => {
                 let firstBlock = blocks[0];
@@ -1533,6 +1537,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
+  const addChordsRef = useRef<HTMLButtonElement | null>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1671,6 +1676,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           multiSelected={multiSelected}
           onToggleMultiSelected={toggleMultiSelected}
           onClearMultiSelected={() => setMultiSelected(new Map())}
+          addChordsRef={i === 0 ? addChordsRef : undefined}
           onAddNewBlockRequest={(sid, patternId) => {
             if (isDesktop) {
               setPicker({ patternId, atBeat: 0, replaceChordId: undefined });
@@ -1861,16 +1867,23 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         </div>
       )}
 
-      {canShowCoachMark && progressionsStep >= 1 && progressionsStep <= 5 &&
+      {canShowCoachMark && progressionsStep === 1 && (
+        <AnchoredCoachMark
+          anchorRef={addChordsRef}
+          gap={16}
+          step="3/7"
+          message="Tap Add Chords to begin!"
+          arrowSide="top"
+        />
+      )}
+      {canShowCoachMark && progressionsStep >= 2 && progressionsStep <= 5 &&
        !(progressionsStep === 4 && !!picker && !picker?.replaceChordId) && (
         <AnchoredCoachMark
           anchorRef={progressionsRootRef}
           viewportBottom={140}
           step={`${progressionsStep + 2}/7`}
           message={
-            progressionsStep === 1
-              ? "Tap the + slot in a pattern block to add a chord"
-              : progressionsStep === 2
+            progressionsStep === 2
               ? "Right click or tap & hold a chord chip to replace it"
               : progressionsStep <= 4
               ? "Tap Add Chords to begin!"
