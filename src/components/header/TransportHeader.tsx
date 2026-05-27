@@ -55,7 +55,7 @@ import {
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
-import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -339,6 +339,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const { preset, setPreset } = useSoundStore();
   const [fileInputKey, setFileInputKey] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const tabsBarRef = useRef<HTMLDivElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
@@ -765,7 +766,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <div className="flex items-center justify-center gap-3 sm:order-2 sm:justify-start">
 
           {/* Tabs bar — recessed well with cocoa active pill */}
-          <div className="relative">
+          <div className="relative" ref={tabsBarRef}>
             <div
               className="inline-flex items-center gap-1"
               style={{
@@ -808,13 +809,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             </div>
 
             {onboarding.enabled && onboarding.globalPhase === 0 && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 pointer-events-none">
-                <OnboardingCoachMark
-                  step="1/5"
-                  message="Write lyrics or build progressions? Tap a tab to begin"
-                  arrowSide="top"
-                />
-              </div>
+              <AnchoredCoachMark
+                anchorRef={tabsBarRef}
+                step="1/5"
+                message="Write lyrics or build progressions? Tap a tab to begin"
+                arrowSide="top"
+              />
             )}
           </div>
         </div>
