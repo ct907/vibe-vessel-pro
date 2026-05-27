@@ -82,7 +82,7 @@ import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -1079,6 +1079,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const lyricsRootRef = useRef<HTMLDivElement>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1476,7 +1477,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   }, [activeChordId, isMobile]);
 
   return (
-    <div className="relative space-y-4">
+    <div className="relative space-y-4" ref={lyricsRootRef}>
       {sections.map((sec, i) => (
         <div key={sec.id} className="space-y-2">
           <SectionCard
@@ -1539,19 +1540,20 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
 
 
       {onboardingEnabled && lyricsStep >= 1 && lyricsStep <= 3 && (
-        <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none" style={{ top: 52 }}>
-          <OnboardingCoachMark
-            step={`${lyricsStep + 2}/5`}
-            message={
-              lyricsStep === 1
-                ? "Tap the + in a chord row to add a chord, then type your lyrics below"
-                : lyricsStep === 2
-                ? "Right click or tap & hold a chord chip to replace it"
-                : "Tap a chord to select it, then press Backspace / Delete to remove it"
-            }
-            arrowSide="top"
-          />
-        </div>
+        <AnchoredCoachMark
+          anchorRef={lyricsRootRef}
+          anchorEdge="top"
+          gap={52}
+          step={`${lyricsStep + 2}/5`}
+          message={
+            lyricsStep === 1
+              ? "Tap the + in a chord row to add a chord, then type your lyrics below"
+              : lyricsStep === 2
+              ? "Right click or tap & hold a chord chip to replace it"
+              : "Tap a chord to select it, then press Backspace / Delete to remove it"
+          }
+          arrowSide="top"
+        />
       )}
 
       {onboardingEnabled && showNewSongPrompt && (

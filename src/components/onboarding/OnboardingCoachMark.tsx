@@ -1,4 +1,6 @@
-import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { useLayoutEffect, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
 
 interface Props {
   step: string;
@@ -71,5 +73,49 @@ export function OnboardingCoachMark({ step, message, arrowSide = "top" }: Props)
         </p>
       </div>
     </div>
+  );
+}
+
+/** Renders an OnboardingCoachMark via a document.body portal with fixed
+ *  positioning anchored to an element ref, escaping any overflow:hidden
+ *  or stacking-context constraints in the parent tree. */
+export function AnchoredCoachMark({
+  anchorRef,
+  gap = 8,
+  anchorEdge = "bottom",
+  ...markProps
+}: Props & {
+  anchorRef: RefObject<HTMLElement | null>;
+  gap?: number;
+  anchorEdge?: "bottom" | "top";
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const top = anchorEdge === "top" ? r.top + gap : r.bottom + gap;
+      setPos({ top, left: r.left + r.width / 2 });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef, gap, anchorEdge]);
+
+  if (!pos) return null;
+  return createPortal(
+    <div
+      className="pointer-events-none"
+      style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)", zIndex: 9999 }}
+    >
+      <OnboardingCoachMark {...markProps} />
+    </div>,
+    document.body,
   );
 }

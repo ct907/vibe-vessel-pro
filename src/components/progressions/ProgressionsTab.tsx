@@ -64,7 +64,7 @@ import { useUIStore } from "@/store/ui";
 import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
 
@@ -1531,6 +1531,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const progressionsRootRef = useRef<HTMLDivElement>(null);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1619,6 +1620,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
   return (
     <div
       className="relative space-y-4"
+      ref={progressionsRootRef}
       onClick={(e) => { if (e.target === e.currentTarget) setActiveChordId(null); }}
     >
       <div className="flex items-center gap-2">
@@ -1855,21 +1857,22 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       )}
 
       {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 4 && (
-        <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none" style={{ top: 52 }}>
-          <OnboardingCoachMark
-            step={`${progressionsStep + 2}/6`}
-            message={
-              progressionsStep === 1
-                ? "Tap the + slot in a pattern block to add a chord"
-                : progressionsStep === 2
-                ? "Right click or tap & hold a chord chip to replace it"
-                : progressionsStep === 3
-                ? "Tap a chord to select it, then press Backspace / Delete to remove it"
-                : "Press the ✨ Add Spice button to try AI chord variations on this block"
-            }
-            arrowSide="top"
-          />
-        </div>
+        <AnchoredCoachMark
+          anchorRef={progressionsRootRef}
+          anchorEdge="top"
+          gap={52}
+          step={`${progressionsStep + 2}/6`}
+          message={
+            progressionsStep === 1
+              ? "Tap the + slot in a pattern block to add a chord"
+              : progressionsStep === 2
+              ? "Right click or tap & hold a chord chip to replace it"
+              : progressionsStep === 3
+              ? "Tap a chord to select it, then press Backspace / Delete to remove it"
+              : "Press the ✨ Add Spice button to try AI chord variations on this block"
+          }
+          arrowSide="top"
+        />
       )}
 
       {onboardingEnabled && showNewSongPrompt && (
