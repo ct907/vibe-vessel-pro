@@ -158,7 +158,9 @@ interface PatternProps {
   extendBackground?: boolean;
   blockRef?: React.RefObject<HTMLDivElement | null>;
   spiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  spiceHeaderRef?: React.RefObject<HTMLDivElement | null>;
   onVariationApplied?: () => void;
+  onSpiceOpenChange?: (open: boolean) => void;
 }
 
 function formatBeats(n: number) {
@@ -182,7 +184,9 @@ function PatternBlock({
   extendBackground = false,
   blockRef: blockRefProp,
   spiceButtonRef,
+  spiceHeaderRef,
   onVariationApplied,
+  onSpiceOpenChange,
 }: PatternProps) {
   const {
     updatePattern,
@@ -197,6 +201,7 @@ function PatternBlock({
   
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const [spiceOpen, setSpiceOpen] = useState(false);
+  useEffect(() => { onSpiceOpenChange?.(spiceOpen); }, [spiceOpen, onSpiceOpenChange]);
   const [voiceLinesOpen, setVoiceLinesOpen] = useState(false);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
@@ -933,6 +938,7 @@ function PatternBlock({
         activeChordId={activeChordId}
         onAuditionChange={setPreviewingSpiceChords}
         onVariationApplied={onVariationApplied}
+        headerRef={spiceHeaderRef}
       />
 
     </div>
@@ -962,7 +968,9 @@ interface SectionGroupProps {
   addChordsRef?: React.RefObject<HTMLButtonElement | null>;
   firstBlockRef?: React.RefObject<HTMLDivElement | null>;
   firstSpiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  firstSpiceHeaderRef?: React.RefObject<HTMLDivElement | null>;
   onFirstBlockVariationApplied?: () => void;
+  onFirstSpiceOpenChange?: (open: boolean) => void;
 }
 
 function SectionGroup({
@@ -987,7 +995,9 @@ function SectionGroup({
   addChordsRef,
   firstBlockRef,
   firstSpiceButtonRef,
+  firstSpiceHeaderRef,
   onFirstBlockVariationApplied,
+  onFirstSpiceOpenChange,
 }: SectionGroupProps) {
   const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
@@ -1264,7 +1274,9 @@ function SectionGroup({
                     effectiveOffset={effectiveOffset}
                     blockRef={i === 0 ? firstBlockRef : undefined}
                     spiceButtonRef={i === 0 ? firstSpiceButtonRef : undefined}
+                    spiceHeaderRef={i === 0 ? firstSpiceHeaderRef : undefined}
                     onVariationApplied={i === 0 ? onFirstBlockVariationApplied : undefined}
+                    onSpiceOpenChange={i === 0 ? onFirstSpiceOpenChange : undefined}
                   />
                 ) : (
                   <button
@@ -1317,7 +1329,7 @@ function SectionGroup({
                 className="mr-auto rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
               >
                 <Plus className="h-4 w-4" />
-                <span className="text-xs font-display uppercase tracking-wide">Add block</span>
+                <span className="text-xs font-display uppercase tracking-wide">Add Chords</span>
               </button>
               <button
                 type="button"
@@ -1337,7 +1349,6 @@ function SectionGroup({
             return (
               <div>
                 {addChordsPlaceholder}
-                {addBlockRow}
               </div>
             );
           }
@@ -1558,6 +1569,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const spiceButtonRef = useRef<HTMLButtonElement | null>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
   const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
+  const spiceHeaderRef = useRef<HTMLDivElement | null>(null);
+  const [firstSpiceOpen, setFirstSpiceOpen] = useState(false);
   const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
   const totalChordCountRef = useRef(totalChordCount);
   useEffect(() => {
@@ -1719,7 +1732,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           addChordsRef={i === 0 ? addChordsRef : undefined}
           firstBlockRef={i === 0 ? firstBlockRef : undefined}
           firstSpiceButtonRef={i === 0 ? spiceButtonRef : undefined}
+          firstSpiceHeaderRef={i === 0 ? spiceHeaderRef : undefined}
           onFirstBlockVariationApplied={i === 0 ? () => { if (onboardingEnabled && progressionsStep === 4) setProgressionsStep(5); } : undefined}
+          onFirstSpiceOpenChange={i === 0 ? setFirstSpiceOpen : undefined}
           onAddNewBlockRequest={(sid, patternId) => {
             if (isDesktop) {
               setPicker({ patternId, atBeat: 0, replaceChordId: undefined });
@@ -1923,20 +1938,20 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         picker !== null ? (
           <AnchoredCoachMark
             anchorRef={chordPickerHeaderRef}
-            anchorEdge="bottom"
+            anchorEdge="top"
             gap={8}
             step="4/7"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
-            arrowSide="top"
+            arrowSide="bottom"
           />
         ) : (patternAddSlot !== null || chordEditor !== null) ? (
           <AnchoredCoachMark
             anchorRef={focusedEditorHeaderRef}
-            anchorEdge="bottom"
+            anchorEdge="top"
             gap={8}
             step="4/7"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
-            arrowSide="top"
+            arrowSide="bottom"
           />
         ) : (
           <AnchoredCoachMark
@@ -1963,7 +1978,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         ) : (
           <AnchoredCoachMark
             anchorRef={firstBlockRef}
-            gap={12}
+            gap={44}
             anchorEdge="top"
             step="5/7"
             message="Right click or tap & hold a chord chip to replace it"
@@ -1972,14 +1987,25 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         );
       })()}
       {canShowCoachMark && progressionsStep === 4 && (
-        <AnchoredCoachMark
-          anchorRef={spiceButtonRef}
-          gap={16}
-          anchorEdge="top"
-          step="6/7"
-          message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
-          arrowSide="bottom"
-        />
+        firstSpiceOpen ? (
+          <AnchoredCoachMark
+            anchorRef={spiceHeaderRef}
+            gap={8}
+            anchorEdge="top"
+            step="6/7"
+            message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
+            arrowSide="bottom"
+          />
+        ) : (
+          <AnchoredCoachMark
+            anchorRef={spiceButtonRef}
+            gap={16}
+            anchorEdge="top"
+            step="6/7"
+            message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
+            arrowSide="bottom"
+          />
+        )
       )}
       {canShowCoachMark && progressionsStep === 5 && createPortal(
         <div

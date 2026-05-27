@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { RefObject } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock } from "@/store/song";
 import { generateSpiceSuggestions, type SpiceSuggestion, type SpiceCategory } from "@/lib/music/spice";
@@ -19,6 +20,7 @@ interface Props {
   activeChordId: string | null;
   onAuditionChange?: (chords: ChordSymbol[] | null) => void;
   onVariationApplied?: () => void;
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
@@ -45,7 +47,7 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
 };
 
 
-export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChordId, onAuditionChange, onVariationApplied }: Props) {
+export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChordId, onAuditionChange, onVariationApplied, headerRef }: Props) {
   const meta = useSongStore((s) => s.meta);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
@@ -319,6 +321,7 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
       >
         {/* Header */}
         <div
+          ref={headerRef}
           className="flex items-center gap-3 px-4 pt-4 pb-3 sticky top-0 z-10"
           style={{ background: "var(--paper)" }}
         >
