@@ -130,16 +130,16 @@ export function AnchoredCoachMark({
     const PAD = 8;
     const measure = () => {
       if (viewportBottom !== undefined) {
-        setPos({ top: window.innerHeight - viewportBottom, left: window.innerWidth / 2 });
+        setPos((prev) => {
+          const next = { top: window.innerHeight - viewportBottom, left: window.innerWidth / 2 };
+          return prev && prev.top === next.top && prev.left === next.left ? prev : next;
+        });
         return;
       }
       const el = anchorRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) {
-        raf = requestAnimationFrame(measure);
-        return;
-      }
+      if (r.width === 0 && r.height === 0) return;
       let top: number;
       if (anchorEdge === "top") {
         const h = markSize?.h ?? 0;
@@ -155,9 +155,16 @@ export function AnchoredCoachMark({
         if (maxLeft >= minLeft) left = Math.min(Math.max(left, minLeft), maxLeft);
         top = Math.max(top, PAD);
       }
-      setPos({ top, left });
+      setPos((prev) => (prev && prev.top === top && prev.left === left ? prev : { top, left }));
     };
-    raf = requestAnimationFrame(measure);
+    const start = performance.now();
+    const tick = () => {
+      measure();
+      if (performance.now() - start < 600) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
     return () => {
