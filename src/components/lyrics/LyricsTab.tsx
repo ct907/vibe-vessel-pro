@@ -1542,8 +1542,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       {onboardingEnabled && lyricsStep >= 1 && lyricsStep <= 3 && (
         <AnchoredCoachMark
           anchorRef={lyricsRootRef}
-          anchorEdge="top"
-          gap={52}
+          viewportBottom={140}
           step={`${lyricsStep + 2}/5`}
           message={
             lyricsStep === 1
@@ -1552,7 +1551,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
               ? "Right click or tap & hold a chord chip to replace it"
               : "Tap a chord to select it, then press Backspace / Delete to remove it"
           }
-          arrowSide="top"
+          arrowSide="bottom"
         />
       )}
 

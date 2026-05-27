@@ -1859,8 +1859,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
       {onboardingEnabled && progressionsStep >= 1 && progressionsStep <= 4 && (
         <AnchoredCoachMark
           anchorRef={progressionsRootRef}
-          anchorEdge="top"
-          gap={52}
+          viewportBottom={140}
           step={`${progressionsStep + 2}/6`}
           message={
             progressionsStep === 1
@@ -1871,7 +1870,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
               ? "Tap a chord to select it, then press Backspace / Delete to remove it"
               : "Press the ✨ Add Spice button to try AI chord variations on this block"
           }
-          arrowSide="top"
+          arrowSide="bottom"
         />
       )}
 
@@ -1961,6 +1960,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab }:
           chords.forEach((c, i) =>
             addChordToPatternSlot(picker.patternId, c, picker.atBeat + i, !isDesktop ? 4 : undefined),
           );
+          if (onboardingEnabled && progressionsStep === 1) setProgressionsStep(2);
         }}
         sectionId={(() => {
           if (!picker) return undefined;
