@@ -1930,10 +1930,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         <AnchoredCoachMark
           anchorRef={firstBlockRef}
           gap={12}
-          anchorEdge="bottom"
+          anchorEdge="top"
           step="5/7"
           message="Right click or tap & hold a chord chip to replace it"
-          arrowSide="top"
+          arrowSide="bottom"
         />
       )}
       {canShowCoachMark && progressionsStep === 4 && (

@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 
 interface Props {
@@ -107,9 +107,27 @@ export function AnchoredCoachMark({
   viewportBottom?: number;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [markSize, setMarkSize] = useState<{ w: number; h: number } | null>(null);
+  const markWrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = markWrapperRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        setMarkSize((prev) => (prev && prev.w === r.width && prev.h === r.height ? prev : { w: r.width, h: r.height }));
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     let raf: number;
+    const PAD = 8;
     const measure = () => {
       if (viewportBottom !== undefined) {
         setPos({ top: window.innerHeight - viewportBottom, left: window.innerWidth / 2 });
@@ -122,8 +140,22 @@ export function AnchoredCoachMark({
         raf = requestAnimationFrame(measure);
         return;
       }
-      const top = anchorEdge === "top" ? r.top + gap : r.bottom + gap;
-      setPos({ top, left: r.left + r.width / 2 });
+      let top: number;
+      if (anchorEdge === "top") {
+        const h = markSize?.h ?? 0;
+        top = r.top - h - gap;
+      } else {
+        top = r.bottom + gap;
+      }
+      let left = r.left + r.width / 2;
+      if (markSize) {
+        const half = markSize.w / 2;
+        const minLeft = half + PAD;
+        const maxLeft = window.innerWidth - half - PAD;
+        if (maxLeft >= minLeft) left = Math.min(Math.max(left, minLeft), maxLeft);
+        top = Math.max(top, PAD);
+      }
+      setPos({ top, left });
     };
     raf = requestAnimationFrame(measure);
     window.addEventListener("resize", measure);
@@ -133,14 +165,22 @@ export function AnchoredCoachMark({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [anchorRef, gap, anchorEdge, viewportBottom]);
+  }, [anchorRef, gap, anchorEdge, viewportBottom, markSize]);
 
-  if (!pos) return null;
   const interactive = !!markProps.actionLabel && !!markProps.onAction;
+  const ready = pos !== null && markSize !== null;
   return createPortal(
     <div
+      ref={markWrapperRef}
       className={interactive ? "pointer-events-auto" : "pointer-events-none"}
-      style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)", zIndex: 9999 }}
+      style={{
+        position: "fixed",
+        top: pos?.top ?? 0,
+        left: pos?.left ?? 0,
+        transform: "translateX(-50%)",
+        zIndex: 9999,
+        visibility: ready ? "visible" : "hidden",
+      }}
     >
       <OnboardingCoachMark {...markProps} />
     </div>,
