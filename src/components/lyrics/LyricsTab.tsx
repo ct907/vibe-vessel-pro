@@ -82,7 +82,8 @@ import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { createPortal } from "react-dom";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -1084,15 +1085,23 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
   const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
-  const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
-  const totalChordCountRef = useRef(totalChordCount);
+  const firstLyricRowRef = useRef<HTMLElement | null>(null);
+  const firstChordRowRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const lineId = sections[0]?.lines[0]?.id;
+    if (!lineId) {
+      firstLyricRowRef.current = null;
+      firstChordRowRef.current = null;
+      return;
+    }
+    firstLyricRowRef.current = document.querySelector<HTMLElement>(`[data-lyric-input="${lineId}"]`);
+    firstChordRowRef.current = document.querySelector<HTMLElement>(`[data-chord-row="${lineId}"]`);
+  });
   useEffect(() => {
-    if (onboardingEnabled && lyricsStep === 3 && totalChordCount < totalChordCountRef.current) {
+    if (onboardingEnabled && lyricsStep === 3 && picker?.anchorId) {
       setLyricsStep(4);
     }
-    totalChordCountRef.current = totalChordCount;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalChordCount]);
+  }, [picker?.anchorId, lyricsStep, onboardingEnabled, setLyricsStep]);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
@@ -1122,8 +1131,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     activeIdx: number;
   } | null>(null);
 
-  const handleLineTextFocus = (sectionId: string, lineId: string) =>
+  const handleLineTextFocus = (sectionId: string, lineId: string) => {
     setFocusedLineInfo({ sectionId, lineId });
+    if (onboardingEnabled && lyricsStep === 1) setLyricsStep(2);
+  };
   const handleLineTextBlur = () =>
     setFocusedLineInfo(null);
   const handleRhymeOpen = (sectionId: string, lineId: string) => {
@@ -1420,11 +1431,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     if (picker.anchorId) {
       // Editing existing chord: keep its slot, swap symbol.
       upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, chord, picker.anchorId);
-      if (onboardingEnabled && lyricsStep === 2) setLyricsStep(3);
+      if (onboardingEnabled && lyricsStep === 4) setLyricsStep(5);
     } else {
       // Placing new chord into the requested slot.
       placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
-      if (onboardingEnabled && lyricsStep === 1) setLyricsStep(2);
+      if (onboardingEnabled && lyricsStep === 2) setLyricsStep(3);
     }
     setPickerQuery("");
     // Step picker to the next slot for fast successive entry.
@@ -1543,44 +1554,88 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       ))}
 
 
-      {canShowCoachMark && lyricsStep >= 1 && lyricsStep <= 3 && (() => {
-        const modalOpen = !!picker;
-        const modalHeaderRef = isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef;
-        const isReplaceMode = !!(picker?.anchorId);
-        if (lyricsStep === 3) {
-          return (
-            <AnchoredCoachMark
-              anchorRef={lyricsRootRef}
-              viewportBottom={140}
-              step="5/5"
-              message="Tap a chord to select it, then press Backspace / Delete to remove it"
-              arrowSide="bottom"
-            />
-          );
-        }
-        return modalOpen ? (
+      {canShowCoachMark && lyricsStep === 1 && (
+        <AnchoredCoachMark
+          anchorRef={firstLyricRowRef}
+          anchorEdge="bottom"
+          gap={12}
+          step="3/7"
+          message="Write your lyrics here! Press enter to create a new line."
+          arrowSide="top"
+        />
+      )}
+      {canShowCoachMark && lyricsStep === 2 && (
+        picker ? (
           <AnchoredCoachMark
-            anchorRef={modalHeaderRef}
+            anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
             anchorEdge="top"
             gap={8}
-            step={`${lyricsStep + 2}/5`}
-            message={isReplaceMode ? "Replace with one of these chords!" : "Tap the + in a chord row to add a chord, then type your lyrics below"}
+            step="4/7"
+            message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
           />
         ) : (
           <AnchoredCoachMark
-            anchorRef={lyricsRootRef}
-            viewportBottom={140}
-            step={`${lyricsStep + 2}/5`}
-            message={
-              lyricsStep === 1
-                ? "Tap the + in a chord row to add a chord, then type your lyrics below"
-                : "Right click or tap & hold a chord chip to replace it"
-            }
+            anchorRef={firstChordRowRef}
+            anchorEdge="top"
+            gap={12}
+            step="4/7"
+            message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
           />
-        );
-      })()}
+        )
+      )}
+      {canShowCoachMark && lyricsStep === 3 && (
+        picker ? (
+          <AnchoredCoachMark
+            anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
+            anchorEdge="top"
+            gap={8}
+            step="5/7"
+            message="Right click or tap & hold a chord chip to edit it."
+            arrowSide="bottom"
+          />
+        ) : (
+          <AnchoredCoachMark
+            anchorRef={firstChordRowRef}
+            anchorEdge="top"
+            gap={12}
+            step="5/7"
+            message="Right click or tap & hold a chord chip to edit it."
+            arrowSide="bottom"
+          />
+        )
+      )}
+      {canShowCoachMark && lyricsStep === 4 && (
+        <AnchoredCoachMark
+          anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
+          anchorEdge="top"
+          gap={8}
+          step="6/7"
+          message="Pick a chord from the list to replace it."
+          arrowSide="bottom"
+        />
+      )}
+      {canShowCoachMark && lyricsStep === 5 && createPortal(
+        <div
+          className="pointer-events-auto"
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 9999,
+          }}
+        >
+          <OnboardingCoachMark
+            step="7/7"
+            message="This is the end of the tutorial! You can press the Chord Progressions here to learn the other side of this app."
+            actionLabel="Finish"
+            onAction={() => setLyricsStep(6)}
+          />
+        </div>,
+        document.body,
+      )}
 
       {onboardingEnabled && showNewSongPrompt && (
         <div className="fixed bottom-14 left-0 right-0 z-50">

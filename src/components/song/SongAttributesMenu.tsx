@@ -249,7 +249,7 @@ export function SongAttributesMenu() {
       <AnchoredCoachMark
         anchorRef={attrBtnRef}
         gap={24}
-        step="2/5"
+        step="2/7"
         message="Set the scene — choose key and timing, then tap Save Settings"
         arrowSide="top"
       />
