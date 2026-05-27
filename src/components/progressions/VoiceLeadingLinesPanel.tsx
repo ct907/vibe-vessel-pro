@@ -16,7 +16,7 @@ const MARKER_R = 12;
 const ANCHOR_Y = [16, 40, 64, 88];
 
 function voicesTopDown(chord: ChordSymbol): number[] {
-  const notes = chordToMidi(chord, chord.octave ?? 4);
+  const notes = chordToMidi(chord, 4);
   const uniq = Array.from(new Set(notes)).sort((a, b) => b - a);
   return uniq.slice(0, 4);
 }
