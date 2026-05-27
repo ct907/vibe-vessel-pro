@@ -18,6 +18,7 @@ interface Props {
   blockIndex: number;
   activeChordId: string | null;
   onAuditionChange?: (chords: ChordSymbol[] | null) => void;
+  onVariationApplied?: () => void;
 }
 
 const CATEGORY_ORDER: SpiceCategory[] = [
@@ -44,7 +45,7 @@ const CATEGORY_EMOJI: Record<SpiceCategory, string> = {
 };
 
 
-export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChordId, onAuditionChange }: Props) {
+export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChordId, onAuditionChange, onVariationApplied }: Props) {
   const meta = useSongStore((s) => s.meta);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
@@ -156,6 +157,9 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
     } else {
       replacePatternChords(pattern.id, s.chords.map((c, i) => withOctave(c, i)));
     }
+
+    onOpenChange(false);
+    onVariationApplied?.();
 
     toast({
       title: `Applied "${CATEGORY_EMOJI[s.category]} ${s.emotiveLabel}"`,
