@@ -298,34 +298,6 @@
     --section-tint-alpha: 18%;
     --tint-base: oklch(0.238 0.006 88);
   }
-
-  /* When an app tint is active, every -b base color the tint blends with
-     drops its chroma to 0 so the resulting color-mix is purely tinted
-     rather than muddied by the underlying paper hue. Toggled from
-     src/store/appTint.ts. */
-  .app-tinted {
-    --paper:            oklch(from var(--app-tint-raw) 0.9613 calc(c * 0.5)  h);
-    --paper-shade:      oklch(from var(--app-tint-raw) 0.883  calc(c * 0.55) h);
-    --paper-shade-soft: oklch(from var(--app-tint-raw) 0.9234 calc(c * 0.5)  h);
-    --paper-card:       oklch(from var(--app-tint-raw) 0.974  calc(c * 0.4)  h);
-    --popover:          oklch(from var(--app-tint-raw) 0.9803 calc(c * 0.35) h);
-    --muted:            oklch(from var(--app-tint-raw) 0.915  calc(c * 0.5)  h);
-    --accent:           oklch(from var(--app-tint-raw) 0.9287 calc(c * 0.5)  h);
-    --border:           oklch(from var(--app-tint-raw) 0.819  calc(c * 0.6)  h);
-  }
-
-  .dark.app-tinted {
-    --paper:            oklch(from var(--app-tint-raw) 0.2179 calc(c * 0.4)  h);
-    --paper-shade:      oklch(from var(--app-tint-raw) 0.175  calc(c * 0.45) h);
-    --paper-shade-soft: oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.4)  h);
-    --paper-card:       oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.35) h);
-    --popover:          oklch(from var(--app-tint-raw) 0.2499 calc(c * 0.35) h);
-    --secondary:        oklch(from var(--app-tint-raw) 0.3229 calc(c * 0.4)  h);
-    --muted:            oklch(from var(--app-tint-raw) 0.3019 calc(c * 0.4)  h);
-    --accent:           oklch(from var(--app-tint-raw) 0.3589 calc(c * 0.4)  h);
-    --border:           oklch(from var(--app-tint-raw) 0.3432 calc(c * 0.5)  h);
-    --pill-hover-bg:    oklch(from var(--app-tint-raw) 0.3    calc(c * 0.4)  h);
-  }
 }
 
 @layer base {
