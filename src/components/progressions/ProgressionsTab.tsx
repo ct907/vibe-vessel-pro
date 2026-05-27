@@ -1546,11 +1546,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [totalChordCount]);
 
   useEffect(() => {
-    if (onboardingEnabled && progressionsStep === 3 && picker !== null && !picker.replaceChordId) {
+    if (
+      onboardingEnabled &&
+      progressionsStep === 3 &&
+      ((picker !== null && !picker.replaceChordId) || patternAddSlot !== null || chordEditor !== null)
+    ) {
       setProgressionsStep(4);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picker]);
+  }, [picker, patternAddSlot, chordEditor]);
 
   const openChordEditor = (patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
