@@ -1969,11 +1969,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         return editorOpen ? (
           <AnchoredCoachMark
             anchorRef={modalHeaderRef}
-            anchorEdge="bottom"
+            anchorEdge="top"
             gap={8}
             step="5/7"
-            message="Right click or tap & hold a chord chip to replace it"
-            arrowSide="top"
+            message="Replace with one of these chords!"
+            arrowSide="bottom"
           />
         ) : (
           <AnchoredCoachMark
