@@ -1079,6 +1079,15 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const totalChordCount = useMemo(() => sections.reduce((acc, s) => acc + s.chords.length, 0), [sections]);
+  const totalChordCountRef = useRef(totalChordCount);
+  useEffect(() => {
+    if (onboardingEnabled && lyricsStep === 3 && totalChordCount < totalChordCountRef.current) {
+      setLyricsStep(4);
+    }
+    totalChordCountRef.current = totalChordCount;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalChordCount]);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
@@ -1406,6 +1415,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
     if (picker.anchorId) {
       // Editing existing chord: keep its slot, swap symbol.
       upsertChordAt(picker.sectionId, picker.lineId, picker.slotIndex, chord, picker.anchorId);
+      if (onboardingEnabled && lyricsStep === 2) setLyricsStep(3);
     } else {
       // Placing new chord into the requested slot.
       placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
@@ -1466,7 +1476,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
   }, [activeChordId, isMobile]);
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
       {sections.map((sec, i) => (
         <div key={sec.id} className="space-y-2">
           <SectionCard
@@ -1528,25 +1538,20 @@ export function LyricsTab({ sortMode = false, onSwitchTab }: LyricsTabProps) {
       ))}
 
 
-      {onboardingEnabled && lyricsStep === 1 && (
-        <OnboardingCoachMark
-          step="3/5"
-          message="Add chords and write lyrics here. Press Enter in the lyrics to start a new line."
-        />
-      )}
-      {onboardingEnabled && lyricsStep === 2 && (
-        <OnboardingCoachMark
-          step="4/5"
-          message="Tap and hold or right click to change a chord."
-          onDismiss={() => setLyricsStep(3)}
-        />
-      )}
-      {onboardingEnabled && lyricsStep === 3 && (
-        <OnboardingCoachMark
-          step="5/5"
-          message="Delete chords by tapping on them then pressing delete."
-          onDismiss={() => setLyricsStep(4)}
-        />
+      {onboardingEnabled && lyricsStep >= 1 && lyricsStep <= 3 && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none" style={{ top: 52 }}>
+          <OnboardingCoachMark
+            step={`${lyricsStep + 2}/5`}
+            message={
+              lyricsStep === 1
+                ? "Tap the + in a chord row to add a chord, then type your lyrics below"
+                : lyricsStep === 2
+                ? "Right click or tap & hold a chord chip to replace it"
+                : "Tap a chord to select it, then press Backspace / Delete to remove it"
+            }
+            arrowSide="top"
+          />
+        </div>
       )}
 
       {onboardingEnabled && showNewSongPrompt && (

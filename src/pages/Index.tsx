@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   DragDropContext,
@@ -19,7 +19,6 @@ import { useDefaultsStore } from "@/store/defaults";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 const Index = () => {
   const bg = useAppBackgroundStore();
@@ -35,12 +34,10 @@ const Index = () => {
   const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">(initialTab);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
-  const meta = useSongStore((s) => s.meta);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
   const updateSection = useSongStore((s) => s.updateSection);
 
   const onboarding = useOnboardingStore();
-  const prevMetaRef = useRef(meta);
 
   // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
   // states so we can restore them when exiting sort mode.
@@ -76,27 +73,6 @@ const Index = () => {
     if (sortMode && sortMode !== tab) exitSortMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
-
-  // Onboarding: detect meta change to advance from phase 1 → 2.
-  useEffect(() => {
-    if (!onboarding.enabled || onboarding.globalPhase !== 1) {
-      prevMetaRef.current = meta;
-      return;
-    }
-    const prev = prevMetaRef.current;
-    if (
-      meta.keyRoot !== prev.keyRoot ||
-      meta.keyMode !== prev.keyMode ||
-      meta.bpm !== prev.bpm ||
-      meta.beatsPerBar !== prev.beatsPerBar
-    ) {
-      onboarding.setGlobalPhase(2);
-      onboarding.setLyricsStep(1);
-      onboarding.setProgressionsStep(1);
-    }
-    prevMetaRef.current = meta;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meta]);
 
   // Onboarding: advance from phase 0 → 1 when user first presses a tab.
   const handleTabSelect = (v: string) => {
@@ -168,19 +144,6 @@ const Index = () => {
 
       </DragDropContext>
 
-      {/* Global onboarding coach marks for phases 0 and 1 */}
-      {onboarding.enabled && onboarding.globalPhase === 0 && (
-        <OnboardingCoachMark
-          step="1/5"
-          message="Write lyrics or build progressions?"
-        />
-      )}
-      {onboarding.enabled && onboarding.globalPhase === 1 && (
-        <OnboardingCoachMark
-          step="2/5"
-          message="Set the scene. Choose the song's key and timing."
-        />
-      )}
     </div>
   );
 };

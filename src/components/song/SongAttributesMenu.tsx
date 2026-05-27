@@ -27,6 +27,8 @@ import { useMetronomeStore } from "@/store/metronome";
 import { previewClick } from "@/lib/audio/metronome";
 import { usePlaybackStore } from "@/store/playback";
 import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
+import { useOnboardingStore } from "@/store/onboarding";
+import { OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 const TIME_SIGS = ["2/4", "3/4", "4/4", "5/4", "6/4", "6/8", "7/8", "9/8", "12/8"];
 
@@ -40,9 +42,20 @@ export function SongAttributesMenu() {
   const transposeSong = useSongStore((s) => s.transposeSong);
   const metronome = useMetronomeStore();
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const onboarding = useOnboardingStore();
   const [bpmDraft, setBpmDraft] = useState(String(meta.bpm));
   const [transposeOffset, setTransposeOffset] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const handleConfirm = () => {
+    setOpen(false);
+    if (onboarding.enabled && onboarding.globalPhase === 1) {
+      onboarding.setGlobalPhase(2);
+      onboarding.setLyricsStep(1);
+      onboarding.setProgressionsStep(1);
+    }
+  };
 
   useEffect(() => { setBpmDraft(String(meta.bpm)); }, [meta.bpm]);
 
@@ -79,7 +92,8 @@ export function SongAttributesMenu() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    <DropdownMenu modal={false}>
+    <div className="relative inline-flex justify-center">
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -217,8 +231,30 @@ export function SongAttributesMenu() {
             </div>
           </div>
         </div>
+
+          <div className="pt-2 border-t border-border">
+            <button
+              type="button"
+              className="btn-sculpt-amber w-full rounded-lg h-9 text-sm font-semibold"
+              onClick={handleConfirm}
+            >
+              Save Settings
+            </button>
+          </div>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {onboarding.enabled && onboarding.globalPhase === 1 && !open && (
+      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 pointer-events-none">
+        <OnboardingCoachMark
+          step="2/5"
+          message="Set the scene — choose key and timing, then tap Save Settings"
+          arrowSide="top"
+        />
+      </div>
+    )}
+    </div>
     </>
   );
 }

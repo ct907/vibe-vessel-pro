@@ -1,52 +1,74 @@
-import { X } from "lucide-react";
+import type { CSSProperties } from "react";
 
 interface Props {
   step: string;
   message: string;
-  onDismiss?: () => void;
+  arrowSide?: "top" | "bottom" | "left" | "right";
 }
 
-export function OnboardingCoachMark({ step, message, onDismiss }: Props) {
+function arrowStyle(side: NonNullable<Props["arrowSide"]>): CSSProperties {
+  const base: CSSProperties = {
+    position: "absolute",
+    width: 0,
+    height: 0,
+    borderStyle: "solid",
+  };
+  switch (side) {
+    case "top":
+      return { ...base, borderWidth: "0 8px 8px 8px", borderColor: `transparent transparent var(--primary-strong) transparent`, top: -8, left: "50%", transform: "translateX(-50%)" };
+    case "bottom":
+      return { ...base, borderWidth: "8px 8px 0 8px", borderColor: `var(--primary-strong) transparent transparent transparent`, bottom: -8, left: "50%", transform: "translateX(-50%)" };
+    case "left":
+      return { ...base, borderWidth: "8px 8px 8px 0", borderColor: `transparent var(--primary-strong) transparent transparent`, left: -8, top: "50%", transform: "translateY(-50%)" };
+    case "right":
+      return { ...base, borderWidth: "8px 0 8px 8px", borderColor: `transparent transparent transparent var(--primary-strong)`, right: -8, top: "50%", transform: "translateY(-50%)" };
+  }
+}
+
+export function OnboardingCoachMark({ step, message, arrowSide = "top" }: Props) {
   return (
-    <div className="fixed bottom-14 left-0 right-0 z-40 pointer-events-none">
-      <div className="max-w-6xl mx-auto px-4">
-        <div
-          className="pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 shadow-lg"
+    <div
+      className="pointer-events-none"
+      style={{ position: "relative", width: "max-content", maxWidth: 360, boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 10 }}
+    >
+      {/* Arrow */}
+      <div style={arrowStyle(arrowSide)} />
+      {/* Background with paper-noise edge distortion */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "var(--primary-strong)",
+          borderRadius: 10,
+          filter: "url(#onb-paper-noise)",
+        }}
+      />
+      {/* Content */}
+      <div style={{ position: "relative", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <span
+          className="font-mono-chord"
           style={{
-            background: "color-mix(in oklch, var(--paper-card) 96%, transparent)",
-            border: "1px solid color-mix(in oklch, var(--border) 70%, transparent)",
-            boxShadow: "var(--shadow-card)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "color-mix(in oklch, var(--paper) 20%, transparent)",
+            color: "var(--paper)",
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 700,
+            height: 24,
+            padding: "0 8px",
+            width: "max-content",
           }}
         >
-          <span
-            className="shrink-0 inline-flex items-center justify-center rounded-full font-mono-chord font-bold text-[11px] h-6 px-2"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-              minWidth: "2.5rem",
-            }}
-          >
-            {step}
-          </span>
-          <p
-            className="flex-1 text-sm"
-            style={{ fontFamily: "var(--font-ui, 'Nunito', sans-serif)", color: "var(--ink)", fontWeight: 600 }}
-          >
-            {message}
-          </p>
-          {onDismiss && (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="btn-sculpt-amber shrink-0 inline-flex items-center gap-1 rounded-lg px-3 h-7 text-xs font-semibold"
-              aria-label="Dismiss tip"
-            >
-              Got it <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+          {step}
+        </span>
+        <p
+          className="onb-squiggly"
+          style={{ color: "var(--paper)", fontSize: 18, margin: 0, lineHeight: 1.3 }}
+        >
+          {message}
+        </p>
       </div>
     </div>
   );
