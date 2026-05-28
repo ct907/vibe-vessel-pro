@@ -377,7 +377,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
   }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
 
-  const handlePlay = async () => {
+  const handlePlay = async (requestedStartAt?: number) => {
     stopRequestedRef.current = false;
     await ensureAudio();
     // Defensive: AudioContext may be suspended after autoplay-policy
@@ -410,7 +410,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     setCurrent(built.meta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
-    const startAt = getAudioContext().currentTime + 0.04;
+    // requestedStartAt comes from count-in (pre-calculated beat-1 AC time);
+    // fall back to 40 ms from now for a regular press-play.
+    const startAt = requestedStartAt ?? getAudioContext().currentTime + 0.04;
     const attack = Math.max(0, useSoundStore.getState().adsr.attack);
     if (metronome.enabled) {
       startMetronome({
@@ -471,16 +473,18 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   };
 
   useEffect(() => {
-    const onReq = () => {
-      handlePlay();
+    const onReq = () => { handlePlay(); };
+    const onReqAt = (e: Event) => {
+      const t = (e as CustomEvent<{ startAtAcTime: number }>).detail?.startAtAcTime;
+      handlePlay(t);
     };
-    const onStop = () => {
-      handleStop();
-    };
+    const onStop = () => { handleStop(); };
     window.addEventListener("lovable:request-play", onReq);
+    window.addEventListener("lovable:request-play-at", onReqAt);
     window.addEventListener("lovable:request-stop", onStop);
     return () => {
       window.removeEventListener("lovable:request-play", onReq);
+      window.removeEventListener("lovable:request-play-at", onReqAt);
       window.removeEventListener("lovable:request-stop", onStop);
     };
     // handlePlay is recreated on every render but reads startFromChordId

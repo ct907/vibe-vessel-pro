@@ -854,16 +854,25 @@ export function RecordingsTab() {
 
   const beginCountIn = (trackId: string, startSec = 0) => {
     const { bpm, beatsPerBar } = songMeta;
-    const barDurationMs = (beatsPerBar * 60 / bpm) * 1000;
+    const barDurationSec = (beatsPerBar * 60) / bpm;
+    // Note the exact AudioContext time beat-1 will fall on so the chord
+    // engine can anchor to it precisely, independent of setTimeout jitter.
+    // startMetronome internally uses currentTime + 0.05 for its first tick.
+    const beat1AcTime = getAudioContext().currentTime + 0.05 + barDurationSec;
     setCountingInTrackId(trackId);
     stopMetronome();
     startMetronome({ bpm, beatsPerBar, volume: 0.8 });
+    // Fire 150ms before the bar ends so handlePlay has time to do async work
+    // and still start the chord engine exactly on beat 1.
+    const fireMs = Math.max(0, barDurationSec * 1000 - 150);
     countInTimeoutRef.current = setTimeout(() => {
       setCountingInTrackId(null);
       stopMetronome();
-      window.dispatchEvent(new CustomEvent("lovable:request-play"));
+      window.dispatchEvent(
+        new CustomEvent("lovable:request-play-at", { detail: { startAtAcTime: beat1AcTime } }),
+      );
       void startTrackRecording(trackId, startSec);
-    }, barDurationMs);
+    }, fireMs);
   };
 
   const cancelCountIn = () => {
