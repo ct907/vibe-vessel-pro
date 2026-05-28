@@ -31,8 +31,8 @@ import { getAudioContext } from "@/lib/audio/context";
 import { toast } from "sonner";
 
 const PX_PER_SEC = 40;
-const ROW_HEIGHT_MOBILE = 56;
-const ROW_HEIGHT_DESKTOP = 72;
+const ROW_HEIGHT_MOBILE = 80;
+const ROW_HEIGHT_DESKTOP = 96;
 
 function computeLoopBeats(): number {
   const { sections, progression } = useSongStore.getState();
@@ -409,40 +409,42 @@ function TrackRow({
       style={{ height }}
       onClick={onSelect}
     >
-      <div className="flex items-center gap-2 px-2 w-56 shrink-0 border-r">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRecordToggle();
-          }}
-          className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-            isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-paper"
-          }`}
-          aria-label={isRecording ? "Stop recording" : "Record"}
-        >
-          {isRecording ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
-        </button>
-        <span
-          className="h-4 w-4 rounded-full shrink-0"
-          style={{ background: track.color }}
-        />
-        <Input
-          value={track.name}
-          onChange={(e) => onRename(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onFocus={(e) => e.stopPropagation()}
-          className="h-7 px-2 text-sm font-display flex-1 min-w-0 border-transparent focus:border-input bg-transparent"
-          aria-label="Track name"
-        />
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col justify-center gap-1 px-2 w-56 shrink-0 border-r">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRecordToggle();
+            }}
+            className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+              isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-paper"
+            }`}
+            aria-label={isRecording ? "Stop recording" : "Record"}
+          >
+            {isRecording ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
+          </button>
+          <span
+            className="h-4 w-4 rounded-full shrink-0"
+            style={{ background: track.color }}
+          />
+          <Input
+            value={track.name}
+            onChange={(e) => onRename(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onFocus={(e) => e.stopPropagation()}
+            className="h-7 px-2 text-sm font-display flex-1 min-w-0 border-transparent focus:border-input bg-transparent"
+            aria-label="Track name"
+          />
+        </div>
+        <div className="flex items-center gap-2 pl-9">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleMute();
             }}
-            className={`h-5 w-5 rounded text-[10px] font-bold border ${
+            className={`h-[26px] w-[26px] rounded text-[13px] font-bold border ${
               track.muted ? "bg-destructive/20 border-destructive text-destructive" : "border-transparent text-muted-foreground"
             }`}
             aria-label="Mute"
@@ -455,7 +457,7 @@ function TrackRow({
               e.stopPropagation();
               onToggleSolo();
             }}
-            className={`h-5 w-5 rounded text-[10px] font-bold border ${
+            className={`h-[26px] w-[26px] rounded text-[13px] font-bold border ${
               track.soloed ? "bg-primary/30 border-primary text-primary" : "border-transparent text-muted-foreground"
             }`}
             aria-label="Solo"
@@ -467,10 +469,10 @@ function TrackRow({
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
-                className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
+                className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
                 aria-label="Edit track"
               >
-                <Pencil className="h-3 w-3" />
+                <Pencil className="h-4 w-4" />
               </button>
             </PopoverTrigger>
             <PopoverContent
