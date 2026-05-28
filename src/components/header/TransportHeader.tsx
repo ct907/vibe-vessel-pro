@@ -57,6 +57,7 @@ import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { useRecordingsStore } from "@/store/recordings";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -338,6 +339,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
   const { preset, setPreset } = useSoundStore();
+  const recUndo = useRecordingsStore((s) => s.undo);
+  const recRedo = useRecordingsStore((s) => s.redo);
+  const recCanUndo = useRecordingsStore((s) => s.canUndo);
+  const recCanRedo = useRecordingsStore((s) => s.canRedo);
   const [fileInputKey, setFileInputKey] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
@@ -617,8 +622,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               <div className="flex items-center gap-1.5 shrink-0 sm:order-3">
                 <button
                   className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
-                  onClick={() => undo()}
-                  disabled={!canUndo()}
+                  onClick={() => { if (!undo()) recUndo(); }}
+                  disabled={!canUndo() && !recCanUndo()}
                   aria-label="Undo"
                   title="Undo (⌘/Ctrl+Z)"
                 >
@@ -626,8 +631,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 </button>
                 <button
                   className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 disabled:opacity-30"
-                  onClick={() => redo()}
-                  disabled={!canRedo()}
+                  onClick={() => { if (!redo()) recRedo(); }}
+                  disabled={!canRedo() && !recCanRedo()}
                   aria-label="Redo"
                   title="Redo (⌘/Ctrl+Shift+Z)"
                 >

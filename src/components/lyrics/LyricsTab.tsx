@@ -14,6 +14,7 @@ import {
   type Section,
   type SectionType,
   type ChordAnchor,
+  type PatternBlock,
 } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -51,6 +52,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useRecordingsStore } from "@/store/recordings";
 import {
   Plus,
   Trash2,
@@ -69,6 +72,7 @@ import {
   WholeWord,
   Music2,
   KeyRound,
+  Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -600,6 +604,22 @@ function LineRow({
   );
 }
 
+function getSectionStartSec(
+  sectionId: string,
+  allSections: Section[],
+  progression: PatternBlock[],
+  bpm: number,
+): number {
+  const spb = 60 / bpm;
+  let cursor = 0;
+  for (const sec of allSections) {
+    if (sec.id === sectionId) return cursor * spb;
+    const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
+    for (const p of patterns) cursor += p.bars * p.beatsPerBar;
+  }
+  return cursor * spb;
+}
+
 // =============================================================================
 //                               SectionCard
 // =============================================================================
@@ -666,9 +686,13 @@ function SectionCard({
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
+  const [overdubOpen, setOverdubOpen] = useState(false);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const allSections = useSongStore((s) => s.sections);
+  const progression = useSongStore((s) => s.progression);
+  const bpm = useSongStore((s) => s.meta.bpm);
+  const recTracks = useRecordingsStore((s) => s.tracks);
   const effectiveOffsets = useMemo(() => computeEffectiveOffsets(allSections), [allSections]);
   const effectiveOffset = effectiveOffsets[index] ?? 0;
   const isFirstSection = index === 0;
@@ -854,6 +878,47 @@ function SectionCard({
             >
               <Copy className="h-3.5 w-3.5" />
             </button>
+            {recTracks.length > 0 && (
+              <Popover open={overdubOpen} onOpenChange={setOverdubOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    aria-label="Overdub this section"
+                    title="Overdub this section"
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-52 p-2">
+                  <p className="text-xs font-semibold mb-2 px-1">Record onto track</p>
+                  <div className="flex flex-col gap-1">
+                    {recTracks.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-left"
+                        onClick={() => {
+                          setOverdubOpen(false);
+                          const startSec = getSectionStartSec(section.id, allSections, progression, bpm);
+                          window.dispatchEvent(
+                            new CustomEvent("lovable:begin-section-overdub", {
+                              detail: { trackId: t.id, startSec },
+                            }),
+                          );
+                        }}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ background: t.color }}
+                        />
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="icon" variant="ghost" className="h-7 w-7">
