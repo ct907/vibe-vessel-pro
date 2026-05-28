@@ -446,7 +446,7 @@ function TrackRow({
             aria-label="Track name"
           />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={(e) => {
@@ -552,7 +552,8 @@ function TrackRow({
               e.stopPropagation();
               onOpenDelay();
             }}
-            className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
+            disabled={!clip}
+            className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
             aria-label="Delay compensation"
           >
             <Timer className="h-3.5 w-3.5" />
@@ -636,30 +637,33 @@ function DelayCompensationSheet({
   onClose: () => void;
 }) {
   const store = useRecordingsStore();
-  if (!track || !track.clip) return null;
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto p-0">
-        <div
-          className="px-4 pt-6 pb-4 flex items-center gap-3"
-          style={{ background: track.color, color: "white" }}
-        >
-          <Timer className="h-5 w-5 shrink-0" />
-          <div>
-            <div className="font-display text-base font-semibold">{track.name}</div>
-            <div className="text-xs opacity-80">Delay Compensation</div>
-          </div>
-        </div>
-        <div className="px-4 py-5 space-y-4 pb-10">
-          <p className="text-sm text-muted-foreground">
-            Nudge the clip start time to fix recording latency offsets.
-          </p>
-          <DelayCompensationControl
-            startSec={track.clip.startSec}
-            maxSec={loopSec}
-            onChange={(sec) => store.setClipStart(track.id, sec)}
-          />
-        </div>
+        {track && track.clip && (
+          <>
+            <div
+              className="px-4 pt-6 pb-4 flex items-center gap-3"
+              style={{ background: track.color, color: "white" }}
+            >
+              <Timer className="h-5 w-5 shrink-0" />
+              <div>
+                <div className="font-display text-base font-semibold">{track.name}</div>
+                <div className="text-xs opacity-80">Delay Compensation</div>
+              </div>
+            </div>
+            <div className="px-4 py-5 space-y-4 pb-10">
+              <p className="text-sm text-muted-foreground">
+                Nudge the clip start time to fix recording latency offsets.
+              </p>
+              <DelayCompensationControl
+                startSec={track.clip.startSec}
+                maxSec={loopSec}
+                onChange={(sec) => store.setClipStart(track.id, sec)}
+              />
+            </div>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );

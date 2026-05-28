@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,8 +92,8 @@ export function SongAttributesMenu() {
       </AlertDialogContent>
     </AlertDialog>
     <div className="relative inline-flex justify-center" ref={attrBtnRef}>
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <button
           type="button"
           className="inline-flex items-center gap-1 mx-auto mt-0.5 text-sm font-normal text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full px-3 py-0.5"
@@ -105,10 +103,10 @@ export function SongAttributesMenu() {
           <span>{meta.keyRoot} {modeLabel} | {meta.beatsPerBar}/{meta.beatUnit} | {meta.bpm} bpm</span>
           <ChevronDown className="h-3 w-3 opacity-70" />
         </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" className="w-72">
-        <DropdownMenuLabel>Song settings</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      </PopoverTrigger>
+      <PopoverContent align="center" className="w-72">
+        <div className="text-sm font-semibold mb-1 px-1">Song settings</div>
+        <div className="h-px bg-border mb-2" />
         <div className="p-2 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">Key</span>
@@ -242,8 +240,8 @@ export function SongAttributesMenu() {
               Save Settings
             </button>
           </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverContent>
+    </Popover>
 
     {onboarding.enabled && onboarding.globalPhase === 1 && !open && (
       <AnchoredCoachMark
