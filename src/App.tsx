@@ -102,10 +102,10 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <OnboardingFilters />
-          <SkipTutorialButton />
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <SkipTutorialButton />
             <Index />
             <Routes>
               <Route path="/" element={<Landing />} />

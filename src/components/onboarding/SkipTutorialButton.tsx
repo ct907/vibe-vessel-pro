@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useLocation } from "react-router-dom";
 import { useOnboardingStore } from "@/store/onboarding";
 
 export function SkipTutorialButton() {
@@ -7,6 +8,7 @@ export function SkipTutorialButton() {
   const lyricsStep = useOnboardingStore((s) => s.lyricsStep);
   const progressionsStep = useOnboardingStore((s) => s.progressionsStep);
   const disable = useOnboardingStore((s) => s.disable);
+  const { pathname } = useLocation();
 
   const inTutorial =
     enabled &&
@@ -14,7 +16,7 @@ export function SkipTutorialButton() {
       (lyricsStep >= 1 && lyricsStep <= 5) ||
       (progressionsStep >= 1 && progressionsStep <= 5));
 
-  if (!inTutorial) return null;
+  if (!inTutorial || pathname === "/") return null;
 
   return createPortal(
     <button

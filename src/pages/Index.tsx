@@ -121,7 +121,9 @@ const Index = () => {
           style={{ zIndex: -1, opacity: theme === "dark" ? 0.2 : (bg.pattern === "dot" ? 0.8 : 0.3), ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
         />
       )}
-      <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} onTabSelect={handleTabSelect} />
+      {tab !== "chords" && (
+        <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} onTabSelect={handleTabSelect} />
+      )}
 
       <DragDropContext
         onBeforeDragStart={onBeforeDragStart}
@@ -132,7 +134,9 @@ const Index = () => {
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-32">
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
-          {showTitleHeader && (
+          {tab === "chords" ? (
+            <h1 className="text-3xl font-display font-bold text-center mt-6 mb-2">Explore Chords</h1>
+          ) : showTitleHeader && (
             <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
           )}
 
