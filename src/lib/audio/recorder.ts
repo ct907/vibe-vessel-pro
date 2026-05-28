@@ -29,8 +29,11 @@ export interface RecorderHandle {
 
 export async function startRecording(opts: {
   onLevel?: (level: number) => void;
+  deviceId?: string | null;
 }): Promise<RecorderHandle> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: opts.deviceId ? { deviceId: { exact: opts.deviceId } } : true,
+  });
   const mime = pickSupportedMime();
   const recorder = new MediaRecorder(stream, { mimeType: mime });
   const chunks: BlobPart[] = [];
