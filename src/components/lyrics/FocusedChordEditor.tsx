@@ -13,6 +13,7 @@ import {
   type LyricLine,
 } from "@/store/song";
 import { useUIStore } from "@/store/ui";
+import { useOnboardingStore } from "@/store/onboarding";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -197,6 +198,8 @@ export function FocusedChordEditor(props: Props) {
         addChordToPatternSlot(props.patternId, { ...toStorage(chord), octave }, progAddCursor + i, 4),
       );
       setProgAddCursor((c) => c + chords.length);
+      const { enabled: ob, progressionsStep, setProgressionsStep } = useOnboardingStore.getState();
+      if (ob && progressionsStep === 2) setProgressionsStep(3);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
@@ -209,10 +212,9 @@ export function FocusedChordEditor(props: Props) {
     if (!line) return;
     if (anchorId && chords[0]) {
       upsertChordAt(props.sectionId, lyricsLineId, slot, { ...toStorage(chords[0]), octave }, anchorId);
-      setAnchorId(undefined);
-      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + chordSlotWidth(chords[0].display) + 1));
-      setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 30);
+      const { enabled: ob, lyricsStep, setLyricsStep } = useOnboardingStore.getState();
+      if (ob && lyricsStep === 4) setLyricsStep(5);
+      props.onClose();
       return;
     }
     // Insert in forward order; insertSectionChordAtSlot keeps SSOT sorted by slot.
@@ -231,6 +233,8 @@ export function FocusedChordEditor(props: Props) {
     if (isProgressionAdd) {
       addChordToPatternSlot(props.patternId, chordWithOctave, progAddCursor, 4);
       setProgAddCursor((c) => c + 1);
+      const { enabled: ob, progressionsStep, setProgressionsStep } = useOnboardingStore.getState();
+      if (ob && progressionsStep === 2) setProgressionsStep(3);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
@@ -245,10 +249,9 @@ export function FocusedChordEditor(props: Props) {
     if (!line) return;
     if (anchorId) {
       upsertChordAt(props.sectionId, lyricsLineId, slot, chordWithOctave, anchorId);
-      setAnchorId(undefined);
-      setSlot((s) => Math.min(CHORD_ROW_SLOTS - 1, s + chordSlotWidth(chord.display) + 1));
-      setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 30);
+      const { enabled: ob, lyricsStep, setLyricsStep } = useOnboardingStore.getState();
+      if (ob && lyricsStep === 4) setLyricsStep(5);
+      props.onClose();
       return;
     }
 
@@ -281,6 +284,8 @@ export function FocusedChordEditor(props: Props) {
         addChordToPatternSlot(patternId, { ...toStorage(chord), octave }, startSlot + i, 4);
       });
       if (isProgressionAdd) setProgAddCursor((c) => c + chords.length);
+      const { enabled: ob, progressionsStep, setProgressionsStep } = useOnboardingStore.getState();
+      if (ob && progressionsStep === 2) setProgressionsStep(3);
       props.onClose();
       return;
     }
