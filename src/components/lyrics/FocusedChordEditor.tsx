@@ -233,8 +233,6 @@ export function FocusedChordEditor(props: Props) {
     if (isProgressionAdd) {
       addChordToPatternSlot(props.patternId, chordWithOctave, progAddCursor, 4);
       setProgAddCursor((c) => c + 1);
-      const { enabled: ob, progressionsStep, setProgressionsStep } = useOnboardingStore.getState();
-      if (ob && progressionsStep === 2) setProgressionsStep(3);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
