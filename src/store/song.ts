@@ -3686,13 +3686,93 @@ export function downloadProjectJSON(filename = "song.json") {
   URL.revokeObjectURL(url);
 }
 
-export function loadProjectFromFile(file: File): Promise<void> {
+export async function downloadProjectZip(filename = "song.zip") {
+  const [{ default: JSZip }, { useRecordingsStore }, { getAudioBlob }, { extFromMime }] = await Promise.all([
+    import("jszip"),
+    import("@/store/recordings"),
+    import("@/lib/audio/blob-store"),
+    import("@/lib/audio/waveform"),
+  ]);
+  const songJson = useSongStore.getState().toJSON() as SerializedSong & { recordings?: { tracks: unknown[] } };
+  const recordingsJson = useRecordingsStore.getState().toJSON();
+  (songJson as SerializedSong & { recordings?: typeof recordingsJson }).recordings = recordingsJson;
+  const zip = new JSZip();
+  zip.file("song.json", JSON.stringify(songJson, null, 2));
+  const audioFolder = zip.folder("audio");
+  if (audioFolder) {
+    for (const track of recordingsJson.tracks) {
+      const clip = track.clip;
+      if (!clip) continue;
+      const blob = await getAudioBlob(clip.blobId);
+      if (blob) {
+        audioFolder.file(`${clip.blobId}.${extFromMime(blob.type)}`, blob);
+      }
+    }
+  }
+  const out = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(out);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".zip") ? filename : `${filename}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function loadProjectFromZipFile(file: File): Promise<void> {
+  const [{ default: JSZip }, { useRecordingsStore }, { putAudioBlob }] = await Promise.all([
+    import("jszip"),
+    import("@/store/recordings"),
+    import("@/lib/audio/blob-store"),
+  ]);
+  const zip = await JSZip.loadAsync(file);
+  const songFile = zip.file("song.json");
+  if (!songFile) throw new Error("Missing song.json in archive");
+  const songText = await songFile.async("string");
+  const data = JSON.parse(songText) as SerializedSong & { recordings?: { tracks: unknown[] } };
+  useSongStore.getState().loadFromJSON(data);
+
+  // Restore audio blobs.
+  const audioFolder = zip.folder("audio");
+  if (audioFolder) {
+    const entries: { id: string; blob: Promise<Blob> }[] = [];
+    audioFolder.forEach((relativePath, file) => {
+      if (file.dir) return;
+      const base = relativePath.split("/").pop() || relativePath;
+      const id = base.replace(/\.[^.]+$/, "");
+      entries.push({ id, blob: file.async("blob") });
+    });
+    for (const { id, blob } of entries) {
+      const b = await blob;
+      await putAudioBlob(id, b);
+    }
+  }
+
+  // Restore recordings store state.
+  const recordings = (data as { recordings?: { tracks?: unknown } }).recordings;
+  if (recordings && Array.isArray(recordings.tracks)) {
+    // Cast to the store's RecTrack[] shape — JSON shape matches at runtime.
+    useRecordingsStore.getState().hydrate(recordings.tracks as Parameters<ReturnType<typeof useRecordingsStore.getState>["hydrate"]>[0]);
+  } else {
+    useRecordingsStore.getState().clear();
+  }
+}
+
+export async function loadProjectFromFile(file: File): Promise<void> {
+  const isZip = file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip";
+  if (isZip) {
+    await loadProjectFromZipFile(file);
+    return;
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
         useSongStore.getState().loadFromJSON(data);
+        // Plain JSON has no recordings — clear them.
+        import("@/store/recordings").then((m) => m.useRecordingsStore.getState().clear()).catch(() => { /* noop */ });
         resolve();
       } catch (e) {
         reject(e);

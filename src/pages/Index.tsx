@@ -14,6 +14,7 @@ import { SongTitleHeader } from "@/components/song/SongTitleHeader";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
+import { RecordingsTab } from "@/components/recordings/RecordingsTab";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
@@ -27,13 +28,13 @@ const Index = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
-  const initialTab = ((): "lyrics" | "chords" | "progressions" => {
+  const initialTab = ((): "lyrics" | "chords" | "progressions" | "recordings" => {
     const q = searchParams.get("tab");
-    if (q === "lyrics" || q === "chords" || q === "progressions") return q;
+    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings") return q;
     if (defaultLandingTab) return defaultLandingTab;
     return "lyrics";
   })();
-  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions">(initialTab);
+  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions" | "recordings">(initialTab);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
@@ -144,6 +145,9 @@ const Index = () => {
             </TabsContent>
             <TabsContent value="progressions" forceMount className="mt-0 data-[state=inactive]:hidden">
               {showTabContent && <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} showOnboarding={tab === "progressions" && location.pathname !== '/'} />}
+            </TabsContent>
+            <TabsContent value="recordings" forceMount className="mt-0 data-[state=inactive]:hidden">
+              {showTabContent && <RecordingsTab />}
             </TabsContent>
           </Tabs>
         </main>
