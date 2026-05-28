@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Pencil, ChevronLeft, ChevronRight, Settings2, Timer } from "lucide-react";
+import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Pencil, ChevronLeft, ChevronRight, Settings2, Timer, Music2 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,12 @@ import { usePlaybackStore } from "@/store/playback";
 import {
   MAX_TRACKS,
   TRACK_COLOR_PRESETS,
+  clipEndSec,
   useRecordingsStore,
   type RecClip,
   type RecTrack,
 } from "@/store/recordings";
+import { startMetronome, stopMetronome } from "@/lib/audio/metronome";
 import { putAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
 import { decodeBlob, cachedPeaks, invalidatePeaks } from "@/lib/audio/waveform";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
@@ -409,7 +411,7 @@ function TrackRow({
   pxPerSec,
   height,
 }: TrackRowProps) {
-  const clip = track.clip;
+  const hasClip = track.clips.length > 0;
   return (
     <div
       className={`flex items-stretch border-b cursor-pointer ${
@@ -552,7 +554,7 @@ function TrackRow({
               e.stopPropagation();
               onOpenDelay();
             }}
-            disabled={!clip}
+            disabled={!hasClip}
             className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
             aria-label="Delay compensation"
           >
@@ -561,23 +563,29 @@ function TrackRow({
         </div>
       </div>
       <div className="relative flex-1 overflow-hidden">
-        {clip ? (
-          <div
-            className="absolute top-1 bottom-1 rounded-md overflow-hidden"
-            style={{
-              left: clip.startSec * pxPerSec,
-              width: Math.max(4, (clip.trimEndSec - clip.trimStartSec) * pxPerSec),
-              background: `color-mix(in oklch, ${track.color} 30%, transparent)`,
-              border: `1px solid ${track.color}`,
-            }}
-          >
-            <WaveformCanvas
-              blobId={clip.blobId}
-              width={Math.max(4, (clip.trimEndSec - clip.trimStartSec) * pxPerSec)}
-              height={height - 8}
-              color={track.color}
-            />
-          </div>
+        {hasClip ? (
+          track.clips.map((clip) => {
+            const clipW = Math.max(4, (clip.trimEndSec - clip.trimStartSec) * pxPerSec);
+            return (
+              <div
+                key={clip.blobId}
+                className="absolute top-1 bottom-1 rounded-md overflow-hidden"
+                style={{
+                  left: clip.startSec * pxPerSec,
+                  width: clipW,
+                  background: `color-mix(in oklch, ${track.color} 30%, transparent)`,
+                  border: `1px solid ${track.color}`,
+                }}
+              >
+                <WaveformCanvas
+                  blobId={clip.blobId}
+                  width={clipW}
+                  height={height - 8}
+                  color={track.color}
+                />
+              </div>
+            );
+          })
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
             Press record or use Replace to add audio
@@ -598,7 +606,7 @@ function TrackSettingsPanel({
   onClose: () => void;
 }) {
   const store = useRecordingsStore();
-  if (!track.clip) return null;
+  if (track.clips.length === 0) return null;
   return (
     <div className="border-t bg-paper-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
@@ -607,20 +615,22 @@ function TrackSettingsPanel({
           Close
         </Button>
       </div>
-      <div>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-          Trim ({track.clip.trimStartSec.toFixed(2)}s – {track.clip.trimEndSec.toFixed(2)}s)
+      {track.clips.map((clip) => (
+        <div key={clip.blobId}>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            Clip @{fmtTime(clip.startSec)} — trim ({clip.trimStartSec.toFixed(2)}s – {clip.trimEndSec.toFixed(2)}s)
+          </div>
+          <Slider
+            value={[clip.trimStartSec, clip.trimEndSec]}
+            min={0}
+            max={clip.durationSec}
+            step={0.01}
+            onValueChange={(v) =>
+              store.setClipTrim(track.id, clip.blobId, v[0], v[1] ?? clip.trimEndSec)
+            }
+          />
         </div>
-        <Slider
-          value={[track.clip.trimStartSec, track.clip.trimEndSec]}
-          min={0}
-          max={track.clip.durationSec}
-          step={0.01}
-          onValueChange={(v) =>
-            store.setClipTrim(track.id, v[0], v[1] ?? track.clip!.trimEndSec)
-          }
-        />
-      </div>
+      ))}
     </div>
   );
 }
@@ -640,7 +650,7 @@ function DelayCompensationSheet({
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto p-0">
-        {track && track.clip && (
+        {track && track.clips.length > 0 && (
           <>
             <div
               className="px-4 pt-6 pb-4 flex items-center gap-3"
@@ -652,15 +662,22 @@ function DelayCompensationSheet({
                 <div className="text-xs opacity-80">Delay Compensation</div>
               </div>
             </div>
-            <div className="px-4 py-5 space-y-4 pb-10">
+            <div className="px-4 py-5 space-y-5 pb-10">
               <p className="text-sm text-muted-foreground">
-                Nudge the clip start time to fix recording latency offsets.
+                Nudge each clip's start time to fix recording latency.
               </p>
-              <DelayCompensationControl
-                startSec={track.clip.startSec}
-                maxSec={loopSec}
-                onChange={(sec) => store.setClipStart(track.id, sec)}
-              />
+              {track.clips.map((clip) => (
+                <div key={clip.blobId}>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Clip @{fmtTime(clip.startSec)}
+                  </div>
+                  <DelayCompensationControl
+                    startSec={clip.startSec}
+                    maxSec={loopSec}
+                    onChange={(sec) => store.setClipStart(track.id, clip.blobId, sec)}
+                  />
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -738,7 +755,8 @@ export function RecordingsTab() {
   const selectedId = useRecordingsStore((s) => s.selectedTrackId);
   const addTrack = useRecordingsStore((s) => s.addTrack);
   const selectTrack = useRecordingsStore((s) => s.selectTrack);
-  const setClip = useRecordingsStore((s) => s.setClip);
+  const addClip = useRecordingsStore((s) => s.addClip);
+  const removeClip = useRecordingsStore((s) => s.removeClip);
   const toggleMute = useRecordingsStore((s) => s.toggleMute);
   const toggleSolo = useRecordingsStore((s) => s.toggleSolo);
   const removeTrack = useRecordingsStore((s) => s.removeTrack);
@@ -747,6 +765,7 @@ export function RecordingsTab() {
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const monitorLevel = useRecordingsStore((s) => s.monitorLevel);
   const selectedInputDeviceId = useRecordingsStore((s) => s.selectedInputDeviceId);
+  const songMeta = useSongStore((s) => s.meta);
 
   const loopSec = useLoopSec();
   const segments = useBarsStrip();
@@ -758,6 +777,9 @@ export function RecordingsTab() {
   const [delayTrackId, setDelayTrackId] = useState<string | null>(null);
   const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
   const delayTrack = useMemo(() => tracks.find((t) => t.id === delayTrackId) ?? null, [tracks, delayTrackId]);
+
+  const [countingInTrackId, setCountingInTrackId] = useState<string | null>(null);
+  const countInTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
   const recordingStartedAtRef = useRef<number>(0);
@@ -797,20 +819,6 @@ export function RecordingsTab() {
     const captured = durationSec || (blob.size / 16000); // rough fallback
     const ls = loopSec || captured;
     const startOffset = Math.max(0, Math.min(ls - 0.01, startSec));
-    if (captured > ls + 0.05) {
-      setOverflow({ blob, durationSec: captured, mime, startSec: startOffset, trackId, blobId });
-      // Place a tentative clip (untrimmed) so the user sees waveform before deciding.
-      const clip: RecClip = {
-        blobId,
-        mime,
-        durationSec: captured,
-        startSec: startOffset,
-        trimStartSec: 0,
-        trimEndSec: captured,
-      };
-      setClip(trackId, clip);
-      return;
-    }
     const clip: RecClip = {
       blobId,
       mime,
@@ -819,10 +827,15 @@ export function RecordingsTab() {
       trimStartSec: 0,
       trimEndSec: captured,
     };
-    setClip(trackId, clip);
+    if (captured > ls + 0.05) {
+      setOverflow({ blob, durationSec: captured, mime, startSec: startOffset, trackId, blobId });
+      addClip(trackId, clip);
+      return;
+    }
+    addClip(trackId, clip);
   };
 
-  const startTrackRecording = async (trackId: string) => {
+  const startTrackRecording = async (trackId: string, atStartSec = 0) => {
     try {
       const handle = await startRecording({
         onLevel: (l) => setMonitorLevel(l),
@@ -831,21 +844,35 @@ export function RecordingsTab() {
       recorderRef.current = handle;
       recordingTrackIdRef.current = trackId;
       setRecording(true, trackId);
-      // Capture the loop-relative position at the moment recording began.
-      let startSec = 0;
-      if (isEngineRunning()) {
-        const ac = getAudioContext();
-        const ls = getLoopSec();
-        if (ls > 0) {
-          startSec = (((ac.currentTime - getLoopStartCtxTime()) % ls) + ls) % ls;
-        }
-      }
-      recordingStartedAtRef.current = startSec;
+      recordingStartedAtRef.current = atStartSec;
       toast.success("Recording…");
     } catch (e) {
       console.error(e);
       toast.error("Microphone access denied");
     }
+  };
+
+  const beginCountIn = (trackId: string, startSec = 0) => {
+    const { bpm, beatsPerBar } = songMeta;
+    const barDurationMs = (beatsPerBar * 60 / bpm) * 1000;
+    setCountingInTrackId(trackId);
+    stopMetronome();
+    startMetronome({ bpm, beatsPerBar, volume: 0.8 });
+    countInTimeoutRef.current = setTimeout(() => {
+      setCountingInTrackId(null);
+      stopMetronome();
+      window.dispatchEvent(new CustomEvent("lovable:request-play"));
+      void startTrackRecording(trackId, startSec);
+    }, barDurationMs);
+  };
+
+  const cancelCountIn = () => {
+    if (countInTimeoutRef.current) {
+      clearTimeout(countInTimeoutRef.current);
+      countInTimeoutRef.current = null;
+    }
+    setCountingInTrackId(null);
+    stopMetronome();
   };
 
   const stopTrackRecording = async () => {
@@ -867,6 +894,7 @@ export function RecordingsTab() {
 
   useEffect(() => {
     return () => {
+      cancelCountIn();
       if (recorderRef.current) {
         recorderRef.current.cancel();
         recorderRef.current = null;
@@ -874,13 +902,44 @@ export function RecordingsTab() {
     };
   }, []);
 
+  useEffect(() => {
+    const onSectionOverdub = (e: Event) => {
+      const { trackId, startSec } = (e as CustomEvent<{ trackId: string; startSec: number }>).detail;
+      if (recordingTrackId || countingInTrackId) {
+        toast.info("Another track is recording");
+        return;
+      }
+      if (isPlaying) {
+        void startTrackRecording(trackId, startSec);
+      } else {
+        beginCountIn(trackId, startSec);
+      }
+    };
+    window.addEventListener("lovable:begin-section-overdub", onSectionOverdub);
+    return () => window.removeEventListener("lovable:begin-section-overdub", onSectionOverdub);
+  }, [recordingTrackId, countingInTrackId, isPlaying]);
+
   const handleRecordToggle = (trackId: string) => {
+    if (countingInTrackId === trackId) {
+      cancelCountIn();
+      return;
+    }
     if (recordingTrackId === trackId) {
       void stopTrackRecording();
-    } else if (recordingTrackId) {
+      window.dispatchEvent(new CustomEvent("lovable:request-stop"));
+    } else if (recordingTrackId || countingInTrackId) {
       toast.info("Another track is recording");
+    } else if (isPlaying) {
+      // Already playing — start recording immediately at current playhead position.
+      let startSec = 0;
+      if (isEngineRunning()) {
+        const ac = getAudioContext();
+        const ls = getLoopSec();
+        if (ls > 0) startSec = (((ac.currentTime - getLoopStartCtxTime()) % ls) + ls) % ls;
+      }
+      void startTrackRecording(trackId, startSec);
     } else {
-      void startTrackRecording(trackId);
+      beginCountIn(trackId);
     }
   };
 
@@ -911,13 +970,15 @@ export function RecordingsTab() {
 
   const handleDeleteTrack = async (trackId: string) => {
     const t = tracks.find((x) => x.id === trackId);
-    if (t?.clip) {
-      try {
-        await deleteAudioBlob(t.clip.blobId);
-        clearDecodedCache(t.clip.blobId);
-        invalidatePeaks(t.clip.blobId);
-      } catch {
-        /* noop */
+    if (t) {
+      for (const clip of t.clips) {
+        try {
+          await deleteAudioBlob(clip.blobId);
+          clearDecodedCache(clip.blobId);
+          invalidatePeaks(clip.blobId);
+        } catch {
+          /* noop */
+        }
       }
     }
     removeTrack(trackId);
@@ -925,17 +986,19 @@ export function RecordingsTab() {
 
   const handleReRecord = async (trackId: string) => {
     const t = tracks.find((x) => x.id === trackId);
-    if (t?.clip) {
-      try {
-        await deleteAudioBlob(t.clip.blobId);
-        clearDecodedCache(t.clip.blobId);
-        invalidatePeaks(t.clip.blobId);
-      } catch {
-        /* noop */
+    if (t) {
+      for (const clip of t.clips) {
+        try {
+          await deleteAudioBlob(clip.blobId);
+          clearDecodedCache(clip.blobId);
+          invalidatePeaks(clip.blobId);
+        } catch {
+          /* noop */
+        }
+        removeClip(trackId, clip.blobId);
       }
-      setClip(trackId, null);
     }
-    void startTrackRecording(trackId);
+    beginCountIn(trackId);
   };
 
   const handleOverflowChoice = (choice: "trim" | "expand" | "cancel") => {
@@ -943,10 +1006,7 @@ export function RecordingsTab() {
     const { trackId, blobId, durationSec, startSec } = overflow;
     if (choice === "trim") {
       const trimmedLen = Math.max(0.05, loopSec - startSec);
-      const clip = tracks.find((t) => t.id === trackId)?.clip;
-      if (clip) {
-        useRecordingsStore.getState().setClipTrim(trackId, 0, Math.min(durationSec, trimmedLen));
-      }
+      useRecordingsStore.getState().setClipTrim(trackId, blobId, 0, Math.min(durationSec, trimmedLen));
       setOverflow(null);
     } else if (choice === "expand") {
       const factor = Math.max(2, Math.ceil((startSec + durationSec) / loopSec));
@@ -964,9 +1024,8 @@ export function RecordingsTab() {
         });
       }, 200);
     } else {
-      // cancel: delete the blob & clip
       void deleteAudioBlob(blobId);
-      setClip(trackId, null);
+      useRecordingsStore.getState().removeClip(trackId, blobId);
       setOverflow(null);
     }
   };
@@ -987,6 +1046,12 @@ export function RecordingsTab() {
             {tracks.length}/{MAX_TRACKS} tracks · loop {fmtTime(loopSec)}
           </span>
         </div>
+        {countingInTrackId && !recordingTrackId && (
+          <div className="flex items-center gap-1 text-xs text-primary font-semibold">
+            <Music2 className="h-3.5 w-3.5 animate-pulse" />
+            Count in…
+          </div>
+        )}
         {recordingTrackId && (
           <div className="flex items-center gap-1 text-xs text-destructive">
             <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
@@ -1004,7 +1069,7 @@ export function RecordingsTab() {
                 key={t.id}
                 track={t}
                 isSelected={selectedId === t.id}
-                isRecording={recordingTrackId === t.id}
+                isRecording={recordingTrackId === t.id || countingInTrackId === t.id}
                 onSelect={() => selectTrack(t.id)}
                 onRecordToggle={() => handleRecordToggle(t.id)}
                 onToggleMute={() => toggleMute(t.id)}
@@ -1042,7 +1107,7 @@ export function RecordingsTab() {
         </div>
       )}
 
-      {selectedTrack && selectedTrack.clip && (
+      {selectedTrack && selectedTrack.clips.length > 0 && (
         <TrackSettingsPanel
           track={selectedTrack}
           loopSec={loopSec}

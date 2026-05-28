@@ -135,10 +135,9 @@ function disposeAllNodes() {
 
 async function scheduleClipForLoop(
   track: RecTrack,
+  clip: RecClip,
   loopIndex: number,
 ) {
-  const clip = track.clip;
-  if (!clip) return;
   const buffer = await getDecoded(clip);
   if (!buffer) return;
   if (!state.running) return;
@@ -169,8 +168,8 @@ async function scheduleLoop(loopIndex: number) {
   for (const track of store.tracks) {
     ensureNodes(track);
     applyTrackParams(track, anySolo);
-    if (track.clip) {
-      await scheduleClipForLoop(track, loopIndex);
+    for (const clip of track.clips) {
+      await scheduleClipForLoop(track, clip, loopIndex);
     }
   }
 }
