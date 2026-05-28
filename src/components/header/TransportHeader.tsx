@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
 import { useUIStore } from "@/store/ui";
-import { downloadProjectJSON, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import { startRecordingsEngine, stopRecordingsEngine } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -301,14 +302,14 @@ function InspirationLightbox({
 interface Props {
   isPlaying: boolean;
   setIsPlaying: (b: boolean) => void;
-  tab: "lyrics" | "chords" | "progressions";
-  setTab: (t: "lyrics" | "chords" | "progressions") => void;
+  tab: "lyrics" | "chords" | "progressions" | "recordings";
+  setTab: (t: "lyrics" | "chords" | "progressions" | "recordings") => void;
   onTabSelect?: (t: string) => void;
 }
 
 export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSelect }: Props) {
   const toolbarExpanded = useUIStore((s) => s.toolbarExpanded);
-  const guardedSetTab = (t: "lyrics" | "chords" | "progressions") => {
+  const guardedSetTab = (t: "lyrics" | "chords" | "progressions" | "recordings") => {
     if (toolbarExpanded) {
       toast({
         title: "Finish editing chords first",
@@ -422,6 +423,23 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       loopBeats: built.loopBeats,
       startAt,
     });
+    // Start the recordings engine in lockstep with the progression. Compute
+    // the seconds offset corresponding to startFromChordId so the audio
+    // playhead aligns to the same musical position.
+    let playheadOffsetSec = 0;
+    if (anchorAtPlay) {
+      const idx = built.meta.findIndex((m) => m.patternChordId === anchorAtPlay);
+      if (idx >= 0) {
+        const beat = built.events[idx]?.startBeat ?? 0;
+        playheadOffsetSec = (beat * 60) / meta.bpm;
+      }
+    }
+    startRecordingsEngine({
+      bpm: meta.bpm,
+      loopBeats: built.loopBeats,
+      startAtCtxTime: startAt,
+      playheadOffsetSec,
+    });
   };
 
   // Live re-feed: while the loop is running, mirror SSOT edits into the
@@ -439,6 +457,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const handleStop = () => {
     stopRequestedRef.current = true;
     stopProgression();
+    stopRecordingsEngine();
     stopMetronome();
     setIsPlaying(false);
     setPlayingStore(false);
@@ -635,7 +654,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       variant="outline"
                       className="flex-1 justify-start gap-2 border-0"
                       style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
-                      onClick={() => { downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json"); setNavOpen(false); }}
+                      onClick={() => { void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip"); setNavOpen(false); }}
                     >
                       <Save className="h-4 w-4" /> Save
                     </Button>
@@ -643,7 +662,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       <input
                         key={fileInputKey}
                         type="file"
-                        accept="application/json,.json"
+                        accept=".zip,application/zip,application/json,.json"
                         className="hidden"
                         onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
                       />
@@ -777,10 +796,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 boxShadow: "var(--shadow-recess)",
               }}
             >
-              {(["lyrics", "progressions"] as const).map((t) => {
+              {(["lyrics", "progressions", "recordings"] as const).map((t) => {
                 const isOnboardingPhase0 = onboarding.enabled && onboarding.globalPhase === 0;
                 const active = !isOnboardingPhase0 && tab === t;
-                const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions" };
+                const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions", recordings: "Recordings" };
                 const label = LABEL[t] ?? t;
                 return (
                   <button
@@ -848,7 +867,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           <Button
             variant="outline"
             onClick={() =>
-              downloadProjectJSON(meta.title.replace(/\s+/g, "-").toLowerCase() + ".json")
+              void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip")
             }
           >
             <Save className="h-4 w-4" /> Save first

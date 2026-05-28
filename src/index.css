@@ -53,6 +53,12 @@
     --primary-halo: oklch(0.662 0.1545 54.2 / 0.5);
     --primary-soft: oklch(0.8549 0.1077 80.53);
 
+    /* ─── Track colors — 4 swatch presets for Recordings tab ───── */
+    --track-color-amber: oklch(0.78 0.13 65);
+    --track-color-teal: oklch(0.72 0.10 195);
+    --track-color-rose: oklch(0.74 0.13 25);
+    --track-color-indigo: oklch(0.66 0.11 270);
+
     --secondary: var(--paper-shade);
     --secondary-foreground: oklch(0.2257 0.0204 261.4);
 
