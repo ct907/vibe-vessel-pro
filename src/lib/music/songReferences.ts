@@ -38,6 +38,7 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["sus4"], chordFamily: "special",
     context: "Uses sus4 chords extensively in the verse riff — the unresolved fourth gives the synth line its restless quality.",
     genre: "Progressive Rock",
+    progression: "Esus4 → E → Asus4 → A",
   },
   {
     title: "Brass in Pocket", artist: "The Pretenders",
@@ -51,6 +52,7 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["sus4"], chordFamily: "special",
     context: "The guitar delays on sus4 voicings before resolving to major — the spiritual yearning sound of The Edge.",
     genre: "Rock",
+    progression: "Dsus4 → D → Gsus4 → G → Asus4 → A",
   },
 
   // Augmented
@@ -73,12 +75,14 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["aug"], chordFamily: "special",
     context: "The verse walks through C → C+ → C6 — an ascending line cliché using the augmented chord as a passing voice.",
     genre: "Pop/Rock",
+    progression: "C → Caug → C6 → C7",
   },
   {
     title: "All My Loving", artist: "The Beatles",
     qualities: ["aug"], chordFamily: "special",
     context: "C+ appears between C and Am — the augmented triad connects the two chords via chromatic voice movement in the fifth.",
     genre: "Pop",
+    progression: "C → Caug → Am → F",
   },
 
   // Line cliché
@@ -124,12 +128,14 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["min9", "9"], chordFamily: "minor",
     context: "The vamp sits on minor 9th and dominant 9th voicings — the extended harmony is what makes neo soul feel like neo soul.",
     genre: "Neo Soul",
+    progression: "Am9 → D9 → Gmaj9 → Cmaj9",
   },
   {
     title: "Untitled (How Does It Feel)", artist: "D'Angelo",
     qualities: ["min9", "min7", "9"], chordFamily: "minor",
     context: "Stacked extended voicings throughout — the chord choices float between min9, dom9, and min7 creating a liquid harmonic bed.",
     genre: "Neo Soul/R&B",
+    progression: "Cmaj9 → Bm9 → Am9 → D9",
   },
   {
     title: "Ordinary People", artist: "John Legend",
@@ -150,6 +156,7 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["min7", "maj7"], chordFamily: "minor",
     context: "Am7 → Dm7 → G7 → Cmaj7 — a textbook minor ii-V-I with extended voicings, smooth and understated.",
     genre: "R&B/Soul",
+    progression: "Am7 → Dm7 → G7 → Cmaj7",
   },
 
   // Altered dominants
@@ -158,36 +165,42 @@ export const SONG_REFERENCES: SongReference[] = [
     qualities: ["7b9"], chordFamily: "altered",
     context: "The V7b9 resolves to the minor tonic throughout — the defining cadence of the minor ii-V-i.",
     genre: "Jazz",
+    progression: "Am7b5 → D7b9 → Gm → Cm7",
   },
   {
     title: "Purple Haze", artist: "Jimi Hendrix",
     qualities: ["7#9"], chordFamily: "altered",
     context: "E7#9 is the entire harmonic identity — the chord sits unresolved as a vamp, containing both major and minor thirds simultaneously.",
     genre: "Rock",
+    progression: "E7#9 → G → A → E7#9",
   },
   {
     title: "Superstition", artist: "Stevie Wonder",
     qualities: ["7#9"], chordFamily: "altered",
     context: "The riff implies Eb7#9 throughout — the sharp nine gives the funk groove its gritty edge.",
     genre: "Funk/Soul",
+    progression: "Eb7#9 → Ab7#9 → Bb7#9 → Eb7#9",
   },
   {
     title: "My Funny Valentine (altered)", artist: "Chet Baker / Miles Davis",
     qualities: ["7#5", "minMaj7"], chordFamily: "altered",
     context: "C7#5 resolves to Fm — the raised fifth moves up by semitone to the tonic root, a signature jazz voice-leading move.",
     genre: "Jazz",
+    progression: "Fm → FmMaj7 → Fm7 → C7#5",
   },
   {
     title: "Cry Me a River", artist: "Julie London",
     qualities: ["7b9"], chordFamily: "altered",
     context: "G7b9 creates the brooding tension before resolving to Cm in the verse.",
     genre: "Jazz/Torch",
+    progression: "Cm → Fm7 → G7b9 → Cm",
   },
   {
     title: "Foxy Lady", artist: "Jimi Hendrix",
     qualities: ["7#9"], chordFamily: "altered",
     context: "F#7#9 vamps for the entire song, using the Hendrix chord as a tonal centre rather than a passing tension.",
     genre: "Rock",
+    progression: "F#7#9 → B → F#7#9",
   },
 
   // Power chords
