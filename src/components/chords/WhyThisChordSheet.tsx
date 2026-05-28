@@ -658,7 +658,7 @@ export function WhyThisChordSheet() {
                       className="rounded-lg p-3 space-y-1.5"
                       style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
                     >
-                      <div className="flex items-baseline gap-2 flex-wrap">
+                      <div className="flex items-end gap-2 flex-wrap">
                         <span className="font-mono-chord font-semibold text-sm">{ref.title}</span>
                         <span className="text-xs text-muted-foreground">{ref.artist}</span>
                         <span
@@ -671,7 +671,7 @@ export function WhyThisChordSheet() {
                           <button
                             type="button"
                             onClick={() => playHeardIn(refKey, parsedChords)}
-                            className="btn-sculpt-cream ml-auto inline-flex items-center justify-center gap-1 rounded-md h-7 px-2 text-[11px] font-semibold"
+                            className="btn-sculpt-cream ml-auto inline-flex items-center justify-center gap-1 rounded-md h-7 px-2 text-[11px] font-semibold self-end"
                             aria-label={isPlayingHeard ? "Stop preview" : "Play preview"}
                           >
                             {isPlayingHeard ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
