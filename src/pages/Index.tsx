@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
   DragDropContext,
   useKeyboardSensor,
@@ -26,6 +27,7 @@ const Index = () => {
   const bg = useAppBackgroundStore();
   const { theme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const initialTab = ((): "lyrics" | "chords" | "progressions" | "recordings" => {
@@ -135,7 +137,20 @@ const Index = () => {
           <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
 
           {tab === "chords" ? (
-            <h1 className="text-3xl font-display font-bold text-center mt-6 mb-2">Explore Chords</h1>
+            <div className="relative mt-6 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (searchParams.get("tab") === "chords") navigate("/");
+                  else setTab("lyrics");
+                }}
+                aria-label="Back"
+                className="btn-sculpt-cream absolute left-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full h-9 w-9"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h1 className="text-3xl font-display font-bold text-center">Explore Chords</h1>
+            </div>
           ) : showTitleHeader && (
             <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
           )}
