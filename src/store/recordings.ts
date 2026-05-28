@@ -41,6 +41,8 @@ interface RecordingsState {
   isRecording: boolean;
   recordingTrackId: RecTrackId | null;
   monitorLevel: number;
+  selectedInputDeviceId: string | null;
+  setSelectedInputDeviceId: (id: string | null) => void;
   addTrack: () => RecTrackId | null;
   removeTrack: (id: RecTrackId) => void;
   renameTrack: (id: RecTrackId, name: string) => void;
@@ -69,6 +71,8 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   isRecording: false,
   recordingTrackId: null,
   monitorLevel: 0,
+  selectedInputDeviceId: null,
+  setSelectedInputDeviceId: (id) => set({ selectedInputDeviceId: id }),
 
   addTrack: () => {
     const tracks = get().tracks;

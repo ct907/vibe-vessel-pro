@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Pencil, ChevronLeft, ChevronRight, Settings2, Timer } from "lucide-react";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ import { toast } from "sonner";
 const PX_PER_SEC = 40;
 const ROW_HEIGHT_MOBILE = 80;
 const ROW_HEIGHT_DESKTOP = 96;
+const TRACK_PANEL_WIDTH = 224; // w-56, must match TrackRow left panel
 
 function computeLoopBeats(): number {
   const { sections, progression } = useSongStore.getState();
@@ -287,7 +289,7 @@ function OverflowDialog({
   );
 }
 
-function Playhead({ loopSec, totalWidth }: { loopSec: number; totalWidth: number }) {
+function Playhead({ loopSec, waveformWidth }: { loopSec: number; waveformWidth: number }) {
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const [x, setX] = useState(0);
   useEffect(() => {
@@ -303,13 +305,13 @@ function Playhead({ loopSec, totalWidth }: { loopSec: number; totalWidth: number
         const ls = getLoopSec() || loopSec;
         const elapsed = ac.currentTime - loopStart;
         const rel = ((elapsed % ls) + ls) % ls;
-        setX((rel / ls) * totalWidth);
+        setX(TRACK_PANEL_WIDTH + (rel / ls) * waveformWidth);
       }
       raf = requestAnimationFrame(update);
     };
     raf = requestAnimationFrame(update);
     return () => cancelAnimationFrame(raf);
-  }, [isPlaying, loopSec, totalWidth]);
+  }, [isPlaying, loopSec, waveformWidth]);
   if (!isPlaying) return null;
   return (
     <div
@@ -322,42 +324,45 @@ function Playhead({ loopSec, totalWidth }: { loopSec: number; totalWidth: number
 function TimelineHeader({
   loopSec,
   segments,
-  totalWidth,
+  waveformWidth,
 }: {
   loopSec: number;
   segments: BarSegment[];
-  totalWidth: number;
+  waveformWidth: number;
 }) {
   const ticks: number[] = [];
   const step = loopSec > 60 ? 20 : loopSec > 30 ? 10 : 5;
   for (let s = 0; s <= loopSec; s += step) ticks.push(s);
   return (
-    <div className="sticky top-0 z-10 bg-paper-card border-b" style={{ width: totalWidth }}>
-      <div className="relative h-5">
-        {ticks.map((s) => (
-          <div
-            key={s}
-            className="absolute top-0 text-[10px] text-muted-foreground"
-            style={{ left: s * PX_PER_SEC }}
-          >
-            <div className="h-2 w-px bg-border" />
-            <div className="pl-0.5">{fmtTime(s)}</div>
-          </div>
-        ))}
-      </div>
-      <div className="relative h-4">
-        {segments.map((seg, i) => (
-          <div
-            key={i}
-            className="absolute top-0 bottom-0 border-r border-white/30"
-            style={{
-              left: seg.startSec * PX_PER_SEC,
-              width: Math.max(1, (seg.endSec - seg.startSec) * PX_PER_SEC),
-              background: seg.color,
-            }}
-            title={`${fmtTime(seg.startSec)} – ${fmtTime(seg.endSec)}`}
-          />
-        ))}
+    <div className="sticky top-0 z-10 bg-paper-card border-b flex" style={{ width: TRACK_PANEL_WIDTH + waveformWidth }}>
+      <div className="shrink-0" style={{ width: TRACK_PANEL_WIDTH }} />
+      <div className="flex-1">
+        <div className="relative h-5">
+          {ticks.map((s) => (
+            <div
+              key={s}
+              className="absolute top-0 text-[10px] text-muted-foreground"
+              style={{ left: s * PX_PER_SEC }}
+            >
+              <div className="h-2 w-px bg-border" />
+              <div className="pl-0.5">{fmtTime(s)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="relative h-4">
+          {segments.map((seg, i) => (
+            <div
+              key={i}
+              className="absolute top-0 bottom-0 border-r border-white/30"
+              style={{
+                left: seg.startSec * PX_PER_SEC,
+                width: Math.max(1, (seg.endSec - seg.startSec) * PX_PER_SEC),
+                background: seg.color,
+              }}
+              title={`${fmtTime(seg.startSec)} – ${fmtTime(seg.endSec)}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -378,6 +383,8 @@ interface TrackRowProps {
   onReplace: () => void;
   onReRecord: () => void;
   onDelete: () => void;
+  onOpenDelay: () => void;
+  onOpenDeviceSettings: () => void;
   pxPerSec: number;
   height: number;
 }
@@ -397,6 +404,8 @@ function TrackRow({
   onReplace,
   onReRecord,
   onDelete,
+  onOpenDelay,
+  onOpenDeviceSettings,
   pxPerSec,
   height,
 }: TrackRowProps) {
@@ -437,7 +446,18 @@ function TrackRow({
             aria-label="Track name"
           />
         </div>
-        <div className="flex items-center gap-2 pl-9">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDeviceSettings();
+            }}
+            className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
+            aria-label="Input device settings"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={(e) => {
@@ -472,7 +492,7 @@ function TrackRow({
                 className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
                 aria-label="Edit track"
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -526,6 +546,17 @@ function TrackRow({
               </div>
             </PopoverContent>
           </Popover>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDelay();
+            }}
+            className="h-[26px] w-[26px] rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
+            aria-label="Delay compensation"
+          >
+            <Timer className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
       <div className="relative flex-1 overflow-hidden">
@@ -575,28 +606,125 @@ function TrackSettingsPanel({
           Close
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-            Trim ({track.clip.trimStartSec.toFixed(2)}s – {track.clip.trimEndSec.toFixed(2)}s)
-          </div>
-          <Slider
-            value={[track.clip.trimStartSec, track.clip.trimEndSec]}
-            min={0}
-            max={track.clip.durationSec}
-            step={0.01}
-            onValueChange={(v) =>
-              store.setClipTrim(track.id, v[0], v[1] ?? track.clip!.trimEndSec)
-            }
-          />
+      <div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          Trim ({track.clip.trimStartSec.toFixed(2)}s – {track.clip.trimEndSec.toFixed(2)}s)
         </div>
-        <DelayCompensationControl
-          startSec={track.clip.startSec}
-          maxSec={loopSec}
-          onChange={(sec) => store.setClipStart(track.id, sec)}
+        <Slider
+          value={[track.clip.trimStartSec, track.clip.trimEndSec]}
+          min={0}
+          max={track.clip.durationSec}
+          step={0.01}
+          onValueChange={(v) =>
+            store.setClipTrim(track.id, v[0], v[1] ?? track.clip!.trimEndSec)
+          }
         />
       </div>
     </div>
+  );
+}
+
+function DelayCompensationSheet({
+  track,
+  loopSec,
+  open,
+  onClose,
+}: {
+  track: RecTrack | null;
+  loopSec: number;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const store = useRecordingsStore();
+  if (!track || !track.clip) return null;
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto p-0">
+        <div
+          className="px-4 pt-6 pb-4 flex items-center gap-3"
+          style={{ background: track.color, color: "white" }}
+        >
+          <Timer className="h-5 w-5 shrink-0" />
+          <div>
+            <div className="font-display text-base font-semibold">{track.name}</div>
+            <div className="text-xs opacity-80">Delay Compensation</div>
+          </div>
+        </div>
+        <div className="px-4 py-5 space-y-4 pb-10">
+          <p className="text-sm text-muted-foreground">
+            Nudge the clip start time to fix recording latency offsets.
+          </p>
+          <DelayCompensationControl
+            startSec={track.clip.startSec}
+            maxSec={loopSec}
+            onChange={(sec) => store.setClipStart(track.id, sec)}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function InputDeviceSheet({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const selectedInputDeviceId = useRecordingsStore((s) => s.selectedInputDeviceId);
+  const setSelectedInputDeviceId = useRecordingsStore((s) => s.setSelectedInputDeviceId);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((all) => setDevices(all.filter((d) => d.kind === "audioinput")))
+      .catch(() => setDevices([]));
+  }, [open]);
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto p-0">
+        <div className="px-4 pt-6 pb-4 flex items-center gap-3 bg-[var(--paper-card)] border-b">
+          <Settings2 className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="font-display text-base font-semibold">Input Device</div>
+        </div>
+        <div className="px-4 py-4 pb-10 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedInputDeviceId(null)}
+            className={`flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+              !selectedInputDeviceId
+                ? "bg-[var(--primary)] text-[var(--paper)] font-semibold"
+                : "bg-[var(--paper-card)] hover:bg-[var(--paper-shade)]"
+            }`}
+          >
+            Default system microphone
+          </button>
+          {devices.map((d) => (
+            <button
+              key={d.deviceId}
+              type="button"
+              onClick={() => setSelectedInputDeviceId(d.deviceId)}
+              className={`flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                selectedInputDeviceId === d.deviceId
+                  ? "bg-[var(--primary)] text-[var(--paper)] font-semibold"
+                  : "bg-[var(--paper-card)] hover:bg-[var(--paper-shade)]"
+              }`}
+            >
+              {d.label || `Microphone ${d.deviceId.slice(0, 6)}`}
+            </button>
+          ))}
+          {devices.length === 0 && (
+            <p className="text-xs text-muted-foreground px-1">
+              No devices found. Grant microphone permission first.
+            </p>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -614,13 +742,18 @@ export function RecordingsTab() {
   const setMonitorLevel = useRecordingsStore((s) => s.setMonitorLevel);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const monitorLevel = useRecordingsStore((s) => s.monitorLevel);
+  const selectedInputDeviceId = useRecordingsStore((s) => s.selectedInputDeviceId);
 
   const loopSec = useLoopSec();
   const segments = useBarsStrip();
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
-  const totalWidth = Math.max(800, loopSec * PX_PER_SEC + 200);
+  const waveformWidth = Math.max(800, loopSec * PX_PER_SEC + 200);
   const rowHeight = isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+
+  const [delayTrackId, setDelayTrackId] = useState<string | null>(null);
+  const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
+  const delayTrack = useMemo(() => tracks.find((t) => t.id === delayTrackId) ?? null, [tracks, delayTrackId]);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
   const recordingStartedAtRef = useRef<number>(0);
@@ -689,6 +822,7 @@ export function RecordingsTab() {
     try {
       const handle = await startRecording({
         onLevel: (l) => setMonitorLevel(l),
+        deviceId: selectedInputDeviceId,
       });
       recorderRef.current = handle;
       recordingTrackIdRef.current = trackId;
@@ -858,8 +992,8 @@ export function RecordingsTab() {
       </div>
 
       <div className="overflow-x-auto">
-        <div style={{ width: totalWidth, position: "relative" }}>
-          <TimelineHeader loopSec={loopSec} segments={segments} totalWidth={totalWidth} />
+        <div style={{ width: TRACK_PANEL_WIDTH + waveformWidth, position: "relative" }}>
+          <TimelineHeader loopSec={loopSec} segments={segments} waveformWidth={waveformWidth} />
           <div className="relative">
             {tracks.map((t) => (
               <TrackRow
@@ -878,11 +1012,13 @@ export function RecordingsTab() {
                 onReplace={() => handleReplaceTrack(t.id)}
                 onReRecord={() => handleReRecord(t.id)}
                 onDelete={() => handleDeleteTrack(t.id)}
+                onOpenDelay={() => setDelayTrackId(t.id)}
+                onOpenDeviceSettings={() => setDeviceSettingsOpen(true)}
                 pxPerSec={PX_PER_SEC}
                 height={rowHeight}
               />
             ))}
-            <Playhead loopSec={loopSec} totalWidth={totalWidth} />
+            <Playhead loopSec={loopSec} waveformWidth={waveformWidth} />
           </div>
         </div>
       </div>
@@ -910,6 +1046,16 @@ export function RecordingsTab() {
         />
       )}
 
+      <DelayCompensationSheet
+        track={delayTrack}
+        loopSec={loopSec}
+        open={!!delayTrackId}
+        onClose={() => setDelayTrackId(null)}
+      />
+      <InputDeviceSheet
+        open={deviceSettingsOpen}
+        onClose={() => setDeviceSettingsOpen(false)}
+      />
       <OverflowDialog
         open={!!overflow}
         onChoose={handleOverflowChoice}

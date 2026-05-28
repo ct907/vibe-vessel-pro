@@ -22,6 +22,7 @@ import { useDefaultsStore } from "@/store/defaults";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
+import { useUIStore } from "@/store/ui";
 
 const Index = () => {
   const bg = useAppBackgroundStore();
@@ -43,6 +44,11 @@ const Index = () => {
   const updateSection = useSongStore((s) => s.updateSection);
 
   const onboarding = useOnboardingStore();
+  const setActiveTab = useUIStore((s) => s.setActiveTab);
+
+  useEffect(() => {
+    setActiveTab(tab);
+  }, [tab, setActiveTab]);
 
   // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
   // states so we can restore them when exiting sort mode.
