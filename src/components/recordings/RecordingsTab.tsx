@@ -849,23 +849,12 @@ export function RecordingsTab() {
             {tracks.length}/{MAX_TRACKS} tracks · loop {fmtTime(loopSec)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {recordingTrackId && (
-            <div className="flex items-center gap-1 text-xs text-destructive">
-              <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
-              REC · level {(monitorLevel * 100).toFixed(0)}%
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAddTrack}
-            disabled={tracks.length >= MAX_TRACKS}
-            title={tracks.length >= MAX_TRACKS ? "Maximum 4 tracks" : "Add track"}
-          >
-            <Plus className="h-4 w-4 mr-1" /> Add track
-          </Button>
-        </div>
+        {recordingTrackId && (
+          <div className="flex items-center gap-1 text-xs text-destructive">
+            <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+            REC · level {(monitorLevel * 100).toFixed(0)}%
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -898,9 +887,18 @@ export function RecordingsTab() {
         </div>
       </div>
 
-      {tracks.length === 0 && (
-        <div className="p-8 text-center text-muted-foreground text-sm">
-          No tracks yet. Add one to start recording or importing audio.
+      {tracks.length < MAX_TRACKS ? (
+        <button
+          type="button"
+          onClick={handleAddTrack}
+          className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors mt-3"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="text-sm font-display uppercase tracking-wide">Add Track</span>
+        </button>
+      ) : (
+        <div className="p-4 text-center text-xs text-muted-foreground">
+          Maximum {MAX_TRACKS} tracks reached
         </div>
       )}
 
