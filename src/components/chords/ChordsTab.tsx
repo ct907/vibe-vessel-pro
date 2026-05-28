@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Music, Play, Square } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, getPresetVibes, type ProgressionPreset } from "@/lib/music/presets";
+import { PROGRESSION_PRESETS, QUALITY_PROGRESSION_PRESETS, realizePreset, realizePresetAnchored, getPresetVibes, type ProgressionPreset } from "@/lib/music/presets";
 import { analyzeProgression, describeChordFunction } from "@/lib/music/harmony";
 import { playProgression, stopProgression, ensureAudio } from "@/lib/music/audio";
 import { getChordProgressionSuggestions } from "@/lib/music/suggestions";
@@ -109,6 +109,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     const keyPc = rootToPc(meta.keyRoot);
     const targetInterval = (chordPc - keyPc + 12) % 12;
     const detailFamily = QUALITY_FAMILY[detailChord.quality];
+    const useFlat = detailChord.root.includes("b") || meta.keyRoot.includes("b");
 
     const swapAt = (chords: ChordSymbol[], i: number): ChordSymbol[] =>
       chords.map((c, idx) =>
@@ -122,9 +123,12 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
       const featIdx = preset.featureIndex ?? preset.degrees.findIndex((d) => d.quality === detailChord.quality);
       if (featIdx < 0) continue;
       const slot = preset.degrees[featIdx];
-      if (slot.interval !== targetInterval) continue;
       if (QUALITY_FAMILY[slot.quality] !== detailFamily) continue;
-      const chords = swapAt(realizePreset(preset, meta.keyRoot, meta.keyMode), featIdx);
+      const realized =
+        slot.interval === targetInterval
+          ? realizePreset(preset, meta.keyRoot, meta.keyMode)
+          : realizePresetAnchored(preset, detailChord.root, featIdx, useFlat);
+      const chords = swapAt(realized, featIdx);
       matches.push({ preset, chords, hitIndex: featIdx });
       usedIds.add(preset.id);
       if (matches.length >= 3) break;
@@ -133,12 +137,18 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
     if (matches.length < 3) {
       for (const preset of PROGRESSION_PRESETS) {
         if (usedIds.has(preset.id)) continue;
-        const hitIndex = preset.degrees.findIndex(
+        const exactIdx = preset.degrees.findIndex(
           (d) => d.interval === targetInterval && QUALITY_FAMILY[d.quality] === detailFamily,
         );
-        if (hitIndex < 0) continue;
-        const chords = swapAt(realizePreset(preset, meta.keyRoot, meta.keyMode), hitIndex);
-        matches.push({ preset, chords, hitIndex });
+        const familyIdx = exactIdx >= 0
+          ? exactIdx
+          : preset.degrees.findIndex((d) => QUALITY_FAMILY[d.quality] === detailFamily);
+        if (familyIdx < 0) continue;
+        const realized = exactIdx >= 0
+          ? realizePreset(preset, meta.keyRoot, meta.keyMode)
+          : realizePresetAnchored(preset, detailChord.root, familyIdx, useFlat);
+        const chords = swapAt(realized, familyIdx);
+        matches.push({ preset, chords, hitIndex: familyIdx });
         if (matches.length >= 3) break;
       }
     }
