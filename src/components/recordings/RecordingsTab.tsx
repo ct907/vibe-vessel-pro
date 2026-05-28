@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Volume1, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
+import { Mic, Square, Plus, Upload, Trash2, Volume2, RefreshCw, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -370,6 +371,13 @@ interface TrackRowProps {
   onRecordToggle: () => void;
   onToggleMute: () => void;
   onToggleSolo: () => void;
+  onRename: (name: string) => void;
+  onSetColor: (color: string) => void;
+  onSetGainDb: (db: number) => void;
+  onSetPan: (pan: number) => void;
+  onReplace: () => void;
+  onReRecord: () => void;
+  onDelete: () => void;
   pxPerSec: number;
   height: number;
 }
@@ -382,6 +390,13 @@ function TrackRow({
   onRecordToggle,
   onToggleMute,
   onToggleSolo,
+  onRename,
+  onSetColor,
+  onSetGainDb,
+  onSetPan,
+  onReplace,
+  onReRecord,
+  onDelete,
   pxPerSec,
   height,
 }: TrackRowProps) {
@@ -394,7 +409,7 @@ function TrackRow({
       style={{ height }}
       onClick={onSelect}
     >
-      <div className="flex items-center gap-2 px-2 w-40 shrink-0 border-r">
+      <div className="flex items-center gap-2 px-2 w-56 shrink-0 border-r">
         <button
           type="button"
           onClick={(e) => {
@@ -412,8 +427,15 @@ function TrackRow({
           className="h-4 w-4 rounded-full shrink-0"
           style={{ background: track.color }}
         />
-        <span className="text-sm truncate font-display">{track.name}</span>
-        <div className="ml-auto flex items-center gap-1">
+        <Input
+          value={track.name}
+          onChange={(e) => onRename(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onFocus={(e) => e.stopPropagation()}
+          className="h-7 px-2 text-sm font-display flex-1 min-w-0 border-transparent focus:border-input bg-transparent"
+          aria-label="Track name"
+        />
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={(e) => {
@@ -440,6 +462,68 @@ function TrackRow({
           >
             S
           </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground"
+                aria-label="Edit track"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-72 flex flex-col gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Color</div>
+                <ColorSwatches value={track.color} onChange={onSetColor} />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
+                  <Volume2 className="h-3 w-3" /> Volume ({track.gainDb.toFixed(1)} dB)
+                </div>
+                <Slider
+                  value={[track.gainDb]}
+                  min={-60}
+                  max={6}
+                  step={0.5}
+                  onValueChange={(v) => onSetGainDb(v[0])}
+                />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  Pan ({track.pan.toFixed(2)})
+                </div>
+                <Slider
+                  value={[track.pan]}
+                  min={-1}
+                  max={1}
+                  step={0.05}
+                  onValueChange={(v) => onSetPan(v[0])}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
+                <Button variant="outline" size="sm" onClick={onReplace}>
+                  <Upload className="h-3.5 w-3.5 mr-1" /> Replace
+                </Button>
+                <Button variant="outline" size="sm" onClick={onReRecord}>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Re-record
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/40"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       <div className="relative flex-1 overflow-hidden">
@@ -474,106 +558,41 @@ function TrackSettingsPanel({
   track,
   loopSec,
   onClose,
-  onReplace,
-  onReRecord,
-  onDelete,
 }: {
   track: RecTrack;
   loopSec: number;
   onClose: () => void;
-  onReplace: () => void;
-  onReRecord: () => void;
-  onDelete: () => void;
 }) {
   const store = useRecordingsStore();
+  if (!track.clip) return null;
   return (
     <div className="border-t bg-paper-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <Input
-          value={track.name}
-          onChange={(e) => store.renameTrack(track.id, e.target.value)}
-          className="font-display text-base"
-          aria-label="Track name"
-        />
+        <h4 className="font-display text-base truncate">{track.name}</h4>
         <Button variant="ghost" size="sm" onClick={onClose}>
           Close
         </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Color</div>
-            <ColorSwatches
-              value={track.color}
-              onChange={(c) => store.setTrackColor(track.id, c)}
-            />
+        <div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            Trim ({track.clip.trimStartSec.toFixed(2)}s – {track.clip.trimEndSec.toFixed(2)}s)
           </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
-              <Volume2 className="h-3 w-3" /> Gain ({track.gainDb.toFixed(1)} dB)
-            </div>
-            <Slider
-              value={[track.gainDb]}
-              min={-60}
-              max={6}
-              step={0.5}
-              onValueChange={(v) => store.setGainDb(track.id, v[0])}
-            />
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-              Pan ({track.pan.toFixed(2)})
-            </div>
-            <Slider
-              value={[track.pan]}
-              min={-1}
-              max={1}
-              step={0.05}
-              onValueChange={(v) => store.setPan(track.id, v[0])}
-            />
-          </div>
-          {track.clip && (
-            <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                Trim ({track.clip.trimStartSec.toFixed(2)}s – {track.clip.trimEndSec.toFixed(2)}s)
-              </div>
-              <Slider
-                value={[track.clip.trimStartSec, track.clip.trimEndSec]}
-                min={0}
-                max={track.clip.durationSec}
-                step={0.01}
-                onValueChange={(v) =>
-                  store.setClipTrim(track.id, v[0], v[1] ?? track.clip!.trimEndSec)
-                }
-              />
-            </div>
-          )}
+          <Slider
+            value={[track.clip.trimStartSec, track.clip.trimEndSec]}
+            min={0}
+            max={track.clip.durationSec}
+            step={0.01}
+            onValueChange={(v) =>
+              store.setClipTrim(track.id, v[0], v[1] ?? track.clip!.trimEndSec)
+            }
+          />
         </div>
-        <div className="flex flex-col gap-3">
-          {track.clip && (
-            <DelayCompensationControl
-              startSec={track.clip.startSec}
-              maxSec={loopSec}
-              onChange={(sec) => store.setClipStart(track.id, sec)}
-            />
-          )}
-          <div className="flex flex-wrap items-center gap-2 mt-auto">
-            <Button variant="outline" size="sm" onClick={onReplace}>
-              <Upload className="h-3.5 w-3.5 mr-1" /> Replace
-            </Button>
-            <Button variant="outline" size="sm" onClick={onReRecord}>
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Re-record
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive border-destructive/40"
-              onClick={onDelete}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-            </Button>
-          </div>
-        </div>
+        <DelayCompensationControl
+          startSec={track.clip.startSec}
+          maxSec={loopSec}
+          onChange={(sec) => store.setClipStart(track.id, sec)}
+        />
       </div>
     </div>
   );
@@ -861,6 +880,13 @@ export function RecordingsTab() {
                 onRecordToggle={() => handleRecordToggle(t.id)}
                 onToggleMute={() => toggleMute(t.id)}
                 onToggleSolo={() => toggleSolo(t.id)}
+                onRename={(name) => useRecordingsStore.getState().renameTrack(t.id, name)}
+                onSetColor={(c) => useRecordingsStore.getState().setTrackColor(t.id, c)}
+                onSetGainDb={(db) => useRecordingsStore.getState().setGainDb(t.id, db)}
+                onSetPan={(p) => useRecordingsStore.getState().setPan(t.id, p)}
+                onReplace={() => handleReplaceTrack(t.id)}
+                onReRecord={() => handleReRecord(t.id)}
+                onDelete={() => handleDeleteTrack(t.id)}
                 pxPerSec={PX_PER_SEC}
                 height={rowHeight}
               />
@@ -876,14 +902,11 @@ export function RecordingsTab() {
         </div>
       )}
 
-      {selectedTrack && (
+      {selectedTrack && selectedTrack.clip && (
         <TrackSettingsPanel
           track={selectedTrack}
           loopSec={loopSec}
           onClose={() => selectTrack(null)}
-          onReplace={() => handleReplaceTrack(selectedTrack.id)}
-          onReRecord={() => handleReRecord(selectedTrack.id)}
-          onDelete={() => handleDeleteTrack(selectedTrack.id)}
         />
       )}
 
