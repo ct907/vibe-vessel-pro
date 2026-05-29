@@ -390,7 +390,7 @@ export function VoiceKeyTab() {
     rangePitchesRef.current = [];
     setRangePitch(null);
 
-    const countdownRef = { id: 0 as ReturnType<typeof setInterval> };
+    const countdownRef: { id: ReturnType<typeof setInterval> | null } = { id: null };
     countdownRef.id = setInterval(() => {
       setRangeCountdown((c) => Math.max(0, c - 1));
     }, 1000);

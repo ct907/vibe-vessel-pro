@@ -3701,11 +3701,11 @@ export async function downloadProjectZip(filename = "song.zip") {
   const audioFolder = zip.folder("audio");
   if (audioFolder) {
     for (const track of recordingsJson.tracks) {
-      const clip = track.clip;
-      if (!clip) continue;
-      const blob = await getAudioBlob(clip.blobId);
-      if (blob) {
-        audioFolder.file(`${clip.blobId}.${extFromMime(blob.type)}`, blob);
+      for (const clip of track.clips ?? []) {
+        const blob = await getAudioBlob(clip.blobId);
+        if (blob) {
+          audioFolder.file(`${clip.blobId}.${extFromMime(blob.type)}`, blob);
+        }
       }
     }
   }
