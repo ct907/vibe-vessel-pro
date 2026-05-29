@@ -30,7 +30,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       showNewSongPrompt: false,
 
       disable: () => set({ enabled: false, showNewSongPrompt: false }),
-      enable: () => set({ enabled: true }),
+      enable: () => set({ enabled: true, globalPhase: 2 }),
       setGlobalPhase: (p) => set({ globalPhase: p }),
       setLyricsStep: (s) => set({ lyricsStep: s }),
       setProgressionsStep: (s) => set({ progressionsStep: s }),
