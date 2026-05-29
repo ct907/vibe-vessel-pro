@@ -11,7 +11,7 @@ import { SongAttributesMenu } from "./SongAttributesMenu";
 
 interface Props {
   /** Which tab is currently active — drives which menu items are enabled. */
-  activeTab: "lyrics" | "chords" | "progressions";
+  activeTab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
   sortMode: null | "lyrics" | "progressions";
   onToggleSort: () => void;
 }
