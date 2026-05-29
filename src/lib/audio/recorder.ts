@@ -1,5 +1,5 @@
 import { getAudioContext } from "@/lib/audio/context";
-import { decodeBlob } from "@/lib/audio/waveform";
+import { normalizeRecording } from "@/lib/audio/normalize";
 
 const MIME_PREFERENCES = [
   "audio/webm;codecs=opus",
@@ -36,13 +36,12 @@ export async function startRecording(opts: {
   });
   const mime = pickSupportedMime();
 
-  // Boost the captured signal before feeding it to the MediaRecorder.
-  // Raw mic levels are often quiet; ×2 brings them up to a usable level
-  // and matches what the level meter shows.
+  // Route through a unity-gain node so the level meter taps the same signal
+  // that's recorded. Peak normalization to -2 dBFS happens after stop().
   const ac = getAudioContext();
   const src = ac.createMediaStreamSource(stream);
   const boostGain = ac.createGain();
-  boostGain.gain.value = 2.0;
+  boostGain.gain.value = 1.0;
   const dest = ac.createMediaStreamDestination();
   src.connect(boostGain);
   boostGain.connect(dest);
@@ -82,15 +81,13 @@ export async function startRecording(opts: {
         try { boostGain.disconnect(); } catch { /* noop */ }
         stream.getTracks().forEach((t) => t.stop());
         try {
-          const blob = new Blob(chunks, { type: mime });
-          let durationSec = 0;
-          try {
-            const buf = await decodeBlob(blob);
-            durationSec = buf.duration;
-          } catch {
-            durationSec = 0;
-          }
-          resolve({ blob, durationSec, mime });
+          const raw = new Blob(chunks, { type: mime });
+          const normalized = await normalizeRecording(raw);
+          resolve({
+            blob: normalized.blob,
+            durationSec: normalized.durationSec,
+            mime: normalized.mime,
+          });
         } catch (e) {
           reject(e);
         }
