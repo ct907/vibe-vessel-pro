@@ -605,7 +605,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             <div className="flex items-center justify-between gap-2 sm:[display:contents]">
               {!isPlaying ? (
                 <button
-                  onClick={handlePlay}
+                  onClick={() => handlePlay()}
                   className="btn-sculpt-amber shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm sm:order-1"
                   aria-label="Play"
                 >

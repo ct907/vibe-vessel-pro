@@ -1414,7 +1414,7 @@ function SectionGroup({
 
 interface ProgressionsTabProps {
   sortMode?: boolean;
-  onSwitchTab?: (t: "lyrics" | "chords" | "progressions") => void;
+  onSwitchTab?: (t: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey") => void;
   showOnboarding?: boolean;
 }
 
