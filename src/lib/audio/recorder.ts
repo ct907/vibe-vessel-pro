@@ -35,18 +35,28 @@ export async function startRecording(opts: {
     audio: opts.deviceId ? { deviceId: { exact: opts.deviceId } } : true,
   });
   const mime = pickSupportedMime();
-  const recorder = new MediaRecorder(stream, { mimeType: mime });
+
+  // Boost the captured signal before feeding it to the MediaRecorder.
+  // Raw mic levels are often quiet; ×2 brings them up to a usable level
+  // and matches what the level meter shows.
+  const ac = getAudioContext();
+  const src = ac.createMediaStreamSource(stream);
+  const boostGain = ac.createGain();
+  boostGain.gain.value = 2.0;
+  const dest = ac.createMediaStreamDestination();
+  src.connect(boostGain);
+  boostGain.connect(dest);
+
+  const recorder = new MediaRecorder(dest.stream, { mimeType: mime });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) chunks.push(e.data);
   };
 
-  // Level monitor via AnalyserNode.
-  const ac = getAudioContext();
-  const src = ac.createMediaStreamSource(stream);
+  // Level monitor — tap the boosted signal so the meter matches the recording.
   const analyser = ac.createAnalyser();
   analyser.fftSize = 1024;
-  src.connect(analyser);
+  boostGain.connect(analyser);
   const data = new Uint8Array(analyser.fftSize);
   let rafId = 0;
   const tick = () => {
@@ -57,7 +67,7 @@ export async function startRecording(opts: {
       sumSq += v * v;
     }
     const rms = Math.sqrt(sumSq / data.length);
-    opts.onLevel?.(Math.min(1, rms * 2));
+    opts.onLevel?.(Math.min(1, rms));
     rafId = requestAnimationFrame(tick);
   };
   rafId = requestAnimationFrame(tick);
@@ -68,11 +78,8 @@ export async function startRecording(opts: {
     new Promise((resolve, reject) => {
       recorder.onstop = async () => {
         cancelAnimationFrame(rafId);
-        try {
-          src.disconnect();
-        } catch {
-          /* noop */
-        }
+        try { src.disconnect(); } catch { /* noop */ }
+        try { boostGain.disconnect(); } catch { /* noop */ }
         stream.getTracks().forEach((t) => t.stop());
         try {
           const blob = new Blob(chunks, { type: mime });
@@ -97,16 +104,9 @@ export async function startRecording(opts: {
 
   const cancel = () => {
     cancelAnimationFrame(rafId);
-    try {
-      recorder.stop();
-    } catch {
-      /* noop */
-    }
-    try {
-      src.disconnect();
-    } catch {
-      /* noop */
-    }
+    try { recorder.stop(); } catch { /* noop */ }
+    try { src.disconnect(); } catch { /* noop */ }
+    try { boostGain.disconnect(); } catch { /* noop */ }
     stream.getTracks().forEach((t) => t.stop());
   };
 
