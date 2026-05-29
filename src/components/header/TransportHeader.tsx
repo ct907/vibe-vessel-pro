@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
-import { useUIStore } from "@/store/ui";
+import { useUIStore, type TabName } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { startRecordingsEngine, stopRecordingsEngine } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
@@ -303,8 +303,8 @@ function InspirationLightbox({
 interface Props {
   isPlaying: boolean;
   setIsPlaying: (b: boolean) => void;
-  tab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
-  setTab: (t: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey") => void;
+  tab: TabName;
+  setTab: (t: TabName) => void;
   onTabSelect?: (t: string) => void;
 }
 
