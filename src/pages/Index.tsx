@@ -23,7 +23,10 @@ import { useDefaultsStore } from "@/store/defaults";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { useUIStore } from "@/store/ui";
+import { useUIStore, type TabName } from "@/store/ui";
+
+const isTabName = (v: string | null): v is TabName =>
+  v === "lyrics" || v === "chords" || v === "progressions" || v === "recordings" || v === "voicekey";
 
 const Index = () => {
   const bg = useAppBackgroundStore();
@@ -32,23 +35,16 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
-  const initialTab = ((): "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" => {
-    const q = searchParams.get("tab");
-    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings" || q === "voicekey") return q;
-    if (defaultLandingTab) return defaultLandingTab;
-    return "lyrics";
-  })();
-  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions" | "recordings" | "voicekey">(initialTab);
+  const queryTab = searchParams.get("tab");
+  const initialTab: TabName = isTabName(queryTab) ? queryTab : (defaultLandingTab ?? "lyrics");
+  const [tab, setTab] = useState<TabName>(initialTab);
 
   // Index is always mounted (outside <Routes>), so useState(initialTab) only runs
   // once — at the time the app loads, before any navigation. Sync tab from the URL
   // whenever searchParams change so clicking the landing-page buttons actually works.
   useEffect(() => {
-    const q = searchParams.get("tab");
-    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings" || q === "voicekey") {
-      setTab(q);
-    }
-  }, [searchParams]);
+    if (isTabName(queryTab)) setTab(queryTab);
+  }, [queryTab]);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);

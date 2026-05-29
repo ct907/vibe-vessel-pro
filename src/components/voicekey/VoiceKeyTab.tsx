@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Mic, Play, RotateCcw, Square, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { pcToName, rootToPc, midiToNoteName } from "@/lib/music/chords";
+import { pcToName, midiToNoteName } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { startPitchDetection, type PitchHandle, type PitchResult } from "@/lib/audio/pitch-detector";
@@ -282,8 +282,12 @@ export function VoiceKeyTab() {
 
     // Check stability: all readings within 2-semitone window
     if (buf.length >= 20) {
-      const mn = Math.min(...buf);
-      const mx = Math.max(...buf);
+      let mn = buf[0];
+      let mx = buf[0];
+      for (let i = 1; i < buf.length; i++) {
+        if (buf[i] < mn) mn = buf[i];
+        if (buf[i] > mx) mx = buf[i];
+      }
       const stable = mx - mn <= 2;
       if (stable) {
         setStabilityProgress(buf.length / STABILITY_FRAMES);
@@ -564,7 +568,7 @@ export function VoiceKeyTab() {
                     −
                   </button>
                   <span className="font-mono-chord text-sm w-8 text-center tabular-nums">
-                    {transposeOffset === 0 ? "0" : transposeOffset > 0 ? `+${transposeOffset}` : transposeOffset}
+                    {transposeOffset > 0 ? `+${transposeOffset}` : String(transposeOffset)}
                   </span>
                   <button
                     type="button"

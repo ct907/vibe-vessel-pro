@@ -3,7 +3,7 @@ import { getAudioContext } from "@/lib/audio/context";
 // Autocorrelation-based monophonic pitch detector.
 // Accurate from ~60 Hz (low bass) to 1300 Hz (high soprano).
 
-function detectPitch(buffer: Float32Array, sampleRate: number): number | null {
+function detectPitch(buffer: Float32Array, sampleRate: number, corr: Float32Array): number | null {
   const SIZE = buffer.length;
 
   // Silence gate — avoid detecting noise as a pitch.
@@ -14,8 +14,7 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number | null {
   const minLag = Math.floor(sampleRate / 1300);
   const maxLag = Math.min(SIZE - 2, Math.ceil(sampleRate / 60));
 
-  // Normalised autocorrelation
-  const corr = new Float32Array(maxLag + 2);
+  // Normalised autocorrelation (corr is a reused scratch buffer)
   for (let lag = minLag; lag <= maxLag + 1; lag++) {
     let sum = 0;
     const n = SIZE - lag;
@@ -91,6 +90,7 @@ export async function startPitchDetection(
   gain.connect(analyser);
 
   const buffer = new Float32Array(analyser.fftSize);
+  const corr = new Float32Array(analyser.fftSize);
   let rafId = 0;
   let stopped = false;
 
@@ -106,7 +106,7 @@ export async function startPitchDetection(
   const tick = () => {
     if (stopped) return;
     analyser.getFloatTimeDomainData(buffer);
-    const freq = detectPitch(buffer, ac.sampleRate);
+    const freq = detectPitch(buffer, ac.sampleRate, corr);
     const now = performance.now();
 
     if (freq !== null && freq > 60 && freq < 1350) {

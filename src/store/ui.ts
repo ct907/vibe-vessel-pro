@@ -17,6 +17,8 @@ export interface WhyChordRequest {
   nextChord?: ChordSymbol;
 }
 
+export type TabName = "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
@@ -26,8 +28,8 @@ interface UIState {
   setMultiSelectMode: (v: boolean) => void;
   whyChord: WhyChordRequest | null;
   setWhyChord: (req: WhyChordRequest | null) => void;
-  activeTab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" | null;
-  setActiveTab: (tab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" | null) => void;
+  activeTab: TabName | null;
+  setActiveTab: (tab: TabName | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
