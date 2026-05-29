@@ -39,6 +39,16 @@ const Index = () => {
     return "lyrics";
   })();
   const [tab, setTab] = useState<"lyrics" | "chords" | "progressions" | "recordings" | "voicekey">(initialTab);
+
+  // Index is always mounted (outside <Routes>), so useState(initialTab) only runs
+  // once — at the time the app loads, before any navigation. Sync tab from the URL
+  // whenever searchParams change so clicking the landing-page buttons actually works.
+  useEffect(() => {
+    const q = searchParams.get("tab");
+    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings" || q === "voicekey") {
+      setTab(q);
+    }
+  }, [searchParams]);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
@@ -92,8 +102,8 @@ const Index = () => {
     if (onboarding.enabled && onboarding.globalPhase === 0) {
       onboarding.setGlobalPhase(1);
     }
-    if (onboarding.enabled && onboarding.globalPhase >= 2 && t !== tab) {
-      const label = t === "lyrics" ? "Lyrics" : t === "progressions" ? "Chord Progressions" : "Chords";
+    if (onboarding.enabled && onboarding.globalPhase >= 2 && t !== tab && (t === "lyrics" || t === "progressions")) {
+      const label = t === "lyrics" ? "Lyrics" : "Chord Progressions";
       toast(`Switching to ${label} tutorial`);
     }
     setTab(t);
@@ -167,7 +177,7 @@ const Index = () => {
               {showTabContent && <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} showOnboarding={tab === "lyrics" && location.pathname !== '/'} />}
             </TabsContent>
             <TabsContent value="chords" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <ChordsTab onSwitchTab={setTab} />}
+              <ChordsTab onSwitchTab={setTab} />
             </TabsContent>
             <TabsContent value="progressions" forceMount className="mt-0 data-[state=inactive]:hidden">
               {showTabContent && <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} showOnboarding={tab === "progressions" && location.pathname !== '/'} />}
