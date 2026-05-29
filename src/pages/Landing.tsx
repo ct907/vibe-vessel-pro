@@ -180,7 +180,7 @@ export default function Landing() {
           <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
         </p>
 
-        <div className="mt-12 flex items-center justify-center gap-3">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
             onClick={startWriting}
@@ -194,6 +194,13 @@ export default function Landing() {
             className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
           >
             Explore Chords
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/app?tab=voicekey")}
+            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+          >
+            Find Your Key & Range
           </button>
         </div>
 

@@ -16,6 +16,7 @@ import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import { RecordingsTab } from "@/components/recordings/RecordingsTab";
+import { VoiceKeyTab } from "@/components/voicekey/VoiceKeyTab";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useDefaultsStore } from "@/store/defaults";
@@ -31,13 +32,13 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
-  const initialTab = ((): "lyrics" | "chords" | "progressions" | "recordings" => {
+  const initialTab = ((): "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" => {
     const q = searchParams.get("tab");
-    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings") return q;
+    if (q === "lyrics" || q === "chords" || q === "progressions" || q === "recordings" || q === "voicekey") return q;
     if (defaultLandingTab) return defaultLandingTab;
     return "lyrics";
   })();
-  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions" | "recordings">(initialTab);
+  const [tab, setTab] = useState<"lyrics" | "chords" | "progressions" | "recordings" | "voicekey">(initialTab);
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
@@ -129,7 +130,7 @@ const Index = () => {
           style={{ zIndex: -1, opacity: theme === "dark" ? 0.2 : (bg.pattern === "dot" ? 0.8 : 0.3), ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
         />
       )}
-      {tab !== "chords" && (
+      {tab !== "chords" && tab !== "voicekey" && (
         <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} onTabSelect={handleTabSelect} />
       )}
 
@@ -157,7 +158,7 @@ const Index = () => {
               </button>
               <h1 className="text-3xl font-display font-bold text-center">Explore Chords</h1>
             </div>
-          ) : showTitleHeader && (
+          ) : tab === "voicekey" ? null : showTitleHeader && (
             <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
           )}
 
@@ -173,6 +174,9 @@ const Index = () => {
             </TabsContent>
             <TabsContent value="recordings" forceMount className="mt-0 data-[state=inactive]:hidden">
               {showTabContent && <RecordingsTab />}
+            </TabsContent>
+            <TabsContent value="voicekey" forceMount className="mt-0 data-[state=inactive]:hidden">
+              <VoiceKeyTab />
             </TabsContent>
           </Tabs>
         </main>

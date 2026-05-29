@@ -26,8 +26,8 @@ interface UIState {
   setMultiSelectMode: (v: boolean) => void;
   whyChord: WhyChordRequest | null;
   setWhyChord: (req: WhyChordRequest | null) => void;
-  activeTab: "lyrics" | "chords" | "progressions" | "recordings" | null;
-  setActiveTab: (tab: "lyrics" | "chords" | "progressions" | "recordings" | null) => void;
+  activeTab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" | null;
+  setActiveTab: (tab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey" | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
