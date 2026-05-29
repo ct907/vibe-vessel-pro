@@ -303,8 +303,8 @@ function InspirationLightbox({
 interface Props {
   isPlaying: boolean;
   setIsPlaying: (b: boolean) => void;
-  tab: "lyrics" | "chords" | "progressions" | "recordings";
-  setTab: (t: "lyrics" | "chords" | "progressions" | "recordings") => void;
+  tab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
+  setTab: (t: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey") => void;
   onTabSelect?: (t: string) => void;
 }
 
