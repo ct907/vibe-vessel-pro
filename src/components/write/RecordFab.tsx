@@ -39,7 +39,7 @@ export function RecordFab() {
 
       <button
         type="button"
-        className="btn-sculpt-amber flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+        className="btn-sculpt-amber hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
         aria-label="Edit"
       >
         <Pencil className="h-4 w-4" />

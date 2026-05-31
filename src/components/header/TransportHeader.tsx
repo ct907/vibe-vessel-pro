@@ -58,6 +58,7 @@ import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { useRecordingsStore } from "@/store/recordings";
+import { useTakesStore } from "@/store/takes";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -818,7 +819,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 const isOnboardingPhase0 = onboarding.enabled && onboarding.globalPhase === 0;
                 const onChordsOverlay = tab === "chords" || tab === "voicekey";
                 const active = !isOnboardingPhase0 && !onChordsOverlay && mode === m;
-                const LABEL: Record<AppMode, string> = { write: "Write", arrange: "Arrange" };
+                const LABEL: Record<AppMode, string> = { write: "1. Write", arrange: "2. Arrange" };
                 return (
                   <button
                     key={m}
@@ -903,6 +904,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
               resetSong();
+              useTakesStore.getState().clear();
+              useRecordingsStore.getState().clear();
               onboarding.resetForNewSong();
               onboarding.incrementNewSong();
               setConfirmNewSong(false);
