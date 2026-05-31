@@ -120,6 +120,16 @@
       0 1px 1px 0 color-mix(in oklch, var(--border) 80%, transparent),
       inset 0 1px 2px 0 color-mix(in oklch, #ffffff 70%, transparent);
 
+    /* DESTRUCTIVE (record / capture buttons) */
+    --shadow-sculpt-destructive-rest:
+      0 4px 8px 0 color-mix(in oklch, var(--destructive) 55%, transparent),
+      0 3px 1px 0 color-mix(in oklch, var(--destructive) 85%, black),
+      inset 0 3px 4px 0 color-mix(in oklch, var(--destructive) 55%, white);
+    --shadow-sculpt-destructive-press:
+      0 1px 2px 0 color-mix(in oklch, var(--destructive) 55%, transparent),
+      0 1px 1px 0 color-mix(in oklch, var(--destructive) 85%, black),
+      inset 0 1px 2px 0 color-mix(in oklch, var(--destructive) 55%, white);
+
     /* RECESS — inner-shadow well for segmented controls (tabs container) */
     --shadow-recess:
       inset 0 2px 4px 0 color-mix(in oklch, var(--cocoa-deep) 22%, transparent),
@@ -264,6 +274,15 @@
       0 1px 2px 0 color-mix(in oklch, #000 50%, transparent), 0 1px 1px 0 color-mix(in oklch, #000 60%, transparent),
       inset 0 1px 2px 0 color-mix(in oklch, #ffffff 10%, transparent);
 
+    --shadow-sculpt-destructive-rest:
+      0 4px 8px 0 color-mix(in oklch, var(--destructive) 70%, transparent),
+      0 3px 1px 0 color-mix(in oklch, var(--destructive) 90%, black),
+      inset 0 3px 4px 0 color-mix(in oklch, var(--destructive) 40%, white);
+    --shadow-sculpt-destructive-press:
+      0 1px 2px 0 color-mix(in oklch, var(--destructive) 70%, transparent),
+      0 1px 1px 0 color-mix(in oklch, var(--destructive) 90%, black),
+      inset 0 1px 2px 0 color-mix(in oklch, var(--destructive) 40%, white);
+
     --shadow-recess:
       inset 0 2px 4px 0 color-mix(in oklch, #000 60%, transparent),
       inset 0 -1px 1px 0 color-mix(in oklch, #ffffff 6%, transparent);
@@ -406,6 +425,21 @@
   }
   .btn-sculpt-cocoa:active {
     box-shadow: var(--shadow-sculpt-cocoa-press);
+    transform: translateY(1px);
+  }
+
+  /* Destructive (record / capture) */
+  .btn-sculpt-destructive {
+    background-color: var(--destructive);
+    color: var(--destructive-foreground);
+    border: 0;
+    box-shadow: var(--shadow-sculpt-destructive-rest);
+    transition:
+      box-shadow 120ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .btn-sculpt-destructive:active {
+    box-shadow: var(--shadow-sculpt-destructive-press);
     transform: translateY(1px);
   }
 

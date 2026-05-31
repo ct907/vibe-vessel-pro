@@ -428,9 +428,7 @@ function TrackRow({
               e.stopPropagation();
               onRecordToggle();
             }}
-            className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-              isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-paper"
-            }`}
+            className={`h-7 w-7 rounded-full flex items-center justify-center border border-destructive bg-destructive text-destructive-foreground${isRecording ? " animate-pulse" : ""}`}
             aria-label={isRecording ? "Stop recording" : "Record"}
           >
             {isRecording ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}

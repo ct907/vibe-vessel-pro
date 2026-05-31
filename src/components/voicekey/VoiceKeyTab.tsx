@@ -495,7 +495,7 @@ export function VoiceKeyTab() {
           {keyState === "idle" && (
             <button
               type="button"
-              className="btn-sculpt-amber inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
+              className="btn-sculpt-destructive inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
               onClick={startListening}
             >
               <Mic className="h-4 w-4" /> Start Listening
@@ -644,7 +644,7 @@ export function VoiceKeyTab() {
             ) : (
               <button
                 type="button"
-                className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
+                className="btn-sculpt-destructive inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
                 onClick={() => startRangeMeasurement("high")}
                 disabled={isMeasuringRange}
               >
@@ -679,7 +679,7 @@ export function VoiceKeyTab() {
               ) : (
                 <button
                   type="button"
-                  className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
+                  className="btn-sculpt-destructive inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
                   onClick={() => startRangeMeasurement("low")}
                   disabled={isMeasuringRange}
                 >

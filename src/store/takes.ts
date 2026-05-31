@@ -24,14 +24,6 @@ export interface Take {
 
 export const MAX_BEST_TAKES = 3;
 
-const SAMPLE_TAKES: Take[] = [
-  { id: "t-melody", name: "Melody hum", date: "Today · 13:55", duration: "0:12", seed: 42, best: true },
-  { id: "t-vocal", name: "Vocal sketch", date: "Today · 13:40", duration: "0:08", seed: 17, best: true },
-  { id: "t-bass", name: "Bass riff idea", date: "Yesterday", duration: "0:06", seed: 73, best: false },
-  { id: "t-take4", name: "Take 4", date: "Yesterday", duration: "0:19", seed: 91, best: false },
-  { id: "t-guitar", name: "Guitar idea", date: "2 days ago", duration: "0:14", seed: 33, best: false },
-];
-
 interface TakesState {
   takes: Take[];
   bestCount: () => number;
@@ -42,7 +34,7 @@ interface TakesState {
 }
 
 export const useTakesStore = create<TakesState>((set, get) => ({
-  takes: SAMPLE_TAKES,
+  takes: [],
   bestCount: () => get().takes.filter((t) => t.best).length,
   toggleBest: (id) =>
     set((s) => {
