@@ -1,17 +1,12 @@
 import { useState } from "react";
-import { Play, Pause, Star, Mic } from "lucide-react";
+import { Play, Pause, Star, Trash2 } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { Waveform } from "@/components/common/Waveform";
 
-/**
- * Pinned, swipeable strip of song-level takes at the top of Write mode
- * (Apple-Notes-style). Each card can be starred as one of the best takes;
- * the counter caps the selection at {@link MAX_BEST_TAKES}.
- */
 export function RecordingsStrip() {
   const takes = useTakesStore((s) => s.takes);
   const toggleBest = useTakesStore((s) => s.toggleBest);
-  const addTake = useTakesStore((s) => s.addTake);
+  const removeTake = useTakesStore((s) => s.removeTake);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   const bestCount = takes.filter((t) => t.best).length;
@@ -23,16 +18,18 @@ export function RecordingsStrip() {
         <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
           Recordings
         </span>
-        <span
-          className="inline-flex items-center gap-1 text-[11px] font-bold"
-          style={{ color: atMax ? "var(--primary-strong)" : "var(--ink-soft)" }}
-        >
-          <Star className="h-3 w-3 fill-[var(--star,#e8a838)] text-[var(--star,#e8a838)]" />
-          {bestCount} of {MAX_BEST_TAKES} best takes
-        </span>
+        {takes.length > 0 && (
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-bold"
+            style={{ color: atMax ? "var(--primary-strong)" : "var(--ink-soft)" }}
+          >
+            <Star className="h-3 w-3 fill-[var(--star,#e8a838)] text-[var(--star,#e8a838)]" />
+            {bestCount} of {MAX_BEST_TAKES} best takes
+          </span>
+        )}
       </div>
 
-      {takes.length > 0 && (
+      {takes.length > 0 ? (
         <div className="hide-scroll flex gap-2 overflow-x-auto px-4 pb-2" style={{ scrollSnapType: "x mandatory" }}>
           {takes.map((take) => (
             <TakeCard
@@ -41,23 +38,29 @@ export function RecordingsStrip() {
               playing={playingId === take.id}
               onPlay={() => setPlayingId((p) => (p === take.id ? null : take.id))}
               onStar={() => toggleBest(take.id)}
+              onDelete={() => {
+                if (playingId === take.id) setPlayingId(null);
+                removeTake(take.id);
+              }}
               starDisabled={atMax && !take.best}
             />
           ))}
         </div>
+      ) : (
+        <div className="mx-4 mb-2 rounded-lg border border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col items-center justify-center gap-3 py-5 px-4 text-center">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            To record a take, press the{" "}
+            <span
+              className="btn-sculpt-destructive inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold pointer-events-none select-none"
+              aria-hidden="true"
+            >
+              <span className="rounded-full bg-white" style={{ width: 8, height: 8, flexShrink: 0 }} />
+              Record
+            </span>{" "}
+            button below!
+          </p>
+        </div>
       )}
-
-      <div className="px-4 pb-2">
-        <button
-          type="button"
-          onClick={() => addTake()}
-          className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
-          aria-label="Record a take"
-        >
-          <Mic className="h-4 w-4" />
-          <span className="text-sm font-display uppercase tracking-wide">Record a take</span>
-        </button>
-      </div>
     </div>
   );
 }
@@ -67,12 +70,14 @@ function TakeCard({
   playing,
   onPlay,
   onStar,
+  onDelete,
   starDisabled,
 }: {
   take: Take;
   playing: boolean;
   onPlay: () => void;
   onStar: () => void;
+  onDelete: () => void;
   starDisabled: boolean;
 }) {
   return (
@@ -80,27 +85,37 @@ function TakeCard({
       className="flex w-[168px] shrink-0 flex-col gap-2 rounded-xl border border-border bg-card p-2.5"
       style={{ boxShadow: "var(--shadow-card)", scrollSnapAlign: "start" }}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-1">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-bold text-ink">{take.name}</div>
           <div className="mt-0.5 font-mono-chord text-[9.5px] text-ink-soft">{take.date}</div>
         </div>
-        <button
-          type="button"
-          onClick={onStar}
-          disabled={starDisabled}
-          aria-label={take.best ? "Unstar take" : "Mark as best take"}
-          className="shrink-0 p-0.5 disabled:opacity-30"
-        >
-          <Star
-            className="h-[17px] w-[17px]"
-            style={
-              take.best
-                ? { fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }
-                : { color: "var(--ink-soft)" }
-            }
-          />
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onStar}
+            disabled={starDisabled}
+            aria-label={take.best ? "Unstar take" : "Mark as best take"}
+            className="p-0.5 disabled:opacity-30"
+          >
+            <Star
+              className="h-[17px] w-[17px]"
+              style={
+                take.best
+                  ? { fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }
+                  : { color: "var(--ink-soft)" }
+              }
+            />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Delete take"
+            className="p-0.5 text-ink-soft hover:text-destructive transition-colors"
+          >
+            <Trash2 className="h-[15px] w-[15px]" />
+          </button>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <button

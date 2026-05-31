@@ -27,10 +27,10 @@ export const MAX_BEST_TAKES = 3;
 interface TakesState {
   takes: Take[];
   bestCount: () => number;
-  /** Toggle a take's "best" flag. No-op when trying to exceed the cap. */
   toggleBest: (id: string) => void;
-  /** Add a fresh take to the front of the strip. */
   addTake: (name?: string) => string;
+  removeTake: (id: string) => void;
+  clear: () => void;
 }
 
 export const useTakesStore = create<TakesState>((set, get) => ({
@@ -55,4 +55,6 @@ export const useTakesStore = create<TakesState>((set, get) => ({
     }));
     return id;
   },
+  removeTake: (id) => set((s) => ({ takes: s.takes.filter((t) => t.id !== id) })),
+  clear: () => set({ takes: [] }),
 }));
