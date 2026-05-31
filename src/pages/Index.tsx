@@ -19,7 +19,6 @@ import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
-import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 
 const isTabName = (v: string | null): v is TabName =>
@@ -44,7 +43,6 @@ const Index = () => {
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
   const updateSection = useSongStore((s) => s.updateSection);
 
-  const onboarding = useOnboardingStore();
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const mode = useUIStore((s) => s.mode);
   const setMode = useUIStore((s) => s.setMode);
@@ -127,8 +125,8 @@ const Index = () => {
     }
   };
 
-  const showTitleHeader = !onboarding.enabled || onboarding.globalPhase >= 1;
-  const showTabContent = !onboarding.enabled || onboarding.globalPhase >= 2;
+  const showTitleHeader = true;
+  const showTabContent = true;
   const inEditor = location.pathname !== "/";
 
   return (
