@@ -14,9 +14,11 @@ interface Props {
   activeTab: "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
   sortMode: null | "lyrics" | "progressions";
   onToggleSort: () => void;
+  /** Optional control rendered beside the Key·Time·BPM pill (e.g. Track/Chords toggle). */
+  metaSlot?: React.ReactNode;
 }
 
-export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
+export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }: Props) {
   const meta = useSongStore((s) => s.meta);
   const setTitle = useSongStore((s) => s.setTitle);
   const sections = useSongStore((s) => s.sections);
@@ -84,8 +86,9 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort }: Props) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex justify-center">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <SongAttributesMenu />
+        {metaSlot}
       </div>
     </div>
   );

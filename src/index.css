@@ -521,3 +521,29 @@
   font-family: 'Caveat', cursive;
   font-weight: 400;
 }
+
+/* ─── Direction A (Write ↔ Arrange) ───────────────────────────── */
+
+/* Hidden horizontal scrollbars for swipeable strips / timeline. */
+.hide-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scroll::-webkit-scrollbar {
+  height: 0;
+  width: 0;
+  display: none;
+}
+
+/* Recording pulse — record pill & per-track arm buttons. */
+@keyframes rec-pulse {
+  0%, 100% { box-shadow: 0 4px 16px color-mix(in oklch, var(--destructive) 40%, transparent); }
+  50%      { box-shadow: 0 4px 24px color-mix(in oklch, var(--destructive) 70%, transparent); }
+}
+.animate-rec-pulse {
+  animation: rec-pulse 1.2s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rec-pulse { animation: none; }
+}
