@@ -883,7 +883,7 @@ function SectionCard({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label="Overdub this section"
                     title="Overdub this section"
                   >

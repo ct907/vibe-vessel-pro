@@ -245,20 +245,17 @@ export function TrackTimeline() {
                           onClick={() => toggleRecord(track.id)}
                           aria-label="Record"
                           className={
-                            "inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border" +
+                            "inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-destructive" +
                             (isRec ? " animate-rec-pulse" : "")
                           }
-                          style={{
-                            borderColor: isRec ? "var(--destructive)" : "var(--border)",
-                            background: isRec ? "var(--destructive)" : "var(--paper)",
-                          }}
+                          style={{ background: "var(--destructive)" }}
                         >
                           <span
                             style={{
                               width: 9,
                               height: 9,
                               borderRadius: isRec ? 2 : 5,
-                              background: isRec ? "#fff" : "var(--destructive)",
+                              background: "#fff",
                             }}
                           />
                         </button>

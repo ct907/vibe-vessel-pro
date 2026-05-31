@@ -25,13 +25,9 @@ export function RecordFab() {
         type="button"
         onClick={toggle}
         className={
-          "inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold text-white transition-all" +
+          "btn-sculpt-destructive inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold" +
           (recording ? " animate-rec-pulse" : "")
         }
-        style={{
-          background: recording ? "var(--destructive)" : "var(--primary)",
-          boxShadow: recording ? undefined : "var(--shadow-sculpt-amber-rest)",
-        }}
         aria-label={recording ? "Stop recording" : "Record a take"}
       >
         <span
