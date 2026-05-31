@@ -37,7 +37,8 @@ function useSectionBars() {
 
 /** Best-takes clipboard tray, pinned at the top of Track view. */
 function BestTakesTray() {
-  const best = useTakesStore((s) => s.takes.filter((t) => t.best));
+  const takes = useTakesStore((s) => s.takes);
+  const best = takes.filter((t) => t.best);
   return (
     <div className="px-4 pb-3">
       <div className="rounded-xl border border-border p-2.5" style={{ background: "var(--paper-shade-soft)" }}>
