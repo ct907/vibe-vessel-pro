@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Served from a repo subpath on GitHub Pages; root in dev / other hosts.
+  base: mode === "production" ? "/vibe-vessel-pro/" : "/",
   server: {
     host: "::",
     port: 8080,
