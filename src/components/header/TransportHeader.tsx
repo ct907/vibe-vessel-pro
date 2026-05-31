@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
-import { useUIStore, type TabName } from "@/store/ui";
+import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { startRecordingsEngine, stopRecordingsEngine } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
@@ -306,9 +306,12 @@ interface Props {
   tab: TabName;
   setTab: (t: TabName) => void;
   onTabSelect?: (t: string) => void;
+  /** Direction A primary navigation. */
+  mode: AppMode;
+  onSelectMode: (m: AppMode) => void;
 }
 
-export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSelect }: Props) {
+export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSelect, mode, onSelectMode }: Props) {
   const toolbarExpanded = useUIStore((s) => s.toolbarExpanded);
   const guardedSetTab = (t: "lyrics" | "chords" | "progressions" | "recordings") => {
     if (toolbarExpanded) {
@@ -811,18 +814,27 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 boxShadow: "var(--shadow-recess)",
               }}
             >
-              {(["lyrics", "progressions", "recordings"] as const).map((t) => {
+              {(["write", "arrange"] as const).map((m) => {
                 const isOnboardingPhase0 = onboarding.enabled && onboarding.globalPhase === 0;
-                const active = !isOnboardingPhase0 && tab === t;
-                const LABEL: Record<string, string> = { lyrics: "Lyrics", progressions: "Chord Progressions", recordings: "Recordings" };
-                const label = LABEL[t] ?? t;
+                const onChordsOverlay = tab === "chords" || tab === "voicekey";
+                const active = !isOnboardingPhase0 && !onChordsOverlay && mode === m;
+                const LABEL: Record<AppMode, string> = { write: "Write", arrange: "Arrange" };
                 return (
                   <button
-                    key={t}
-                    onClick={() => guardedSetTab(t)}
+                    key={m}
+                    onClick={() => {
+                      if (toolbarExpanded) {
+                        toast({
+                          title: "Finish editing chords first",
+                          description: "Close the chord toolbar before switching modes.",
+                        });
+                        return;
+                      }
+                      onSelectMode(m);
+                    }}
                     aria-disabled={toolbarExpanded && !active}
                     style={{
-                      padding: "7px 14px",
+                      padding: "7px 16px",
                       border: 0,
                       borderRadius: 7.6,
                       cursor: "pointer",
@@ -838,7 +850,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
                     }}
                   >
-                    {label}
+                    {LABEL[m]}
                   </button>
                 );
               })}

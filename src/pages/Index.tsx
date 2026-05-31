@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
   DragDropContext,
@@ -9,21 +8,19 @@ import {
 } from "@hello-pangea/dnd";
 import { useInstantTouchSensor } from "@/lib/dnd/instant-touch-sensor";
 import { useInstantMouseSensor } from "@/lib/dnd/instant-mouse-sensor";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TransportHeader } from "@/components/header/TransportHeader";
 import { SongTitleHeader } from "@/components/song/SongTitleHeader";
-import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import { ChordsTab } from "@/components/chords/ChordsTab";
-import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
-import { RecordingsTab } from "@/components/recordings/RecordingsTab";
 import { VoiceKeyTab } from "@/components/voicekey/VoiceKeyTab";
+import { WriteMode } from "@/components/write/WriteMode";
+import { ArrangeMode } from "@/components/arrange/ArrangeMode";
+import { ArrangeViewToggle } from "@/components/arrange/ArrangeViewToggle";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
-import { useDefaultsStore } from "@/store/defaults";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { useUIStore, type TabName } from "@/store/ui";
+import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 
 const isTabName = (v: string | null): v is TabName =>
   v === "lyrics" || v === "chords" || v === "progressions" || v === "recordings" || v === "voicekey";
@@ -34,17 +31,14 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const defaultLandingTab = useDefaultsStore((s) => s.defaultLandingTab);
   const queryTab = searchParams.get("tab");
-  const initialTab: TabName = isTabName(queryTab) ? queryTab : (defaultLandingTab ?? "lyrics");
-  const [tab, setTab] = useState<TabName>(initialTab);
-
-  // Index is always mounted (outside <Routes>), so useState(initialTab) only runs
-  // once — at the time the app loads, before any navigation. Sync tab from the URL
-  // whenever searchParams change so clicking the landing-page buttons actually works.
+  // `tab` now only drives the Explore-Chords / Voice-Key overlays. Primary
+  // navigation is the Write ↔ Arrange mode toggle.
+  const [tab, setTab] = useState<TabName>(isTabName(queryTab) ? queryTab : "lyrics");
   useEffect(() => {
     if (isTabName(queryTab)) setTab(queryTab);
   }, [queryTab]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
@@ -52,13 +46,36 @@ const Index = () => {
 
   const onboarding = useOnboardingStore();
   const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const mode = useUIStore((s) => s.mode);
+  const setMode = useUIStore((s) => s.setMode);
+  const arrangeView = useUIStore((s) => s.arrangeView);
+  const setArrangeView = useUIStore((s) => s.setArrangeView);
+
+  const isOverlay = tab === "chords" || tab === "voicekey";
+
+  // Map the active surface onto the legacy tab vocabulary the song menu and
+  // sort logic still speak.
+  const activeTab: TabName = isOverlay
+    ? tab
+    : mode === "write"
+      ? "lyrics"
+      : arrangeView === "chords"
+        ? "progressions"
+        : "recordings";
 
   useEffect(() => {
-    setActiveTab(tab);
-  }, [tab, setActiveTab]);
+    setActiveTab(activeTab);
+  }, [activeTab, setActiveTab]);
 
-  // Sort mode is per-tab (lyrics & progressions). Tracks prior collapsed
-  // states so we can restore them when exiting sort mode.
+  const handleSelectMode = (m: AppMode) => {
+    if (isOverlay) setTab("lyrics");
+    setMode(m);
+  };
+
+  // Sort mode applies to the chord-over-lyric sheet (Write) and the pattern
+  // blocks (Arrange/Chords). Tracks prior collapsed states for restore.
+  const sortContext: "lyrics" | "progressions" | null =
+    mode === "write" ? "lyrics" : arrangeView === "chords" ? "progressions" : null;
   const [sortMode, setSortMode] = useState<null | "lyrics" | "progressions">(null);
   const [priorCollapsed, setPriorCollapsed] = useState<Record<string, boolean>>({});
 
@@ -81,32 +98,17 @@ const Index = () => {
     setPriorCollapsed({});
   };
   const toggleSortMode = () => {
-    if (tab !== "lyrics" && tab !== "progressions") return;
-    if (sortMode === tab) exitSortMode();
-    else enterSortMode(tab);
+    if (!sortContext) return;
+    if (sortMode === sortContext) exitSortMode();
+    else enterSortMode(sortContext);
   };
 
-  // Auto-exit sort mode if the user switches tabs.
+  // Auto-exit sort mode if the user switches surface.
   useEffect(() => {
-    if (sortMode && sortMode !== tab) exitSortMode();
+    if (sortMode && sortMode !== sortContext) exitSortMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [mode, arrangeView]);
 
-  // Onboarding: advance from phase 0 → 1 when user first presses a tab.
-  const handleTabSelect = (v: string) => {
-    const t = v as typeof tab;
-    if (onboarding.enabled && onboarding.globalPhase === 0) {
-      onboarding.setGlobalPhase(1);
-    }
-    if (onboarding.enabled && onboarding.globalPhase >= 2 && t !== tab && (t === "lyrics" || t === "progressions")) {
-      const label = t === "lyrics" ? "Lyrics" : "Chord Progressions";
-      toast(`Switching to ${label} tutorial`);
-    }
-    setTab(t);
-  };
-
-  // Single global DragDropContext. Only basket chips are draggable; chord
-  // chips in Lyrics and Progressions are no longer draggable.
   const onBeforeDragStart = () => {
     beginInteraction();
   };
@@ -127,6 +129,7 @@ const Index = () => {
 
   const showTitleHeader = !onboarding.enabled || onboarding.globalPhase >= 1;
   const showTabContent = !onboarding.enabled || onboarding.globalPhase >= 2;
+  const inEditor = location.pathname !== "/";
 
   return (
     <div className="min-h-screen bg-paper text-foreground flex flex-col isolate">
@@ -136,8 +139,15 @@ const Index = () => {
           style={{ zIndex: -1, opacity: theme === "dark" ? 0.2 : (bg.pattern === "dot" ? 0.8 : 0.3), ...getPatternStyle(bg.pattern), ...getMaskStyle(bg.mask) }}
         />
       )}
-      {tab !== "chords" && tab !== "voicekey" && (
-        <TransportHeader isPlaying={isPlaying} setIsPlaying={setIsPlaying} tab={tab} setTab={setTab} onTabSelect={handleTabSelect} />
+      {!isOverlay && (
+        <TransportHeader
+          isPlaying={isPlaying}
+          setIsPlaying={setIsPlaying}
+          tab={tab}
+          setTab={setTab}
+          mode={mode}
+          onSelectMode={handleSelectMode}
+        />
       )}
 
       <DragDropContext
@@ -147,48 +157,61 @@ const Index = () => {
         sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
       >
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-32">
-          <h2 className="sr-only">Songwriter's Notebook — lyrics, chords, and progressions</h2>
+          <h2 className="sr-only">Songwriter's Notebook — write and arrange</h2>
 
-          {tab === "chords" ? (
-            <div className="relative mt-6 mb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (searchParams.get("tab") === "chords") navigate("/");
-                  else setTab("lyrics");
-                }}
-                aria-label="Back"
-                className="btn-sculpt-cream absolute left-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full h-9 w-9"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <h1 className="text-3xl font-display font-bold text-center">Explore Chords</h1>
-            </div>
-          ) : tab === "voicekey" ? null : showTitleHeader && (
-            <SongTitleHeader activeTab={tab} sortMode={sortMode} onToggleSort={toggleSortMode} />
-          )}
-
-          <Tabs value={tab} onValueChange={handleTabSelect} className="w-full mt-4">
-            <TabsContent value="lyrics" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <LyricsTab sortMode={sortMode === "lyrics"} onSwitchTab={setTab} showOnboarding={tab === "lyrics" && location.pathname !== '/'} />}
-            </TabsContent>
-            <TabsContent value="chords" forceMount className="mt-0 data-[state=inactive]:hidden">
-              <ChordsTab onSwitchTab={setTab} />
-            </TabsContent>
-            <TabsContent value="progressions" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <ProgressionsTab sortMode={sortMode === "progressions"} onSwitchTab={setTab} showOnboarding={tab === "progressions" && location.pathname !== '/'} />}
-            </TabsContent>
-            <TabsContent value="recordings" forceMount className="mt-0 data-[state=inactive]:hidden">
-              {showTabContent && <RecordingsTab />}
-            </TabsContent>
-            <TabsContent value="voicekey" forceMount className="mt-0 data-[state=inactive]:hidden">
+          {isOverlay ? (
+            tab === "chords" ? (
+              <>
+                <div className="relative mt-6 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (searchParams.get("tab") === "chords") navigate("/");
+                      else setTab("lyrics");
+                    }}
+                    aria-label="Back"
+                    className="btn-sculpt-cream absolute left-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full h-9 w-9"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <h1 className="text-3xl font-display font-bold text-center">Explore Chords</h1>
+                </div>
+                <ChordsTab onSwitchTab={setTab} />
+              </>
+            ) : (
               <VoiceKeyTab />
-            </TabsContent>
-          </Tabs>
+            )
+          ) : (
+            <>
+              {showTitleHeader && (
+                <SongTitleHeader
+                  activeTab={activeTab}
+                  sortMode={sortMode}
+                  onToggleSort={toggleSortMode}
+                  metaSlot={mode === "arrange" ? <ArrangeViewToggle value={arrangeView} onChange={setArrangeView} /> : undefined}
+                />
+              )}
+
+              {showTabContent && (
+                mode === "write" ? (
+                  <div className="mt-4">
+                    <WriteMode sortMode={sortMode === "lyrics"} onSwitchTab={setTab} showOnboarding={inEditor} />
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <ArrangeMode
+                      view={arrangeView}
+                      sortMode={sortMode === "progressions"}
+                      onSwitchTab={setTab}
+                      showOnboarding={inEditor}
+                    />
+                  </div>
+                )
+              )}
+            </>
+          )}
         </main>
-
       </DragDropContext>
-
     </div>
   );
 };

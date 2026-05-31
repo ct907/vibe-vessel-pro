@@ -19,6 +19,11 @@ export interface WhyChordRequest {
 
 export type TabName = "lyrics" | "chords" | "progressions" | "recordings" | "voicekey";
 
+/** Direction A primary navigation: Capture (write) ↔ Refine (arrange). */
+export type AppMode = "write" | "arrange";
+/** Arrange sub-view, chosen in the song-meta row. */
+export type ArrangeView = "track" | "chords";
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
@@ -30,6 +35,10 @@ interface UIState {
   setWhyChord: (req: WhyChordRequest | null) => void;
   activeTab: TabName | null;
   setActiveTab: (tab: TabName | null) => void;
+  mode: AppMode;
+  setMode: (m: AppMode) => void;
+  arrangeView: ArrangeView;
+  setArrangeView: (v: ArrangeView) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -43,5 +52,9 @@ export const useUIStore = create<UIState>((set) => ({
   setWhyChord: (req) => set({ whyChord: req }),
   activeTab: null,
   setActiveTab: (tab) => set({ activeTab: tab }),
+  mode: "write",
+  setMode: (mode) => set({ mode }),
+  arrangeView: "track",
+  setArrangeView: (arrangeView) => set({ arrangeView }),
 }));
 
