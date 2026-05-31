@@ -3,9 +3,9 @@ import { Pencil } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 
 /**
- * Floating capture controls for Write mode: an amber Record pill (turns red
- * and pulses while armed) paired with a circular pencil-edit button. Capture
- * is UI-state only here — stopping a recording appends a placeholder take.
+ * Floating capture controls for Write mode: a red Record pill (pulses while
+ * armed) paired with a circular amber pencil-edit button. Capture is
+ * UI-state only here — stopping a recording appends a placeholder take.
  */
 export function RecordFab() {
   const [recording, setRecording] = useState(false);
@@ -39,7 +39,7 @@ export function RecordFab() {
 
       <button
         type="button"
-        className="btn-sculpt-cream flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-cocoa"
+        className="btn-sculpt-amber flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
         aria-label="Edit"
       >
         <Pencil className="h-4 w-4" />

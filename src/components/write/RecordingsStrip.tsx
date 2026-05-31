@@ -32,33 +32,30 @@ export function RecordingsStrip() {
         </span>
       </div>
 
-      <div className="hide-scroll flex gap-2 overflow-x-auto px-4 pb-2" style={{ scrollSnapType: "x mandatory" }}>
-        {takes.map((take) => (
-          <TakeCard
-            key={take.id}
-            take={take}
-            playing={playingId === take.id}
-            onPlay={() => setPlayingId((p) => (p === take.id ? null : take.id))}
-            onStar={() => toggleBest(take.id)}
-            starDisabled={atMax && !take.best}
-          />
-        ))}
+      {takes.length > 0 && (
+        <div className="hide-scroll flex gap-2 overflow-x-auto px-4 pb-2" style={{ scrollSnapType: "x mandatory" }}>
+          {takes.map((take) => (
+            <TakeCard
+              key={take.id}
+              take={take}
+              playing={playingId === take.id}
+              onPlay={() => setPlayingId((p) => (p === take.id ? null : take.id))}
+              onStar={() => toggleBest(take.id)}
+              starDisabled={atMax && !take.best}
+            />
+          ))}
+        </div>
+      )}
 
-        {/* New-take affordance */}
+      <div className="px-4 pb-2">
         <button
           type="button"
           onClick={() => addTake()}
-          className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl text-ink-soft"
-          style={{ border: "2px dashed var(--border)" }}
-          aria-label="New take"
+          className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+          aria-label="Record a take"
         >
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-full"
-            style={{ background: "var(--primary)", boxShadow: "var(--shadow-sculpt-amber-rest)" }}
-          >
-            <Mic className="h-3.5 w-3.5 text-white" />
-          </span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.04em]">New</span>
+          <Mic className="h-4 w-4" />
+          <span className="text-sm font-display uppercase tracking-wide">Record a take</span>
         </button>
       </div>
     </div>

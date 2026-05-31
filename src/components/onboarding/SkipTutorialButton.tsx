@@ -24,13 +24,8 @@ export function SkipTutorialButton() {
     <button
       type="button"
       onClick={() => disable()}
-      className="fixed bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-xs font-display font-semibold transition-colors hover:brightness-110"
-      style={{
-        zIndex: 10000,
-        background: "var(--destructive)",
-        color: "var(--paper)",
-        boxShadow: "var(--shadow-card)",
-      }}
+      className="btn-sculpt-cream fixed bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-xs font-display font-semibold"
+      style={{ zIndex: 10000 }}
     >
       Skip Tutorial
     </button>,
