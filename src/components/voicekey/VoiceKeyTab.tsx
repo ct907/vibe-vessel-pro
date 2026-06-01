@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { pcToName, midiToNoteName } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
+import { useOnboardingStore } from "@/store/onboarding";
 import { startPitchDetection, type PitchHandle, type PitchResult } from "@/lib/audio/pitch-detector";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 
@@ -236,6 +237,7 @@ const NOTE_DUR_SEC = 0.42;
 export function VoiceKeyTab() {
   const navigate = useNavigate();
   const setSongKey = useSongStore((s) => s.setKey);
+  const resetSong = useSongStore((s) => s.resetSong);
 
   // ── Key finder state ──────────────────────────────────────────────────────
   type KeyState = "idle" | "listening" | "locked";
@@ -353,11 +355,16 @@ export function VoiceKeyTab() {
   };
 
   const resetKey = () => {
-    stopListening();
+    pitchHandleRef.current?.stop();
+    pitchHandleRef.current = null;
     setLockedMidi(null);
     setTransposeOffset(0);
     setIsPlayingScale(false);
     scaleTimeoutsRef.current.forEach(clearTimeout);
+    setCurrentPitch(null);
+    setStabilityProgress(0);
+    stabilityBufRef.current = [];
+    void startListening();
   };
 
   const playScale = () => {
@@ -381,7 +388,9 @@ export function VoiceKeyTab() {
     scaleTimeoutsRef.current = timeouts;
   };
 
-  const applyKeyToSong = () => {
+  const applyKeyToNewSong = () => {
+    resetSong();
+    useOnboardingStore.getState().resetForNewSong();
     setSongKey(keyRoot, "maj");
     navigate("/app");
   };
@@ -446,11 +455,11 @@ export function VoiceKeyTab() {
   const resetRange = () => {
     rangePitchHandleRef.current?.stop();
     rangePitchHandleRef.current = null;
-    setRangeStep("idle");
     setHighMidi(null);
     setLowMidi(null);
     setRangePitch(null);
     setRangeCountdown(3);
+    void startRangeMeasurement("high");
   };
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
@@ -602,9 +611,9 @@ export function VoiceKeyTab() {
                 <button
                   type="button"
                   className="btn-sculpt-amber inline-flex items-center gap-2 rounded-lg h-9 px-4 text-sm font-semibold"
-                  onClick={applyKeyToSong}
+                  onClick={applyKeyToNewSong}
                 >
-                  Use {keyRoot} Major in My Song <ArrowRight className="h-3.5 w-3.5" />
+                  Use {keyRoot} Major for New Song <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
