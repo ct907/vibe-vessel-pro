@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Play, MoreVertical } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -133,15 +133,7 @@ export default function Landing() {
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
       <ChipScatterBackground />
       <main className="relative mx-auto max-w-[1600px] px-4 pt-10 pb-24 flex flex-col items-center text-center">
-        <Link
-          to="/app"
-          aria-label="Open editor"
-          className="btn-sculpt-amber inline-flex items-center justify-center rounded-full h-6 w-6"
-        >
-          <Play className="h-2.5 w-2.5 fill-current" />
-        </Link>
-
-        <div className="mt-24 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2">
+        <div className="mt-10 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2">
           <span
             className="logomark-ink"
             style={{
@@ -180,25 +172,25 @@ export default function Landing() {
           <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
         </p>
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-12 flex flex-col items-center justify-center gap-3">
           <button
             type="button"
             onClick={startWriting}
-            className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+            className="btn-sculpt-amber inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
           >
             Start Writing
           </button>
           <button
             type="button"
             onClick={() => navigate("/app?tab=chords")}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+            className="btn-sculpt-cream inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
           >
             Explore Chords
           </button>
           <button
             type="button"
             onClick={() => navigate("/app?tab=voicekey")}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+            className="btn-sculpt-cream inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
           >
             Find Your Key & Range
           </button>

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Pencil } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 
 /**
@@ -37,13 +36,6 @@ export function RecordFab() {
         {recording ? "Stop" : "Record"}
       </button>
 
-      <button
-        type="button"
-        className="btn-sculpt-amber hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-        aria-label="Edit"
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
     </div>
   );
 }
