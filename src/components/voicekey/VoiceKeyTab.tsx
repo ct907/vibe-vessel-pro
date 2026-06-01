@@ -6,6 +6,7 @@ import { pcToName, midiToNoteName } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
 import { useSongStore } from "@/store/song";
 import { startPitchDetection, type PitchHandle, type PitchResult } from "@/lib/audio/pitch-detector";
+import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 
 // ─── Music theory helpers ────────────────────────────────────────────────────
 
@@ -84,17 +85,30 @@ const VOICE_TYPES: Record<string, VoiceTypeData> = {
   },
 };
 
+const VOICE_RANGES = [
+  { key: "soprano",   low: 60, high: 84 },
+  { key: "mezzo",     low: 57, high: 81 },
+  { key: "contralto", low: 52, high: 76 },
+  { key: "tenor",     low: 48, high: 72 },
+  { key: "baritone",  low: 43, high: 67 },
+  { key: "bass",      low: 40, high: 64 },
+] as const;
+
 function classifyVoice(lowMidi: number, highMidi: number): VoiceTypeData {
-  // Female range: high note typically >= 65 (F4)
-  const isFemaleRange = highMidi >= 65;
-  if (isFemaleRange) {
-    if (highMidi >= 77) return VOICE_TYPES.soprano;
-    if (highMidi >= 70) return VOICE_TYPES.mezzo;
-    return VOICE_TYPES.contralto;
+  const mid = (lowMidi + highMidi) / 2;
+  // Low note below E3 (MIDI 52) reliably indicates a male voice.
+  const isMale = lowMidi < 52;
+  const candidates = VOICE_RANGES.filter((v) =>
+    isMale ? v.key === "tenor" || v.key === "baritone" || v.key === "bass"
+           : v.key === "soprano" || v.key === "mezzo" || v.key === "contralto"
+  );
+  let best = candidates[0];
+  let bestDist = Infinity;
+  for (const v of candidates) {
+    const dist = Math.abs(mid - (v.low + v.high) / 2);
+    if (dist < bestDist) { bestDist = dist; best = v; }
   }
-  if (highMidi >= 60) return VOICE_TYPES.tenor;
-  if (highMidi >= 53) return VOICE_TYPES.baritone;
-  return VOICE_TYPES.bass;
+  return VOICE_TYPES[best.key];
 }
 
 // ─── Tuner needle display ─────────────────────────────────────────────────────
@@ -173,24 +187,24 @@ function RangeBar({ lowMidi, highMidi }: { lowMidi: number; highMidi: number }) 
   const high = midiToNoteName(highMidi);
 
   return (
-    <div className="flex flex-col gap-1 w-full">
-      <div className="flex items-center gap-2">
-        <span className="font-mono-chord text-sm font-semibold w-10 text-right">{low}</span>
-        <div className="flex-1 h-3 rounded-full bg-[var(--paper-shade)] relative overflow-hidden">
-          <div className="absolute inset-0 rounded-full" style={{ background: "var(--primary)", opacity: 0.7 }} />
-        </div>
-        <span className="font-mono-chord text-sm font-semibold w-10">{high}</span>
+    <div className="flex items-center gap-3 w-full">
+      <span className="font-mono-chord text-sm font-semibold shrink-0">{low}</span>
+      <div
+        className="h-7 rounded-full flex items-center overflow-hidden shrink-0"
+        style={{ background: "var(--primary)", width: "50%" }}
+      >
+        <span className="px-4 text-xs font-semibold text-white/90 whitespace-nowrap">
+          {octaves} octaves · {semitones} semitones
+        </span>
       </div>
-      <p className="text-center text-xs text-[var(--ink-soft)]">
-        {octaves} octaves · {semitones} semitones
-      </p>
+      <span className="font-mono-chord text-sm font-semibold shrink-0">{high}</span>
     </div>
   );
 }
 
 // ─── Note chip ────────────────────────────────────────────────────────────────
 
-function NoteChip({ label, midi, isRoot }: { label: string; midi: number; isRoot: boolean }) {
+function NoteChip({ label, midi, index }: { label: string; midi: number; index: number }) {
   const [active, setActive] = useState(false);
   const play = () => {
     setActive(true);
@@ -203,12 +217,10 @@ function NoteChip({ label, midi, isRoot }: { label: string; midi: number; isRoot
       type="button"
       onClick={play}
       className={cn(
-        "font-mono-chord text-sm font-semibold rounded-lg px-3 py-1.5 transition-all",
-        isRoot
-          ? "btn-sculpt-amber"
-          : "btn-sculpt-cream",
+        "noise-texture-chip font-mono-chord text-sm font-semibold rounded-lg px-3 py-1.5 transition-all",
         active && "scale-95",
       )}
+      style={ALL_CHIP_STYLES[index % ALL_CHIP_STYLES.length]}
     >
       {label}
     </button>
@@ -477,10 +489,11 @@ export function VoiceKeyTab() {
         </h1>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pb-24 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 pb-24">
+        <div className="flex flex-col md:flex-row gap-6 items-start">
 
         {/* ─── Key Finder Card ───────────────────────────────────────────── */}
-        <section className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] p-6">
+        <section className="flex-1 rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] p-6">
           <h2 className="text-lg font-semibold mb-1">Find Your Song Key</h2>
           <p className="text-sm text-[var(--ink-soft)] mb-4">
             {keyState === "idle" && "Hum or sing a comfortable note — hold it steady for about 3 seconds and we'll lock in your key."}
@@ -516,7 +529,7 @@ export function VoiceKeyTab() {
           )}
 
           {keyState === "locked" && lockedMidi !== null && (
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
               {/* Key display */}
               <div className="flex items-center gap-3">
                 <div
@@ -532,27 +545,22 @@ export function VoiceKeyTab() {
               </div>
 
               {/* Scale note chips */}
-              <div>
-                <p className="text-xs text-[var(--ink-soft)] mb-2 uppercase tracking-wide font-semibold">
-                  Tap a note to hear it
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {scaleNoteNames.map((name, i) => (
-                    <NoteChip
-                      key={i}
-                      label={name}
-                      midi={scaleMidis[i]}
-                      isRoot={i === 0 || i === 7}
-                    />
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {scaleNoteNames.map((name, i) => (
+                  <NoteChip
+                    key={i}
+                    label={name}
+                    midi={scaleMidis[i]}
+                    index={i}
+                  />
+                ))}
               </div>
 
               {/* Play scale + transpose */}
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  className="btn-sculpt-amber inline-flex items-center gap-2 rounded-lg h-9 px-4 text-sm font-semibold"
+                  className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-9 px-4 text-sm font-semibold"
                   onClick={isPlayingScale ? () => { scaleTimeoutsRef.current.forEach(clearTimeout); setIsPlayingScale(false); } : playScale}
                 >
                   {isPlayingScale ? <><Square className="h-3.5 w-3.5" /> Stop</> : <><Play className="h-3.5 w-3.5" /> Play Scale</>}
@@ -583,7 +591,7 @@ export function VoiceKeyTab() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+              <div className="flex flex-wrap gap-2 mt-1 pt-4 border-t border-border">
                 <button
                   type="button"
                   className="btn-sculpt-cream inline-flex items-center gap-2 rounded-lg h-9 px-4 text-sm font-semibold"
@@ -604,7 +612,7 @@ export function VoiceKeyTab() {
         </section>
 
         {/* ─── Vocal Range Card ──────────────────────────────────────────── */}
-        <section className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] p-6">
+        <section className="flex-1 rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] p-6">
           <h2 className="text-lg font-semibold mb-1">Your Vocal Range</h2>
           <p className="text-sm text-[var(--ink-soft)] mb-5">
             Sing your highest and lowest comfortable notes. Hold each for about 3 seconds.
@@ -754,6 +762,7 @@ export function VoiceKeyTab() {
             </div>
           )}
         </section>
+        </div>
       </div>
     </div>
   );
