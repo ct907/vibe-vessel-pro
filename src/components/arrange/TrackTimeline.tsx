@@ -148,7 +148,7 @@ export function TrackTimeline() {
     setRecording(recordingTrackId !== tid, recordingTrackId === tid ? null : tid);
 
   return (
-    <div className="pb-32">
+    <div className="pb-4">
       <BestTakesTray />
 
       <div className="flex items-center gap-2.5 px-4 pb-2.5">
