@@ -304,9 +304,9 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {visibleGrid.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          <div className="md:col-span-2 rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
             No degrees match this filter.
           </div>
         )}
@@ -379,6 +379,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                 {matchingPresets.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="font-display text-base font-bold">Used in these progressions</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {matchingPresets.map(({ preset, chords, hitIndex }) => {
                       const isPlaying = playingPresetId === preset.id;
                       return (
@@ -429,6 +430,7 @@ export function ChordsTab({ onSwitchTab }: ChordsTabProps = {}) {
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 )}
               </div>
