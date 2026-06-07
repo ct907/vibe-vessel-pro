@@ -819,7 +819,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 const isOnboardingPhase0 = onboarding.enabled && onboarding.globalPhase === 0;
                 const onChordsOverlay = tab === "chords" || tab === "voicekey";
                 const active = !isOnboardingPhase0 && !onChordsOverlay && mode === m;
-                const LABEL: Record<AppMode, string> = { write: "1. Write", arrange: "2. Arrange" };
+                const LABEL: Record<AppMode, string> = { write: "1. Write and Record", arrange: "2. Arrange" };
                 return (
                   <button
                     key={m}
