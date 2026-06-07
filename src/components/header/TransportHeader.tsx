@@ -857,12 +857,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               })}
             </div>
 
-            {onboarding.enabled && onboarding.globalPhase === 0 && location.pathname !== '/' && (
+            {onboarding.enabled && onboarding.globalPhase === 0 && onboarding.dismissedKey !== "phase-0" && location.pathname !== '/' && (
               <AnchoredCoachMark
                 anchorRef={tabsBarRef}
                 step="1/7"
                 message="Write lyrics or build progressions? Tap a tab to begin"
                 arrowSide="top"
+                onDismiss={() => onboarding.dismissCoachMark("phase-0")}
               />
             )}
           </div>
