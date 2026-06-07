@@ -31,29 +31,35 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const showChords = !progressionsEmpty || chordsRevealed;
 
   return (
-    <div className="flex flex-col gap-4">
-      {showTrack ? (
-        <div>
-          <TrackTimeline />
-          <RecordFab onComplete={recordToFirstTrack} />
-        </div>
-      ) : (
-        <EmptyTapCard
-          icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
-          label="Add Recording"
-          onClick={() => setTrackRevealed(true)}
-        />
-      )}
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
+      {/* Left column — multitrack timeline (2 of 5) */}
+      <div className="md:col-span-2">
+        {showTrack ? (
+          <div>
+            <TrackTimeline />
+            <RecordFab onComplete={recordToFirstTrack} />
+          </div>
+        ) : (
+          <EmptyTapCard
+            icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
+            label="Add Recording"
+            onClick={() => setTrackRevealed(true)}
+          />
+        )}
+      </div>
 
-      {showChords ? (
-        <ProgressionsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
-      ) : (
-        <EmptyTapCard
-          icon={<ListMusic className="h-7 w-7" strokeWidth={1.75} />}
-          label="Add Chords"
-          onClick={() => setChordsRevealed(true)}
-        />
-      )}
+      {/* Right column — chord progressions (3 of 5) */}
+      <div className="md:col-span-3 min-w-0">
+        {showChords ? (
+          <ProgressionsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
+        ) : (
+          <EmptyTapCard
+            icon={<ListMusic className="h-7 w-7" strokeWidth={1.75} />}
+            label="Add Chords"
+            onClick={() => setChordsRevealed(true)}
+          />
+        )}
+      </div>
     </div>
   );
 }

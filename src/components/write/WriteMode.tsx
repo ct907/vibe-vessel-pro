@@ -37,21 +37,27 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const showLyrics = !lyricsEmpty || lyricsRevealed;
 
   return (
-    <div className="flex flex-col gap-4">
-      {showRecordings ? (
-        <div>
-          <RecordingsStrip />
-          <RecordFab />
-        </div>
-      ) : (
-        <EmptyTapCard icon={<Mic className="h-7 w-7" strokeWidth={1.75} />} label="Add Recording" onClick={() => setRecRevealed(true)} />
-      )}
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
+      {/* Left column — recordings (2 of 5) */}
+      <div className="md:col-span-2">
+        {showRecordings ? (
+          <div>
+            <RecordingsStrip />
+            <RecordFab />
+          </div>
+        ) : (
+          <EmptyTapCard icon={<Mic className="h-7 w-7" strokeWidth={1.75} />} label="Add Recording" onClick={() => setRecRevealed(true)} />
+        )}
+      </div>
 
-      {showLyrics ? (
-        <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
-      ) : (
-        <EmptyTapCard icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />} label="Write Lyrics" onClick={() => setLyricsRevealed(true)} />
-      )}
+      {/* Right column — lyrics (3 of 5) */}
+      <div className="md:col-span-3 min-w-0">
+        {showLyrics ? (
+          <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
+        ) : (
+          <EmptyTapCard icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />} label="Write Lyrics" onClick={() => setLyricsRevealed(true)} />
+        )}
+      </div>
     </div>
   );
 }
