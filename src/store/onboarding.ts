@@ -8,6 +8,7 @@ interface OnboardingState {
   progressionsStep: number;
   newSongCount: number;
   showNewSongPrompt: boolean;
+  dismissedKey: string | null;
 
   disable(): void;
   enable(): void;
@@ -16,6 +17,7 @@ interface OnboardingState {
   setProgressionsStep(s: number): void;
   incrementNewSong(): void;
   dismissNewSongPrompt(): void;
+  dismissCoachMark(key: string): void;
   resetForNewSong(): void;
 }
 
@@ -28,9 +30,10 @@ export const useOnboardingStore = create<OnboardingState>()(
       progressionsStep: 0,
       newSongCount: 0,
       showNewSongPrompt: false,
+      dismissedKey: null,
 
       disable: () => set({ enabled: false, showNewSongPrompt: false }),
-      enable: () => set({ enabled: true, globalPhase: 2 }),
+      enable: () => set({ enabled: true, globalPhase: 2, dismissedKey: null }),
       setGlobalPhase: (p) => set({ globalPhase: p }),
       setLyricsStep: (s) => set({ lyricsStep: s }),
       setProgressionsStep: (s) => set({ progressionsStep: s }),
@@ -39,6 +42,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         set({ newSongCount: count, showNewSongPrompt: count >= 1 });
       },
       dismissNewSongPrompt: () => set({ showNewSongPrompt: false }),
+      dismissCoachMark: (key) => set({ dismissedKey: key }),
       resetForNewSong: () => {
         if (!get().enabled) return;
         set({
@@ -46,6 +50,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           lyricsStep: 0,
           progressionsStep: 0,
           showNewSongPrompt: false,
+          dismissedKey: null,
         });
       },
     }),

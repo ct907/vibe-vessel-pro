@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
+import { X } from "lucide-react";
 
 interface Props {
   step: string;
@@ -8,6 +9,7 @@ interface Props {
   arrowSide?: "top" | "bottom" | "left" | "right";
   actionLabel?: string;
   onAction?: () => void;
+  onDismiss?: () => void;
 }
 
 function arrowStyle(side: NonNullable<Props["arrowSide"]>): CSSProperties {
@@ -29,7 +31,7 @@ function arrowStyle(side: NonNullable<Props["arrowSide"]>): CSSProperties {
   }
 }
 
-export function OnboardingCoachMark({ step, message, arrowSide = "top", actionLabel, onAction }: Props) {
+export function OnboardingCoachMark({ step, message, arrowSide = "top", actionLabel, onAction, onDismiss }: Props) {
   const interactive = !!actionLabel && !!onAction;
   return (
     <div
@@ -38,6 +40,35 @@ export function OnboardingCoachMark({ step, message, arrowSide = "top", actionLa
     >
       {/* Arrow */}
       <div style={arrowStyle(arrowSide)} />
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismiss();
+          }}
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            zIndex: 1,
+            pointerEvents: "auto",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 20,
+            height: 20,
+            borderRadius: 999,
+            border: 0,
+            cursor: "pointer",
+            background: "color-mix(in oklch, var(--paper) 20%, transparent)",
+            color: "var(--paper)",
+          }}
+        >
+          <X style={{ width: 13, height: 13 }} />
+        </button>
+      )}
       {/* Background with paper-noise edge distortion */}
       <div
         style={{

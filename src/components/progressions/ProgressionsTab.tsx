@@ -1561,7 +1561,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
   const addChordsRef = useRef<HTMLButtonElement | null>(null);
@@ -1925,16 +1925,17 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         </div>
       )}
 
-      {canShowCoachMark && progressionsStep === 1 && (
+      {canShowCoachMark && progressionsStep === 1 && dismissedKey !== "progressions-1" && (
         <AnchoredCoachMark
           anchorRef={addChordsRef}
           gap={16}
           step="3/7"
           message="Tap Add Chords to begin!"
           arrowSide="top"
+          onDismiss={() => dismissCoachMark("progressions-1")}
         />
       )}
-      {canShowCoachMark && progressionsStep === 2 && (
+      {canShowCoachMark && progressionsStep === 2 && dismissedKey !== "progressions-2" && (
         picker !== null ? (
           <AnchoredCoachMark
             anchorRef={chordPickerHeaderRef}
@@ -1943,6 +1944,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="4/7"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-2")}
           />
         ) : (patternAddSlot !== null || chordEditor !== null) ? (
           <AnchoredCoachMark
@@ -1952,6 +1954,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="4/7"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-2")}
           />
         ) : (
           <AnchoredCoachMark
@@ -1960,10 +1963,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="4/7"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-2")}
           />
         )
       )}
-      {canShowCoachMark && progressionsStep === 3 && (() => {
+      {canShowCoachMark && progressionsStep === 3 && dismissedKey !== "progressions-3" && (() => {
         const editorOpen = chordEditor !== null || (picker !== null && !!picker.replaceChordId);
         const modalHeaderRef = chordEditor !== null ? focusedEditorHeaderRef : chordPickerHeaderRef;
         return editorOpen ? (
@@ -1974,6 +1978,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="5/7"
             message="Replace with one of these chords!"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-3")}
           />
         ) : (
           <AnchoredCoachMark
@@ -1983,10 +1988,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="5/7"
             message="Right click or tap & hold a chord chip to replace it"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-3")}
           />
         );
       })()}
-      {canShowCoachMark && progressionsStep === 4 && (
+      {canShowCoachMark && progressionsStep === 4 && dismissedKey !== "progressions-4" && (
         firstSpiceOpen ? (
           <AnchoredCoachMark
             anchorRef={spiceHeaderRef}
@@ -1995,6 +2001,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="6/7"
             message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-4")}
           />
         ) : (
           <AnchoredCoachMark
@@ -2004,10 +2011,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             step="6/7"
             message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("progressions-4")}
           />
         )
       )}
-      {canShowCoachMark && progressionsStep === 5 && createPortal(
+      {canShowCoachMark && progressionsStep === 5 && dismissedKey !== "progressions-5" && createPortal(
         <div
           className="pointer-events-auto"
           style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9999 }}
@@ -2021,6 +2029,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               if (lyricsStep === 0 || lyricsStep >= 6) setLyricsStep(1);
               dismissNewSongPrompt();
             }}
+            onDismiss={() => dismissCoachMark("progressions-5")}
           />
         </div>,
         document.body,

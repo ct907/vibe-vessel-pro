@@ -20,6 +20,7 @@ import { useDndStore } from "@/store/dnd";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
+import { useOnboardingStore } from "@/store/onboarding";
 
 const isTabName = (v: string | null): v is TabName =>
   v === "lyrics" || v === "chords" || v === "progressions" || v === "recordings" || v === "voicekey";
@@ -68,6 +69,8 @@ const Index = () => {
   const handleSelectMode = (m: AppMode) => {
     if (isOverlay) setTab("lyrics");
     setMode(m);
+    const ob = useOnboardingStore.getState();
+    if (ob.enabled && ob.globalPhase === 0) ob.setGlobalPhase(1);
   };
 
   // Sort mode applies to the chord-over-lyric sheet (Write) and the pattern

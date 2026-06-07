@@ -1145,7 +1145,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding } = useOnboardingStore();
+  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -1628,7 +1628,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       ))}
 
 
-      {canShowCoachMark && lyricsStep === 1 && (
+      {canShowCoachMark && lyricsStep === 1 && dismissedKey !== "lyrics-1" && (
         <AnchoredCoachMark
           anchorRef={firstLyricRowRef}
           anchorEdge="bottom"
@@ -1636,9 +1636,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           step="3/7"
           message="Write your lyrics here! Press enter to create a new line."
           arrowSide="top"
+          onDismiss={() => dismissCoachMark("lyrics-1")}
         />
       )}
-      {canShowCoachMark && lyricsStep === 2 && (
+      {canShowCoachMark && lyricsStep === 2 && dismissedKey !== "lyrics-2" && (
         picker ? (
           <AnchoredCoachMark
             anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
@@ -1647,6 +1648,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             step="4/7"
             message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("lyrics-2")}
           />
         ) : (
           <AnchoredCoachMark
@@ -1656,10 +1658,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             step="4/7"
             message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("lyrics-2")}
           />
         )
       )}
-      {canShowCoachMark && lyricsStep === 3 && (
+      {canShowCoachMark && lyricsStep === 3 && dismissedKey !== "lyrics-3" && (
         picker ? (
           <AnchoredCoachMark
             anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
@@ -1668,6 +1671,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             step="5/7"
             message="Right click or tap & hold a chord chip to edit it."
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("lyrics-3")}
           />
         ) : (
           <AnchoredCoachMark
@@ -1677,10 +1681,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             step="5/7"
             message="Right click or tap & hold a chord chip to edit it."
             arrowSide="bottom"
+            onDismiss={() => dismissCoachMark("lyrics-3")}
           />
         )
       )}
-      {canShowCoachMark && lyricsStep === 4 && (
+      {canShowCoachMark && lyricsStep === 4 && dismissedKey !== "lyrics-4" && (
         <AnchoredCoachMark
           anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
           anchorEdge="top"
@@ -1688,9 +1693,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           step="6/7"
           message="Pick a chord from the list to replace it."
           arrowSide="bottom"
+          onDismiss={() => dismissCoachMark("lyrics-4")}
         />
       )}
-      {canShowCoachMark && lyricsStep === 5 && createPortal(
+      {canShowCoachMark && lyricsStep === 5 && dismissedKey !== "lyrics-5" && createPortal(
         <div
           className="pointer-events-auto"
           style={{
@@ -1710,6 +1716,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               if (progressionsStep === 0 || progressionsStep >= 6) setProgressionsStep(1);
               dismissNewSongPrompt();
             }}
+            onDismiss={() => dismissCoachMark("lyrics-5")}
           />
         </div>,
         document.body,

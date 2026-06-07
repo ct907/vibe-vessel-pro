@@ -243,13 +243,14 @@ export function SongAttributesMenu() {
       </PopoverContent>
     </Popover>
 
-    {onboarding.enabled && onboarding.globalPhase === 1 && !open && (
+    {onboarding.enabled && onboarding.globalPhase === 1 && onboarding.dismissedKey !== "phase-1" && !open && (
       <AnchoredCoachMark
         anchorRef={attrBtnRef}
         gap={24}
         step="2/7"
         message="Set the scene — choose key and timing, then tap Save Settings"
         arrowSide="top"
+        onDismiss={() => onboarding.dismissCoachMark("phase-1")}
       />
     )}
     </div>
