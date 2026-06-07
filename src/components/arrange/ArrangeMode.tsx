@@ -35,7 +35,7 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       {showTrack ? (
         <div>
           <TrackTimeline />
-          <RecordFab onStop={recordToFirstTrack} />
+          <RecordFab onComplete={recordToFirstTrack} />
         </div>
       ) : (
         <EmptyTapCard
