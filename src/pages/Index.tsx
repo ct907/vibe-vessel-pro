@@ -14,7 +14,6 @@ import { ChordsTab } from "@/components/chords/ChordsTab";
 import { VoiceKeyTab } from "@/components/voicekey/VoiceKeyTab";
 import { WriteMode } from "@/components/write/WriteMode";
 import { ArrangeMode } from "@/components/arrange/ArrangeMode";
-import { ArrangeViewToggle } from "@/components/arrange/ArrangeViewToggle";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
@@ -47,20 +46,17 @@ const Index = () => {
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const mode = useUIStore((s) => s.mode);
   const setMode = useUIStore((s) => s.setMode);
-  const arrangeView = useUIStore((s) => s.arrangeView);
-  const setArrangeView = useUIStore((s) => s.setArrangeView);
 
   const isOverlay = tab === "chords" || tab === "voicekey";
 
   // Map the active surface onto the legacy tab vocabulary the song menu and
-  // sort logic still speak.
+  // sort logic still speak. Arrange is now a single stacked page; its sort and
+  // menu actions target the progressions editor.
   const activeTab: TabName = isOverlay
     ? tab
     : mode === "write"
       ? "lyrics"
-      : arrangeView === "chords"
-        ? "progressions"
-        : "recordings";
+      : "progressions";
 
   useEffect(() => {
     setActiveTab(activeTab);
@@ -76,7 +72,7 @@ const Index = () => {
   // Sort mode applies to the chord-over-lyric sheet (Write) and the pattern
   // blocks (Arrange/Chords). Tracks prior collapsed states for restore.
   const sortContext: "lyrics" | "progressions" | null =
-    mode === "write" ? "lyrics" : arrangeView === "chords" ? "progressions" : null;
+    mode === "write" ? "lyrics" : "progressions";
   const [sortMode, setSortMode] = useState<null | "lyrics" | "progressions">(null);
   const [priorCollapsed, setPriorCollapsed] = useState<Record<string, boolean>>({});
 
@@ -108,7 +104,7 @@ const Index = () => {
   useEffect(() => {
     if (sortMode && sortMode !== sortContext) exitSortMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, arrangeView]);
+  }, [mode]);
 
   const onBeforeDragStart = () => {
     beginInteraction();
@@ -189,7 +185,6 @@ const Index = () => {
                   activeTab={activeTab}
                   sortMode={sortMode}
                   onToggleSort={toggleSortMode}
-                  metaSlot={mode === "arrange" ? <ArrangeViewToggle value={arrangeView} onChange={setArrangeView} /> : undefined}
                 />
               )}
 
@@ -201,7 +196,6 @@ const Index = () => {
                 ) : (
                   <div className="mt-4">
                     <ArrangeMode
-                      view={arrangeView}
                       sortMode={sortMode === "progressions"}
                       onSwitchTab={setTab}
                       showOnboarding={inEditor}

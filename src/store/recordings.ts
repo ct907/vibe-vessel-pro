@@ -120,6 +120,8 @@ interface RecordingsState {
 
   /** Add a clip to a track. Replaces any overlapping clips in the clip's time range. */
   addClip: (id: RecTrackId, clip: RecClip) => void;
+  /** Record (placeholder) onto the first track, creating it if none exists. */
+  recordToFirstTrack: () => void;
   /** Remove a single clip by blobId. */
   removeClip: (id: RecTrackId, blobId: RecBlobId) => void;
   /** Punch-in: replace audio in [punchStart, punchEnd] with newClip. */
@@ -193,6 +195,16 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
         return { ...t, clips: applyPunchIn(t.clips, clip, punchStart, punchEnd) };
       }),
     }));
+  },
+
+  recordToFirstTrack: () => {
+    let id = get().tracks[0]?.id ?? null;
+    if (!id) id = get().addTrack();
+    if (!id) return;
+    const track = get().tracks.find((t) => t.id === id);
+    const startSec = track ? track.clips.reduce((m, c) => Math.max(m, clipEndSec(c)), 0) : 0;
+    const clip: RecClip = { blobId: nanoid(), mime: "audio/webm", durationSec: 4, startSec, trimStartSec: 0, trimEndSec: 4 };
+    get().addClip(id, clip);
   },
 
   removeClip: (id, blobId) => {

@@ -6,12 +6,12 @@ import { useTakesStore } from "@/store/takes";
  * armed) paired with a circular amber pencil-edit button. Capture is
  * UI-state only here — stopping a recording appends a placeholder take.
  */
-export function RecordFab() {
+export function RecordFab({ onStop }: { onStop?: () => void } = {}) {
   const [recording, setRecording] = useState(false);
   const addTake = useTakesStore((s) => s.addTake);
 
   const toggle = () => {
-    if (recording) addTake();
+    if (recording) (onStop ?? addTake)();
     setRecording((r) => !r);
   };
 
