@@ -1,13 +1,64 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Star, Trash2 } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
+import { getAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
 import { Waveform } from "@/components/common/Waveform";
 
 export function RecordingsStrip() {
   const takes = useTakesStore((s) => s.takes);
   const toggleBest = useTakesStore((s) => s.toggleBest);
   const removeTake = useTakesStore((s) => s.removeTake);
+
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopAudio(), []);
+
+  const handlePlay = async (take: Take) => {
+    if (playingId === take.id) {
+      stopAudio();
+      setPlayingId(null);
+      return;
+    }
+    stopAudio();
+    setPlayingId(take.id);
+
+    if (take.blobId) {
+      const blob = await getAudioBlob(take.blobId);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          blobUrlRef.current = null;
+          audioRef.current = null;
+          setPlayingId(null);
+        };
+        audio.play().catch(() => setPlayingId(null));
+      }
+    }
+  };
+
+  const handleDelete = (take: Take) => {
+    if (playingId === take.id) {
+      stopAudio();
+      setPlayingId(null);
+    }
+    removeTake(take.id);
+    if (take.blobId) deleteAudioBlob(take.blobId);
+  };
 
   const bestCount = takes.filter((t) => t.best).length;
   const atMax = bestCount >= MAX_BEST_TAKES;
@@ -36,12 +87,9 @@ export function RecordingsStrip() {
               key={take.id}
               take={take}
               playing={playingId === take.id}
-              onPlay={() => setPlayingId((p) => (p === take.id ? null : take.id))}
+              onPlay={() => handlePlay(take)}
               onStar={() => toggleBest(take.id)}
-              onDelete={() => {
-                if (playingId === take.id) setPlayingId(null);
-                removeTake(take.id);
-              }}
+              onDelete={() => handleDelete(take)}
               starDisabled={atMax && !take.best}
             />
           ))}

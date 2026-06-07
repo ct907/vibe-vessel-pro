@@ -1,34 +1,33 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 
-/**
- * Write-mode "recordings strip" model — a flat library of song-level takes,
- * distinct from the multitrack `recordings` store (which holds clips placed
- * on the Arrange timeline). Up to {@link MAX_BEST_TAKES} can be starred as
- * "best takes"; the Arrange/Track view surfaces those starred takes in its
- * clipboard tray.
- *
- * This is UI state only — the takes carry display metadata (name, date,
- * duration, a waveform seed) but no audio blob. Real capture wires in later.
- */
 export interface Take {
   id: string;
   name: string;
   date: string;
-  /** Display duration, e.g. "0:12". */
+  /** Formatted display duration, e.g. "0:12". */
   duration: string;
-  /** Deterministic seed for the placeholder waveform. */
+  durationSec: number;
+  /** Deterministic seed for the waveform visualisation. */
   seed: number;
   best: boolean;
+  /** IndexedDB key for the real audio blob, absent for placeholder takes. */
+  blobId?: string;
 }
 
 export const MAX_BEST_TAKES = 3;
+
+function fmtDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 interface TakesState {
   takes: Take[];
   bestCount: () => number;
   toggleBest: (id: string) => void;
-  addTake: (name?: string) => string;
+  addTake: (opts?: { name?: string; blobId?: string; durationSec?: number }) => string;
   removeTake: (id: string) => void;
   clear: () => void;
 }
@@ -43,13 +42,23 @@ export const useTakesStore = create<TakesState>((set, get) => ({
       if (!target.best && s.takes.filter((t) => t.best).length >= MAX_BEST_TAKES) return s;
       return { takes: s.takes.map((t) => (t.id === id ? { ...t, best: !t.best } : t)) };
     }),
-  addTake: (name) => {
+  addTake: (opts = {}) => {
+    const { name, blobId, durationSec = 0 } = opts;
     const id = nanoid();
     const now = new Date();
     const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     set((s) => ({
       takes: [
-        { id, name: name ?? "New take", date: `Today · ${time}`, duration: "0:00", seed: Math.floor(Math.random() * 100), best: false },
+        {
+          id,
+          name: name ?? `Take ${s.takes.length + 1}`,
+          date: `Today · ${time}`,
+          duration: fmtDuration(durationSec),
+          durationSec,
+          seed: Math.floor(Math.random() * 100),
+          best: false,
+          blobId,
+        },
         ...s.takes,
       ],
     }));
