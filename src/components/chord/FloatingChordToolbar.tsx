@@ -22,6 +22,8 @@ type Mode = "progression" | "lyrics";
 
 export interface FloatingChordToolbarProps {
   mode: Mode;
+  /** When true, the Pencil FAB trigger button is hidden (sticky bar provides it). */
+  hideTrigger?: boolean;
   activeChord:
     | { id: string; display: string; octave?: number; lengthBeats?: number }
     | null;
@@ -50,6 +52,7 @@ const ANIM_STYLE: React.CSSProperties = {
 
 export function FloatingChordToolbar({
   mode,
+  hideTrigger = false,
   activeChord,
   selectedCount,
   selectedOctaves,
@@ -71,9 +74,18 @@ export function FloatingChordToolbar({
   const setToolbarExpanded = useUIStore((s) => s.setToolbarExpanded);
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setMultiSelectMode = useUIStore((s) => s.setMultiSelectMode);
+  const chordToolbarOpen = useUIStore((s) => s.chordToolbarOpen);
+  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const [expanded, setExpanded] = useState(false);
   const visible = isMobile && !focusedEditorOpen;
   const effectiveExpanded = visible && expanded;
+
+  useEffect(() => {
+    if (chordToolbarOpen && visible) {
+      setExpanded(true);
+      setChordToolbarOpen(false);
+    }
+  }, [chordToolbarOpen, visible, setChordToolbarOpen]);
 
   useEffect(() => {
     setToolbarExpanded(effectiveExpanded);
@@ -122,21 +134,25 @@ export function FloatingChordToolbar({
     setExpanded(false);
   };
 
+  const bottomClass = hideTrigger ? "bottom-16" : "bottom-4";
+
   return (
-    <div className="fixed bottom-4 right-4 z-40 pointer-events-none">
-      <button
-        type="button"
-        aria-label="Open chord editing toolbar"
-        onClick={() => setExpanded(true)}
-        style={ANIM_STYLE}
-        className={cn(
-          "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
-          "h-10 w-10 rounded-full flex items-center justify-center btn-sculpt-amber",
-          expanded ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100",
-        )}
-      >
-        <Pencil className="h-6 w-6" />
-      </button>
+    <div className={`fixed ${bottomClass} right-4 z-[55] pointer-events-none`}>
+      {!hideTrigger && (
+        <button
+          type="button"
+          aria-label="Open chord editing toolbar"
+          onClick={() => setExpanded(true)}
+          style={ANIM_STYLE}
+          className={cn(
+            "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
+            "h-10 w-10 rounded-full flex items-center justify-center btn-sculpt-amber",
+            expanded ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100",
+          )}
+        >
+          <Pencil className="h-6 w-6" />
+        </button>
+      )}
 
       <div
         role="toolbar"

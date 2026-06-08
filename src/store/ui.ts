@@ -39,6 +39,9 @@ interface UIState {
   setMode: (m: AppMode) => void;
   arrangeView: ArrangeView;
   setArrangeView: (v: ArrangeView) => void;
+  /** One-shot signal: WriteStickyBar requests FloatingChordToolbar to expand. */
+  chordToolbarOpen: boolean;
+  setChordToolbarOpen: (v: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -56,5 +59,7 @@ export const useUIStore = create<UIState>((set) => ({
   setMode: (mode) => set({ mode }),
   arrangeView: "track",
   setArrangeView: (arrangeView) => set({ arrangeView }),
+  chordToolbarOpen: false,
+  setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
 }));
 
