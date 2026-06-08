@@ -1177,7 +1177,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     }
   }, [picker, lyricsStep, onboardingEnabled, setLyricsStep]);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
-  const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [lyricMultiSelected, setLyricMultiSelected] =
     useState<Map<string, { sectionId: string; lineId: string }>>(new Map());
   const lyricMultiSelectedIds = useMemo(
@@ -1723,7 +1722,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       )}
 
       {onboardingEnabled && showNewSongPrompt && (
-        <div className="fixed bottom-14 left-0 right-0 z-50">
+        <div className="fixed bottom-16 left-0 right-0 z-50">
           <div
             className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4 rounded-t-xl"
             style={{ background: "var(--paper-card)", borderTop: "1px solid var(--border)", boxShadow: "var(--shadow-card)" }}
@@ -1751,52 +1750,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="max-w-6xl mx-auto">
-          {addSectionOpen && (
-            <div
-              className="px-4 pt-4 pb-4"
-              style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
-            >
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as SectionType[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => { addSection(t); setAddSectionOpen(false); }}
-                    className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> {t === "pre-chorus" ? "Pre-Chorus" : t}
-                  </button>
-                ))}
-                <button
-                  onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
-                  className="btn-sculpt-cocoa inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Custom…
-                </button>
-              </div>
-            </div>
-          )}
-          <div
-            className="py-3 text-center cursor-pointer"
-            style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-            onClick={() => setAddSectionOpen((o) => !o)}
-          >
-            <span
-              style={{
-                fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
-                fontWeight: 700,
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--ink)",
-              }}
-            >
-              Add Section
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* On mobile, the inline bottom-sheet picker fights the on-screen
           keyboard and sticky headers — render a full-screen overlay instead.
@@ -1903,6 +1856,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         return (
           <FloatingChordToolbar
             mode="lyrics"
+            hideTrigger
             activeChord={
               activeCtx
                 ? {

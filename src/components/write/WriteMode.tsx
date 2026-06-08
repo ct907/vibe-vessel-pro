@@ -6,7 +6,7 @@ import { useTakesStore } from "@/store/takes";
 import { useSongStore } from "@/store/song";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { RecordingsStrip } from "./RecordingsStrip";
-import { RecordFab } from "./RecordFab";
+import { WriteStickyBar } from "./WriteStickyBar";
 
 interface Props {
   sortMode: boolean;
@@ -41,10 +41,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       {/* Left column — recordings (2 of 5) */}
       <div className="md:col-span-2">
         {showRecordings ? (
-          <div>
-            <RecordingsStrip />
-            <RecordFab />
-          </div>
+          <RecordingsStrip />
         ) : (
           <EmptyTapCard icon={<Mic className="h-7 w-7" strokeWidth={1.75} />} label="Add Recording" onClick={() => setRecRevealed(true)} />
         )}
@@ -58,6 +55,8 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <EmptyTapCard icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />} label="Write Lyrics" onClick={() => setLyricsRevealed(true)} />
         )}
       </div>
+
+      <WriteStickyBar actionsEnabled={showLyrics} onSwitchTab={onSwitchTab} />
     </div>
   );
 }
