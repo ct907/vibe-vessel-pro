@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Star, Trash2 } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { getAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
 import { Waveform } from "@/components/common/Waveform";
@@ -79,6 +79,17 @@ export function RecordingsStrip() {
           </span>
         )}
       </div>
+
+      {takes.length > 0 && (
+        <div className="mx-4 mb-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: "color-mix(in oklch, var(--primary) 8%, transparent)", border: "1px solid color-mix(in oklch, var(--primary) 20%, transparent)" }}>
+          <Save className="h-3 w-3 shrink-0" style={{ color: "var(--primary-strong)" }} />
+          <p className="text-[10.5px] leading-snug" style={{ color: "var(--ink-soft)" }}>
+            Recordings are cleared on page refresh — use{" "}
+            <span className="font-bold" style={{ color: "var(--ink)" }}>Menu → Save</span>{" "}
+            to keep them.
+          </p>
+        </div>
+      )}
 
       {takes.length > 0 ? (
         <div className="hide-scroll flex gap-2 overflow-x-auto px-4 pb-2" style={{ scrollSnapType: "x mandatory" }}>
