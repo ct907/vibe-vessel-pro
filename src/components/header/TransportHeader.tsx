@@ -339,6 +339,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     inspirationPhotos,
     addInspirationPhoto,
     removeInspirationPhoto,
+    setBpm,
   } = useSongStore();
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
@@ -367,6 +368,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const stopRequestedRef = useRef(false);
   const playMetaRef = useRef<PlaybackMeta[]>([]);
   const startFromChordIdAtPlayRef = useRef<string | null>(null);
+  const tapTimesRef = useRef<number[]>([]);
+  const tapResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tapBpm, setTapBpm] = useState<number | null>(null);
 
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
   // [isPlaying] — React would run it on the false→true transition AFTER
@@ -474,6 +478,29 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     setPlayingStore(false);
     setCurrent(null);
     usePlaybackStore.getState().setStartFromChord(null, null);
+  };
+
+  const handleTap = () => {
+    if (tapResetRef.current) clearTimeout(tapResetRef.current);
+    const now = performance.now();
+    const times = tapTimesRef.current;
+    if (times.length > 0 && now - times[times.length - 1] > 3000) {
+      tapTimesRef.current = [];
+    }
+    tapTimesRef.current.push(now);
+    if (tapTimesRef.current.length > 8) tapTimesRef.current.shift();
+    if (tapTimesRef.current.length >= 2) {
+      const intervals: number[] = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        intervals.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
+      }
+      const avg = intervals.reduce((a, b) => a + b) / intervals.length;
+      setTapBpm(Math.max(40, Math.min(220, Math.round(60000 / avg))));
+    }
+    tapResetRef.current = setTimeout(() => {
+      tapTimesRef.current = [];
+      setTapBpm(null);
+    }, 3000);
   };
 
   useEffect(() => {
@@ -619,7 +646,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               ) : (
                 <button
                   onClick={handleStop}
-                  className="btn-sculpt-cocoa shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm sm:order-1"
+                  className="btn-sculpt-cocoa animate-play-pulse shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 h-9 font-semibold text-sm sm:order-1"
                   aria-label="Stop"
                 >
                   <Square className="h-4 w-4" />
@@ -742,6 +769,48 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                   >
                     {onboarding.enabled ? "Turn off Tutorial" : "Turn on Tutorial"}
                   </Button>
+                </div>
+              </div>
+
+              {/* Tempo */}
+              <div className="mt-6">
+                <h3 className="uppercase tracking-wide text-[var(--paper-card)] mb-2 font-light font-mono text-sm">Tempo</h3>
+                <div className="rounded-md border border-border p-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: "var(--paper-card)" }}>Current BPM</span>
+                    <span className="font-mono-chord text-2xl font-bold" style={{ color: "var(--paper-card)" }}>{meta.bpm}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBpm(meta.bpm - 1)}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-base font-bold text-ink"
+                      aria-label="Decrease BPM"
+                    >−</button>
+                    <button
+                      type="button"
+                      onClick={handleTap}
+                      className="flex-1 inline-flex items-center justify-center h-9 rounded-md border border-border bg-background text-sm font-bold text-ink"
+                      aria-label="Tap tempo"
+                    >
+                      {tapBpm != null ? `${tapBpm} BPM — tap` : "Tap Tempo"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBpm(meta.bpm + 1)}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-base font-bold text-ink"
+                      aria-label="Increase BPM"
+                    >+</button>
+                  </div>
+                  {tapBpm != null && tapBpm !== meta.bpm && (
+                    <button
+                      type="button"
+                      onClick={() => { setBpm(tapBpm); setTapBpm(null); tapTimesRef.current = []; if (tapResetRef.current) clearTimeout(tapResetRef.current); }}
+                      className="btn-sculpt-amber inline-flex items-center justify-center h-9 rounded-lg text-sm font-bold"
+                    >
+                      Set {tapBpm} BPM
+                    </button>
+                  )}
                 </div>
               </div>
 

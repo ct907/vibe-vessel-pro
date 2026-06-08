@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { nanoid } from "nanoid";
 import { Plus, Trash2, Timer, GripVertical, Copy, Star } from "lucide-react";
 import { useSongStore } from "@/store/song";
-import { useRecordingsStore, type RecTrack } from "@/store/recordings";
+import { useRecordingsStore, type RecTrack, type RecClip, clipEndSec } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
+import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
+import { putAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
+import { getAudioContext } from "@/lib/audio/context";
 
 const PX_PER_BAR = 26;
 
@@ -129,9 +133,14 @@ export function TrackTimeline() {
   const bpm = useSongStore((s) => s.meta.bpm);
   const tracks = useRecordingsStore((s) => s.tracks);
   const addTrack = useRecordingsStore((s) => s.addTrack);
+  const addClip = useRecordingsStore((s) => s.addClip);
   const removeClip = useRecordingsStore((s) => s.removeClip);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const setRecording = useRecordingsStore((s) => s.setRecording);
+
+  const recorderRef = useRef<RecorderHandle | null>(null);
+  const [pendingTid, setPendingTid] = useState<string | null>(null);
+  const [recLevel, setRecLevel] = useState(0);
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
   const [offsets, setOffsets] = useState<Record<string, number>>({});
@@ -143,9 +152,54 @@ export function TrackTimeline() {
 
   const nudge = (tid: string, d: number) =>
     setOffsets((o) => ({ ...o, [tid]: Math.max(-2000, Math.min(2000, (o[tid] || 0) + d)) }));
-  const clearTrack = (t: RecTrack) => t.clips.forEach((c) => removeClip(t.id, c.blobId));
-  const toggleRecord = (tid: string) =>
-    setRecording(recordingTrackId !== tid, recordingTrackId === tid ? null : tid);
+
+  const clearTrack = (t: RecTrack) => {
+    t.clips.forEach((c) => {
+      removeClip(t.id, c.blobId);
+      void deleteAudioBlob(c.blobId);
+    });
+  };
+
+  const toggleRecord = async (tid: string) => {
+    if (recordingTrackId === tid) {
+      const handle = recorderRef.current;
+      recorderRef.current = null;
+      setRecording(false, null);
+      setRecLevel(0);
+      if (!handle) return;
+      setPendingTid(tid);
+      try {
+        const { blob, durationSec, mime } = await handle.stop();
+        const blobId = nanoid();
+        await putAudioBlob(blobId, blob);
+        const track = useRecordingsStore.getState().tracks.find((t) => t.id === tid);
+        const startSec = track ? track.clips.reduce((m, c) => Math.max(m, clipEndSec(c)), 0) : 0;
+        const clip: RecClip = { blobId, mime, durationSec, startSec, trimStartSec: 0, trimEndSec: durationSec };
+        addClip(tid, clip);
+      } catch {
+        // discard silently
+      } finally {
+        setPendingTid(null);
+      }
+      return;
+    }
+    if (recorderRef.current) {
+      recorderRef.current.cancel();
+      recorderRef.current = null;
+      setRecording(false, null);
+      setRecLevel(0);
+      setPendingTid(null);
+    }
+    try {
+      const ac = getAudioContext();
+      if (ac.state === "suspended") await ac.resume();
+      const handle = await startRecording({ onLevel: setRecLevel });
+      recorderRef.current = handle;
+      setRecording(true, tid);
+    } catch {
+      setRecording(false, null);
+    }
+  };
 
   return (
     <div className="pb-4">
@@ -242,11 +296,13 @@ export function TrackTimeline() {
                       <div className="flex items-center gap-2.5">
                         <button
                           type="button"
-                          onClick={() => toggleRecord(track.id)}
-                          aria-label="Record"
+                          onClick={() => void toggleRecord(track.id)}
+                          aria-label={isRec ? "Stop recording" : "Record"}
+                          disabled={pendingTid === track.id}
                           className={
                             "inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-destructive" +
-                            (isRec ? " animate-rec-pulse" : "")
+                            (isRec ? " animate-rec-pulse" : "") +
+                            (pendingTid === track.id ? " opacity-50" : "")
                           }
                           style={{ background: "var(--destructive)" }}
                         >
@@ -340,8 +396,18 @@ export function TrackTimeline() {
                         </div>
                       )}
                       {isRec && (
-                        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-destructive">
-                          ● Recording along…
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                          <span className="text-[11px] font-bold text-destructive">● Recording…</span>
+                          <div className="h-1 w-20 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.12)" }}>
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.round(recLevel * 100)}%`,
+                                background: "var(--destructive)",
+                                transition: "width 80ms linear",
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

@@ -4,6 +4,7 @@ import { Plus, Pencil } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore, type SectionType } from "@/store/song";
 import { useUIStore, type TabName } from "@/store/ui";
+import { useRecordingsStore } from "@/store/recordings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob } from "@/lib/audio/blob-store";
@@ -23,6 +24,7 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const trackIsRecording = useRecordingsStore((s) => s.isRecording);
   const isMobile = useIsMobile();
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -129,15 +131,15 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
             </div>
           )}
 
-          {/* Record — always visible */}
+          {/* Record — always visible; disabled while a track is recording */}
           <button
             type="button"
             onClick={toggle}
-            disabled={pending}
+            disabled={pending || (trackIsRecording && !recording)}
             className={
               "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold" +
               (recording ? " animate-rec-pulse" : "") +
-              (pending ? " opacity-70" : "")
+              ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
             }
             aria-label={recording ? "Stop recording" : "Record a take"}
           >

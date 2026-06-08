@@ -578,6 +578,16 @@
   animation: rec-pulse 1.2s ease infinite;
 }
 
+/* Playback pulse — transport stop button while playing. */
+@keyframes play-pulse {
+  0%, 100% { box-shadow: 0 4px 16px color-mix(in oklch, var(--primary) 45%, transparent); }
+  50%      { box-shadow: 0 4px 26px color-mix(in oklch, var(--primary) 80%, transparent); }
+}
+.animate-play-pulse {
+  animation: play-pulse 1.4s ease infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rec-pulse { animation: none; }
+  .animate-play-pulse { animation: none; }
 }
