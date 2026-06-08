@@ -6,7 +6,7 @@ import { useSongStore } from "@/store/song";
 import { useRecordingsStore } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
-import { RecordFab } from "@/components/write/RecordFab";
+import { WriteStickyBar } from "@/components/write/WriteStickyBar";
 import { TrackTimeline } from "./TrackTimeline";
 
 interface Props {
@@ -37,10 +37,7 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       {/* Left column — multitrack timeline (2 of 5) */}
       <div className="md:col-span-2">
         {showTrack ? (
-          <div>
-            <TrackTimeline />
-            <RecordFab onComplete={recordToFirstTrack} />
-          </div>
+          <TrackTimeline />
         ) : hasTakes ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-10 text-center" style={{ borderColor: "var(--primary)", background: "color-mix(in oklch, var(--primary) 6%, transparent)" }}>
             <Star className="h-8 w-8" style={{ color: "var(--primary)" }} strokeWidth={1.5} />
@@ -70,6 +67,12 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           />
         )}
       </div>
+
+      <WriteStickyBar
+        actionsEnabled={showChords}
+        onSwitchTab={onSwitchTab}
+        onRecordComplete={recordToFirstTrack}
+      />
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
         )}
       </div>
 
-      <WriteStickyBar lyricsShown={showLyrics} onSwitchTab={onSwitchTab} />
+      <WriteStickyBar actionsEnabled={showLyrics} onSwitchTab={onSwitchTab} />
     </div>
   );
 }

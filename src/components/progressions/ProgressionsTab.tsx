@@ -1816,6 +1816,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         return (
           <FloatingChordToolbar
             mode="progression"
+            hideTrigger
             activeChord={
               activeChordData
                 ? {

@@ -10,13 +10,16 @@ import { putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
 
 interface Props {
-  lyricsShown: boolean;
+  /** Whether the editor panel (lyrics / progressions) has been revealed — gates the Add Section and Edit Chords buttons. */
+  actionsEnabled: boolean;
   onSwitchTab: (t: TabName) => void;
+  /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
+  onRecordComplete?: (blobId: string, durationSec: number, mime: string) => void;
 }
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge", "intro"];
 
-export function WriteStickyBar({ lyricsShown, onSwitchTab }: Props) {
+export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
@@ -48,10 +51,14 @@ export function WriteStickyBar({ lyricsShown, onSwitchTab }: Props) {
     setLevel(0);
     setPending(true);
     try {
-      const { blob, durationSec } = await handle.stop();
+      const { blob, durationSec, mime } = await handle.stop();
       const blobId = nanoid();
       await putAudioBlob(blobId, blob);
-      addTake({ blobId, durationSec });
+      if (onRecordComplete) {
+        onRecordComplete(blobId, durationSec, mime);
+      } else {
+        addTake({ blobId, durationSec });
+      }
     } catch {
       // normalization or storage failed — discard silently
     } finally {
@@ -75,7 +82,7 @@ export function WriteStickyBar({ lyricsShown, onSwitchTab }: Props) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[45]" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       {/* Section type picker — slides up above bar */}
-      {addSectionOpen && lyricsShown && (
+      {addSectionOpen && actionsEnabled && (
         <div
           className="animate-in slide-in-from-bottom-2 duration-200"
           style={{ background: "var(--cocoa-deep)" }}
@@ -141,8 +148,8 @@ export function WriteStickyBar({ lyricsShown, onSwitchTab }: Props) {
             {pending ? "Saving…" : recording ? "Stop" : "Record"}
           </button>
 
-          {/* Add Section — disclosed after lyrics are shown */}
-          {lyricsShown && (
+          {/* Add Section — disclosed after editor is revealed */}
+          {actionsEnabled && (
             <button
               type="button"
               onClick={() => setAddSectionOpen((o) => !o)}
@@ -155,8 +162,8 @@ export function WriteStickyBar({ lyricsShown, onSwitchTab }: Props) {
             </button>
           )}
 
-          {/* Edit Chords — disclosed after lyrics are shown */}
-          {lyricsShown && (
+          {/* Edit Chords — disclosed after editor is revealed */}
+          {actionsEnabled && (
             <button
               type="button"
               onClick={handleEditChords}
