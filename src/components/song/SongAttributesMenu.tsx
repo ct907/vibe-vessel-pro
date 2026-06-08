@@ -45,6 +45,9 @@ export function SongAttributesMenu() {
   const [transposeOffset, setTransposeOffset] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const [tapBpm, setTapBpm] = useState<number | null>(null);
+  const tapTimesRef = useRef<number[]>([]);
+  const tapResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attrBtnRef = useRef<HTMLDivElement>(null);
 
   const handleConfirm = () => {
@@ -64,6 +67,29 @@ export function SongAttributesMenu() {
     const clamped = Math.max(40, Math.min(220, n));
     setBpm(clamped);
     setBpmDraft(String(clamped));
+  };
+
+  const handleTap = () => {
+    if (tapResetRef.current) clearTimeout(tapResetRef.current);
+    const now = performance.now();
+    const times = tapTimesRef.current;
+    if (times.length > 0 && now - times[times.length - 1] > 3000) {
+      tapTimesRef.current = [];
+    }
+    tapTimesRef.current.push(now);
+    if (tapTimesRef.current.length > 8) tapTimesRef.current.shift();
+    if (tapTimesRef.current.length >= 2) {
+      const intervals: number[] = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        intervals.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
+      }
+      const avg = intervals.reduce((a, b) => a + b) / intervals.length;
+      setTapBpm(Math.max(40, Math.min(220, Math.round(60000 / avg))));
+    }
+    tapResetRef.current = setTimeout(() => {
+      tapTimesRef.current = [];
+      setTapBpm(null);
+    }, 3000);
   };
 
   const stepTranspose = (delta: -1 | 1) => {
@@ -164,24 +190,51 @@ export function SongAttributesMenu() {
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">BPM</span>
-            <Input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={bpmDraft}
-              onChange={(e) => setBpmDraft(e.target.value.replace(/[^\d]/g, ""))}
-              onBlur={commitBpm}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitBpm();
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              className="h-9 w-20 px-2 text-center font-mono-chord"
-            />
+          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">BPM</span>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bpmDraft}
+                  onChange={(e) => setBpmDraft(e.target.value.replace(/[^\d]/g, ""))}
+                  onBlur={commitBpm}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitBpm();
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  className="h-9 w-16 px-2 text-center font-mono-chord"
+                />
+                <button
+                  type="button"
+                  onClick={handleTap}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-ink"
+                  aria-label="Tap tempo"
+                >
+                  {tapBpm != null ? `${tapBpm}` : "Tap"}
+                </button>
+              </div>
+            </div>
+            {tapBpm != null && tapBpm !== meta.bpm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBpm(tapBpm);
+                  setBpmDraft(String(tapBpm));
+                  setTapBpm(null);
+                  tapTimesRef.current = [];
+                  if (tapResetRef.current) clearTimeout(tapResetRef.current);
+                }}
+                className="btn-sculpt-amber w-full rounded-lg h-8 text-xs font-bold"
+              >
+                Set {tapBpm} BPM
+              </button>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2">
