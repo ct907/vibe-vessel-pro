@@ -25,11 +25,12 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const recordToFirstTrack = useRecordingsStore((s) => s.recordToFirstTrack);
   const progressionsEmpty = useSongStore((s) => s.sections.every((sec) => sec.chords.length === 0));
   const hasTakes = useTakesStore((s) => s.takes.length > 0);
+  const hasBestTakes = useTakesStore((s) => s.takes.some((t) => t.best));
 
   const [trackRevealed, setTrackRevealed] = useState(false);
   const [chordsRevealed, setChordsRevealed] = useState(false);
 
-  const showTrack = !tracksEmpty || trackRevealed;
+  const showTrack = !tracksEmpty || trackRevealed || hasBestTakes;
   const showChords = !progressionsEmpty || chordsRevealed;
 
   return (
