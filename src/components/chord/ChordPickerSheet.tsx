@@ -253,6 +253,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
               }}
             />
             <ChordTypeHelpers query={query} onChange={setQuery} />
+            <SlashBassPicker query={query} onChange={setQuery} />
             <Select value={String(octave)} onValueChange={(v) => { const o = Number(v); setOctave(o); onOctaveChange?.(o); }}>
               <SelectTrigger
                 className="h-10 w-[64px] px-2 text-xs font-mono-chord border-0"
@@ -270,8 +271,6 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
               </SelectContent>
             </Select>
           </div>
-
-          <SlashBassPicker query={query} onChange={setQuery} />
 
           {nashvilleChords && nashvilleChords.length > 0 && (
             <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
@@ -377,9 +376,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
 }
 
 // ============================================================================
-// Slash-bass note picker row. Renders 12 compact pitch-class chips; the chip
-// matching the current slash bass (detected from the typed query) is highlighted.
-// Clicking an active chip clears the bass; clicking another sets it.
+// Slash-bass dropdown. Shows /—, /C, /D, /Eb … options; the option matching
+// the current slash bass (detected from the typed query via pitch class) is
+// pre-selected. Picking /— clears the bass.
 // ============================================================================
 
 export function SlashBassPicker({ query, onChange }: { query: string; onChange: (q: string) => void }) {
@@ -388,50 +387,32 @@ export function SlashBassPicker({ query, onChange }: { query: string; onChange: 
   const tail = query.trim().slice(rl);
   const [core, currentBass] = splitSlash(tail);
   const currentPc = currentBass ? rootToPc(currentBass) : -1;
+  const activeNote = currentPc >= 0 ? (BASS_NOTES.find((n) => rootToPc(n) === currentPc) ?? null) : null;
 
-  const handleNote = (note: string) => {
-    if (rootToPc(note) === currentPc) {
+  const handleChange = (value: string) => {
+    if (value === "__none") {
       onChange(root + core);
     } else {
-      onChange(`${root}${core}/${note}`);
+      onChange(`${root}${core}/${value}`);
     }
   };
 
   return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <span
-        className="font-mono-chord"
-        style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", opacity: 0.45, userSelect: "none", marginRight: 2 }}
+    <Select value={activeNote ?? "__none"} onValueChange={handleChange}>
+      <SelectTrigger
+        className="h-10 w-[88px] px-2 text-xs font-mono-chord border-0"
+        style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
+        aria-label="Slash bass note"
       >
-        /bass
-      </span>
-      {BASS_NOTES.map((note) => {
-        const isActive = currentPc >= 0 && rootToPc(note) === currentPc;
-        return (
-          <button
-            key={note}
-            type="button"
-            onClick={() => handleNote(note)}
-            className="font-mono-chord"
-            style={{
-              fontWeight: 700,
-              fontSize: 11,
-              minWidth: 28,
-              height: 26,
-              borderRadius: 6,
-              padding: "0 5px",
-              background: isActive ? "var(--primary)" : "var(--paper-shade)",
-              color: isActive ? "var(--primary-foreground, var(--ink))" : "var(--ink-soft)",
-              border: `2px solid ${isActive ? "var(--primary-strong)" : "transparent"}`,
-              cursor: "pointer",
-              transition: "background 120ms ease, border-color 120ms ease",
-            }}
-          >
-            {note}
-          </button>
-        );
-      })}
-    </div>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none" className="text-xs font-mono-chord">/—</SelectItem>
+        {BASS_NOTES.map((note) => (
+          <SelectItem key={note} value={note} className="text-xs font-mono-chord">/{note}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
