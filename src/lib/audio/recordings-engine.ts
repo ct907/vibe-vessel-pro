@@ -144,22 +144,28 @@ async function scheduleClipForLoop(
   const nodes = ensureNodes(track);
   const ac = getAudioContext();
   const loopStart = state.loopStartCtxTime + loopIndex * state.loopSec;
-  const startTime = loopStart + clip.startSec;
-  if (startTime + 0.001 < ac.currentTime) return;
   const offset = Math.max(0, Math.min(clip.trimStartSec, buffer.duration - 0.001));
-  const maxLen = Math.max(0.01, clip.trimEndSec - offset);
-  const remainingInLoop = state.loopSec - clip.startSec;
-  const length = Math.max(0.01, Math.min(maxLen, remainingInLoop));
-  const source = ac.createBufferSource();
-  source.buffer = buffer;
-  source.connect(nodes.gain);
-  try {
-    source.start(startTime, offset, length);
-  } catch {
-    return;
+  const body = Math.max(0.01, clip.trimEndSec - offset);
+  const fillEnd = clip.startSec + Math.max(body, clip.loopSec ?? 0);
+
+  for (let pos = clip.startSec; pos < fillEnd - 0.001; pos += body) {
+    const startTime = loopStart + pos;
+    if (startTime + 0.001 < ac.currentTime) continue;
+    const remainingInFill = fillEnd - pos;
+    const remainingInLoop = state.loopSec - pos;
+    const length = Math.max(0.01, Math.min(body, remainingInFill, remainingInLoop));
+    if (length <= 0.001) break;
+    const source = ac.createBufferSource();
+    source.buffer = buffer;
+    source.connect(nodes.gain);
+    try {
+      source.start(startTime, offset, length);
+    } catch {
+      break;
+    }
+    nodes.sources.push({ source, endTime: startTime + length });
+    if (remainingInLoop <= body + 0.001) break;
   }
-  const endTime = startTime + length;
-  nodes.sources.push({ source, endTime });
 }
 
 async function scheduleLoop(loopIndex: number) {

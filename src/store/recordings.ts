@@ -12,6 +12,9 @@ export interface RecClip {
   startSec: number;
   trimStartSec: number;
   trimEndSec: number;
+  /** When set and larger than the clip body, the clip repeats back-to-back to
+   *  fill this many seconds on the timeline (BandLab-style loop). */
+  loopSec?: number;
 }
 
 export interface RecTrack {
@@ -37,9 +40,19 @@ export const TRACK_COLOR_PRESETS = [
 
 const DEFAULT_NAMES = ["Track 1", "Track 2", "Track 3", "Track 4"];
 
+/** Length of a single playback of the clip body (after trimming). */
+export function clipBodySec(clip: RecClip): number {
+  return clip.trimEndSec - clip.trimStartSec;
+}
+
+/** Visible length of a clip on the timeline, including any loop fill. */
+export function clipSpanSec(clip: RecClip): number {
+  return Math.max(clipBodySec(clip), clip.loopSec ?? 0);
+}
+
 /** Effective end of a clip in loop time. */
 export function clipEndSec(clip: RecClip): number {
-  return clip.startSec + (clip.trimEndSec - clip.trimStartSec);
+  return clip.startSec + clipSpanSec(clip);
 }
 
 /** Punch-in: remove/trim any clips overlapping [punchStart, punchEnd] and
@@ -131,6 +144,12 @@ interface RecordingsState {
   punchInClip: (id: RecTrackId, clip: RecClip, punchStart: number, punchEnd: number) => void;
   setClipTrim: (id: RecTrackId, blobId: RecBlobId, trimStart: number, trimEnd: number) => void;
   setClipStart: (id: RecTrackId, blobId: RecBlobId, startSec: number) => void;
+  /** Set the looped fill length. Pass undefined / a value <= body to disable looping. */
+  setClipLoop: (id: RecTrackId, blobId: RecBlobId, loopSec: number | undefined) => void;
+  /** Move a clip within or across tracks, re-applying non-overlap at the destination. */
+  moveClip: (from: RecTrackId, to: RecTrackId, blobId: RecBlobId, startSec: number) => void;
+  /** Snapshot the current tracks for a single undo step (call once at the start of a drag). */
+  beginClipEdit: () => void;
 
   /** @deprecated use addClip instead */
   setClip: (id: RecTrackId, clip: RecClip | null) => void;
@@ -261,6 +280,44 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
         };
       }),
     })),
+
+  setClipLoop: (id, blobId, loopSec) =>
+    set((s) => ({
+      tracks: s.tracks.map((t) => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          clips: t.clips.map((c) => {
+            if (c.blobId !== blobId) return c;
+            const body = clipBodySec(c);
+            const next = loopSec === undefined || loopSec <= body + 0.001 ? undefined : loopSec;
+            return { ...c, loopSec: next };
+          }),
+        };
+      }),
+    })),
+
+  moveClip: (from, to, blobId, startSec) =>
+    set((s) => {
+      const src = s.tracks.find((t) => t.id === from);
+      const clip = src?.clips.find((c) => c.blobId === blobId);
+      if (!clip) return {};
+      const moved: RecClip = { ...clip, startSec: Math.max(0, startSec) };
+      return {
+        tracks: s.tracks.map((t) => {
+          if (t.id === from && from !== to) {
+            return { ...t, clips: t.clips.filter((c) => c.blobId !== blobId) };
+          }
+          if (t.id === to) {
+            const base = from === to ? t.clips.filter((c) => c.blobId !== blobId) : t.clips;
+            return { ...t, clips: applyPunchIn(base, moved, moved.startSec, clipEndSec(moved)) };
+          }
+          return t;
+        }),
+      };
+    }),
+
+  beginClipEdit: () => pushHistory(get().tracks),
 
   setClip: (id, clip) => {
     pushHistory(get().tracks);
