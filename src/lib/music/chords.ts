@@ -64,7 +64,7 @@ const QUALITY_MAP: Array<[RegExp, Quality]> = [
   [/^5(?!\d)/,               "5"],
 ];
 
-const QUALITY_INTERVALS: Record<Quality, number[]> = {
+export const QUALITY_INTERVALS: Record<Quality, number[]> = {
   maj:    [0, 4, 7],
   min:    [0, 3, 7],
   dim:    [0, 3, 6],

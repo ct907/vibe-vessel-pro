@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Star, Trash2, Save } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { getAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
 import { Waveform } from "@/components/common/Waveform";
+import { DetectChordsSheet } from "@/components/chord/DetectChordsSheet";
 
 export function RecordingsStrip() {
   const takes = useTakesStore((s) => s.takes);
   const toggleBest = useTakesStore((s) => s.toggleBest);
   const removeTake = useTakesStore((s) => s.removeTake);
 
+  const [detectOpen, setDetectOpen] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -66,9 +68,19 @@ export function RecordingsStrip() {
   return (
     <div className="mb-3">
       <div className="flex items-center justify-between px-4 pb-1.5">
-        <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
-          Recordings
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
+            Recordings
+          </span>
+          <button
+            type="button"
+            onClick={() => setDetectOpen(true)}
+            className="btn-sculpt-cream inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+          >
+            <Sparkles className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
+            Detect chords
+          </button>
+        </div>
         {takes.length > 0 && (
           <span
             className="inline-flex items-center gap-1 text-[11px] font-bold"
@@ -120,6 +132,8 @@ export function RecordingsStrip() {
           </p>
         </div>
       )}
+
+      <DetectChordsSheet open={detectOpen} onOpenChange={setDetectOpen} />
     </div>
   );
 }
