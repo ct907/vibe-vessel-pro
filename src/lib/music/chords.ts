@@ -199,9 +199,22 @@ export function makeChordFromInput(raw: string): ChordSymbol | null {
   return parseChord(raw);
 }
 
+const KEEP_FIFTH_QUALITIES = new Set<Quality>([
+  "dim", "aug", "dim7", "m7b5", "7#5", "7alt", "sus2", "sus4", "5", "maj", "min",
+]);
+
+function voiceIntervals(quality: Quality): number[] {
+  const raw = QUALITY_INTERVALS[quality];
+  if (KEEP_FIFTH_QUALITIES.has(quality) || raw.length <= 4) return raw;
+  let v = raw.filter((i) => i !== 7);
+  if (raw.includes(21)) v = v.filter((i) => i !== 14 && i !== 17);
+  else if (raw.includes(17)) v = v.filter((i) => i !== 14);
+  return v;
+}
+
 export function chordToMidi(chord: ChordSymbol, octave = 4): number[] {
   const rootPc = rootToPc(chord.root);
-  const intervals = QUALITY_INTERVALS[chord.quality];
+  const intervals = voiceIntervals(chord.quality);
   const base = 12 * (octave + 1) + rootPc; // MIDI C4 = 60
   const notes = intervals.map((i) => base + i);
   let padIdx = 0;
