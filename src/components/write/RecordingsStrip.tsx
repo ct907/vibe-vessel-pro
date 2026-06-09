@@ -136,8 +136,8 @@ export function RecordingsStrip() {
         return;
       }
       const name = file.name.replace(/\.[^.]+$/, "") || "Imported";
-      const takeId = addTake({ name, blobId, durationSec, mime: file.type || "audio/*" });
-      void runTranscription(takeId, file);
+      addTake({ name, blobId, durationSec, mime: file.type || "audio/*" });
+      toast.success("Imported — use the take's ⋮ menu to transcribe chords.");
     } catch {
       toast.error("Couldn't import that audio file.");
     }
