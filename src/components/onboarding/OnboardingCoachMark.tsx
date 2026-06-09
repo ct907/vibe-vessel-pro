@@ -224,7 +224,7 @@ export function AnchoredCoachMark({
         left: pos?.left ?? 0,
         transform: "translateX(-50%)",
         zIndex: 9999,
-        visibility: ready ? "visible" : "hidden",
+        visibility: visible ? "visible" : "hidden",
       }}
     >
       <OnboardingCoachMark {...markProps} />
