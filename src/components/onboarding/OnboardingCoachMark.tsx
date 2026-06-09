@@ -213,7 +213,7 @@ export function AnchoredCoachMark({
   }, [anchorRef, gap, anchorEdge, viewportBottom]);
 
   const interactive = !!markProps.actionLabel && !!markProps.onAction;
-  const ready = pos !== null && markSize !== null;
+  const visible = pos !== null && ready;
   return createPortal(
     <div
       ref={markWrapperRef}
