@@ -6,18 +6,23 @@ interface Props {
   isVisible: boolean;
 }
 
-const VOICE_COLORS = ["#E8C547", "#9CC27A", "#7FB0D6", "#D77A6B"];
+const VOICE_COLORS = ["#E8C547", "#9CC27A", "#7FB0D6", "#D77A6B", "#C8956A"];
 const PX_PER_SEMITONE = 4;
 const PAD_TOP = 28;
 const PAD_BOTTOM = 12;
 const MIN_H = 120;
 const MAX_H = 280;
 const MARKER_R = 12;
-const ANCHOR_Y = [16, 40, 64, 88];
+const ANCHOR_Y = [16, 40, 64, 88, 118];
 
 function voicesTopDown(chord: ChordSymbol): number[] {
-  const notes = chordToMidi(chord, 4);
-  const uniq = Array.from(new Set(notes)).sort((a, b) => b - a);
+  const all = chordToMidi(chord, 4);
+  if (chord.bass) {
+    const bass = all[0];
+    const chordNotes = Array.from(new Set(all.slice(1))).sort((a, b) => b - a).slice(0, 4);
+    return [...chordNotes, bass];
+  }
+  const uniq = Array.from(new Set(all)).sort((a, b) => b - a);
   return uniq.slice(0, 4);
 }
 
@@ -65,9 +70,13 @@ function Marker({ x, y, voiceIdx, label }: { x: number; y: number; voiceIdx: num
         strokeWidth={1}
       />
     );
-  } else {
+  } else if (voiceIdx === 3) {
     // circle
     shape = <circle r={r} fill={fill} stroke={stroke} strokeWidth={1} />;
+  } else {
+    // downward triangle — slash bass note
+    const pts = [`0,${r}`, `${-r * 0.87},${-r * 0.5}`, `${r * 0.87},${-r * 0.5}`].join(" ");
+    shape = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1} />;
   }
   return (
     <g transform={`translate(${x}, ${y})`}>
@@ -176,7 +185,7 @@ export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
               viewBox={`0 0 ${width} ${height}`}
               style={{ display: "block" }}
             >
-              {[0, 1, 2, 3].map((vi) => {
+              {[0, 1, 2, 3, 4].map((vi) => {
                 const segs: JSX.Element[] = [];
                 for (let i = 0; i < n - 1; i++) {
                   const a = cols[i][vi];
