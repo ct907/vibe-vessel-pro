@@ -434,8 +434,19 @@ export function TrackTimeline() {
 
   const LANE_H = isMobile ? 114 : 78;
   const LABEL_W = isMobile ? 138 : 156;
-  const timelineW = totalBars * PX_PER_BAR;
   const secPerBar = (60 / bpm) * beatsPerBar;
+
+  // Default the timeline to 10 minutes, extending to fit the longest clip.
+  const MIN_TIMELINE_SEC = 600;
+  const maxClipEnd = tracks.reduce(
+    (m, t) => t.clips.reduce((mm, c) => Math.max(mm, clipEndSec(c)), m),
+    0,
+  );
+  const displayBars = Math.max(
+    totalBars,
+    Math.ceil(Math.max(MIN_TIMELINE_SEC, maxClipEnd) / secPerBar),
+  );
+  const timelineW = displayBars * PX_PER_BAR;
 
   const nudge = (tid: string, d: number) =>
     setOffsets((o) => ({ ...o, [tid]: Math.max(-2000, Math.min(2000, (o[tid] || 0) + d)) }));
@@ -557,7 +568,7 @@ export function TrackTimeline() {
             style={{ paddingLeft: LABEL_W, background: "var(--paper-shade-soft)" }}
             onClick={handleRulerClick}
           >
-            {Array.from({ length: Math.ceil(totalBars / 4) }).map((_, i) => (
+            {Array.from({ length: Math.ceil(displayBars / 4) }).map((_, i) => (
               <div
                 key={i}
                 className="shrink-0 border-l border-border pl-1 font-mono-chord text-[9px] text-ink-soft"
@@ -718,14 +729,14 @@ export function TrackTimeline() {
                           }}
                           onClick={handleLaneClick}
                         >
-                          {Array.from({ length: totalBars }).map((_, i) => (
+                          {Array.from({ length: Math.ceil(displayBars / 4) }).map((_, i) => (
                             <div
                               key={i}
                               className="absolute bottom-0 top-0"
                               style={{
-                                left: i * PX_PER_BAR,
+                                left: i * 4 * PX_PER_BAR,
                                 width: 1,
-                                background: i % 4 === 0 ? "var(--border)" : "transparent",
+                                background: "var(--border)",
                                 opacity: 0.6,
                               }}
                             />
