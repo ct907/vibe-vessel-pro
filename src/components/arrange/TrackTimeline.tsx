@@ -1,15 +1,25 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { Plus, Trash2, Timer, GripVertical, Copy, Star } from "lucide-react";
+import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
-import { useRecordingsStore, type RecTrack, type RecClip, clipEndSec } from "@/store/recordings";
+import {
+  useRecordingsStore,
+  type RecTrack,
+  type RecClip,
+  clipEndSec,
+  clipBodySec,
+  clipSpanSec,
+} from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
-import { putAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
+import { putAudioBlob, deleteAudioBlob, getAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
+import { decodeBlob, cachedPeaks, invalidatePeaks } from "@/lib/audio/waveform";
+import { clearDecodedCache } from "@/lib/audio/recordings-engine";
 
 const PX_PER_BAR = 26;
 
@@ -18,6 +28,80 @@ function seedFromId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 100;
   return h;
+}
+
+/** Real decoded-peaks waveform for a clip. Falls back to a seed placeholder
+ *  while the blob decodes. `tileWidth`, when set, repeats the peaks every
+ *  `tileWidth` px (used to draw looped clips). */
+function ClipWaveform({
+  blobId,
+  width,
+  height,
+  color,
+  opacity = 1,
+  tileWidth,
+}: {
+  blobId: string;
+  width: number;
+  height: number;
+  color: string;
+  opacity?: number;
+  tileWidth?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const blob = await getAudioBlob(blobId);
+        if (!blob || cancelled) return;
+        const buf = await decodeBlob(blob);
+        if (!cancelled) setBuffer(buf);
+      } catch {
+        /* keep placeholder */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [blobId]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !buffer) return;
+    const w = Math.max(1, Math.floor(width));
+    const h = Math.max(1, Math.floor(height));
+    const tile = Math.max(1, Math.floor(tileWidth ?? w));
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    const peaks = cachedPeaks(blobId, buffer, tile);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = opacity;
+    const mid = h / 2;
+    for (let i = 0; i < w; i++) {
+      const p = peaks[i % tile] ?? 0;
+      const bar = Math.max(1, p * h);
+      ctx.fillRect(i, mid - bar / 2, 1, bar);
+    }
+    if (tileWidth && tile < w) {
+      ctx.globalAlpha = opacity * 0.5;
+      for (let x = tile; x < w; x += tile) ctx.fillRect(x, 0, 1, h);
+    }
+  }, [buffer, blobId, width, height, color, opacity, tileWidth]);
+
+  if (!buffer) {
+    return (
+      <Waveform width={width} height={height} seed={seedFromId(blobId)} color={color} opacity={opacity} />
+    );
+  }
+  return <canvas ref={canvasRef} style={{ width, height }} />;
 }
 
 /** Bars for a section = sum of its pattern bars, or a sensible default. */
@@ -155,6 +239,11 @@ export function TrackTimeline() {
   const addTrack = useRecordingsStore((s) => s.addTrack);
   const addClip = useRecordingsStore((s) => s.addClip);
   const removeClip = useRecordingsStore((s) => s.removeClip);
+  const setClipStart = useRecordingsStore((s) => s.setClipStart);
+  const setClipTrim = useRecordingsStore((s) => s.setClipTrim);
+  const setClipLoop = useRecordingsStore((s) => s.setClipLoop);
+  const moveClip = useRecordingsStore((s) => s.moveClip);
+  const beginClipEdit = useRecordingsStore((s) => s.beginClipEdit);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const setRecording = useRecordingsStore((s) => s.setRecording);
   const playheadSec = useRecordingsStore((s) => s.playheadSec);
@@ -167,8 +256,181 @@ export function TrackTimeline() {
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
   const [offsets, setOffsets] = useState<Record<string, number>>({});
 
+  const [selected, setSelected] = useState<{ trackId: string; blobId: string } | null>(null);
+  const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importTargetRef = useRef<string | null>(null);
+
+  const dragRef = useRef<
+    | {
+        mode: "move" | "trim-left" | "trim-right" | "loop";
+        trackId: string;
+        blobId: string;
+        durationSec: number;
+        grabOffsetSec: number;
+        origStart: number;
+        origTrimStart: number;
+        origTrimEnd: number;
+        origClientX: number;
+        moved: boolean;
+      }
+    | null
+  >(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const isDraggingPlayhead = useRef(false);
+
+  const selectedClip = selected
+    ? tracks.find((t) => t.id === selected.trackId)?.clips.find((c) => c.blobId === selected.blobId) ?? null
+    : null;
+  const selectedTrack = selected ? tracks.find((t) => t.id === selected.trackId) ?? null : null;
+
+  const deleteClip = (trackId: string, blobId: string) => {
+    removeClip(trackId, blobId);
+    void deleteAudioBlob(blobId);
+    clearDecodedCache(blobId);
+    invalidatePeaks(blobId);
+    setSelected((s) => (s?.blobId === blobId ? null : s));
+  };
+
+  const duplicateClip = async (track: RecTrack, clip: RecClip) => {
+    const blob = await getAudioBlob(clip.blobId);
+    if (!blob) return;
+    const newId = nanoid();
+    await putAudioBlob(newId, blob);
+    const copy: RecClip = { ...clip, blobId: newId, startSec: clipEndSec(clip) };
+    addClip(track.id, copy);
+    setSelected({ trackId: track.id, blobId: newId });
+  };
+
+  const triggerImport = (trackId: string) => {
+    importTargetRef.current = trackId;
+    fileInputRef.current?.click();
+  };
+
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const trackId = importTargetRef.current;
+    e.target.value = "";
+    importTargetRef.current = null;
+    if (!file || !trackId) return;
+    let durationSec = 0;
+    try {
+      const buf = await decodeBlob(file);
+      durationSec = buf.duration;
+    } catch {
+      toast.error("Could not decode audio file");
+      return;
+    }
+    const blobId = nanoid();
+    await putAudioBlob(blobId, file);
+    const startSec = useRecordingsStore.getState().playheadSec;
+    const clip: RecClip = {
+      blobId,
+      mime: file.type || "audio/mpeg",
+      durationSec,
+      startSec,
+      trimStartSec: 0,
+      trimEndSec: durationSec,
+    };
+    addClip(trackId, clip);
+    setSelected({ trackId, blobId });
+    toast.success(`Imported ${file.name}`);
+  };
+
+  const onClipPointerDown = (e: React.PointerEvent, track: RecTrack, clip: RecClip) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const mode = ((e.target as HTMLElement).dataset.handle as
+      | "trim-left"
+      | "trim-right"
+      | "loop"
+      | undefined) ?? "move";
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = {
+      mode,
+      trackId: track.id,
+      blobId: clip.blobId,
+      durationSec: clip.durationSec,
+      grabOffsetSec: clientXToSec(e.clientX) - clip.startSec,
+      origStart: clip.startSec,
+      origTrimStart: clip.trimStartSec,
+      origTrimEnd: clip.trimEndSec,
+      origClientX: e.clientX,
+      moved: false,
+    };
+  };
+
+  const onClipPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const sec = clientXToSec(e.clientX);
+    if (!d.moved && Math.abs(e.clientX - d.origClientX) > 4) {
+      d.moved = true;
+      beginClipEdit();
+      if (d.mode === "move") (e.currentTarget as HTMLElement).style.pointerEvents = "none";
+    }
+    if (d.mode === "move") {
+      setClipStart(d.trackId, d.blobId, Math.max(0, sec - d.grabOffsetSec));
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const lane = el?.closest("[data-lane-track]");
+      setHoverTrackId(lane?.getAttribute("data-lane-track") ?? d.trackId);
+    } else if (d.mode === "trim-left") {
+      let nStart = Math.max(0, sec);
+      let nTrimStart = d.origTrimStart + (nStart - d.origStart);
+      nTrimStart = Math.max(0, Math.min(nTrimStart, d.origTrimEnd - 0.05));
+      nStart = d.origStart + (nTrimStart - d.origTrimStart);
+      setClipTrim(d.trackId, d.blobId, nTrimStart, d.origTrimEnd);
+      setClipStart(d.trackId, d.blobId, nStart);
+    } else if (d.mode === "trim-right") {
+      let nTrimEnd = d.origTrimStart + (sec - d.origStart);
+      nTrimEnd = Math.max(d.origTrimStart + 0.05, Math.min(nTrimEnd, d.durationSec));
+      setClipTrim(d.trackId, d.blobId, d.origTrimStart, nTrimEnd);
+    } else if (d.mode === "loop") {
+      setClipLoop(d.trackId, d.blobId, Math.max(0, sec - d.origStart));
+    }
+  };
+
+  const onClipPointerUp = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+    (e.currentTarget as HTMLElement).style.pointerEvents = "";
+    if (d.mode === "move" && d.moved) {
+      const st = useRecordingsStore.getState();
+      const cur = st.tracks.find((t) => t.id === d.trackId)?.clips.find((c) => c.blobId === d.blobId);
+      const ns = cur?.startSec ?? d.origStart;
+      const dest = hoverTrackId ?? d.trackId;
+      moveClip(d.trackId, dest, d.blobId, ns);
+      setSelected({ trackId: dest, blobId: d.blobId });
+    } else if (!d.moved) {
+      setSelected({ trackId: d.trackId, blobId: d.blobId });
+    }
+    setHoverTrackId(null);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!selected) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteClip(selected.trackId, selected.blobId);
+      } else if (e.key === "Escape") {
+        setSelected(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const LANE_H = isMobile ? 114 : 78;
   const LABEL_W = isMobile ? 138 : 156;
@@ -203,6 +465,7 @@ export function TrackTimeline() {
     if (isDraggingPlayhead.current) return;
     // Only set playhead when clicking the bare lane background, not on clips
     if ((e.target as HTMLElement).closest("[data-clip]")) return;
+    setSelected(null);
     setPlayheadSec(clientXToSec(e.clientX));
   };
 
@@ -269,6 +532,13 @@ export function TrackTimeline() {
 
   return (
     <div className="pb-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,.mp3,.wav,.ogg,.m4a"
+        className="hidden"
+        onChange={handleFilePicked}
+      />
       <BestTakesTray />
 
       <div className="flex items-center gap-2.5 px-4 pb-2.5">
@@ -409,6 +679,14 @@ export function TrackTimeline() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => triggerImport(track.id)}
+                          aria-label="Import audio"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setDelayOpen(showDelay ? null : track.id)}
                           aria-label="Delay compensation"
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
@@ -429,9 +707,10 @@ export function TrackTimeline() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
+                          data-lane-track={track.id}
                           className="relative flex-1"
                           style={{
-                            background: snapshot.isDraggingOver
+                            background: snapshot.isDraggingOver || hoverTrackId === track.id
                               ? "var(--primary-halo)"
                               : isRec
                               ? "#fdf3f3"
@@ -452,37 +731,83 @@ export function TrackTimeline() {
                             />
                           ))}
                           {track.clips.map((clip) => {
-                            const len = clip.trimEndSec - clip.trimStartSec;
+                            const body = clipBodySec(clip);
+                            const span = clipSpanSec(clip);
+                            const looped = (clip.loopSec ?? 0) > body + 0.001;
                             const startBar = clip.startSec / secPerBar + offBars;
-                            const lengthBars = Math.max(0.5, len / secPerBar);
-                            const seed = seedFromId(clip.blobId);
+                            const spanBars = Math.max(0.5, span / secPerBar);
+                            const bodyBars = Math.max(0.5, body / secPerBar);
+                            const widthPx = spanBars * PX_PER_BAR - 4;
+                            const bodyWidthPx = bodyBars * PX_PER_BAR - 4;
+                            const innerW = Math.max(8, widthPx - 12);
+                            const isSel = selected?.blobId === clip.blobId && selected?.trackId === track.id;
+                            const handleW = isMobile ? 14 : 9;
+                            const trimRightLeft = (looped ? bodyWidthPx : widthPx) - handleW;
                             return (
                               <div
                                 key={clip.blobId}
                                 data-clip="1"
-                                className="absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md px-1.5"
+                                onPointerDown={(e) => onClipPointerDown(e, track, clip)}
+                                onPointerMove={onClipPointerMove}
+                                onPointerUp={onClipPointerUp}
+                                className="absolute flex touch-none cursor-grab flex-col justify-center overflow-hidden rounded-md px-1.5"
                                 style={{
                                   top: 6,
                                   bottom: 6,
                                   left: startBar * PX_PER_BAR + 2,
-                                  width: lengthBars * PX_PER_BAR - 4,
+                                  width: widthPx,
                                   background: track.color,
-                                  boxShadow: "0 1px 4px rgba(61,43,26,0.18)",
+                                  boxShadow: isSel
+                                    ? "0 0 0 2px var(--paper), 0 0 0 4px var(--primary), 0 1px 4px rgba(61,43,26,0.18)"
+                                    : "0 1px 4px rgba(61,43,26,0.18)",
+                                  zIndex: isSel ? 3 : 1,
                                 }}
                               >
                                 <span
-                                  className="truncate text-[9px] font-bold text-white"
+                                  className="pointer-events-none truncate text-[9px] font-bold text-white"
                                   style={{ textShadow: "0 1px 1px rgba(0,0,0,0.2)" }}
                                 >
                                   {track.name}
+                                  {looped ? ` · ${Math.round(span / Math.max(0.01, body) * 10) / 10}×` : ""}
                                 </span>
-                                <Waveform
-                                  width={Math.max(8, lengthBars * PX_PER_BAR - 16)}
-                                  height={isMobile ? 34 : 22}
-                                  seed={seed}
-                                  color="#fff"
-                                  opacity={0.55}
-                                />
+                                <div className="pointer-events-none">
+                                  <ClipWaveform
+                                    blobId={clip.blobId}
+                                    width={innerW}
+                                    height={isMobile ? 34 : 22}
+                                    color="#fff"
+                                    opacity={0.55}
+                                    tileWidth={looped ? Math.max(4, (body / span) * innerW) : undefined}
+                                  />
+                                </div>
+                                {isSel && (
+                                  <>
+                                    <div
+                                      data-handle="trim-left"
+                                      className="absolute bottom-0 left-0 top-0 cursor-ew-resize"
+                                      style={{ width: handleW, background: "rgba(255,255,255,0.35)" }}
+                                    />
+                                    <div
+                                      data-handle="trim-right"
+                                      className="absolute bottom-0 top-0 cursor-ew-resize"
+                                      style={{ left: trimRightLeft, width: handleW, background: "rgba(255,255,255,0.35)" }}
+                                    />
+                                    <div
+                                      data-handle="loop"
+                                      aria-label="Loop clip"
+                                      className="absolute flex cursor-ew-resize items-center justify-center rounded"
+                                      style={{
+                                        top: 2,
+                                        right: 2,
+                                        width: 16,
+                                        height: 16,
+                                        background: looped ? "var(--primary-strong)" : "rgba(0,0,0,0.25)",
+                                      }}
+                                    >
+                                      <Repeat className="pointer-events-none h-2.5 w-2.5 text-white" />
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             );
                           })}
@@ -543,6 +868,56 @@ export function TrackTimeline() {
           </div>
         </div>
       </div>
+
+      {selectedClip && selectedTrack && (
+        <div className="px-4 pt-3">
+          <div
+            className="flex items-center gap-2 rounded-xl border border-border p-2"
+            style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
+          >
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: selectedTrack.color }} />
+            <span className="truncate text-xs font-bold text-ink">{selectedTrack.name}</span>
+            <span className="font-mono-chord text-[10px] text-ink-soft">
+              {clipBodySec(selectedClip).toFixed(1)}s
+              {(selectedClip.loopSec ?? 0) > clipBodySec(selectedClip) + 0.001
+                ? ` · loop ${clipSpanSec(selectedClip).toFixed(1)}s`
+                : ""}
+            </span>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => void duplicateClip(selectedTrack, selectedClip)}
+              className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+            >
+              <Copy className="h-3.5 w-3.5" /> Duplicate
+            </button>
+            {(selectedClip.loopSec ?? 0) > clipBodySec(selectedClip) + 0.001 && (
+              <button
+                type="button"
+                onClick={() => setClipLoop(selectedTrack.id, selectedClip.blobId, undefined)}
+                className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+              >
+                <Repeat className="h-3.5 w-3.5" /> Unloop
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => deleteClip(selectedTrack.id, selectedClip.blobId)}
+              className="btn-sculpt-destructive inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              aria-label="Deselect clip"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
