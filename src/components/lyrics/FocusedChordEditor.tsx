@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
+import { SlashBassPicker } from "@/components/chord/ChordPickerSheet";
 
 interface LyricsModeProps {
   mode?: "lyrics";
@@ -551,7 +552,7 @@ export function FocusedChordEditor(props: Props) {
           );
         })()}
 
-        <div className="px-3 py-3 shrink-0 flex items-center gap-2" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+        <div className="px-3 py-3 shrink-0 flex items-center gap-2">
           <input
             ref={inputRef}
             value={query}
@@ -639,6 +640,9 @@ export function FocusedChordEditor(props: Props) {
               }}
             >+</button>
           </div>
+        </div>
+        <div className="px-3 pb-2 shrink-0" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
+          <SlashBassPicker query={query} onChange={setQuery} />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>

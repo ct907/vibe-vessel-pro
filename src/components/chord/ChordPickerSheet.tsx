@@ -4,7 +4,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ChordSymbol, suggestChords, parseChord, ALL_ROOTS, normalizeRoot, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
+import { ChordSymbol, suggestChords, parseChord, normalizeRoot, parseNashvilleInput, transposeChord, rootToPc } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { useSongStore } from "@/store/song";
 import { getChordColorClasses } from "@/lib/music/chordColor";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
+const BASS_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
 
 interface Props {
   open: boolean;
@@ -270,6 +271,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
             </Select>
           </div>
 
+          <SlashBassPicker query={query} onChange={setQuery} />
+
           {nashvilleChords && nashvilleChords.length > 0 && (
             <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
@@ -370,6 +373,65 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
 
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ============================================================================
+// Slash-bass note picker row. Renders 12 compact pitch-class chips; the chip
+// matching the current slash bass (detected from the typed query) is highlighted.
+// Clicking an active chip clears the bass; clicking another sets it.
+// ============================================================================
+
+export function SlashBassPicker({ query, onChange }: { query: string; onChange: (q: string) => void }) {
+  const root = rootOf(query);
+  const rl = rootLen(query);
+  const tail = query.trim().slice(rl);
+  const [core, currentBass] = splitSlash(tail);
+  const currentPc = currentBass ? rootToPc(currentBass) : -1;
+
+  const handleNote = (note: string) => {
+    if (rootToPc(note) === currentPc) {
+      onChange(root + core);
+    } else {
+      onChange(`${root}${core}/${note}`);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <span
+        className="font-mono-chord"
+        style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", opacity: 0.45, userSelect: "none", marginRight: 2 }}
+      >
+        /bass
+      </span>
+      {BASS_NOTES.map((note) => {
+        const isActive = currentPc >= 0 && rootToPc(note) === currentPc;
+        return (
+          <button
+            key={note}
+            type="button"
+            onClick={() => handleNote(note)}
+            className="font-mono-chord"
+            style={{
+              fontWeight: 700,
+              fontSize: 11,
+              minWidth: 28,
+              height: 26,
+              borderRadius: 6,
+              padding: "0 5px",
+              background: isActive ? "var(--primary)" : "var(--paper-shade)",
+              color: isActive ? "var(--primary-foreground, var(--ink))" : "var(--ink-soft)",
+              border: `2px solid ${isActive ? "var(--primary-strong)" : "transparent"}`,
+              cursor: "pointer",
+              transition: "background 120ms ease, border-color 120ms ease",
+            }}
+          >
+            {note}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -564,8 +626,6 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
     return `${root}${suffix}${slash}`;
   };
 
-  const slashOptions = ALL_ROOTS.filter((r) => r !== root);
-
   const handleType = (next: TypeKey) => {
     const firstVariant = VARIANTS_BY_TYPE[next][0]?.value ?? "";
     onChange(compose(next, firstVariant, "", bass));
@@ -608,22 +668,6 @@ function ChordTypeHelpers({ query, onChange }: HelpersProps) {
             >
               {o.label}
             </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={bass || "__none"} onValueChange={(v) => onChange(compose(typeVal, variantVal, alteredVal, v === "__none" ? "" : v))}>
-        <SelectTrigger
-          className="h-10 w-[72px] px-2 text-xs font-mono-chord border-0"
-          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-sculpt-cream-rest)", borderRadius: 8 }}
-          aria-label="Slash bass"
-        >
-          <SelectValue placeholder="/—" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none" className="text-xs font-mono-chord">/—</SelectItem>
-          {slashOptions.map((r) => (
-            <SelectItem key={r} value={r} className="text-xs font-mono-chord">/{r}</SelectItem>
           ))}
         </SelectContent>
       </Select>
