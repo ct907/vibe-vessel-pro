@@ -53,6 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -187,6 +188,111 @@ function buildPlayback(
     }
   }
   return { events: outEvents, meta: outMeta, loopBeats: cursorBeat, startAnchorStale };
+}
+
+const GALLERY_URLS = [1, 2, 3, 4, 5].map(
+  (n) => `https://www.gstatic.com/webp/gallery/${n}.webp`,
+);
+
+function InspirationOnboardingModal({
+  open,
+  onClose,
+  onUpload,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onUpload: () => void;
+}) {
+  const [sampleUrls, setSampleUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const shuffled = [...GALLERY_URLS].sort(() => Math.random() - 0.5);
+    setSampleUrls(shuffled.slice(0, 3));
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Inspiration photos</DialogTitle>
+          <DialogDescription>
+            Upload up to 3 photos to keep your creative vision in focus.
+            They float above your workspace while you write.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative mt-2" style={{ paddingTop: 64 }}>
+          {sampleUrls.map((url, i) => {
+            const slot = PHOTO_SLOTS[PHOTO_SLOTS.length - 1 - i] ?? PHOTO_SLOTS[0];
+            return (
+              <img
+                key={i}
+                src={url}
+                alt=""
+                draggable={false}
+                style={{
+                  position: "absolute",
+                  left: slot.left,
+                  top: 64 + slot.top,
+                  maxWidth: 72,
+                  maxHeight: 72,
+                  borderRadius: 7,
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+                  transform: `rotate(${slot.rotate}deg)`,
+                  zIndex: 1,
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              />
+            );
+          })}
+          <div
+            className="noise-texture rounded-xl border border-border/60 w-full relative z-0"
+            style={{
+              boxShadow: "var(--shadow-paper)",
+              background: "color-mix(in oklch, var(--card) 20%, transparent)",
+            }}
+          >
+            <div className="px-3 py-2 flex items-center gap-2">
+              <div className="btn-sculpt-amber inline-flex items-center justify-center gap-1 rounded-lg px-3 h-8 font-semibold text-sm shrink-0 pointer-events-none select-none">
+                <Play className="h-3 w-3 fill-current" />
+                <span>Play</span>
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
+                {[Undo2, Redo2, ImageIcon].map((Icon, k) => (
+                  <div key={k} className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 pointer-events-none select-none">
+                    <Icon className="h-3 w-3" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-3 pb-2 flex gap-1.5">
+              {["Lyrics", "Chords", "Progressions"].map((t) => (
+                <div key={t} className="btn-sculpt-cream rounded-lg px-3 h-7 text-xs flex items-center pointer-events-none select-none">
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col gap-2 sm:flex-col mt-2">
+          <button
+            type="button"
+            className="btn-sculpt-amber inline-flex items-center justify-center gap-2 rounded-lg px-4 h-9 font-semibold text-sm w-full"
+            onClick={() => { onClose(); onUpload(); }}
+          >
+            <ImageIcon className="h-4 w-4" />
+            Choose photos
+          </button>
+          <p className="text-xs text-center" style={{ color: "var(--ink-soft)" }}>
+            Save your project after uploading to preserve your photos.
+          </p>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function InspirationLightbox({
@@ -349,6 +455,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const recCanUndo = useRecordingsStore((s) => s.canUndo);
   const recCanRedo = useRecordingsStore((s) => s.canRedo);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [inspirationModalOpen, setInspirationModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -578,7 +685,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 setLightboxIndex(0);
                 setLightboxOpen(true);
               } else {
-                photoInputRef.current?.click();
+                setInspirationModalOpen(true);
               }
             }}
             className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
@@ -939,6 +1046,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         </div>
       </div>
         </header>
+        <InspirationOnboardingModal
+          open={inspirationModalOpen}
+          onClose={() => setInspirationModalOpen(false)}
+          onUpload={() => photoInputRef.current?.click()}
+        />
         <input
           ref={photoInputRef}
           type="file"
