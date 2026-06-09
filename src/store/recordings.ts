@@ -109,6 +109,9 @@ interface RecordingsState {
   selectedInputDeviceId: string | null;
   setSelectedInputDeviceId: (id: string | null) => void;
 
+  playheadSec: number;
+  setPlayheadSec: (sec: number) => void;
+
   addTrack: () => RecTrackId | null;
   removeTrack: (id: RecTrackId) => void;
   renameTrack: (id: RecTrackId, name: string) => void;
@@ -157,6 +160,9 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   monitorLevel: 0,
   selectedInputDeviceId: null,
   setSelectedInputDeviceId: (id) => set({ selectedInputDeviceId: id }),
+
+  playheadSec: 0,
+  setPlayheadSec: (sec) => set({ playheadSec: Math.max(0, sec) }),
 
   addTrack: () => {
     const tracks = get().tracks;

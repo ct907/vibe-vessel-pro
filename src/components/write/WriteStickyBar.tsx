@@ -59,7 +59,7 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
       if (onRecordComplete) {
         onRecordComplete(blobId, durationSec, mime);
       } else {
-        addTake({ blobId, durationSec });
+        addTake({ blobId, durationSec, mime });
       }
     } catch {
       // normalization or storage failed — discard silently

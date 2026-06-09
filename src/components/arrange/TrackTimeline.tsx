@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { nanoid } from "nanoid";
 import { Plus, Trash2, Timer, GripVertical, Copy, Star } from "lucide-react";
+import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
 import { useRecordingsStore, type RecTrack, type RecClip, clipEndSec } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
@@ -52,25 +53,44 @@ function BestTakesTray() {
             Best takes — drag into a track
           </span>
         </div>
-        <div className="hide-scroll flex gap-2 overflow-x-auto">
-          {best.length === 0 ? (
-            <span className="py-1.5 text-xs italic text-ink-soft">Star takes in Write to pin them here.</span>
-          ) : (
-            best.map((take) => (
-              <div
-                key={take.id}
-                className="flex shrink-0 cursor-grab items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-2 pr-2.5"
-                style={{ boxShadow: "var(--shadow-card)" }}
-              >
-                <GripVertical className="h-3.5 w-3.5 text-ink-soft" />
-                <Star className="h-3 w-3" style={{ fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }} />
-                <span className="whitespace-nowrap text-xs font-bold text-ink">{take.name}</span>
-                <Waveform width={44} height={14} seed={take.seed} color="var(--primary)" />
-                <span className="font-mono-chord text-[9px] text-ink-soft">{take.duration}</span>
-              </div>
-            ))
+        <Droppable droppableId="takes-tray" type="take" direction="horizontal" isDropDisabled={true}>
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className="hide-scroll flex gap-2 overflow-x-auto"
+            >
+              {best.length === 0 ? (
+                <span className="py-1.5 text-xs italic text-ink-soft">Star takes in Write to pin them here.</span>
+              ) : (
+                best.map((take, i) => (
+                  <Draggable key={take.id} draggableId={`take:${take.id}`} index={i}>
+                    {(dragProvided, snapshot) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        {...dragProvided.dragHandleProps}
+                        className="flex shrink-0 cursor-grab items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-2 pr-2.5"
+                        style={{
+                          boxShadow: snapshot.isDragging ? "var(--shadow-sculpt-amber)" : "var(--shadow-card)",
+                          opacity: snapshot.isDragging ? 0.85 : 1,
+                          ...dragProvided.draggableProps.style,
+                        }}
+                      >
+                        <GripVertical className="h-3.5 w-3.5 text-ink-soft" />
+                        <Star className="h-3 w-3" style={{ fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }} />
+                        <span className="whitespace-nowrap text-xs font-bold text-ink">{take.name}</span>
+                        <Waveform width={44} height={14} seed={take.seed} color="var(--primary)" />
+                        <span className="font-mono-chord text-[9px] text-ink-soft">{take.duration}</span>
+                      </div>
+                    )}
+                  </Draggable>
+                ))
+              )}
+              {provided.placeholder}
+            </div>
           )}
-        </div>
+        </Droppable>
       </div>
     </div>
   );
@@ -137,6 +157,8 @@ export function TrackTimeline() {
   const removeClip = useRecordingsStore((s) => s.removeClip);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const setRecording = useRecordingsStore((s) => s.setRecording);
+  const playheadSec = useRecordingsStore((s) => s.playheadSec);
+  const setPlayheadSec = useRecordingsStore((s) => s.setPlayheadSec);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
   const [pendingTid, setPendingTid] = useState<string | null>(null);
@@ -144,6 +166,9 @@ export function TrackTimeline() {
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
   const [offsets, setOffsets] = useState<Record<string, number>>({});
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDraggingPlayhead = useRef(false);
 
   const LANE_H = isMobile ? 114 : 78;
   const LABEL_W = isMobile ? 138 : 156;
@@ -160,6 +185,47 @@ export function TrackTimeline() {
     });
   };
 
+  /** Convert a pointer clientX to a timeline position in seconds, accounting for scroll. */
+  const clientXToSec = (clientX: number): number => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    const xInContent = clientX - rect.left + el.scrollLeft - LABEL_W;
+    return Math.max(0, (xInContent / PX_PER_BAR) * secPerBar);
+  };
+
+  const handleRulerClick = (e: React.MouseEvent) => {
+    if (isDraggingPlayhead.current) return;
+    setPlayheadSec(clientXToSec(e.clientX));
+  };
+
+  const handleLaneClick = (e: React.MouseEvent) => {
+    if (isDraggingPlayhead.current) return;
+    // Only set playhead when clicking the bare lane background, not on clips
+    if ((e.target as HTMLElement).closest("[data-clip]")) return;
+    setPlayheadSec(clientXToSec(e.clientX));
+  };
+
+  const handlePlayheadPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingPlayhead.current = true;
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePlayheadPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingPlayhead.current) return;
+    setPlayheadSec(clientXToSec(e.clientX));
+  };
+
+  const handlePlayheadPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDraggingPlayhead.current = false;
+    (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+  };
+
+  const playheadX = LABEL_W + (playheadSec / secPerBar) * PX_PER_BAR;
+  const playheadBar = Math.floor(playheadSec / secPerBar) + 1;
+
   const toggleRecord = async (tid: string) => {
     if (recordingTrackId === tid) {
       const handle = recorderRef.current;
@@ -172,10 +238,10 @@ export function TrackTimeline() {
         const { blob, durationSec, mime } = await handle.stop();
         const blobId = nanoid();
         await putAudioBlob(blobId, blob);
-        const track = useRecordingsStore.getState().tracks.find((t) => t.id === tid);
-        const startSec = track ? track.clips.reduce((m, c) => Math.max(m, clipEndSec(c)), 0) : 0;
+        const startSec = useRecordingsStore.getState().playheadSec;
         const clip: RecClip = { blobId, mime, durationSec, startSec, trimStartSec: 0, trimEndSec: durationSec };
         addClip(tid, clip);
+        setPlayheadSec(startSec + durationSec);
       } catch {
         // discard silently
       } finally {
@@ -213,12 +279,13 @@ export function TrackTimeline() {
         <span className="text-[11px] font-bold text-ink-soft">{tracks.length} tracks</span>
       </div>
 
-      <div className="hide-scroll overflow-x-auto border-t border-border">
+      <div ref={scrollRef} className="hide-scroll overflow-x-auto border-t border-border">
         <div style={{ width: timelineW + LABEL_W, position: "relative" }}>
-          {/* Bar ruler */}
+          {/* Bar ruler — click to set playhead */}
           <div
-            className="flex h-[18px]"
+            className="flex h-[18px] cursor-col-resize"
             style={{ paddingLeft: LABEL_W, background: "var(--paper-shade-soft)" }}
+            onClick={handleRulerClick}
           >
             {Array.from({ length: Math.ceil(totalBars / 4) }).map((_, i) => (
               <div
@@ -263,15 +330,32 @@ export function TrackTimeline() {
 
           {/* Track lanes */}
           <div className="relative">
-            {/* Playhead at the start of the timeline */}
+            {/* Playhead */}
             <div
               className="pointer-events-none absolute bottom-0 top-0 z-[6] w-0.5"
-              style={{ left: LABEL_W, background: "var(--destructive)" }}
+              style={{ left: playheadX, background: "var(--destructive)" }}
             >
+              {/* Draggable handle — overlaps ruler so the user can grab it */}
               <div
-                className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full"
-                style={{ background: "var(--destructive)" }}
-              />
+                className="pointer-events-auto absolute -top-[18px] flex cursor-col-resize flex-col items-center"
+                style={{ left: -9, width: 18 }}
+                onPointerDown={handlePlayheadPointerDown}
+                onPointerMove={handlePlayheadPointerMove}
+                onPointerUp={handlePlayheadPointerUp}
+              >
+                {/* Bar label */}
+                <span
+                  className="font-mono-chord select-none whitespace-nowrap text-[8px] font-bold leading-none"
+                  style={{ color: "var(--destructive)" }}
+                >
+                  {playheadBar}
+                </span>
+                {/* Circle */}
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: "var(--destructive)", marginTop: 1 }}
+                />
+              </div>
             </div>
 
             {tracks.map((track) => {
@@ -339,78 +423,98 @@ export function TrackTimeline() {
                       </div>
                     </div>
 
-                    {/* Lane */}
-                    <div
-                      className="relative flex-1"
-                      style={{ background: isRec ? "#fdf3f3" : "var(--card)" }}
-                    >
-                      {Array.from({ length: totalBars }).map((_, i) => (
+                    {/* Lane — droppable for takes */}
+                    <Droppable droppableId={`track:${track.id}`} type="take" direction="horizontal">
+                      {(provided, snapshot) => (
                         <div
-                          key={i}
-                          className="absolute bottom-0 top-0"
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className="relative flex-1"
                           style={{
-                            left: i * PX_PER_BAR,
-                            width: 1,
-                            background: i % 4 === 0 ? "var(--border)" : "transparent",
-                            opacity: 0.6,
+                            background: snapshot.isDraggingOver
+                              ? "var(--primary-halo)"
+                              : isRec
+                              ? "#fdf3f3"
+                              : "var(--card)",
                           }}
-                        />
-                      ))}
-                      {track.clips.map((clip) => {
-                        const len = clip.trimEndSec - clip.trimStartSec;
-                        const startBar = clip.startSec / secPerBar + offBars;
-                        const lengthBars = Math.max(0.5, len / secPerBar);
-                        const seed = seedFromId(clip.blobId);
-                        return (
-                          <div
-                            key={clip.blobId}
-                            className="absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md px-1.5"
-                            style={{
-                              top: 6,
-                              bottom: 6,
-                              left: startBar * PX_PER_BAR + 2,
-                              width: lengthBars * PX_PER_BAR - 4,
-                              background: track.color,
-                              boxShadow: "0 1px 4px rgba(61,43,26,0.18)",
-                            }}
-                          >
-                            <span
-                              className="truncate text-[9px] font-bold text-white"
-                              style={{ textShadow: "0 1px 1px rgba(0,0,0,0.2)" }}
-                            >
-                              {track.name}
-                            </span>
-                            <Waveform
-                              width={Math.max(8, lengthBars * PX_PER_BAR - 16)}
-                              height={isMobile ? 34 : 22}
-                              seed={seed}
-                              color="#fff"
-                              opacity={0.55}
-                            />
-                          </div>
-                        );
-                      })}
-                      {track.clips.length === 0 && !isRec && (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] italic text-ink-soft">
-                          Drop a take or record
-                        </div>
-                      )}
-                      {isRec && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-                          <span className="text-[11px] font-bold text-destructive">● Recording…</span>
-                          <div className="h-1 w-20 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.12)" }}>
+                          onClick={handleLaneClick}
+                        >
+                          {Array.from({ length: totalBars }).map((_, i) => (
                             <div
-                              className="h-full rounded-full"
+                              key={i}
+                              className="absolute bottom-0 top-0"
                               style={{
-                                width: `${Math.round(recLevel * 100)}%`,
-                                background: "var(--destructive)",
-                                transition: "width 80ms linear",
+                                left: i * PX_PER_BAR,
+                                width: 1,
+                                background: i % 4 === 0 ? "var(--border)" : "transparent",
+                                opacity: 0.6,
                               }}
                             />
-                          </div>
+                          ))}
+                          {track.clips.map((clip) => {
+                            const len = clip.trimEndSec - clip.trimStartSec;
+                            const startBar = clip.startSec / secPerBar + offBars;
+                            const lengthBars = Math.max(0.5, len / secPerBar);
+                            const seed = seedFromId(clip.blobId);
+                            return (
+                              <div
+                                key={clip.blobId}
+                                data-clip="1"
+                                className="absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md px-1.5"
+                                style={{
+                                  top: 6,
+                                  bottom: 6,
+                                  left: startBar * PX_PER_BAR + 2,
+                                  width: lengthBars * PX_PER_BAR - 4,
+                                  background: track.color,
+                                  boxShadow: "0 1px 4px rgba(61,43,26,0.18)",
+                                }}
+                              >
+                                <span
+                                  className="truncate text-[9px] font-bold text-white"
+                                  style={{ textShadow: "0 1px 1px rgba(0,0,0,0.2)" }}
+                                >
+                                  {track.name}
+                                </span>
+                                <Waveform
+                                  width={Math.max(8, lengthBars * PX_PER_BAR - 16)}
+                                  height={isMobile ? 34 : 22}
+                                  seed={seed}
+                                  color="#fff"
+                                  opacity={0.55}
+                                />
+                              </div>
+                            );
+                          })}
+                          {track.clips.length === 0 && !isRec && !snapshot.isDraggingOver && (
+                            <div className="absolute inset-0 flex items-center justify-center text-[10px] italic text-ink-soft">
+                              Drop a take or record
+                            </div>
+                          )}
+                          {snapshot.isDraggingOver && (
+                            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold" style={{ color: "var(--primary)" }}>
+                              Drop here
+                            </div>
+                          )}
+                          {isRec && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                              <span className="text-[11px] font-bold text-destructive">● Recording…</span>
+                              <div className="h-1 w-20 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.12)" }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${Math.round(recLevel * 100)}%`,
+                                    background: "var(--destructive)",
+                                    transition: "width 80ms linear",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {provided.placeholder}
                         </div>
                       )}
-                    </div>
+                    </Droppable>
                   </div>
                   {showDelay && (
                     <div className="flex border-b border-border">

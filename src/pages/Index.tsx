@@ -16,6 +16,8 @@ import { WriteMode } from "@/components/write/WriteMode";
 import { ArrangeMode } from "@/components/arrange/ArrangeMode";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
+import { useTakesStore } from "@/store/takes";
+import { useRecordingsStore, type RecClip, clipEndSec } from "@/store/recordings";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
@@ -117,6 +119,24 @@ const Index = () => {
         lyricsOnDragEnd?.(result);
       } else if (dstPrefix === "pattern") {
         progressionsOnDragEnd?.(result);
+      } else if (dstPrefix === "track" && result.destination) {
+        const trackId = result.destination.droppableId.slice("track:".length);
+        const takeId = result.draggableId.slice("take:".length);
+        const take = useTakesStore.getState().takes.find((t) => t.id === takeId);
+        if (take?.blobId) {
+          const { tracks, addClip } = useRecordingsStore.getState();
+          const track = tracks.find((t) => t.id === trackId);
+          const startSec = track ? track.clips.reduce((m, c) => Math.max(m, clipEndSec(c)), 0) : 0;
+          const clip: RecClip = {
+            blobId: take.blobId,
+            mime: take.mime ?? "audio/webm",
+            durationSec: take.durationSec,
+            startSec,
+            trimStartSec: 0,
+            trimEndSec: take.durationSec,
+          };
+          addClip(trackId, clip);
+        }
       }
     } finally {
       useDndStore.getState().clear();
