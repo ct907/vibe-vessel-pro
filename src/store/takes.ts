@@ -13,6 +13,8 @@ export interface Take {
   best: boolean;
   /** IndexedDB key for the real audio blob, absent for placeholder takes. */
   blobId?: string;
+  /** MIME type of the audio blob, e.g. "audio/wav". */
+  mime?: string;
 }
 
 export const MAX_BEST_TAKES = 3;
@@ -27,7 +29,7 @@ interface TakesState {
   takes: Take[];
   bestCount: () => number;
   toggleBest: (id: string) => void;
-  addTake: (opts?: { name?: string; blobId?: string; durationSec?: number }) => string;
+  addTake: (opts?: { name?: string; blobId?: string; durationSec?: number; mime?: string }) => string;
   removeTake: (id: string) => void;
   clear: () => void;
 }
@@ -43,7 +45,7 @@ export const useTakesStore = create<TakesState>((set, get) => ({
       return { takes: s.takes.map((t) => (t.id === id ? { ...t, best: !t.best } : t)) };
     }),
   addTake: (opts = {}) => {
-    const { name, blobId, durationSec = 0 } = opts;
+    const { name, blobId, durationSec = 0, mime } = opts;
     const id = nanoid();
     const now = new Date();
     const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -58,6 +60,7 @@ export const useTakesStore = create<TakesState>((set, get) => ({
           seed: Math.floor(Math.random() * 100),
           best: false,
           blobId,
+          mime,
         },
         ...s.takes,
       ],

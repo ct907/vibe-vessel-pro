@@ -49,7 +49,7 @@ export function RecordFab({
       if (onComplete) {
         onComplete(blobId, durationSec, mime);
       } else {
-        addTake({ blobId, durationSec });
+        addTake({ blobId, durationSec, mime });
       }
     } catch {
       // normalization or storage failed — discard silently

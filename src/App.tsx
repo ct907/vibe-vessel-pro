@@ -13,6 +13,7 @@ import Defaults from "./pages/Defaults.tsx";
 import Help from "./pages/Help.tsx";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
+import { useRecordingsStore } from "@/store/recordings";
 import { pushRecent } from "@/lib/recent-projects";
 
 const queryClient = new QueryClient();
@@ -86,11 +87,14 @@ const App = () => {
       if ((e.target as HTMLElement | null)?.isContentEditable) return;
       if (e.key === "z" || e.key === "Z") {
         e.preventDefault();
-        if (e.shiftKey) useSongStore.getState().redo();
-        else useSongStore.getState().undo();
+        if (e.shiftKey) {
+          if (!useSongStore.getState().redo()) useRecordingsStore.getState().redo();
+        } else {
+          if (!useSongStore.getState().undo()) useRecordingsStore.getState().undo();
+        }
       } else if (e.key === "y" || e.key === "Y") {
         e.preventDefault();
-        useSongStore.getState().redo();
+        if (!useSongStore.getState().redo()) useRecordingsStore.getState().redo();
       }
     };
     document.addEventListener("keydown", onKeyDown);
