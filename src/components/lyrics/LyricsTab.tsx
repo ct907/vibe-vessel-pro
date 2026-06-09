@@ -4,6 +4,7 @@ import {
   type DropResult,
 } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
+import { useTranscriptionStore } from "@/store/transcription";
 import {
   useSongStore,
   getSectionDisplayName,
@@ -1523,9 +1524,24 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     );
   };
 
-  // Basket drag-source was retired in the Spice/Preset overhaul; no draggables target lyrics slots now.
-  const onDragEnd = (_result: DropResult) => {
+  // Detected-chord chips (from the recordings strip) are the only draggables
+  // that target lyric slots. Their draggableId is `detected:<chordId>`; the
+  // slot droppableId is `slot:<sectionId>:<lineId>:<slotIndex>`. Resolve the
+  // chord from the transcription store and let placeChordInSlot reflow.
+  const onDragEnd = (result: DropResult) => {
     justDraggedAtRef.current = Date.now();
+    const { destination, draggableId } = result;
+    if (!destination || !draggableId.startsWith("detected:")) return;
+    const parts = destination.droppableId.split(":");
+    if (parts[0] !== "slot") return;
+    const [, sectionId, lineId, slotStr] = parts;
+    const slotIndex = parseInt(slotStr, 10);
+    if (Number.isNaN(slotIndex)) return;
+    const chordId = draggableId.slice("detected:".length);
+    const detected = useTranscriptionStore.getState().findChord(chordId);
+    if (!detected) return;
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, slotIndex, detected.chord);
+    useTranscriptionStore.getState().removeChordById(chordId);
   };
 
   // Register tab-level handlers with the global DnD store. We use refs so the

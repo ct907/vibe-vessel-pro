@@ -31,6 +31,7 @@ interface TakesState {
   toggleBest: (id: string) => void;
   addTake: (opts?: { name?: string; blobId?: string; durationSec?: number; mime?: string }) => string;
   removeTake: (id: string) => void;
+  renameTake: (id: string, name: string) => void;
   clear: () => void;
 }
 
@@ -68,5 +69,7 @@ export const useTakesStore = create<TakesState>((set, get) => ({
     return id;
   },
   removeTake: (id) => set((s) => ({ takes: s.takes.filter((t) => t.id !== id) })),
+  renameTake: (id, name) =>
+    set((s) => ({ takes: s.takes.map((t) => (t.id === id ? { ...t, name: name.trim() || t.name } : t)) })),
   clear: () => set({ takes: [] }),
 }));
