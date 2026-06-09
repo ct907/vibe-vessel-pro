@@ -138,7 +138,8 @@ export function AnchoredCoachMark({
   viewportBottom?: number;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const [markSize, setMarkSize] = useState<{ w: number; h: number } | null>(null);
+  const [ready, setReady] = useState(false);
+  const markSizeRef = useRef<{ w: number; h: number } | null>(null);
   const markWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -146,9 +147,13 @@ export function AnchoredCoachMark({
     if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
-        setMarkSize((prev) => (prev && prev.w === r.width && prev.h === r.height ? prev : { w: r.width, h: r.height }));
-      }
+      const w = Math.round(r.width);
+      const h = Math.round(r.height);
+      if (w <= 0 || h <= 0) return;
+      const prev = markSizeRef.current;
+      if (prev && prev.w === w && prev.h === h) return;
+      markSizeRef.current = { w, h };
+      setReady(true);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -161,32 +166,34 @@ export function AnchoredCoachMark({
     const PAD = 8;
     const measure = () => {
       if (viewportBottom !== undefined) {
-        setPos((prev) => {
-          const next = { top: window.innerHeight - viewportBottom, left: window.innerWidth / 2 };
-          return prev && prev.top === next.top && prev.left === next.left ? prev : next;
-        });
+        const nextTop = Math.round(window.innerHeight - viewportBottom);
+        const nextLeft = Math.round(window.innerWidth / 2);
+        setPos((prev) => (prev && prev.top === nextTop && prev.left === nextLeft ? prev : { top: nextTop, left: nextLeft }));
         return;
       }
       const el = anchorRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) return;
+      const ms = markSizeRef.current;
       let top: number;
       if (anchorEdge === "top") {
-        const h = markSize?.h ?? 0;
+        const h = ms?.h ?? 0;
         top = r.top - h - gap;
       } else {
         top = r.bottom + gap;
       }
       let left = r.left + r.width / 2;
-      if (markSize) {
-        const half = markSize.w / 2;
+      if (ms) {
+        const half = ms.w / 2;
         const minLeft = half + PAD;
         const maxLeft = window.innerWidth - half - PAD;
         if (maxLeft >= minLeft) left = Math.min(Math.max(left, minLeft), maxLeft);
         top = Math.max(top, PAD);
       }
-      setPos((prev) => (prev && prev.top === top && prev.left === left ? prev : { top, left }));
+      const nextTop = Math.round(top);
+      const nextLeft = Math.round(left);
+      setPos((prev) => (prev && prev.top === nextTop && prev.left === nextLeft ? prev : { top: nextTop, left: nextLeft }));
     };
     const start = performance.now();
     const tick = () => {
@@ -203,7 +210,7 @@ export function AnchoredCoachMark({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [anchorRef, gap, anchorEdge, viewportBottom, markSize]);
+  }, [anchorRef, gap, anchorEdge, viewportBottom]);
 
   const interactive = !!markProps.actionLabel && !!markProps.onAction;
   const ready = pos !== null && markSize !== null;
