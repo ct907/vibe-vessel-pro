@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Mic, ListMusic, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Mic, ListMusic } from "lucide-react";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import type { TabName } from "@/store/ui";
 import { useSongStore } from "@/store/song";
@@ -22,15 +22,24 @@ interface Props {
  */
 export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const tracksEmpty = useRecordingsStore((s) => s.tracks.length === 0);
+  const addTrack = useRecordingsStore((s) => s.addTrack);
   const recordToFirstTrack = useRecordingsStore((s) => s.recordToFirstTrack);
   const progressionsEmpty = useSongStore((s) => s.sections.every((sec) => sec.chords.length === 0));
   const hasTakes = useTakesStore((s) => s.takes.length > 0);
-  const hasBestTakes = useTakesStore((s) => s.takes.some((t) => t.best));
 
   const [trackRevealed, setTrackRevealed] = useState(false);
   const [chordsRevealed, setChordsRevealed] = useState(false);
 
-  const showTrack = !tracksEmpty || trackRevealed || hasBestTakes;
+  // Once a recording exists, give the user a track ready to drop takes into.
+  const autoAdded = useRef(false);
+  useEffect(() => {
+    if (hasTakes && tracksEmpty && !autoAdded.current) {
+      autoAdded.current = true;
+      addTrack();
+    }
+  }, [hasTakes, tracksEmpty, addTrack]);
+
+  const showTrack = !tracksEmpty || trackRevealed || hasTakes;
   const showChords = !progressionsEmpty || chordsRevealed;
 
   return (
@@ -39,14 +48,6 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       <div className="md:col-span-2">
         {showTrack ? (
           <TrackTimeline />
-        ) : hasTakes ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-10 text-center" style={{ borderColor: "var(--primary)", background: "color-mix(in oklch, var(--primary) 6%, transparent)" }}>
-            <Star className="h-8 w-8" style={{ color: "var(--primary)" }} strokeWidth={1.5} />
-            <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Waiting for starred recordings</p>
-            <p className="text-xs max-w-[18rem]" style={{ color: "var(--ink-soft)" }}>
-              Star your best takes in the Write tab and they'll appear here ready to arrange.
-            </p>
-          </div>
         ) : (
           <EmptyTapCard
             icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
