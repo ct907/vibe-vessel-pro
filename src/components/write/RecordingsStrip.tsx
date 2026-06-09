@@ -3,11 +3,12 @@ import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Draggable, Droppable, type DraggableProvided } from "@hello-pangea/dnd";
-import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { useTranscriptionStore, type TranscribedChord } from "@/store/transcription";
 import { useSongStore } from "@/store/song";
-import { getAudioBlob, deleteAudioBlob } from "@/lib/audio/blob-store";
+import { getAudioBlob, deleteAudioBlob, putAudioBlob } from "@/lib/audio/blob-store";
+import { getAudioContext } from "@/lib/audio/context";
 import { transcribeBlob } from "@/lib/music/transcribe";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import type { ChordSymbol } from "@/lib/music/chords";
@@ -29,6 +30,7 @@ export function RecordingsStrip() {
   const toggleBest = useTakesStore((s) => s.toggleBest);
   const removeTake = useTakesStore((s) => s.removeTake);
   const renameTake = useTakesStore((s) => s.renameTake);
+  const addTake = useTakesStore((s) => s.addTake);
 
   const status = useTranscriptionStore((s) => s.status);
   const chordsByTake = useTranscriptionStore((s) => s.chords);
@@ -39,6 +41,7 @@ export function RecordingsStrip() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const stopAudio = () => {
     audioRef.current?.pause();
@@ -88,6 +91,24 @@ export function RecordingsStrip() {
     if (take.blobId) deleteAudioBlob(take.blobId);
   };
 
+  const runTranscription = async (takeId: string, blob: Blob) => {
+    setStatus(takeId, "transcribing");
+    try {
+      const meta = useSongStore.getState().meta;
+      const useFlat = meta.keyRoot.includes("b") || FLAT_KEYS.includes(meta.keyRoot);
+      const result = await transcribeBlob(blob, useFlat);
+      setChords(
+        takeId,
+        result.map((d) => ({ id: nanoid(), chord: d.chord, startSec: d.startSec, endSec: d.endSec, confidence: d.confidence })),
+      );
+      setStatus(takeId, "done");
+      if (result.length === 0) toast("No chords detected — try a cleaner recording.");
+    } catch {
+      setStatus(takeId, "idle");
+      toast.error("Couldn't transcribe that recording.");
+    }
+  };
+
   const handleTranscribe = async (take: Take) => {
     if (!take.blobId) return;
     const blob = await getAudioBlob(take.blobId);
@@ -95,20 +116,30 @@ export function RecordingsStrip() {
       toast.error("That recording's audio is no longer available.");
       return;
     }
-    setStatus(take.id, "transcribing");
+    void runTranscription(take.id, blob);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
     try {
-      const meta = useSongStore.getState().meta;
-      const useFlat = meta.keyRoot.includes("b") || FLAT_KEYS.includes(meta.keyRoot);
-      const result = await transcribeBlob(blob, useFlat);
-      setChords(
-        take.id,
-        result.map((d) => ({ id: nanoid(), chord: d.chord, startSec: d.startSec, endSec: d.endSec, confidence: d.confidence })),
-      );
-      setStatus(take.id, "done");
-      if (result.length === 0) toast("No chords detected — try a cleaner recording.");
+      const blobId = nanoid();
+      await putAudioBlob(blobId, file);
+      let durationSec = 0;
+      try {
+        const buf = await getAudioContext().decodeAudioData(await file.arrayBuffer());
+        durationSec = buf.duration;
+      } catch {
+        toast.error("Couldn't read that audio. Try a WAV, MP3, or M4A file.");
+        await deleteAudioBlob(blobId);
+        return;
+      }
+      const name = file.name.replace(/\.[^.]+$/, "") || "Imported";
+      const takeId = addTake({ name, blobId, durationSec, mime: file.type || "audio/*" });
+      void runTranscription(takeId, file);
     } catch {
-      setStatus(take.id, "idle");
-      toast.error("Couldn't transcribe that recording.");
+      toast.error("Couldn't import that audio file.");
     }
   };
 
@@ -121,16 +152,28 @@ export function RecordingsStrip() {
         <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
           Recordings
         </span>
-        {takes.length > 0 && (
-          <span
-            className="inline-flex items-center gap-1 text-[11px] font-bold"
-            style={{ color: atMax ? "var(--primary-strong)" : "var(--ink-soft)" }}
+        <div className="flex items-center gap-2">
+          {takes.length > 0 && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] font-bold"
+              style={{ color: atMax ? "var(--primary-strong)" : "var(--ink-soft)" }}
+            >
+              <Star className="h-3 w-3 fill-[var(--star,#e8a838)] text-[var(--star,#e8a838)]" />
+              {bestCount} of {MAX_BEST_TAKES} best takes
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-sculpt-cream inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
           >
-            <Star className="h-3 w-3 fill-[var(--star,#e8a838)] text-[var(--star,#e8a838)]" />
-            {bestCount} of {MAX_BEST_TAKES} best takes
-          </span>
-        )}
+            <Upload className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
+            Import
+          </button>
+        </div>
       </div>
+
+      <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleImport} />
 
       {takes.length > 0 && (
         <div className="mx-4 mb-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: "color-mix(in oklch, var(--primary) 8%, transparent)", border: "1px solid color-mix(in oklch, var(--primary) 20%, transparent)" }}>
@@ -184,7 +227,8 @@ export function RecordingsStrip() {
           <p className="flex items-start gap-1.5 text-[12px] leading-relaxed text-muted-foreground">
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: "var(--primary-strong)" }} />
             <span>
-              Record a melody or play some chords on a piano or guitar, then use a take's{" "}
+              Record a melody or play some chords on a piano or guitar (or{" "}
+              <span className="font-bold" style={{ color: "var(--ink)" }}>Import</span> an audio file), then use a take's{" "}
               <span className="font-bold" style={{ color: "var(--ink)" }}>⋮ menu → Transcribe Chords from Audio</span>{" "}
               to detect and transcribe them — right on your device.
             </span>
