@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Mic, Pencil } from "lucide-react";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import type { TabName } from "@/store/ui";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore } from "@/store/song";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { RecordingsStrip } from "./RecordingsStrip";
 import { WriteStickyBar, requestStickyBarRecording } from "./WriteStickyBar";
@@ -48,9 +50,30 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
 
   const [recRevealed, setRecRevealed] = useState(false);
   const [lyricsRevealed, setLyricsRevealed] = useState(false);
+  const isDesktop = useIsDesktop();
+  const tapVerb = isDesktop ? "Click" : "Tap";
 
   const showRecordings = !recordingsEmpty || recRevealed;
   const showLyrics = !lyricsEmpty || lyricsRevealed;
+
+  // Carry the capture intent picked on the landing page straight into the
+  // editor so tapping its empty-state card starts the same gesture here — no
+  // second tap. The param is consumed once, then cleared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const capture = searchParams.get("capture");
+    if (!capture) return;
+    if (capture === "record") {
+      setRecRevealed(true);
+      requestStickyBarRecording();
+    } else if (capture === "lyrics") {
+      setLyricsRevealed(true);
+      focusFirstLyricLine();
+    }
+    searchParams.delete("capture");
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
@@ -62,7 +85,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <EmptyTapCard
             icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
             label="Add Recording"
-            hint="Tap to start recording"
+            hint={`${tapVerb} to start recording`}
             onClick={() => {
               setRecRevealed(true);
               // Within the tap gesture so the mic prompt/keyboard rules apply.
@@ -80,7 +103,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <EmptyTapCard
             icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
             label="Write Lyrics"
-            hint="Tap to start typing"
+            hint={`${tapVerb} to start typing`}
             onClick={() => {
               setLyricsRevealed(true);
               focusFirstLyricLine();
