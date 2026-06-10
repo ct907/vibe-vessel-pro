@@ -909,6 +909,18 @@ export function RecordingsTab() {
     };
   }, []);
 
+  // Phone locked or app backgrounded mid-recording: finalize and save the clip
+  // instead of letting the browser kill the recorder and lose the audio.
+  const stopOnHideRef = useRef(stopTrackRecording);
+  stopOnHideRef.current = stopTrackRecording;
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden && recorderRef.current) void stopOnHideRef.current();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+
   useEffect(() => {
     const onSectionOverdub = (e: Event) => {
       const { trackId, startSec } = (e as CustomEvent<{ trackId: string; startSec: number }>).detail;

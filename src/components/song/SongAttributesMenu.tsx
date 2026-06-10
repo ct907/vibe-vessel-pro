@@ -44,6 +44,10 @@ export function SongAttributesMenu() {
   const [bpmDraft, setBpmDraft] = useState(String(meta.bpm));
   const [transposeOffset, setTransposeOffset] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingTimeSig, setPendingTimeSig] = useState<{ n: number; d: number } | null>(null);
+  const hasPlacedChords = useSongStore((s) =>
+    s.sections.some((sec) => sec.chords.some((c) => c.progressionPlacement)),
+  );
   const [open, setOpen] = useState(false);
   const [tapBpm, setTapBpm] = useState<number | null>(null);
   const tapTimesRef = useRef<number[]>([]);
@@ -114,6 +118,29 @@ export function SongAttributesMenu() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={() => setTransposeOffset(0)}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog open={pendingTimeSig !== null} onOpenChange={(o) => { if (!o) setPendingTimeSig(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Change time signature?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Switching to <strong>{pendingTimeSig?.n}/{pendingTimeSig?.d}</strong> re-flows
+            every section's chords into the new bar grid. Chords keep their order but
+            move back to the start of their section, so you'll need to re-position them.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (pendingTimeSig) setTimeSignature(pendingTimeSig.n, pendingTimeSig.d);
+              setPendingTimeSig(null);
+            }}
+          >
+            Change &amp; re-flow
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -243,7 +270,9 @@ export function SongAttributesMenu() {
               value={`${meta.beatsPerBar}/${meta.beatUnit}`}
               onValueChange={(v) => {
                 const [n, d] = v.split("/").map((x) => parseInt(x, 10));
-                if (Number.isFinite(n) && Number.isFinite(d)) setTimeSignature(n, d);
+                if (!Number.isFinite(n) || !Number.isFinite(d)) return;
+                if (hasPlacedChords) setPendingTimeSig({ n, d });
+                else setTimeSignature(n, d);
               }}
             >
               <SelectTrigger className="h-9 w-[110px] font-mono-chord">

@@ -85,6 +85,18 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
     else start();
   };
 
+  // Phone locked or app backgrounded mid-take: finalize and save instead of
+  // letting the browser kill the recorder and lose the audio.
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden && recorderRef.current) void stopRef.current();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+
   // The empty "Add Recording" tap card starts a take through here so the strip
   // reveal and the recording begin in the same gesture.
   useEffect(() => {

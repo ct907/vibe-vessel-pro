@@ -6,6 +6,7 @@
 import { getAudioContext } from "@/lib/audio/context";
 import { downmixMono, type DetectedChord } from "./detect-chords";
 import type { DetectWorkerResponse } from "./detect-chords-worker-types";
+import type { MelodyNote } from "./detect-melody";
 
 export async function transcribeBlob(
   blob: Blob,
@@ -25,6 +26,37 @@ export async function transcribeBlob(
       } else if (msg.type === "result") {
         worker.terminate();
         resolve(msg.result);
+      } else {
+        worker.terminate();
+        reject(new Error(msg.message || "Detection failed"));
+      }
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      reject(new Error(e.message || "Detection failed"));
+    };
+    worker.postMessage({ channel: mono, sampleRate: audioBuf.sampleRate, useFlat }, [mono.buffer]);
+  });
+}
+
+export async function transcribeMelodyBlob(
+  blob: Blob,
+  useFlat: boolean,
+  onProgress?: (progress: number) => void,
+): Promise<MelodyNote[]> {
+  const arrayBuf = await blob.arrayBuffer();
+  const audioBuf = await getAudioContext().decodeAudioData(arrayBuf);
+  const mono = downmixMono(audioBuf);
+
+  return new Promise<MelodyNote[]>((resolve, reject) => {
+    const worker = new Worker(new URL("./detect-melody.worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<{ type: string; progress?: number; result?: MelodyNote[]; message?: string }>) => {
+      const msg = e.data;
+      if (msg.type === "progress") {
+        onProgress?.(msg.progress ?? 0);
+      } else if (msg.type === "result") {
+        worker.terminate();
+        resolve(msg.result ?? []);
       } else {
         worker.terminate();
         reject(new Error(msg.message || "Detection failed"));

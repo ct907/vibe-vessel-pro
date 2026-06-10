@@ -12,7 +12,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Defaults from "./pages/Defaults.tsx";
 import Help from "./pages/Help.tsx";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
+import { hydrateFromStorage, startAutosave, startCrossTabWarning, useSongStore } from "@/store/song";
 import {
   useRecordingsStore,
   hydrateRecordingsFromStorage,
@@ -77,6 +77,7 @@ const App = () => {
     const unsub = startAutosave();
     const unsubRecordings = startRecordingsAutosave();
     const unsubTakes = startTakesAutosave();
+    const unsubCrossTab = startCrossTabWarning();
 
     // Reclaim IndexedDB space from blobs no longer referenced by any restored
     // take or recording clip (e.g. left behind by older sessions or crashes).
@@ -95,7 +96,7 @@ const App = () => {
         pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
       } catch { /* ignore */ }
     });
-    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); };
+    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); unsubCrossTab(); };
   }, []);
 
   useEffect(() => {
