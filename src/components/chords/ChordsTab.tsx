@@ -30,6 +30,8 @@ const QUALITY_LABEL: Record<Quality, string> = {
   maj11: "Major 11th", maj13: "Major 13th",
   min11: "Minor 11th", min13: "Minor 13th",
   add11: "Add 11", "6/9": "6 / 9",
+  "13": "Dominant 13th", "13b9": "Dominant 13 ♭9",
+  "9#11": "Dominant 9 ♯11", "maj9#11": "Major 9 ♯11",
 };
 
 interface ChordsTabProps {
