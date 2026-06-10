@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { pcToName, midiToNoteName } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
-import { useSongStore } from "@/store/song";
+import { useSongStore, commitCurrentSongToRecents } from "@/store/song";
+import { useTakesStore } from "@/store/takes";
+import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
 import { startPitchDetection, type PitchHandle, type PitchResult } from "@/lib/audio/pitch-detector";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
@@ -389,7 +391,10 @@ export function VoiceKeyTab() {
   };
 
   const applyKeyToNewSong = () => {
+    commitCurrentSongToRecents();
     resetSong();
+    useTakesStore.getState().clear();
+    useRecordingsStore.getState().clear();
     useOnboardingStore.getState().resetForNewSong();
     setSongKey(keyRoot, "maj");
     navigate("/app");

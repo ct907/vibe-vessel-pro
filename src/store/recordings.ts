@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
+import { notifyStorageQuota } from "@/lib/storage-quota";
 
 export type RecTrackId = string;
 export type RecBlobId = string;
@@ -373,3 +374,35 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   },
   toJSON: () => ({ tracks: get().tracks }),
 }));
+
+// ---- localStorage persistence ----
+// Persist only the track/clip metadata (blobId refs) so a refresh restores the
+// arrangement; the audio bytes already live durably in IndexedDB. High-frequency
+// fields like monitorLevel and playheadSec leave `tracks` referentially stable, so
+// the reference guard keeps us from hammering localStorage during playback.
+const RECORDINGS_STORAGE_KEY = "songwriters-notebook:recordings:v1";
+
+export function hydrateRecordingsFromStorage() {
+  try {
+    const raw = localStorage.getItem(RECORDINGS_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data && Array.isArray(data.tracks)) useRecordingsStore.getState().hydrate(data.tracks);
+  } catch { /* ignore */ }
+}
+
+export function startRecordingsAutosave() {
+  let last = useRecordingsStore.getState().tracks;
+  return useRecordingsStore.subscribe((state) => {
+    if (state.tracks === last) return;
+    last = state.tracks;
+    try {
+      localStorage.setItem(RECORDINGS_STORAGE_KEY, JSON.stringify({ tracks: state.tracks }));
+    } catch { notifyStorageQuota(); }
+  });
+}
+
+/** Every blobId currently referenced by a recording clip — used to prune orphans. */
+export function referencedRecordingBlobIds(): string[] {
+  return useRecordingsStore.getState().tracks.flatMap((t) => t.clips.map((c) => c.blobId));
+}

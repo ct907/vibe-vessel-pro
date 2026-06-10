@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { nanoid } from "nanoid";
+import { toast } from "sonner";
 import { useTakesStore } from "@/store/takes";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob } from "@/lib/audio/blob-store";
@@ -31,7 +32,11 @@ export function RecordFab({
       recorderRef.current = handle;
       setRecording(true);
     } catch {
-      // mic permission denied or device unavailable — silently no-op
+      // mic permission denied or device unavailable — tell the user so they
+      // don't think the app is broken at the moment they're trying to capture.
+      toast.error("Can't access the microphone", {
+        description: "Allow mic access in your browser settings, then try again.",
+      });
     }
   };
 

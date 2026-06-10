@@ -8,7 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSongStore } from "@/store/song";
+import { useSongStore, commitCurrentSongToRecents } from "@/store/song";
+import { useTakesStore } from "@/store/takes";
+import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
@@ -116,7 +118,12 @@ export default function Landing() {
   }, []);
 
   const openRecent = (r: RecentProject) => {
+    commitCurrentSongToRecents();
     loadFromJSON(r.snapshot);
+    // Recents snapshots don't carry recordings — start the opened song clean
+    // rather than inheriting the previous session's takes.
+    useTakesStore.getState().clear();
+    useRecordingsStore.getState().clear();
     navigate("/app");
   };
   const removeOne = (id: string) => {
@@ -124,7 +131,10 @@ export default function Landing() {
     setRecents(listRecent());
   };
   const startWriting = () => {
+    commitCurrentSongToRecents();
     resetSong();
+    useTakesStore.getState().clear();
+    useRecordingsStore.getState().clear();
     useOnboardingStore.getState().resetForNewSong();
     navigate("/app");
   };
