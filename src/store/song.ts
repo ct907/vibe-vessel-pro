@@ -8,6 +8,8 @@ import { useAppBackgroundStore, PATTERN_KEYS, MASK_KEYS, type BackgroundPattern,
 import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/SectionColorPicker";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
+import { pushRecent } from "@/lib/recent-projects";
+import { notifyStorageQuota } from "@/lib/storage-quota";
 
 // ---------- Types ----------
 
@@ -3655,7 +3657,7 @@ export function endInteraction() {
     try {
       const state = useSongStore.getState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.toJSON()));
-    } catch { /* quota etc */ }
+    } catch { notifyStorageQuota(); }
   }
 }
 
@@ -3668,8 +3670,28 @@ export function startAutosave() {
     try {
       const json = state.toJSON();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
-    } catch { /* quota etc */ }
+    } catch { notifyStorageQuota(); }
   });
+}
+
+/** True when the current song holds work worth preserving (title, lyrics, chords,
+ *  or inspiration photos). Used to avoid pushing empty drafts into recents. */
+export function songHasContent(s = useSongStore.getState()): boolean {
+  if (s.meta.title.trim()) return true;
+  if (s.inspirationPhotos.length > 0) return true;
+  return s.sections.some(
+    (sec) => sec.chords.length > 0 || sec.lines.some((l) => l.text.trim().length > 0),
+  );
+}
+
+/** Snapshot the current song into recents before it gets wiped by a "new song"
+ *  flow, so an in-progress idea is always recoverable from the landing page. */
+export function commitCurrentSongToRecents() {
+  const s = useSongStore.getState();
+  if (!songHasContent(s)) return;
+  try {
+    pushRecent({ name: s.meta.title || "Untitled Song", snapshot: s.toJSON() });
+  } catch { /* ignore */ }
 }
 
 // ---- File save / load ----

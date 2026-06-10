@@ -179,9 +179,9 @@ export function RecordingsStrip() {
         <div className="mx-4 mb-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: "color-mix(in oklch, var(--primary) 8%, transparent)", border: "1px solid color-mix(in oklch, var(--primary) 20%, transparent)" }}>
           <Save className="h-3 w-3 shrink-0" style={{ color: "var(--primary-strong)" }} />
           <p className="text-[10.5px] leading-snug" style={{ color: "var(--ink-soft)" }}>
-            Recordings are cleared on page refresh — use{" "}
+            Recordings are saved on this device — use{" "}
             <span className="font-bold" style={{ color: "var(--ink)" }}>Menu → Save</span>{" "}
-            to keep them.
+            to back them up or move to another device.
           </p>
         </div>
       )}

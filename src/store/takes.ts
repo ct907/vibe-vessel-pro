@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
+import { notifyStorageQuota } from "@/lib/storage-quota";
 
 export interface Take {
   id: string;
@@ -73,3 +74,28 @@ export const useTakesStore = create<TakesState>((set, get) => ({
     set((s) => ({ takes: s.takes.map((t) => (t.id === id ? { ...t, name: name.trim() || t.name } : t)) })),
   clear: () => set({ takes: [] }),
 }));
+
+// ---- localStorage persistence ----
+// Take metadata is small (audio bytes live in IndexedDB), so the recordings strip
+// survives a refresh instead of silently emptying.
+const TAKES_STORAGE_KEY = "songwriters-notebook:takes:v1";
+
+export function hydrateTakesFromStorage() {
+  try {
+    const raw = localStorage.getItem(TAKES_STORAGE_KEY);
+    if (!raw) return;
+    const takes = JSON.parse(raw);
+    if (Array.isArray(takes)) useTakesStore.setState({ takes });
+  } catch { /* ignore */ }
+}
+
+export function startTakesAutosave() {
+  let last = useTakesStore.getState().takes;
+  return useTakesStore.subscribe((state) => {
+    if (state.takes === last) return;
+    last = state.takes;
+    try {
+      localStorage.setItem(TAKES_STORAGE_KEY, JSON.stringify(state.takes));
+    } catch { notifyStorageQuota(); }
+  });
+}

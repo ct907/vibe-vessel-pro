@@ -13,7 +13,14 @@ import Defaults from "./pages/Defaults.tsx";
 import Help from "./pages/Help.tsx";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { hydrateFromStorage, startAutosave, useSongStore } from "@/store/song";
-import { useRecordingsStore } from "@/store/recordings";
+import {
+  useRecordingsStore,
+  hydrateRecordingsFromStorage,
+  startRecordingsAutosave,
+  referencedRecordingBlobIds,
+} from "@/store/recordings";
+import { hydrateTakesFromStorage, startTakesAutosave, useTakesStore } from "@/store/takes";
+import { pruneOrphanBlobs } from "@/lib/audio/blob-store";
 import { pushRecent } from "@/lib/recent-projects";
 
 const queryClient = new QueryClient();
@@ -65,7 +72,20 @@ const App = () => {
 
   useEffect(() => {
     hydrateFromStorage();
+    hydrateRecordingsFromStorage();
+    hydrateTakesFromStorage();
     const unsub = startAutosave();
+    const unsubRecordings = startRecordingsAutosave();
+    const unsubTakes = startTakesAutosave();
+
+    // Reclaim IndexedDB space from blobs no longer referenced by any restored
+    // take or recording clip (e.g. left behind by older sessions or crashes).
+    const referenced = new Set<string>([
+      ...referencedRecordingBlobIds(),
+      ...useTakesStore.getState().takes.map((t) => t.blobId).filter((id): id is string => !!id),
+    ]);
+    void pruneOrphanBlobs(referenced).catch(() => { /* non-fatal */ });
+
     let lastPush = 0;
     const unsubRecents = useSongStore.subscribe((state) => {
       const now = Date.now();
@@ -75,7 +95,7 @@ const App = () => {
         pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
       } catch { /* ignore */ }
     });
-    return () => { unsub(); unsubRecents(); };
+    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); };
   }, []);
 
   useEffect(() => {
