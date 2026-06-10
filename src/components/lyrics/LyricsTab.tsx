@@ -34,16 +34,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -259,8 +249,6 @@ function LineRow({
   // overlap is now handled by the FocusedChordEditor overlay (mobile only)
   // and CSS `scroll-mt-24` on the row container above.
 
-  const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // ---- Slot row keyboard (undo / redo only) ----
   const onRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const mod = e.metaKey || e.ctrlKey;
@@ -352,11 +340,15 @@ function LineRow({
                       "relative shrink-0 h-9 flex items-center justify-start border border-solid transition-colors",
                       hasActiveChordInLine
                         ? "border-muted-foreground/20"
-                        : "border-transparent group-hover:border-muted-foreground/40",
+                        : isMobile
+                          ? "border-muted-foreground/25"
+                          : "border-transparent group-hover:border-muted-foreground/40",
                       occupied ? "w-10" : "w-7",
                       slotIdx > 0 && (hasActiveChordInLine
                         ? "border-l-muted-foreground/35"
-                        : "border-l-muted-foreground/12 group-hover:border-l-muted-foreground/35"),
+                        : isMobile
+                          ? "border-l-muted-foreground/30"
+                          : "border-l-muted-foreground/12 group-hover:border-l-muted-foreground/35"),
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
@@ -373,10 +365,12 @@ function LineRow({
                         data-chip-anchor={anchor!.id}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
-                          if (singleClickTimerRef.current) {
-                            clearTimeout(singleClickTimerRef.current);
-                            singleClickTimerRef.current = null;
-                          }
+                          onSetActiveChordId(null);
+                          onPickerOpen(line.id, slotIdx, anchor!.id);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onSetActiveChordId(null);
                           onPickerOpen(line.id, slotIdx, anchor!.id);
                         }}
@@ -391,24 +385,13 @@ function LineRow({
                           keyChangeOffset={effectiveOffset}
                           selected={activeChordId === anchor!.id || !!multiSelectedIds?.has(anchor!.id)}
                           onClick={() => {
-                            if (singleClickTimerRef.current) {
-                              clearTimeout(singleClickTimerRef.current);
-                              singleClickTimerRef.current = null;
+                            if (multiSelectModeRef.current) {
+                              onMultiSelectTapRef.current?.(anchor!.id);
+                              return;
                             }
-                            singleClickTimerRef.current = setTimeout(() => {
-                              singleClickTimerRef.current = null;
-                              if (multiSelectModeRef.current) {
-                                onMultiSelectTapRef.current?.(anchor!.id);
-                                return;
-                              }
-                              onSetActiveChordId(activeChordId === anchor!.id ? null : anchor!.id);
-                            }, 250);
+                            onSetActiveChordId(activeChordId === anchor!.id ? null : anchor!.id);
                           }}
                           onLongPress={() => {
-                            if (singleClickTimerRef.current) {
-                              clearTimeout(singleClickTimerRef.current);
-                              singleClickTimerRef.current = null;
-                            }
                             onSetActiveChordId(null);
                             onPickerOpen(line.id, slotIdx, anchor!.id);
                           }}
@@ -422,7 +405,7 @@ function LineRow({
                         {activeChordId === anchor!.id && (
                           <button
                             type="button"
-                            className="absolute -top-1.5 -right-1.5 z-20 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                            className="absolute -top-2 -right-2 z-20 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
                             aria-label="Delete chord"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -431,7 +414,7 @@ function LineRow({
                               onSetActiveChordId(null);
                             }}
                           >
-                            <X className="h-2.5 w-2.5" />
+                            <X className="h-3 w-3" />
                           </button>
                         )}
                       </div>
@@ -516,7 +499,9 @@ function LineRow({
             // beforeinput reliably reports the inserted character.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const data = (e as any).data;
-            if (data === "/") {
+            // Only treat "/" as the new-section command on an empty line, so a
+            // literal slash mid-lyric ("24/7", "and/or") types normally.
+            if (data === "/" && line.text === "") {
               e.preventDefault();
               setSlashType("verse");
               setSlashCustomLabel("");
@@ -524,8 +509,8 @@ function LineRow({
             }
           }}
           onKeyDown={(e) => {
-            // Item 5 — "/" intercepts to open New Section dialog. Skip during IME.
-            if (e.key === "/" && !e.nativeEvent.isComposing) {
+            // "/" on an empty line opens the New Section dialog. Skip during IME.
+            if (e.key === "/" && line.text === "" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               setSlashType("verse");
               setSlashCustomLabel("");
@@ -561,8 +546,15 @@ function LineRow({
       </div>
       <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)" }} />
 
-      {/* Item 5 — "/" → new section dialog */}
-      <Dialog open={slashDialog} onOpenChange={setSlashDialog}>
+      {/* "/" on an empty line → new section dialog */}
+      <Dialog
+        open={slashDialog}
+        onOpenChange={(o) => {
+          setSlashDialog(o);
+          // Return the caret to the line so typing continues without a re-tap.
+          if (!o) setTimeout(() => lyricInputRef.current?.focus(), 0);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New section</DialogTitle>
@@ -588,7 +580,7 @@ function LineRow({
             )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setSlashDialog(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setSlashDialog(false); setTimeout(() => lyricInputRef.current?.focus(), 0); }}>Cancel</Button>
             <Button
               onClick={() => {
                 addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
@@ -678,6 +670,7 @@ function SectionCard({
     setSectionArpArmed,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
+    undo,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(section.label);
@@ -685,7 +678,6 @@ function SectionCard({
   const prevLabelRef = useRef<string>(section.label);
   const [commentOpen, setCommentOpen] = useState(false);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
-  const [confirm, setConfirm] = useState<null | { lineId: string; kind: "lyric" | "chord" }>(null);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
   const [overdubOpen, setOverdubOpen] = useState(false);
   const { theme } = useTheme();
@@ -736,20 +728,14 @@ function SectionCard({
     const line = section.lines[idx];
     const hasOpposite =
       kind === "lyric" ? line.chords.length > 0 : line.text.trim().length > 0;
-    if (hasOpposite) {
-      setConfirm({ lineId, kind });
-    } else {
-      removeLine(section.id, lineId);
-      focusPrevLine(lineId);
-    }
-  };
-
-  const confirmDelete = () => {
-    if (!confirm) return;
-    const { lineId } = confirm;
-    setConfirm(null);
+    // Backspace-merge never interrupts the typing flow with a dialog — the row
+    // is removed immediately and an undoable toast covers the rare case where
+    // the merged row still carried chords (or lyrics).
     removeLine(section.id, lineId);
     focusPrevLine(lineId);
+    if (hasOpposite) {
+      toast("Row deleted", { action: { label: "Undo", onClick: () => undo() } });
+    }
   };
 
   const hasComment = !!(section.comment && section.comment.trim().length);
@@ -1073,29 +1059,6 @@ function SectionCard({
         </DialogContent>
       </Dialog>
 
-      {/* Confirm row delete */}
-      <AlertDialog
-        open={!!confirm}
-        onOpenChange={(o) => {
-          if (!o) setConfirm(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this row?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm?.kind === "lyric"
-                ? "This row's chord row still has content. Deleting will remove the chords too."
-                : "This row's lyric still has text. Deleting will remove the lyric too."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete row</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <ConfirmDeleteDialog
         open={confirmDeleteSection}
         onOpenChange={setConfirmDeleteSection}
@@ -1251,7 +1214,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const pendingGrownRef = useRef<Set<string>>(new Set());
   const [overflowToastFor, setOverflowToastFor] = useState<Record<string, number>>({});
   const [residualOverflowFor, setResidualOverflowFor] = useState<Record<string, boolean>>({});
-  const [orientationOpen, setOrientationOpen] = useState(false);
   const editorOpen = useUIStore((s) => s.focusedEditorOpen);
   const wasEditorOpenRef = useRef(false);
 
@@ -1341,10 +1303,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     const mq = window.matchMedia("(orientation: portrait)");
     const onChange = () => {
       if (!isMobileDevice()) {
-        dbgLog("orientation changed but not a mobile device — skipping modal");
+        dbgLog("orientation changed but not a mobile device — skipping toast");
         return;
       }
-      setOrientationOpen(true);
+      // Non-blocking: don't interrupt writing with a modal. Offer a one-tap
+      // re-fit and otherwise leave the user's chord placements alone.
+      toast("Screen rotated", {
+        description: "Chord layouts were kept as-is.",
+        action: {
+          label: "Re-fit",
+          onClick: () => {
+            const st = useSongStore.getState();
+            st.sections.forEach((s) => st.autoLayoutSection(s.id, window.innerWidth, 28));
+          },
+        },
+      });
     };
     // Modern browsers
     mq.addEventListener?.("change", onChange);
@@ -1974,28 +1947,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         );
       })()}
 
-      <Dialog open={orientationOpen} onOpenChange={setOrientationOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Screen size changed</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Your viewport changed significantly. Auto-layout was not applied to avoid disturbing your chord placements.
-            For the best printable result at this width, consider exporting your lyrics.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOrientationOpen(false)}>Keep current layout</Button>
-            <Button
-              onClick={() => {
-                setOrientationOpen(false);
-                sections.forEach((s) => autoLayoutSection(s.id, window.innerWidth, 28));
-              }}
-            >
-              Re-fit all sections
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

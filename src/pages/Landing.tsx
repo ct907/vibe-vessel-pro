@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { MoreVertical, Mic, Pencil } from "lucide-react";
+import { MoreVertical, Mic, Pencil, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { useIsDesktop } from "@/hooks/use-mobile";
@@ -10,7 +10,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSongStore, commitCurrentSongToRecents } from "@/store/song";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useSongStore, commitCurrentSongToRecents, downloadProjectZip } from "@/store/song";
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -116,31 +126,49 @@ export default function Landing() {
   const isDesktop = useIsDesktop();
   const tapVerb = isDesktop ? "Click" : "Tap";
   const [recents, setRecents] = useState<RecentProject[]>([]);
+  // Holds the navigation to run after the user resolves the "you have unsaved
+  // recordings" prompt. Recents/new songs start without audio, so leaving the
+  // current session would otherwise discard its recordings silently.
+  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     setRecents(listRecent());
   }, []);
 
+  const hasUnsavedRecordings = () => {
+    const takes = useTakesStore.getState().takes.length;
+    const clips = useRecordingsStore.getState().tracks.reduce((n, t) => n + t.clips.length, 0);
+    return takes + clips > 0;
+  };
+  const guardRecordings = (proceed: () => void) => {
+    if (hasUnsavedRecordings()) setPendingNav(() => proceed);
+    else proceed();
+  };
+
   const openRecent = (r: RecentProject) => {
-    commitCurrentSongToRecents();
-    loadFromJSON(r.snapshot);
-    // Recents snapshots don't carry recordings — start the opened song clean
-    // rather than inheriting the previous session's takes.
-    useTakesStore.getState().clear();
-    useRecordingsStore.getState().clear();
-    navigate("/app");
+    guardRecordings(() => {
+      commitCurrentSongToRecents();
+      loadFromJSON(r.snapshot);
+      // Recents snapshots don't carry recordings — start the opened song clean
+      // rather than inheriting the previous session's takes.
+      useTakesStore.getState().clear();
+      useRecordingsStore.getState().clear();
+      navigate("/app");
+    });
   };
   const removeOne = (id: string) => {
     removeRecent(id);
     setRecents(listRecent());
   };
   const startCapture = (capture: "record" | "lyrics") => {
-    commitCurrentSongToRecents();
-    resetSong();
-    useTakesStore.getState().clear();
-    useRecordingsStore.getState().clear();
-    useOnboardingStore.getState().resetForNewSong();
-    navigate(`/app?capture=${capture}`);
+    guardRecordings(() => {
+      commitCurrentSongToRecents();
+      resetSong();
+      useTakesStore.getState().clear();
+      useRecordingsStore.getState().clear();
+      useOnboardingStore.getState().resetForNewSong();
+      navigate(`/app?capture=${capture}`);
+    });
   };
 
   return (
@@ -275,6 +303,44 @@ export default function Landing() {
           </div>
         </section>
       </main>
+
+      <AlertDialog open={!!pendingNav} onOpenChange={(o) => { if (!o) setPendingNav(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave this song?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This song has recordings that aren't saved to a file. Recents and new songs
+              start without audio, so these recordings will be removed. Save the project
+              first to keep them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const proceed = pendingNav;
+                const title = useSongStore.getState().meta.title.replace(/\s+/g, "-").toLowerCase();
+                await downloadProjectZip(`${title || "song"}.zip`);
+                setPendingNav(null);
+                proceed?.();
+              }}
+            >
+              <Save className="h-4 w-4" /> Save first
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const proceed = pendingNav;
+                setPendingNav(null);
+                proceed?.();
+              }}
+            >
+              Discard &amp; continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

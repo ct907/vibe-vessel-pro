@@ -424,14 +424,16 @@ interface Props {
 
 export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSelect, mode, onSelectMode }: Props) {
   const toolbarExpanded = useUIStore((s) => s.toolbarExpanded);
-  const guardedSetTab = (t: "lyrics" | "chords" | "progressions" | "recordings") => {
+  const setToolbarExpanded = useUIStore((s) => s.setToolbarExpanded);
+  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const closeChordToolbar = () => {
     if (toolbarExpanded) {
-      toast({
-        title: "Finish editing chords first",
-        description: "Close the chord toolbar before switching tabs.",
-      });
-      return;
+      setToolbarExpanded(false);
+      setChordToolbarOpen(false);
     }
+  };
+  const guardedSetTab = (t: "lyrics" | "chords" | "progressions" | "recordings") => {
+    closeChordToolbar();
     if (onTabSelect) onTabSelect(t);
     else setTab(t);
   };
@@ -1061,16 +1063,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                   <button
                     key={m}
                     onClick={() => {
-                      if (toolbarExpanded) {
-                        toast({
-                          title: "Finish editing chords first",
-                          description: "Close the chord toolbar before switching modes.",
-                        });
-                        return;
-                      }
+                      closeChordToolbar();
                       onSelectMode(m);
                     }}
-                    aria-disabled={toolbarExpanded && !active}
                     style={{
                       padding: "7px 16px",
                       border: 0,
@@ -1084,7 +1079,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",
                       marginTop: active ? -2 : 0,
                       marginBottom: active ? 2 : 0,
-                      opacity: toolbarExpanded && !active ? 0.5 : 1,
                       transition: "all 120ms cubic-bezier(0.22,0.61,0.36,1)",
                     }}
                   >

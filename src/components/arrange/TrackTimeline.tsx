@@ -23,6 +23,8 @@ import { clearDecodedCache } from "@/lib/audio/recordings-engine";
 
 const PX_PER_BAR = 26;
 
+const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
 /** Hash a string into a stable waveform seed. */
 function seedFromId(id: string): number {
   let h = 0;
@@ -252,6 +254,18 @@ export function TrackTimeline() {
   const recorderRef = useRef<RecorderHandle | null>(null);
   const [pendingTid, setPendingTid] = useState<string | null>(null);
   const [recLevel, setRecLevel] = useState(0);
+  const [recElapsed, setRecElapsed] = useState(0);
+
+  // Live elapsed-time readout while a track is recording.
+  useEffect(() => {
+    if (!recordingTrackId) {
+      setRecElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const id = setInterval(() => setRecElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [recordingTrackId]);
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
   const [offsets, setOffsets] = useState<Record<string, number>>({});
@@ -517,7 +531,9 @@ export function TrackTimeline() {
         addClip(tid, clip);
         setPlayheadSec(startSec + durationSec);
       } catch {
-        // discard silently
+        toast.error("Couldn't save that recording", {
+          description: "Something went wrong storing the audio. Please try recording again.",
+        });
       } finally {
         setPendingTid(null);
       }
@@ -848,7 +864,7 @@ export function TrackTimeline() {
                           )}
                           {isRec && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-                              <span className="text-[11px] font-bold text-destructive">● Recording…</span>
+                              <span className="text-[11px] font-bold text-destructive">● Recording… {fmtElapsed(recElapsed)}</span>
                               <div className="h-1 w-20 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.12)" }}>
                                 <div
                                   className="h-full rounded-full"

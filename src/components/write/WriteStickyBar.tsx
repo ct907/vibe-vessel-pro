@@ -23,6 +23,8 @@ const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge",
 
 const START_RECORDING_EVENT = "write:start-recording";
 
+const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
 /** Ask the mounted sticky bar to start recording, as if its Record button was pressed. */
 export function requestStickyBarRecording() {
   window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
@@ -39,7 +41,19 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
   const [recording, setRecording] = useState(false);
   const [pending, setPending] = useState(false);
   const [level, setLevel] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
+
+  // Live elapsed-time readout so the user knows how long a take has been rolling.
+  useEffect(() => {
+    if (!recording) {
+      setElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [recording]);
 
   const start = async () => {
     try {
@@ -74,7 +88,9 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
         addTake({ blobId, durationSec, mime });
       }
     } catch {
-      // normalization or storage failed — discard silently
+      toast.error("Couldn't save that recording", {
+        description: "Something went wrong storing the audio. Please try recording again.",
+      });
     } finally {
       setPending(false);
     }
@@ -183,7 +199,7 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
               className="bg-white transition-all"
               style={{ width: 12, height: 12, borderRadius: recording ? 3 : 6 }}
             />
-            {pending ? "Saving…" : recording ? "Stop" : "Record"}
+            {pending ? "Saving…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
           </button>
 
           <button
