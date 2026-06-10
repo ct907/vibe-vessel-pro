@@ -10,6 +10,7 @@ import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 import { pushRecent } from "@/lib/recent-projects";
 import { notifyStorageQuota } from "@/lib/storage-quota";
+import { toast } from "sonner";
 
 // ---------- Types ----------
 
@@ -3690,6 +3691,27 @@ export function startAutosave() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
     } catch { notifyStorageQuota(); }
   });
+}
+
+/**
+ * Warn once when another tab writes the song slot. Both tabs autosave to the
+ * same localStorage key (last write wins), so concurrent editing silently
+ * overwrites work. `storage` events only fire for writes from *other* tabs.
+ */
+export function startCrossTabWarning() {
+  let warned = false;
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== STORAGE_KEY || warned) return;
+    warned = true;
+    toast.warning("This song is open in another tab", {
+      id: "cross-tab",
+      description:
+        "Both tabs save to the same place, so the last one to save wins. Close one tab to avoid losing edits.",
+      duration: Infinity,
+    });
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
 }
 
 /** True when the current song holds work worth preserving (title, lyrics, chords,

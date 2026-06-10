@@ -541,6 +541,20 @@ export function TrackTimeline() {
     }
   };
 
+  // Phone locked or app backgrounded mid-recording: finalize and save the clip
+  // instead of letting the browser kill the recorder and lose the audio.
+  const stopOnHideRef = useRef<() => void>(() => {});
+  stopOnHideRef.current = () => {
+    if (recorderRef.current && recordingTrackId) void toggleRecord(recordingTrackId);
+  };
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) stopOnHideRef.current();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+
   return (
     <div className="pb-4">
       <input

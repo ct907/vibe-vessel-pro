@@ -85,11 +85,32 @@ card a one-tap action with helper text telegraphing it.
 - ⬜ **MIDI export** (chord track + tempo/time-sig meta, later a melody track).
 - ⬜ Per-track WAV stem export via `OfflineAudioContext` for DAW handoff.
 
-## 5. Polish — ⬜ todo
+## 5. Polish — ✅ done
 
-- ⬜ Melody-to-notes transcription using the existing pitch detector
-  (`lib/audio/pitch-detector.ts`), not chords-only.
-- ⬜ Warn before destructive time-signature re-flow. (`store/song.ts setTimeSignature`)
-- ⬜ Wire or remove the per-section arpeggiator toggle. (`components/progressions/ProgressionsTab.tsx`)
-- ⬜ Backgrounding/lock protection: finalize + save a recording on `visibilitychange`.
-- ⬜ Cross-tab edit protection (single localStorage slot is last-write-wins).
+- ✅ **Melody-to-notes transcription.** New `detect-melody.ts` runs autocorrelation
+  frame-by-frame over a downsampled take (16 kHz) in a Web Worker, applies a
+  median filter to kill octave flickers, and segments voiced frames into discrete
+  MIDI notes. `transcribeMelodyBlob()` added to `lib/music/transcribe.ts`.
+  RecordingsStrip exposes a "Transcribe Melody" menu item and renders a scrollable
+  note-strip with a one-tap Copy button below each take.
+  (`lib/music/detect-melody.ts`, `lib/music/detect-melody.worker.ts`,
+  `lib/music/transcribe.ts`, `store/transcription.ts`,
+  `components/write/RecordingsStrip.tsx`)
+- ✅ **Warn before destructive time-signature re-flow.** Changing time signature
+  when sections have placed chords now shows an AlertDialog explaining that chords
+  will be reset to the start of their section before applying. No dialog is shown
+  for songs without placed chords. (`components/song/SongAttributesMenu.tsx`)
+- ✅ **Arpeggiator toggle is already wired.** Confirmed: `sectionArpArmed()`
+  is read per event in the chord scheduler, routing to `spawnArpForEvent` vs
+  `spawnChord` based on the section's `arpArmed` flag. Both ProgressionsTab and
+  LyricsTab expose the toggle. No changes needed.
+- ✅ **Backgrounding/lock protection.** All three recording surfaces now listen for
+  `visibilitychange` and call their respective stop/finalize path when the document
+  is hidden, saving the in-progress take instead of letting the browser kill it.
+  (`components/write/WriteStickyBar.tsx`,
+  `components/arrange/TrackTimeline.tsx`,
+  `components/recordings/RecordingsTab.tsx`)
+- ✅ **Cross-tab edit protection.** `startCrossTabWarning()` listens for
+  `storage` events on the song key; fires a persistent toast the first time
+  another tab writes to the slot, warning that last-writer-wins. Wired in App.tsx.
+  (`store/song.ts`, `App.tsx`)

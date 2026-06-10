@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Draggable, Droppable, type DraggableProvided } from "@hello-pangea/dnd";
-import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, Music, Copy, Check } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { useTranscriptionStore, type TranscribedChord } from "@/store/transcription";
 import { useSongStore } from "@/store/song";
 import { getAudioBlob, deleteAudioBlob, putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
-import { transcribeBlob } from "@/lib/music/transcribe";
+import { transcribeBlob, transcribeMelodyBlob } from "@/lib/music/transcribe";
+import type { MelodyNote } from "@/lib/music/detect-melody";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import type { ChordSymbol } from "@/lib/music/chords";
 import { Waveform } from "@/components/common/Waveform";
@@ -36,6 +37,10 @@ export function RecordingsStrip() {
   const chordsByTake = useTranscriptionStore((s) => s.chords);
   const setStatus = useTranscriptionStore((s) => s.setStatus);
   const setChords = useTranscriptionStore((s) => s.setChords);
+  const melodyStatus = useTranscriptionStore((s) => s.melodyStatus);
+  const melodyByTake = useTranscriptionStore((s) => s.melody);
+  const setMelodyStatus = useTranscriptionStore((s) => s.setMelodyStatus);
+  const setMelody = useTranscriptionStore((s) => s.setMelody);
   const clearTake = useTranscriptionStore((s) => s.clearTake);
   const autoTranscribe = useTranscriptionStore((s) => s.autoTranscribe);
   const setAutoTranscribe = useTranscriptionStore((s) => s.setAutoTranscribe);
@@ -119,6 +124,27 @@ export function RecordingsStrip() {
       return;
     }
     void runTranscription(take.id, blob);
+  };
+
+  const handleTranscribeMelody = async (take: Take) => {
+    if (!take.blobId) return;
+    const blob = await getAudioBlob(take.blobId);
+    if (!blob) {
+      toast.error("That recording's audio is no longer available.");
+      return;
+    }
+    setMelodyStatus(take.id, "transcribing");
+    try {
+      const meta = useSongStore.getState().meta;
+      const useFlat = meta.keyRoot.includes("b") || FLAT_KEYS.includes(meta.keyRoot);
+      const notes = await transcribeMelodyBlob(blob, useFlat);
+      setMelody(take.id, notes);
+      setMelodyStatus(take.id, "done");
+      if (notes.length === 0) toast("No melody detected — works best with a single hummed or sung voice.");
+    } catch {
+      setMelodyStatus(take.id, "idle");
+      toast.error("Couldn't detect the melody in that recording.");
+    }
   };
 
   // Auto-detect: transcribe takes as they land in the strip. Takes present on
@@ -229,21 +255,28 @@ export function RecordingsStrip() {
           {takes.map((take) => {
             const st = status[take.id] ?? "idle";
             const detected = chordsByTake[take.id] ?? [];
+            const melSt = melodyStatus[take.id] ?? "idle";
+            const melNotes = melodyByTake[take.id] ?? [];
             return (
               <div key={take.id} className="flex shrink-0 flex-col gap-1.5" style={{ scrollSnapAlign: "start" }}>
                 <TakeCard
                   take={take}
                   playing={playingId === take.id}
                   transcribing={st === "transcribing"}
+                  melodyTranscribing={melSt === "transcribing"}
                   onPlay={() => handlePlay(take)}
                   onStar={() => toggleBest(take.id)}
                   onDelete={() => handleDelete(take)}
                   onTranscribe={() => void handleTranscribe(take)}
+                  onTranscribeMelody={() => void handleTranscribeMelody(take)}
                   onRename={(name) => renameTake(take.id, name)}
                   starDisabled={atMax && !take.best}
                 />
                 {st === "done" && detected.length > 0 && (
                   <DetectedChordsStrip takeId={take.id} chords={detected} />
+                )}
+                {melSt === "done" && melNotes.length > 0 && (
+                  <DetectedMelodyStrip notes={melNotes} />
                 )}
               </div>
             );
@@ -282,20 +315,24 @@ function TakeCard({
   take,
   playing,
   transcribing,
+  melodyTranscribing,
   onPlay,
   onStar,
   onDelete,
   onTranscribe,
+  onTranscribeMelody,
   onRename,
   starDisabled,
 }: {
   take: Take;
   playing: boolean;
   transcribing: boolean;
+  melodyTranscribing: boolean;
   onPlay: () => void;
   onStar: () => void;
   onDelete: () => void;
   onTranscribe: () => void;
+  onTranscribeMelody: () => void;
   onRename: (name: string) => void;
   starDisabled: boolean;
 }) {
@@ -373,6 +410,9 @@ function TakeCard({
               <DropdownMenuItem onClick={onTranscribe} disabled={transcribing || !take.blobId}>
                 <Sparkles className="h-4 w-4" /> Transcribe Chords from Audio
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onTranscribeMelody} disabled={melodyTranscribing || !take.blobId}>
+                <Music className="h-4 w-4" /> Transcribe Melody from Audio
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
                 <Trash2 className="h-4 w-4" /> Delete
@@ -400,11 +440,11 @@ function TakeCard({
         <span className="shrink-0 font-mono-chord text-[9.5px] text-ink-soft">{take.duration}</span>
       </div>
 
-      {transcribing && (
+      {(transcribing || melodyTranscribing) && (
         <div className="flex items-center justify-center gap-1.5 pt-0.5">
           <RefreshCw className="h-3 w-3 animate-spin" style={{ color: "var(--primary-strong)" }} />
           <span className="font-mono-chord text-[9.5px]" style={{ color: "var(--ink-soft)" }}>
-            Transcribing chords…
+            {transcribing ? "Transcribing chords…" : "Detecting melody…"}
           </span>
         </div>
       )}
@@ -454,6 +494,59 @@ function DetectedChordsStrip({ takeId, chords }: { takeId: string; chords: Trans
           </div>
         )}
       </Droppable>
+    </div>
+  );
+}
+
+function DetectedMelodyStrip({ notes }: { notes: MelodyNote[] }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(notes.map((n) => n.noteName).join(" "));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div className="w-[168px]">
+      <div className="mb-0.5 flex items-center justify-between gap-1 px-0.5">
+        <div className="flex items-center gap-1">
+          <Music className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
+          <span className="font-mono-chord text-[9px] font-semibold uppercase tracking-wide text-ink-soft">
+            Melody
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={copy}
+          aria-label="Copy melody notes"
+          title="Copy notes"
+          className="p-0.5 text-ink-soft transition-colors hover:text-ink"
+        >
+          {copied ? (
+            <Check className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
+          ) : (
+            <Copy className="h-3 w-3" />
+          )}
+        </button>
+      </div>
+      <div
+        className="hide-scroll flex gap-1 overflow-x-auto rounded-lg p-1.5"
+        style={{ background: "var(--paper-shade)" }}
+      >
+        {notes.map((n, i) => (
+          <span
+            key={i}
+            className="noise-texture-chip shrink-0 select-none rounded-md bg-card px-1.5 py-1 font-mono-chord text-[12px] font-semibold text-ink"
+            style={{ boxShadow: "var(--shadow-paper)" }}
+            title={`${n.startSec.toFixed(1)}s – ${n.endSec.toFixed(1)}s`}
+          >
+            {n.noteName}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
