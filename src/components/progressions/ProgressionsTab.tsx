@@ -209,7 +209,6 @@ function PatternBlock({
   const playingChordId = isPlaying && playbackCurrent?.patternId === pattern.id ? playbackCurrent.patternChordId : null;
   const blockRef = useRef<HTMLDivElement>(null);
   const justDraggedAtRef = useRef<number>(0);
-  const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
   const isMobile = useIsMobile();
@@ -541,10 +540,6 @@ function PatternBlock({
                                   longPressTimerRef.current = setTimeout(() => {
                                     longPressTimerRef.current = null;
                                     longPressDidFireRef.current = true;
-                                    if (singleClickTimerRef.current) {
-                                      clearTimeout(singleClickTimerRef.current);
-                                      singleClickTimerRef.current = null;
-                                    }
                                     if (isShiftDownRef.current) {
                                       onToggleMultiSelected(c.id, pattern.id);
                                       return;
@@ -573,7 +568,6 @@ function PatternBlock({
                                 }}
                                 onContextMenu={(e) => {
                                   e.preventDefault();
-                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
                                   if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
                                   onSetActiveChordId(null);
@@ -581,7 +575,6 @@ function PatternBlock({
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
-                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
                                   onSetActiveChordId(null);
                                   onEditChordOpen(pattern.id, c.id);
@@ -590,22 +583,13 @@ function PatternBlock({
                                   if (Date.now() - justDraggedAtRef.current < 350) return;
                                   if (longPressDidFireRef.current) { longPressDidFireRef.current = false; return; }
                                   e.stopPropagation();
-                                  if (singleClickTimerRef.current) { clearTimeout(singleClickTimerRef.current); singleClickTimerRef.current = null; }
-                                  const shiftHeld = e.shiftKey;
-                                  singleClickTimerRef.current = setTimeout(() => {
-                                    singleClickTimerRef.current = null;
-                                    if (multiSelectModeRef.current) {
-                                      onToggleMultiSelected(c.id, pattern.id);
-                                      return;
-                                    }
-                                    if (shiftHeld || isShiftDownRef.current) {
-                                      onToggleMultiSelected(c.id, pattern.id);
-                                      return;
-                                    }
-                                    setFocusedPattern(pattern.id);
-                                    void playChord(displayChord, undefined, c.chord.octave ?? 3);
-                                    onSetActiveChordId(activeChordId === c.id ? null : c.id);
-                                  }, 250);
+                                  if (multiSelectModeRef.current || e.shiftKey || isShiftDownRef.current) {
+                                    onToggleMultiSelected(c.id, pattern.id);
+                                    return;
+                                  }
+                                  setFocusedPattern(pattern.id);
+                                  void playChord(displayChord, undefined, c.chord.octave ?? 3);
+                                  onSetActiveChordId(activeChordId === c.id ? null : c.id);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Draggable, Droppable, type DraggableProvided } from "@hello-pangea/dnd";
-import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, Music, Copy, Check } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, Music, Copy, Check, X } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { useTranscriptionStore, type TranscribedChord } from "@/store/transcription";
 import { useSongStore } from "@/store/song";
@@ -46,6 +46,19 @@ export function RecordingsStrip() {
   const setAutoTranscribe = useTranscriptionStore((s) => s.setAutoTranscribe);
 
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [backupHintDismissed, setBackupHintDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("vv:backup-hint-dismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissBackupHint = () => {
+    setBackupHintDismissed(true);
+    try {
+      localStorage.setItem("vv:backup-hint-dismissed", "1");
+    } catch { /* ignore */ }
+  };
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -239,7 +252,7 @@ export function RecordingsStrip() {
 
       <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleImport} />
 
-      {takes.length > 0 && (
+      {takes.length > 0 && !backupHintDismissed && (
         <div className="mx-4 mb-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: "color-mix(in oklch, var(--primary) 8%, transparent)", border: "1px solid color-mix(in oklch, var(--primary) 20%, transparent)" }}>
           <Save className="h-3 w-3 shrink-0" style={{ color: "var(--primary-strong)" }} />
           <p className="text-[10.5px] leading-snug" style={{ color: "var(--ink-soft)" }}>
@@ -247,6 +260,14 @@ export function RecordingsStrip() {
             <span className="font-bold" style={{ color: "var(--ink)" }}>Menu → Save</span>{" "}
             to back them up or move to another device.
           </p>
+          <button
+            type="button"
+            onClick={dismissBackupHint}
+            aria-label="Dismiss backup reminder"
+            className="ml-auto shrink-0 rounded p-0.5 text-ink-soft transition-colors hover:text-ink"
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
 
