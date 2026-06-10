@@ -11,7 +11,9 @@ export type Quality =
   // Phase 1.5 additions
   | "5" | "7alt" | "7#5" | "7b9" | "7#9"
   | "maj11" | "maj13" | "min11" | "min13"
-  | "add11" | "6/9";
+  | "add11" | "6/9"
+  // Extended jazz chords
+  | "13" | "13b9" | "9#11" | "maj9#11";
 
 export interface ChordSymbol {
   root: string;          // normalized: C, C#, Db, etc.
@@ -28,8 +30,10 @@ export interface ChordSymbol {
 //   - When adding a new quality, RE-SORT the entire array — never splice
 //     into the middle. The chord-parser regression test enforces this.
 const QUALITY_MAP: Array<[RegExp, Quality]> = [
-  // 5+ chars
+  // 7 chars
   [/^(?:minMaj7|mMaj7|mM7)/, "minMaj7"],
+  [/^(?:maj9#11|M9#11)/,     "maj9#11"],
+  // 5 chars
   [/^(?:maj13|M13)/,         "maj13"],
   [/^(?:maj11|M11)/,         "maj11"],
   [/^(?:min13|m13)/,         "min13"],
@@ -47,6 +51,8 @@ const QUALITY_MAP: Array<[RegExp, Quality]> = [
   [/^sus2/i,                 "sus2"],
   [/^sus4/i,                 "sus4"],
   [/^add9/i,                 "add9"],
+  [/^13b9/,                  "13b9"],
+  [/^9#11/,                  "9#11"],
   // 3 chars (altered dominants must precede bare ^7)
   [/^7#5/,                   "7#5"],
   [/^7b9/,                   "7b9"],
@@ -56,7 +62,9 @@ const QUALITY_MAP: Array<[RegExp, Quality]> = [
   [/^(?:min|m(?!aj))/,       "min"],
   [/^(?:aug|\+)/i,           "aug"],
   [/^sus/i,                  "sus4"],
-  [/^(?:maj|M(?!7|9|11|13))/,"maj"],
+  [/^(?:maj|M(?!7|9|11|13))/, "maj"],
+  // 2 chars (must precede single-digit entries)
+  [/^13/,                    "13"],
   // 1 char (must be last)
   [/^9/,                     "9"],
   [/^7/,                     "7"],
@@ -95,6 +103,12 @@ export const QUALITY_INTERVALS: Record<Quality, number[]> = {
   min13:   [0, 3, 7, 10, 14, 21],
   add11:   [0, 4, 7, 17],
   "6/9":   [0, 4, 7, 9, 14],
+  // Extended jazz chords — b9 (semitone 13) and #11 (semitone 18) are never
+  // filtered by voiceIntervals so they always sound in the chord stack.
+  "13":      [0, 4, 7, 10, 14, 21],
+  "13b9":    [0, 4, 7, 10, 13, 21],
+  "9#11":    [0, 4, 7, 10, 14, 18],
+  "maj9#11": [0, 4, 7, 11, 14, 18],
 };
 
 export const QUALITY_PRETTY: Record<Quality, string> = {
@@ -104,6 +118,7 @@ export const QUALITY_PRETTY: Record<Quality, string> = {
   "5": "5", "7alt": "7alt", "7#5": "7#5", "7b9": "7b9", "7#9": "7#9",
   maj11: "maj11", maj13: "maj13", min11: "m11", min13: "m13",
   add11: "add11", "6/9": "6/9",
+  "13": "13", "13b9": "13b9", "9#11": "9#11", "maj9#11": "maj9#11",
 };
 
 // Roots that don't exist in standard practice — silently fold to their
@@ -474,13 +489,13 @@ export function transposeKey(root: string, semitones: number): string {
 // Diminished → Special (sus/aug) → Neutral (power).
 export const COMMON_QUALITIES: Quality[] = [
   // Major-family
-  "maj", "maj7", "maj9", "maj11", "maj13", "6", "6/9", "add9", "add11",
+  "maj", "maj7", "maj9", "maj9#11", "maj11", "maj13", "6", "6/9", "add9", "add11",
   // Minor-family
   "min", "min7", "min9", "min11", "min13", "min6", "minMaj7",
   // Dominant-family
-  "7", "9",
+  "7", "9", "13",
   // Altered dominants
-  "7alt", "7#5", "7b9", "7#9",
+  "7alt", "7#5", "7b9", "7#9", "9#11", "13b9",
   // Diminished-family
   "dim", "dim7", "m7b5",
   // Special-family
@@ -505,11 +520,12 @@ export const CHORD_FAMILY_LABEL: Record<ChordFamily, string> = {
 
 export const QUALITY_FAMILY: Record<Quality, ChordFamily> = {
   maj: "major", maj7: "major", maj9: "major", maj11: "major", maj13: "major",
-  "6": "major", "6/9": "major", add9: "major", add11: "major",
+  "6": "major", "6/9": "major", add9: "major", add11: "major", "maj9#11": "major",
   min: "minor", min7: "minor", min9: "minor", min11: "minor", min13: "minor",
   min6: "minor", minMaj7: "minor",
-  "7": "dominant", "9": "dominant",
+  "7": "dominant", "9": "dominant", "13": "dominant",
   "7alt": "altered", "7#5": "altered", "7b9": "altered", "7#9": "altered",
+  "13b9": "altered", "9#11": "altered",
   dim: "diminished", dim7: "diminished", m7b5: "diminished",
   sus2: "special", sus4: "special", aug: "special",
   "5": "neutral",
@@ -543,6 +559,8 @@ const QUALITY_HUMAN: Record<Quality, string> = {
   maj11: "major 11th", maj13: "major 13th",
   min11: "minor 11th", min13: "minor 13th",
   add11: "add 11", "6/9": "six nine",
+  "13": "dominant 13th", "13b9": "dominant 13 flat 9",
+  "9#11": "dominant 9 sharp 11", "maj9#11": "major 9 sharp 11",
 };
 
 const ACC_HUMAN = (r: string) => r.replace("#", "-sharp").replace("b", "-flat");

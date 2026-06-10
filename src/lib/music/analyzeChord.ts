@@ -83,6 +83,10 @@ const QUALITY_INTERVALS: Record<Quality, number[]> = {
   min13: [0, 3, 7, 10],
   add11: [0, 4, 7],
   "6/9": [0, 4, 7, 9],
+  "13":      [0, 4, 7, 10],
+  "13b9":    [0, 4, 7, 10],
+  "9#11":    [0, 4, 7, 10],
+  "maj9#11": [0, 4, 7, 11],
 };
 
 const CHROMATIC_FLAT_NAMES: Record<number, string> = {
@@ -247,8 +251,10 @@ export function analyzeChord(
 
   let func: ChordAnalysis["function"];
   const isDom7 = chord.quality === "7" || chord.quality === "9" ||
+    chord.quality === "13" ||
     chord.quality === "7alt" || chord.quality === "7#5" ||
-    chord.quality === "7b9" || chord.quality === "7#9";
+    chord.quality === "7b9" || chord.quality === "7#9" ||
+    chord.quality === "13b9" || chord.quality === "9#11";
   if (degreeIndex === 0) func = "tonic";
   else if (degreeIndex === 4 || isDom7) func = "dominant";
   else if (degreeIndex === 3) func = "subdominant";
@@ -265,7 +271,8 @@ export function analyzeChord(
 
   const q = chord.quality;
   const isExtended = /7|9|11|13/.test(q) && q !== "5" && q !== "6";
-  const isAltered = q.startsWith("7") && q.length > 1 && /alt|#|b/.test(q.slice(1));
+  const isAltered = (q.startsWith("7") && q.length > 1 && /alt|#|b/.test(q.slice(1)))
+    || q === "13b9" || q === "9#11";
   const isSuspended = q === "sus2" || q === "sus4";
   const isPower = q === "5";
   const hasSlashBass = chord.bass != null;
