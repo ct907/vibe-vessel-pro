@@ -174,7 +174,7 @@ export default function Landing() {
         </div>
 
         <p className="mt-6 text-lg font-bold text-foreground/80">
-          The songwriter's notebook. Free to use. Use offline.
+          The Songwriter's Notebook. Use Offline. Save Locally.
         </p>
 
         <p className="mt-3 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
