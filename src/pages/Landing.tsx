@@ -183,7 +183,7 @@ export default function Landing() {
           <span>and Record.</span>
           <TaglineChip label="Arrange" style={CHORDS_STYLE} />
           <span>and Experiment.</span>
-          <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
+          
         </p>
 
         <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
