@@ -24,6 +24,8 @@ import {
   Palette,
   HelpCircle,
   Compass,
+  Piano,
+  Layers,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, updateScheduledBpm, ScheduledChord } from "@/lib/music/audio";
@@ -60,6 +62,8 @@ import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { useRecordingsStore } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
+import { downloadMidi } from "@/lib/export/midi";
+import { exportStemsAsZip, type StemExportProgress } from "@/lib/export/wav-stems";
 
 async function convertToWebP(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -465,6 +469,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [soundOpen, setSoundOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmNewSong, setConfirmNewSong] = useState(false);
+  const [stemsProgress, setStemsProgress] = useState<StemExportProgress | null>(null);
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
   const metronome = useMetronomeStore();
@@ -847,6 +852,51 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       onClick={() => { setExportOpen(true); setNavOpen(false); }}
                     >
                       <FileText className="h-4 w-4" /> Export Lyrics
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border-0"
+                      style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                      onClick={() => {
+                        const s = useSongStore.getState();
+                        downloadMidi(s.sections, s.progression, s.meta);
+                        setNavOpen(false);
+                      }}
+                    >
+                      <Piano className="h-4 w-4" /> Export MIDI
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border-0"
+                      disabled={stemsProgress !== null}
+                      style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                      onClick={async () => {
+                        const tracks = useRecordingsStore.getState().tracks;
+                        if (!tracks.some((t) => t.clips.length > 0)) {
+                          toast({ title: "No recorded tracks to export" });
+                          return;
+                        }
+                        setNavOpen(false);
+                        toast({ title: "Rendering stems — this may take a moment…" });
+                        try {
+                          await exportStemsAsZip(
+                            tracks,
+                            useSongStore.getState().meta.title,
+                            (p) => setStemsProgress(p),
+                          );
+                        } catch {
+                          toast({ title: "Stem export failed", description: "Check the browser console for details." });
+                        } finally {
+                          setStemsProgress(null);
+                        }
+                      }}
+                    >
+                      <Layers className="h-4 w-4" />
+                      {stemsProgress
+                        ? `${stemsProgress.label} (${stemsProgress.current}/${stemsProgress.total})`
+                        : "Export Stems"}
                     </Button>
                   </div>
                   <Link

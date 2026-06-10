@@ -82,8 +82,17 @@ card a one-tap action with helper text telegraphing it.
   Export sheet now offers a Plain text / ChordPro format toggle and a Download
   button (`.txt` or `.cho`). (`lib/lyrics/export.ts`,
   `components/lyrics/ExportLyricsSheet.tsx`)
-- ⬜ **MIDI export** (chord track + tempo/time-sig meta, later a melody track).
-- ⬜ Per-track WAV stem export via `OfflineAudioContext` for DAW handoff.
+- ✅ **MIDI export** (chord track + tempo/time-sig meta). `lib/export/midi.ts`
+  builds a standard MIDI type-1 file: track 0 carries tempo (µs/beat) and time-
+  signature meta events; track 1 contains note-on/off pairs for every chord in
+  the song, sorted correctly with note-offs before same-tick note-ons. Key
+  changes and section offsets are applied before export. Menu → Export MIDI.
+  (`lib/export/midi.ts`, `components/header/TransportHeader.tsx`)
+- ✅ **Per-track WAV stem export** via `OfflineAudioContext` for DAW handoff.
+  Each track's clips are decoded, positioned at their timeline offset, looped if
+  needed, and rendered offline at 44.1 kHz with the track's gain and pan applied.
+  All stems are packed into a ZIP via JSZip. Menu → Export Stems.
+  (`lib/export/wav-stems.ts`, `components/header/TransportHeader.tsx`)
 
 ## 5. Polish — ✅ done
 
