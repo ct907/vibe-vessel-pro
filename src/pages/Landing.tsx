@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Mic, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyTapCard } from "@/components/common/EmptyTapCard";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,6 +113,8 @@ export default function Landing() {
   const navigate = useNavigate();
   const loadFromJSON = useSongStore((s) => s.loadFromJSON);
   const resetSong = useSongStore((s) => s.resetSong);
+  const isDesktop = useIsDesktop();
+  const tapVerb = isDesktop ? "Click" : "Tap";
   const [recents, setRecents] = useState<RecentProject[]>([]);
 
   useEffect(() => {
@@ -130,13 +134,13 @@ export default function Landing() {
     removeRecent(id);
     setRecents(listRecent());
   };
-  const startWriting = () => {
+  const startCapture = (capture: "record" | "lyrics") => {
     commitCurrentSongToRecents();
     resetSong();
     useTakesStore.getState().clear();
     useRecordingsStore.getState().clear();
     useOnboardingStore.getState().resetForNewSong();
-    navigate("/app");
+    navigate(`/app?capture=${capture}`);
   };
 
   return (
@@ -182,28 +186,33 @@ export default function Landing() {
           <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
         </p>
 
-        <div className="mt-12 flex flex-col items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={startWriting}
-            className="btn-sculpt-amber inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
-          >
-            Start Writing
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/app?tab=chords")}
-            className="btn-sculpt-cream inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
-          >
-            Explore Chords
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/app?tab=voicekey")}
-            className="btn-sculpt-cream inline-flex w-full max-w-[220px] items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
-          >
-            Find Your Key & Range
-          </button>
+        <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
+          <EmptyTapCard
+            icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
+            label={`${tapVerb} to Start Recording`}
+            onClick={() => startCapture("record")}
+          />
+          <EmptyTapCard
+            icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
+            label={`${tapVerb} to Write Lyrics`}
+            onClick={() => startCapture("lyrics")}
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/app?tab=chords")}
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+            >
+              Explore Chords
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/app?tab=voicekey")}
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+            >
+              Find Your Key & Range
+            </button>
+          </div>
         </div>
 
         <section className="mt-20 w-full max-w-md" aria-label="Recent projects">
