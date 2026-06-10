@@ -4,10 +4,12 @@ import { Plus } from "lucide-react";
 interface Props {
   icon: ReactNode;
   label: string;
+  /** Telegraphs what tapping does, e.g. "Tap to start recording". */
+  hint?: string;
   onClick: () => void;
 }
 
-export function EmptyTapCard({ icon, label, onClick }: Props) {
+export function EmptyTapCard({ icon, label, hint, onClick }: Props) {
   return (
     <button
       type="button"
@@ -19,6 +21,7 @@ export function EmptyTapCard({ icon, label, onClick }: Props) {
         {icon}
       </span>
       <span className="text-base font-display font-semibold">{label}</span>
+      {hint && <span className="-mt-1.5 text-xs">{hint}</span>}
     </button>
   );
 }

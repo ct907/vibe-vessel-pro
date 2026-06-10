@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
+import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore, type SectionType } from "@/store/song";
@@ -11,16 +12,23 @@ import { putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
 
 interface Props {
-  /** Whether the editor panel (lyrics / progressions) has been revealed — gates the Add Section and Edit Chords buttons. */
-  actionsEnabled: boolean;
   onSwitchTab: (t: TabName) => void;
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
   onRecordComplete?: (blobId: string, durationSec: number, mime: string) => void;
+  /** Called when Add Section / Edit Chords is used, so the parent can reveal its card-gated editor. */
+  onEditorAction?: () => void;
 }
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge", "intro"];
 
-export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }: Props) {
+const START_RECORDING_EVENT = "write:start-recording";
+
+/** Ask the mounted sticky bar to start recording, as if its Record button was pressed. */
+export function requestStickyBarRecording() {
+  window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
+}
+
+export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
@@ -41,7 +49,11 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
       recorderRef.current = handle;
       setRecording(true);
     } catch {
-      // mic permission denied or device unavailable
+      // mic permission denied or device unavailable — tell the user so they
+      // don't think the app is broken at the moment they're trying to capture.
+      toast.error("Can't access the microphone", {
+        description: "Allow mic access in your browser settings, then try again.",
+      });
     }
   };
 
@@ -73,7 +85,19 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
     else start();
   };
 
+  // The empty "Add Recording" tap card starts a take through here so the strip
+  // reveal and the recording begin in the same gesture.
+  useEffect(() => {
+    const onRequest = () => {
+      if (recorderRef.current || pending || useRecordingsStore.getState().isRecording) return;
+      void start();
+    };
+    window.addEventListener(START_RECORDING_EVENT, onRequest);
+    return () => window.removeEventListener(START_RECORDING_EVENT, onRequest);
+  }, [pending]);
+
   const handleEditChords = () => {
+    onEditorAction?.();
     if (isMobile) {
       setChordToolbarOpen(true);
     } else {
@@ -84,7 +108,7 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[45]" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       {/* Section type picker — slides up above bar */}
-      {addSectionOpen && actionsEnabled && (
+      {addSectionOpen && (
         <div
           className="animate-in slide-in-from-bottom-2 duration-200"
           style={{ background: "var(--cocoa-deep)" }}
@@ -94,14 +118,14 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
               {SECTION_TYPES.map((t) => (
                 <button
                   key={t}
-                  onClick={() => { addSection(t); setAddSectionOpen(false); }}
+                  onClick={() => { onEditorAction?.(); addSection(t); setAddSectionOpen(false); }}
                   className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
                 >
                   <Plus className="h-3.5 w-3.5" />{t === "pre-chorus" ? "Pre-Chorus" : t}
                 </button>
               ))}
               <button
-                onClick={() => { addSection("custom"); setAddSectionOpen(false); }}
+                onClick={() => { onEditorAction?.(); addSection("custom"); setAddSectionOpen(false); }}
                 className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
               >
                 <Plus className="h-3.5 w-3.5" />Custom…
@@ -150,32 +174,26 @@ export function WriteStickyBar({ actionsEnabled, onSwitchTab, onRecordComplete }
             {pending ? "Saving…" : recording ? "Stop" : "Record"}
           </button>
 
-          {/* Add Section — disclosed after editor is revealed */}
-          {actionsEnabled && (
-            <button
-              type="button"
-              onClick={() => setAddSectionOpen((o) => !o)}
-              className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
-              aria-expanded={addSectionOpen}
-              aria-label="Add a song section"
-            >
-              <Plus className="h-4 w-4" />
-              Add Section
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setAddSectionOpen((o) => !o)}
+            className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
+            aria-expanded={addSectionOpen}
+            aria-label="Add a song section"
+          >
+            <Plus className="h-4 w-4" />
+            Add Section
+          </button>
 
-          {/* Edit Chords — disclosed after editor is revealed */}
-          {actionsEnabled && (
-            <button
-              type="button"
-              onClick={handleEditChords}
-              className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
-              aria-label="Open chord editing tools"
-            >
-              <Pencil className="h-4 w-4" />
-              Edit Chords
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleEditChords}
+            className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
+            aria-label="Open chord editing tools"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit Chords
+          </button>
         </div>
       </div>
     </div>

@@ -71,9 +71,9 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       </div>
 
       <WriteStickyBar
-        actionsEnabled={showChords}
         onSwitchTab={onSwitchTab}
         onRecordComplete={recordToFirstTrack}
+        onEditorAction={() => setChordsRevealed(true)}
       />
     </div>
   );

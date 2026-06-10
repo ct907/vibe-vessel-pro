@@ -33,15 +33,28 @@ The product promise is "your idea is safe." These are the highest-priority fixes
 - ✅ Updated the now-inaccurate "recordings are cleared on page refresh" notice in
   the recordings strip. (`components/write/RecordingsStrip.tsx`)
 
-## 2. Capture speed — ⬜ todo
+## 2. Capture speed — ✅ done
 
-- ⬜ Open straight into the lyric editor on a fresh song (remove the extra "Write
-  Lyrics" reveal tap). (`components/write/WriteMode.tsx`)
-- ⬜ Ungate "Add Section" / "Edit Chords" so chords can be sketched before lyrics.
-  (`components/write/WriteStickyBar.tsx`)
-- ⬜ Optional "auto-transcribe after recording" to collapse the record→menu→drag
-  flow. (`components/write/RecordingsStrip.tsx`)
-- ⬜ Group lyric text edits into one undo step per focus/blur cycle. (`store/song.ts`)
+Per user decision: keep progressive disclosure (tap cards stay), but make each
+card a one-tap action with helper text telegraphing it.
+
+- ✅ "Write Lyrics" card reveals the editor **and focuses the first line** (caret
+  ready); "Add Recording" card reveals the strip **and starts recording
+  immediately** (via `requestStickyBarRecording()`, dispatched within the tap
+  gesture so mic-permission rules apply). Cards show "Tap to start typing" /
+  "Tap to start recording" hints. (`components/write/WriteMode.tsx`,
+  `components/common/EmptyTapCard.tsx`, `components/write/WriteStickyBar.tsx`)
+- ✅ Ungated "Add Section" / "Edit Chords" — always visible in the sticky bar.
+  Using them notifies the parent (`onEditorAction`) to reveal the card-gated
+  editor so a new section is never invisible. (`components/write/WriteStickyBar.tsx`,
+  `components/arrange/ArrangeMode.tsx`)
+- ✅ Transcription surfaced: visible ✨ "Detect chords" button on each take card
+  (kept in ⋮ menu too) plus a persisted "Auto-detect" toggle in the strip header
+  (off by default) that transcribes new takes as they land — covers record and
+  import paths. (`components/write/RecordingsStrip.tsx`, `store/transcription.ts`)
+- ✅ Lyric typing coalesces into one undo step per burst (3s idle window, broken
+  by any other edit or undo/redo) instead of one step per keystroke.
+  (`store/song.ts`)
 
 ## 3. Unify playback — ⬜ todo
 
@@ -66,5 +79,3 @@ The product promise is "your idea is safe." These are the highest-priority fixes
 - ⬜ Wire or remove the per-section arpeggiator toggle. (`components/progressions/ProgressionsTab.tsx`)
 - ⬜ Backgrounding/lock protection: finalize + save a recording on `visibilitychange`.
 - ⬜ Cross-tab edit protection (single localStorage slot is last-write-wins).
-</content>
-</invoke>

@@ -1201,7 +1201,14 @@ let historyGroupDepth = 0;
 let historyGroupSnapshotted = false;
 
 /** Call BEFORE mutating sections/progression in a chord-row action. */
+// Typing coalescing: rapid setLineText calls on the same line collapse into a
+// single undo step, so undo reverts a typing burst instead of one keystroke.
+// Any other history point (or undo/redo) breaks the run.
+let lastLineTextEdit: { key: string; at: number } | null = null;
+const LINE_TEXT_COALESCE_MS = 3000;
+
 function pushHistory(get: () => SongState) {
+  lastLineTextEdit = null;
   if (historyGroupDepth > 0) {
     if (historyGroupSnapshotted) return;
     historyGroupSnapshotted = true;
@@ -1556,7 +1563,16 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       );
     })(),
   })),
-  setLineText: (sectionId, id, text) => { pushHistory(get); set((s) => ({
+  setLineText: (sectionId, id, text) => {
+    const editKey = `${sectionId}:${id}`;
+    const now = Date.now();
+    const coalesce =
+      lastLineTextEdit !== null &&
+      lastLineTextEdit.key === editKey &&
+      now - lastLineTextEdit.at < LINE_TEXT_COALESCE_MS;
+    if (!coalesce) pushHistory(get);
+    lastLineTextEdit = { key: editKey, at: now };
+    set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       return {
@@ -3443,6 +3459,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // ---- chord-row undo/redo ----
   undo: () => {
     if (!undoStack.length) return false;
+    lastLineTextEdit = null;
     const cur = get();
     const prev = undoStack.pop()!;
     redoStack.push(snapshot(cur));
@@ -3452,6 +3469,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   },
   redo: () => {
     if (!redoStack.length) return false;
+    lastLineTextEdit = null;
     const cur = get();
     const next = redoStack.pop()!;
     undoStack.push(snapshot(cur));

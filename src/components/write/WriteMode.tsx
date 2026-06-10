@@ -6,12 +6,26 @@ import { useTakesStore } from "@/store/takes";
 import { useSongStore } from "@/store/song";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { RecordingsStrip } from "./RecordingsStrip";
-import { WriteStickyBar } from "./WriteStickyBar";
+import { WriteStickyBar, requestStickyBarRecording } from "./WriteStickyBar";
 
 interface Props {
   sortMode: boolean;
   onSwitchTab: (t: TabName) => void;
   showOnboarding: boolean;
+}
+
+/** Poll a few frames for the first lyric textarea (it mounts on reveal) and focus it. */
+function focusFirstLyricLine() {
+  let tries = 0;
+  const tick = () => {
+    const el = document.querySelector<HTMLTextAreaElement>("[data-lyric-input]");
+    if (el) {
+      el.focus();
+      return;
+    }
+    if (++tries < 10) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 /**
@@ -20,7 +34,9 @@ interface Props {
  * Record pill for one-tap capture.
  *
  * Each area starts as a dashed tap card while it is empty; tapping reveals the
- * real editor inline. An untouched area reverts to its card on remount.
+ * real editor and immediately performs the capture action (caret ready in the
+ * first lyric line / recording already rolling) so inspiration isn't kept
+ * waiting. An untouched area reverts to its card on remount.
  */
 export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const recordingsEmpty = useTakesStore((s) => s.takes.length === 0);
@@ -43,7 +59,16 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
         {showRecordings ? (
           <RecordingsStrip />
         ) : (
-          <EmptyTapCard icon={<Mic className="h-7 w-7" strokeWidth={1.75} />} label="Add Recording" onClick={() => setRecRevealed(true)} />
+          <EmptyTapCard
+            icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
+            label="Add Recording"
+            hint="Tap to start recording"
+            onClick={() => {
+              setRecRevealed(true);
+              // Within the tap gesture so the mic prompt/keyboard rules apply.
+              requestStickyBarRecording();
+            }}
+          />
         )}
       </div>
 
@@ -52,11 +77,22 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
         {showLyrics ? (
           <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
         ) : (
-          <EmptyTapCard icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />} label="Write Lyrics" onClick={() => setLyricsRevealed(true)} />
+          <EmptyTapCard
+            icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
+            label="Write Lyrics"
+            hint="Tap to start typing"
+            onClick={() => {
+              setLyricsRevealed(true);
+              focusFirstLyricLine();
+            }}
+          />
         )}
       </div>
 
-      <WriteStickyBar actionsEnabled={showLyrics} onSwitchTab={onSwitchTab} />
+      <WriteStickyBar
+        onSwitchTab={onSwitchTab}
+        onEditorAction={() => setLyricsRevealed(true)}
+      />
     </div>
   );
 }
