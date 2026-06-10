@@ -56,13 +56,22 @@ card a one-tap action with helper text telegraphing it.
   by any other edit or undo/redo) instead of one step per keystroke.
   (`store/song.ts`)
 
-## 3. Unify playback — ⬜ todo
+## 3. Unify playback — ✅ done
 
-- ⬜ One transport plays the synth progression **and** recorded tracks together,
-  mixed. (`components/header/TransportHeader.tsx`, `lib/music/audio.ts`,
-  `lib/audio/recordings-engine.ts`)
-- ⬜ Per-block "play this progression" audition button. (`components/progressions/ProgressionsTab.tsx`)
-- ⬜ Apply tempo changes mid-playback. (`components/header/TransportHeader.tsx`)
+- ✅ One transport plays synth progression AND recorded tracks together — was
+  already wired in `handlePlay` (recordings engine starts at the same AC time as
+  the chord scheduler). Confirmed no work needed.
+- ✅ Per-section play button added to every section group header in Arrange/
+  Progressions. Button is disabled when the section has no chords; lights amber
+  while that section is the current playing section. Click sets the start-from
+  anchor to the section's first chord and fires `lovable:request-play`.
+  (`components/progressions/ProgressionsTab.tsx`)
+- ✅ Tempo changes apply to running playback without stopping it.
+  `updateScheduledBpm` adjusts `schedOriginAcTime` so the current beat position
+  is preserved at the new BPM; `updateEngineBpm` updates the recordings loop
+  duration, letting the current loop finish and rescheduing future iterations.
+  (`lib/music/audio.ts`, `lib/audio/recordings-engine.ts`,
+  `components/header/TransportHeader.tsx`)
 
 ## 4. Export roadmap — ⬜ todo
 

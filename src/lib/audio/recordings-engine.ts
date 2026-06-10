@@ -273,3 +273,21 @@ export function getLoopSec(): number {
 export function isEngineRunning(): boolean {
   return state.running;
 }
+
+/**
+ * Update the loop duration for a running recordings engine without stopping it.
+ * Sources currently playing continue at their original timing; future loop
+ * iterations are scheduled at the new BPM. This allows seamless live tempo
+ * adjustment — the loop boundary drifts to the new tempo over one cycle.
+ */
+export function updateEngineBpm(bpm: number, loopBeats: number): void {
+  if (!state.running) return;
+  const newLoopSec = (loopBeats * 60) / bpm;
+  if (!isFinite(newLoopSec) || newLoopSec <= 0.05) return;
+  state.loopSec = newLoopSec;
+  // Reset the schedule-ahead counter so the tick immediately reschedules any
+  // future loops with the new loop duration.
+  const ac = getAudioContext();
+  const elapsed = ac.currentTime - state.loopStartCtxTime;
+  state.scheduledUntilLoop = Math.max(0, Math.floor(elapsed / newLoopSec));
+}
