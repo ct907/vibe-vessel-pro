@@ -74,6 +74,7 @@ function styleFor(quality: ChordSymbol["quality"]): CSSProperties {
     // Major-extended
     case "maj7":
     case "maj9":
+    case "maj9#11":
     case "maj11":
     case "maj13":
     case "add11":   return grad(WARM_SAND, ROSE);
@@ -86,13 +87,16 @@ function styleFor(quality: ChordSymbol["quality"]): CSSProperties {
 
     // Dominant
     case "7":
-    case "9":       return grad(APRICOT, PERIWINKLE);
+    case "9":
+    case "13":      return grad(APRICOT, PERIWINKLE);
 
     // Altered dominant
     case "7alt":
     case "7#5":
     case "7b9":
-    case "7#9":     return grad(MINT, MUTED_BLUSH);
+    case "7#9":
+    case "9#11":
+    case "13b9":    return grad(MINT, MUTED_BLUSH);
 
     // Diminished family
     case "dim":
@@ -124,6 +128,7 @@ function strokeFor(quality: ChordSymbol["quality"]): string {
     case "min6":    return "oklch(0.50 0.14 232)";
     case "maj7":
     case "maj9":
+    case "maj9#11":
     case "maj11":
     case "maj13":
     case "add11":   return "oklch(0.50 0.18 25)";
@@ -132,11 +137,14 @@ function strokeFor(quality: ChordSymbol["quality"]): string {
     case "min11":
     case "min13":   return "oklch(0.45 0.17 290)";
     case "7":
-    case "9":       return "oklch(0.52 0.18 50)";
+    case "9":
+    case "13":      return "oklch(0.52 0.18 50)";
     case "7alt":
     case "7#5":
     case "7b9":
-    case "7#9":     return "oklch(0.50 0.16 155)";
+    case "7#9":
+    case "9#11":
+    case "13b9":    return "oklch(0.50 0.16 155)";
     case "dim":
     case "dim7":
     case "m7b5":    return "oklch(0.46 0.15 295)";
