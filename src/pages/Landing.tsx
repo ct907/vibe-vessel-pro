@@ -188,12 +188,12 @@ export default function Landing() {
 
         <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
           <EmptyTapCard
-            icon={<Mic className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Start Recording`}
             onClick={() => startCapture("record")}
           />
           <EmptyTapCard
-            icon={<Pencil className="h-3 w-3" strokeWidth={1.75} />}
+            icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Write Lyrics`}
             onClick={() => startCapture("lyrics")}
           />

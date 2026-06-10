@@ -83,7 +83,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <RecordingsStrip />
         ) : (
           <EmptyTapCard
-            icon={<Mic className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
             label="Add Recording"
             hint={`${tapVerb} to start recording`}
             onClick={() => {
@@ -101,7 +101,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
         ) : (
           <EmptyTapCard
-            icon={<Pencil className="h-3 w-3" strokeWidth={1.75} />}
+            icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
             label="Write Lyrics"
             hint={`${tapVerb} to start typing`}
             onClick={() => {

@@ -25,6 +25,7 @@ const QUALITY_PRETTY: Record<Quality, string> = {
   "5": "5", "7alt": "7alt", "7#5": "7#5", "7b9": "7b9", "7#9": "7#9",
   maj11: "maj11", maj13: "maj13", min11: "m11", min13: "m13",
   add11: "add11", "6/9": "6/9",
+  "13": "13", "13b9": "13b9", "9#11": "9#11", "maj9#11": "maj9#11",
 };
 
 function buildChord(rootPc: number, quality: Quality, useFlat: boolean): ChordSymbol {
