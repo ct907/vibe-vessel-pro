@@ -37,6 +37,8 @@ export function RecordingsStrip() {
   const setStatus = useTranscriptionStore((s) => s.setStatus);
   const setChords = useTranscriptionStore((s) => s.setChords);
   const clearTake = useTranscriptionStore((s) => s.clearTake);
+  const autoTranscribe = useTranscriptionStore((s) => s.autoTranscribe);
+  const setAutoTranscribe = useTranscriptionStore((s) => s.setAutoTranscribe);
 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -119,6 +121,25 @@ export function RecordingsStrip() {
     void runTranscription(take.id, blob);
   };
 
+  // Auto-detect: transcribe takes as they land in the strip. Takes present on
+  // mount (hydrated from a previous session) are treated as already seen.
+  const seenTakeIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!seenTakeIds.current) {
+      seenTakeIds.current = new Set(takes.map((t) => t.id));
+      return;
+    }
+    const seen = seenTakeIds.current;
+    for (const take of takes) {
+      if (seen.has(take.id)) continue;
+      seen.add(take.id);
+      if (autoTranscribe && take.blobId && (status[take.id] ?? "idle") === "idle") {
+        void handleTranscribe(take);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [takes]);
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -137,7 +158,11 @@ export function RecordingsStrip() {
       }
       const name = file.name.replace(/\.[^.]+$/, "") || "Imported";
       addTake({ name, blobId, durationSec, mime: file.type || "audio/*" });
-      toast.success("Imported — use the take's ⋮ menu to transcribe chords.");
+      toast.success(
+        useTranscriptionStore.getState().autoTranscribe
+          ? "Imported — detecting chords…"
+          : "Imported — press a take's ✨ button to detect chords.",
+      );
     } catch {
       toast.error("Couldn't import that audio file.");
     }
@@ -162,6 +187,19 @@ export function RecordingsStrip() {
               {bestCount} of {MAX_BEST_TAKES} best takes
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setAutoTranscribe(!autoTranscribe)}
+            aria-pressed={autoTranscribe}
+            title="Automatically detect chords on new recordings"
+            className={cn(
+              autoTranscribe ? "btn-sculpt-amber" : "btn-sculpt-cream",
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+            )}
+          >
+            <Sparkles className="h-3 w-3" style={autoTranscribe ? undefined : { color: "var(--primary-strong)" }} />
+            Auto-detect
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -228,9 +266,10 @@ export function RecordingsStrip() {
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: "var(--primary-strong)" }} />
             <span>
               Record a melody or play some chords on a piano or guitar (or{" "}
-              <span className="font-bold" style={{ color: "var(--ink)" }}>Import</span> an audio file), then use a take's{" "}
-              <span className="font-bold" style={{ color: "var(--ink)" }}>⋮ menu → Transcribe Chords from Audio</span>{" "}
-              to detect and transcribe them — right on your device.
+              <span className="font-bold" style={{ color: "var(--ink)" }}>Import</span> an audio file), then press a take's{" "}
+              <span className="font-bold" style={{ color: "var(--ink)" }}>✨ button</span>{" "}
+              — or turn on <span className="font-bold" style={{ color: "var(--ink)" }}>Auto-detect</span> —{" "}
+              to detect its chords right on your device.
             </span>
           </p>
         </div>
@@ -295,6 +334,16 @@ function TakeCard({
           <div className="mt-0.5 font-mono-chord text-[9.5px] text-ink-soft">{take.date}</div>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onTranscribe}
+            disabled={transcribing || !take.blobId}
+            aria-label="Detect chords in this take"
+            title="Detect chords"
+            className="p-0.5 disabled:opacity-30"
+          >
+            <Sparkles className="h-[16px] w-[16px]" style={{ color: "var(--primary-strong)" }} />
+          </button>
           <button
             type="button"
             onClick={onStar}

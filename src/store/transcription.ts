@@ -20,6 +20,9 @@ export type TranscribeStatus = "idle" | "transcribing" | "done";
 interface TranscriptionState {
   status: Record<string, TranscribeStatus>;
   chords: Record<string, TranscribedChord[]>;
+  /** When on, new takes are transcribed automatically as they land in the strip. */
+  autoTranscribe: boolean;
+  setAutoTranscribe: (on: boolean) => void;
   setStatus: (takeId: string, status: TranscribeStatus) => void;
   setChords: (takeId: string, chords: TranscribedChord[]) => void;
   removeChordById: (chordId: string) => void;
@@ -27,9 +30,26 @@ interface TranscriptionState {
   clearTake: (takeId: string) => void;
 }
 
+const AUTO_TRANSCRIBE_KEY = "songwriters-notebook:auto-transcribe:v1";
+
+function loadAutoTranscribe(): boolean {
+  try {
+    return localStorage.getItem(AUTO_TRANSCRIBE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export const useTranscriptionStore = create<TranscriptionState>((set, get) => ({
   status: {},
   chords: {},
+  autoTranscribe: loadAutoTranscribe(),
+  setAutoTranscribe: (on) => {
+    set({ autoTranscribe: on });
+    try {
+      localStorage.setItem(AUTO_TRANSCRIBE_KEY, on ? "1" : "0");
+    } catch { /* ignore */ }
+  },
   setStatus: (takeId, status) => set((s) => ({ status: { ...s.status, [takeId]: status } })),
   setChords: (takeId, chords) => set((s) => ({ chords: { ...s.chords, [takeId]: chords } })),
   removeChordById: (chordId) =>
