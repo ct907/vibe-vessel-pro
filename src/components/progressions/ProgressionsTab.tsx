@@ -1024,6 +1024,23 @@ function SectionGroup({
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section?.label ?? "");
 
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isGlobalPlaying = usePlaybackStore((s) => s.isPlaying);
+  const isSectionPlaying = isGlobalPlaying && blocks.some((b) => b.id === playbackCurrent?.patternId);
+
+  const firstSectionChord = useMemo(() => {
+    if (!section?.chords.length) return null;
+    const blockOrder = new Map(blocks.map((b, i) => [b.id, i]));
+    const withPlacement = section.chords.filter((c) => c.progressionPlacement != null);
+    if (!withPlacement.length) return null;
+    return withPlacement.sort((a, b) => {
+      const ao = blockOrder.get(a.progressionPlacement!.patternId) ?? Infinity;
+      const bo = blockOrder.get(b.progressionPlacement!.patternId) ?? Infinity;
+      if (ao !== bo) return ao - bo;
+      return a.progressionPlacement!.startBeat - b.progressionPlacement!.startBeat;
+    })[0];
+  }, [section?.chords, blocks]);
+
   function acceptCustomName() {
     const trimmed = draftLabel.trim() || "Section";
     updateSection(sectionId, { label: trimmed });
@@ -1139,6 +1156,28 @@ function SectionGroup({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!firstSectionChord}
+              onClick={() => {
+                if (!firstSectionChord?.progressionPlacement) return;
+                usePlaybackStore.getState().setStartFromChord(
+                  firstSectionChord.progressionPlacement.patternId,
+                  firstSectionChord.id,
+                );
+                window.dispatchEvent(new Event("lovable:request-play"));
+              }}
+              className={cn(
+                "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
+                isSectionPlaying
+                  ? "bg-[var(--primary)] text-white"
+                  : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+              aria-label="Play from this section"
+              title="Play from this section"
+            >
+              <Play className={cn("h-4 w-4", isSectionPlaying && "fill-white")} />
+            </button>
             <button
               type="button"
               onClick={() => duplicateSection(sectionId)}

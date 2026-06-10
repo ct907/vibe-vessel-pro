@@ -558,6 +558,26 @@ export function stopProgression() {
  *
  * No-op when the scheduler is idle.
  */
+/**
+ * Smoothly update the tempo of a running progression. Adjusts the internal
+ * beat-to-AC-time mapping so the current beat position is preserved — chords
+ * already handed to the AC (inside the lookahead window) keep their pre-update
+ * timing; everything past the lookahead plays at the new BPM.
+ *
+ * No-op when the scheduler is idle.
+ */
+export function updateScheduledBpm(bpm: number): void {
+  if (schedulerTimerId == null) return;
+  const ctx = getAudioContext();
+  const oldBeatSec = 60 / schedBpm;
+  const newBeatSec = 60 / bpm;
+  // Shift the origin so the "current beat" maps to the same AC time under
+  // the new tempo: currentBeat = (now - origin) / oldBeatSec  →  new origin.
+  const currentBeat = (ctx.currentTime - schedOriginAcTime) / oldBeatSec;
+  schedOriginAcTime = ctx.currentTime - currentBeat * newBeatSec;
+  schedBpm = bpm;
+}
+
 export function updateScheduledProgression(
   events: ScheduledChord[],
   loopBeats?: number,

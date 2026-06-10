@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
-import { startRecordingsEngine, stopRecordingsEngine } from "@/lib/audio/recordings-engine";
+import { startRecordingsEngine, stopRecordingsEngine, updateEngineBpm } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +26,7 @@ import {
   Compass,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, ScheduledChord } from "@/lib/music/audio";
+import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, updateScheduledBpm, ScheduledChord } from "@/lib/music/audio";
 import { transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { getAudioContext } from "@/lib/audio/context";
@@ -475,6 +475,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const stopRequestedRef = useRef(false);
   const playMetaRef = useRef<PlaybackMeta[]>([]);
   const startFromChordIdAtPlayRef = useRef<string | null>(null);
+  const loopBeatsRef = useRef<number | null>(null);
   const tapTimesRef = useRef<number[]>([]);
   const tapResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tapBpm, setTapBpm] = useState<number | null>(null);
@@ -491,6 +492,15 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   useEffect(() => {
     updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
   }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
+
+  // Apply tempo changes to running playback without stopping it.
+  useEffect(() => {
+    if (!isPlaying) return;
+    updateScheduledBpm(meta.bpm);
+    if (loopBeatsRef.current != null) {
+      updateEngineBpm(meta.bpm, loopBeatsRef.current);
+    }
+  }, [meta.bpm, isPlaying]);
 
   const handlePlay = async (requestedStartAt?: number) => {
     stopRequestedRef.current = false;
@@ -517,6 +527,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     const anchorAtPlay = built.startAnchorStale ? null : startFromChordId;
     startFromChordIdAtPlayRef.current = anchorAtPlay;
     playMetaRef.current = built.meta;
+    loopBeatsRef.current = built.loopBeats;
 
     setIsPlaying(true);
     setPlayingStore(true);
