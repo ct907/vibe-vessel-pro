@@ -73,10 +73,15 @@ card a one-tap action with helper text telegraphing it.
   (`lib/music/audio.ts`, `lib/audio/recordings-engine.ts`,
   `components/header/TransportHeader.tsx`)
 
-## 4. Export roadmap — ⬜ todo
+## 4. Export roadmap — 🟡 in progress
 
-- ⬜ **ChordPro export** (chords-over-lyrics, the performance lingua franca). All
-  the data exists in `SectionChord`. (`lib/lyrics/export.ts`)
+- ✅ **ChordPro export** (chords-over-lyrics, the performance lingua franca).
+  `exportLyricsAsChordPro()` inlines `[Chord]` markers at the correct lyric
+  character positions from `lyricsPlacement.slotIndex`; emits `{title}`,
+  `{key}`, `{tempo}`, `{start_of_verse/chorus/bridge}` / `{comment}` directives.
+  Export sheet now offers a Plain text / ChordPro format toggle and a Download
+  button (`.txt` or `.cho`). (`lib/lyrics/export.ts`,
+  `components/lyrics/ExportLyricsSheet.tsx`)
 - ⬜ **MIDI export** (chord track + tempo/time-sig meta, later a melody track).
 - ⬜ Per-track WAV stem export via `OfflineAudioContext` for DAW handoff.
 
