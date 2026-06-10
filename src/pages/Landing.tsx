@@ -177,12 +177,12 @@ export default function Landing() {
           The Songwriter's Notebook. Use Offline. Save Locally.
         </p>
 
-        <p className="mt-3 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
-          <span>Write</span>
-          <TaglineChip label="Lyrics." style={LYRICS_STYLE} />
-          <span>Find</span>
-          <TaglineChip label="Chords." style={CHORDS_STYLE} />
-          <span>Play</span>
+        <p className="mt-3 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2 whitespace-pre-wrap">
+          <span>{"\n"}</span>
+          <TaglineChip label="Write" style={LYRICS_STYLE} />
+          <span>and Record.</span>
+          <TaglineChip label="Arrange" style={CHORDS_STYLE} />
+          <span>and Experiment.</span>
           <TaglineChip label="Progressions." style={PROGRESSIONS_STYLE} />
         </p>
 
