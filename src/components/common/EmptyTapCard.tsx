@@ -17,7 +17,7 @@ export function EmptyTapCard({ icon, label, hint, onClick }: Props) {
       className="w-full rounded-xl border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col items-center justify-center gap-3 py-7 px-4 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border transition-colors"
     >
       <span className="flex items-center gap-3">
-        <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+        <Plus className="h-6 w-6" strokeWidth={1.75} />
         {icon}
       </span>
       <span className="text-base font-display font-semibold">{label}</span>
