@@ -178,11 +178,27 @@ function LineRow({
     addSection,
     undo,
     redo,
+    splitLine,
+    mergeLineUp,
+    addLine,
+    noteLyricCaret,
   } = useSongStore();
   const [slashDialog, setSlashDialog] = useState(false);
   const [slashType, setSlashType] = useState<SectionType>("verse");
   const [slashCustomLabel, setSlashCustomLabel] = useState("");
   const isMobile = useIsMobile();
+  // Focus a lyric line's textarea and place the caret. Used after split/merge/
+  // paste and arrow navigation. The 10ms defer lets React render the new line
+  // before we query for it (same pattern as the existing focus-after-add).
+  const focusLineAt = useCallback((lineId: string, caret: number) => {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${lineId}"]`);
+      if (!el) return;
+      el.focus();
+      const c = Math.max(0, Math.min(caret, el.value.length));
+      el.setSelectionRange(c, c);
+    }, 10);
+  }, []);
   // Phase 2 SSOT: read line chords through the section's SectionChord[]
   // projection. The legacy ChordAnchor shape is preserved (renderer still
   // depends on slotIndex/mirrorId/etc.) — only the order is now SSOT-driven.
@@ -491,9 +507,42 @@ function LineRow({
           data-lyric-input={line.id}
           value={line.text}
           rows={1}
-          onFocus={onTextFocus}
+          onFocus={(e) => {
+            noteLyricCaret(sectionId, line.id, e.currentTarget.selectionStart ?? 0);
+            onTextFocus();
+          }}
           onBlur={onTextBlur}
+          onSelect={(e) => noteLyricCaret(sectionId, line.id, e.currentTarget.selectionStart ?? 0)}
           onChange={(e) => setLineText(sectionId, line.id, e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData("text/plain");
+            // Single-line paste: let the textarea handle it normally.
+            if (!/[\r\n]/.test(text)) return;
+            e.preventDefault();
+            const ta = lyricInputRef.current;
+            const selStart = ta?.selectionStart ?? line.text.length;
+            const selEnd = ta?.selectionEnd ?? selStart;
+            const segments = text.replace(/\r\n?/g, "\n").split("\n");
+            // One grouped undo for the whole multi-line paste.
+            withHistoryGroup(() => {
+              const cur = line.text;
+              setLineText(sectionId, line.id, cur.slice(0, selStart) + segments[0] + cur.slice(selEnd));
+              // Push the original tail (text after the selection) onto its own line.
+              const res = splitLine(sectionId, line.id, selStart + segments[0].length);
+              let afterId = line.id;
+              let lastId = res?.newLineId ?? line.id;
+              let lastCaret = 0;
+              // Insert the middle/last pasted segments before that tail line.
+              for (let i = 1; i < segments.length; i++) {
+                const newId = addLine(sectionId, afterId);
+                setLineText(sectionId, newId, segments[i]);
+                afterId = newId;
+                lastId = newId;
+                lastCaret = segments[i].length;
+              }
+              focusLineAt(lastId, lastCaret);
+            });
+          }}
           onBeforeInput={(e: React.FormEvent<HTMLTextAreaElement> & { data?: string }) => {
             // Mobile soft keyboards often fire keydown with key="" / "Unidentified".
             // beforeinput reliably reports the inserted character.
@@ -506,6 +555,18 @@ function LineRow({
               setSlashType("verse");
               setSlashCustomLabel("");
               setSlashDialog(true);
+              return;
+            }
+            // Soft-keyboard Enter arrives as an insertLineBreak beforeinput with
+            // an empty key, so handle the split here too.
+            const inputType = (e.nativeEvent as InputEvent).inputType;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (inputType === "insertLineBreak" && !(e.nativeEvent as any).isComposing) {
+              e.preventDefault();
+              const ta = lyricInputRef.current;
+              const caret = ta?.selectionStart ?? line.text.length;
+              const res = splitLine(sectionId, line.id, caret);
+              if (res?.newLineId) focusLineAt(res.newLineId, 0);
             }
           }}
           onKeyDown={(e) => {
@@ -517,24 +578,75 @@ function LineRow({
               setSlashDialog(true);
               return;
             }
-            if (e.key === "Enter" && !e.shiftKey) {
+            const ta = lyricInputRef.current;
+            const idx = section.lines.findIndex((l) => l.id === line.id);
+            // Enter / Shift+Enter: split the line at the caret, carrying the text
+            // after the caret (and its chords) down to a new line.
+            if (e.key === "Enter") {
+              if (e.nativeEvent.isComposing) return;
               e.preventDefault();
-              const newId = onAddLineAfter();
-              if (typeof newId === "string") {
-                setTimeout(() => {
-                  document
-                    .querySelector<HTMLTextAreaElement>(`[data-lyric-input="${newId}"]`)
-                    ?.focus();
-                }, 10);
-              }
-            } else if (
+              const caret = ta?.selectionStart ?? line.text.length;
+              const res = splitLine(sectionId, line.id, caret);
+              if (res?.newLineId) focusLineAt(res.newLineId, 0);
+              return;
+            }
+            // Backspace at column 0: merge this line onto the END of the previous
+            // line (text + chords). Empty or not. First line falls through to the
+            // browser default (nothing to merge into).
+            if (
               e.key === "Backspace" &&
-              lyricInputRef.current?.selectionStart === 0 &&
-              lyricInputRef.current.selectionEnd === 0 &&
-              line.text === ""
+              ta?.selectionStart === 0 &&
+              ta.selectionEnd === 0 &&
+              !e.nativeEvent.isComposing
             ) {
+              if (idx <= 0) return;
               e.preventDefault();
-              onMergeUp("lyric");
+              const res = mergeLineUp(sectionId, line.id);
+              if (res) focusLineAt(res.prevLineId, res.caretIndex);
+              return;
+            }
+            // Delete at end of line: pull the next line up into this one.
+            if (
+              e.key === "Delete" &&
+              ta?.selectionStart === line.text.length &&
+              ta.selectionEnd === line.text.length &&
+              !e.nativeEvent.isComposing
+            ) {
+              const next = section.lines[idx + 1];
+              if (!next) return;
+              e.preventDefault();
+              const caret = line.text.length;
+              mergeLineUp(sectionId, next.id);
+              focusLineAt(line.id, caret);
+              return;
+            }
+            // Arrow Up at line start → end of previous line.
+            if (
+              e.key === "ArrowUp" &&
+              ta?.selectionStart === 0 &&
+              ta.selectionEnd === 0 &&
+              !e.nativeEvent.isComposing
+            ) {
+              const prev = section.lines[idx - 1];
+              if (prev) {
+                e.preventDefault();
+                focusLineAt(prev.id, prev.text.length);
+              }
+              return;
+            }
+            // Arrow Down at line end → next line, keeping the column where possible.
+            if (
+              e.key === "ArrowDown" &&
+              ta?.selectionStart === line.text.length &&
+              ta.selectionEnd === line.text.length &&
+              !e.nativeEvent.isComposing
+            ) {
+              const next = section.lines[idx + 1];
+              if (next) {
+                e.preventDefault();
+                focusLineAt(next.id, next.text.length);
+              }
+              return;
             }
           }}
           placeholder="Write your lyric line…"
@@ -1106,6 +1218,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     anchorId?: string;
   } | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
+
+  // After an undo/redo that moved a lyric line, restore the caret to where the
+  // edit happened so typing continues uninterrupted.
+  const pendingCaret = useSongStore((s) => s.pendingCaret);
+  const clearPendingCaret = useSongStore((s) => s.clearPendingCaret);
+  useEffect(() => {
+    if (!pendingCaret) return;
+    const { lineId, caret } = pendingCaret;
+    const handle = window.setTimeout(() => {
+      const el = document.querySelector<HTMLTextAreaElement>(`[data-lyric-input="${lineId}"]`);
+      if (el) {
+        el.focus();
+        const c = Math.max(0, Math.min(caret, el.value.length));
+        el.setSelectionRange(c, c);
+      }
+      clearPendingCaret();
+    }, 20);
+    return () => window.clearTimeout(handle);
+  }, [pendingCaret, clearPendingCaret]);
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
