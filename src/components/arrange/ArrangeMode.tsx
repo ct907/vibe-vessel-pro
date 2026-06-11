@@ -6,7 +6,8 @@ import { useSongStore } from "@/store/song";
 import { useRecordingsStore } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
-import { WriteStickyBar } from "@/components/write/WriteStickyBar";
+import { WriteStickyBar, requestStickyBarRecording } from "@/components/write/WriteStickyBar";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import { TrackTimeline } from "./TrackTimeline";
 
 interface Props {
@@ -29,6 +30,8 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
 
   const [trackRevealed, setTrackRevealed] = useState(false);
   const [chordsRevealed, setChordsRevealed] = useState(false);
+  const isDesktop = useIsDesktop();
+  const tapVerb = isDesktop ? "Click" : "Tap";
 
   // Once a recording exists, give the user a track ready to drop takes into.
   const autoAdded = useRef(false);
@@ -52,7 +55,13 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <EmptyTapCard
             icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
             label="Add Recording"
-            onClick={() => setTrackRevealed(true)}
+            hint={`${tapVerb} to start recording`}
+            onClick={() => {
+              setTrackRevealed(true);
+              // Begin the take within the tap gesture so the mic prompt applies,
+              // mirroring the Write-mode card.
+              requestStickyBarRecording();
+            }}
           />
         )}
       </div>

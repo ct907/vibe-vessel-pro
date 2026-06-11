@@ -160,7 +160,8 @@ export function SpiceSheet({ open, onOpenChange, pattern, blockIndex, activeChor
       replacePatternChords(pattern.id, s.chords.map((c, i) => withOctave(c, i)));
     }
 
-    onOpenChange(false);
+    // Keep the sheet open so the user can audition another variation without
+    // reopening; the suggestion list recomputes from the now-updated chords.
     onVariationApplied?.();
 
     toast({

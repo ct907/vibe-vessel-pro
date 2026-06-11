@@ -28,6 +28,9 @@ export interface RecTrack {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  /** Delay-compensation offset in milliseconds applied to this track's clips
+   *  during playback and stem export. Positive = later, negative = earlier. */
+  offsetMs: number;
 }
 
 export const MAX_TRACKS = 4;
@@ -132,6 +135,8 @@ interface RecordingsState {
   setTrackColor: (id: RecTrackId, color: string) => void;
   setGainDb: (id: RecTrackId, db: number) => void;
   setPan: (id: RecTrackId, pan: number) => void;
+  /** Set the delay-compensation offset (clamped to ±2000ms). */
+  setTrackOffsetMs: (id: RecTrackId, offsetMs: number) => void;
   toggleMute: (id: RecTrackId) => void;
   toggleSolo: (id: RecTrackId) => void;
 
@@ -141,6 +146,8 @@ interface RecordingsState {
   recordToFirstTrack: (blobId: string, durationSec: number, mime: string) => void;
   /** Remove a single clip by blobId. */
   removeClip: (id: RecTrackId, blobId: RecBlobId) => void;
+  /** Remove every clip on a track in a single undoable step. */
+  clearTrackClips: (id: RecTrackId) => void;
   /** Punch-in: replace audio in [punchStart, punchEnd] with newClip. */
   punchInClip: (id: RecTrackId, clip: RecClip, punchStart: number, punchEnd: number) => void;
   setClipTrim: (id: RecTrackId, blobId: RecBlobId, trimStart: number, trimEnd: number) => void;
@@ -191,7 +198,7 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
     const id = nanoid();
     const color = TRACK_COLOR_PRESETS[tracks.length % TRACK_COLOR_PRESETS.length];
     const name = DEFAULT_NAMES[tracks.length] ?? `Track ${tracks.length + 1}`;
-    const track: RecTrack = { id, name, color, clips: [], gainDb: 0, pan: 0, muted: false, soloed: false };
+    const track: RecTrack = { id, name, color, clips: [], gainDb: 0, pan: 0, muted: false, soloed: false, offsetMs: 0 };
     set({ tracks: [...tracks, track], selectedTrackId: id });
     return id;
   },
@@ -208,6 +215,8 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   setTrackColor: (id, color) => set((s) => ({ tracks: updateOne(s.tracks, id, { color }) })),
   setGainDb: (id, gainDb) => set((s) => ({ tracks: updateOne(s.tracks, id, { gainDb }) })),
   setPan: (id, pan) => set((s) => ({ tracks: updateOne(s.tracks, id, { pan }) })),
+  setTrackOffsetMs: (id, offsetMs) =>
+    set((s) => ({ tracks: updateOne(s.tracks, id, { offsetMs: Math.max(-2000, Math.min(2000, offsetMs)) }) })),
   toggleMute: (id) => set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, muted: !t.muted } : t)) })),
   toggleSolo: (id) => set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, soloed: !t.soloed } : t)) })),
 
@@ -241,6 +250,11 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
         return { ...t, clips: t.clips.filter((c) => c.blobId !== blobId) };
       }),
     }));
+  },
+
+  clearTrackClips: (id) => {
+    pushHistory(get().tracks);
+    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, clips: [] } : t)) }));
   },
 
   punchInClip: (id, clip, punchStart, punchEnd) => {
@@ -361,9 +375,9 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
       // Migrate legacy clip: RecClip | null → clips: RecClip[]
       const legacy = t as unknown as RecTrack & { clip?: RecClip | null };
       if (!t.clips && legacy.clip) {
-        return { ...t, clips: [legacy.clip] };
+        return { ...t, clips: [legacy.clip], offsetMs: t.offsetMs ?? 0 };
       }
-      return { ...t, clips: t.clips ?? [] };
+      return { ...t, clips: t.clips ?? [], offsetMs: t.offsetMs ?? 0 };
     });
     set({ tracks, selectedTrackId: null });
   },

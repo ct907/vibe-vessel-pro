@@ -87,6 +87,8 @@ async function renderTrack(
 
     const body = clip.trimEndSec - clip.trimStartSec;
     const fillEnd = clip.startSec + Math.max(body, clip.loopSec ?? 0);
+    // Delay compensation: shift this track's clips to match playback.
+    const trackOffsetSec = (track.offsetMs ?? 0) / 1000;
 
     for (let pos = clip.startSec; pos < fillEnd - 0.001; pos += body) {
       const src = ctx.createBufferSource();
@@ -95,7 +97,7 @@ async function renderTrack(
       const remaining = Math.min(body, fillEnd - pos, totalSec - pos);
       if (remaining <= 0.001) break;
       try {
-        src.start(pos, clip.trimStartSec, remaining);
+        src.start(Math.max(0, pos + trackOffsetSec), clip.trimStartSec, remaining);
       } catch {
         break;
       }

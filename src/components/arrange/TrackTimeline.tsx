@@ -126,17 +126,19 @@ function useSectionBars() {
   return { layout, totalBars: cursor, beatsPerBar };
 }
 
-/** Best-takes clipboard tray, pinned at the top of Track view. */
+/** Takes clipboard tray, pinned at the top of Track view. Shows every take
+ *  (starred ones first) so any recording can be dragged in without a trip back
+ *  to Write to star it. */
 function BestTakesTray() {
   const takes = useTakesStore((s) => s.takes);
-  const best = takes.filter((t) => t.best);
+  const ordered = [...takes].sort((a, b) => Number(!!b.best) - Number(!!a.best));
   return (
     <div className="px-4 pb-3">
       <div className="rounded-xl border border-border p-2.5" style={{ background: "var(--paper-shade-soft)" }}>
         <div className="mb-2 flex items-center gap-1.5">
           <Copy className="h-3.5 w-3.5 text-ink-soft" />
           <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
-            Best takes — drag into a track
+            Takes — drag into a track
           </span>
         </div>
         <Droppable droppableId="takes-tray" type="take" direction="horizontal" isDropDisabled={true}>
@@ -146,10 +148,10 @@ function BestTakesTray() {
               {...provided.droppableProps}
               className="hide-scroll flex gap-2 overflow-x-auto"
             >
-              {best.length === 0 ? (
-                <span className="py-1.5 text-xs italic text-ink-soft">Star takes in Write to pin them here.</span>
+              {ordered.length === 0 ? (
+                <span className="py-1.5 text-xs italic text-ink-soft">Record takes in Write to drag them here.</span>
               ) : (
-                best.map((take, i) => (
+                ordered.map((take, i) => (
                   <Draggable key={take.id} draggableId={`take:${take.id}`} index={i}>
                     {(dragProvided, snapshot) => (
                       <div
@@ -164,7 +166,9 @@ function BestTakesTray() {
                         }}
                       >
                         <GripVertical className="h-3.5 w-3.5 text-ink-soft" />
-                        <Star className="h-3 w-3" style={{ fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }} />
+                        {take.best && (
+                          <Star className="h-3 w-3" style={{ fill: "var(--star,#e8a838)", color: "var(--star,#e8a838)" }} />
+                        )}
                         <span className="whitespace-nowrap text-xs font-bold text-ink">{take.name}</span>
                         <Waveform width={44} height={14} seed={take.seed} color="var(--primary)" />
                         <span className="font-mono-chord text-[9px] text-ink-soft">{take.duration}</span>
@@ -244,6 +248,9 @@ export function TrackTimeline() {
   const setClipStart = useRecordingsStore((s) => s.setClipStart);
   const setClipTrim = useRecordingsStore((s) => s.setClipTrim);
   const setClipLoop = useRecordingsStore((s) => s.setClipLoop);
+  const setTrackOffsetMs = useRecordingsStore((s) => s.setTrackOffsetMs);
+  const clearTrackClips = useRecordingsStore((s) => s.clearTrackClips);
+  const recUndo = useRecordingsStore((s) => s.undo);
   const moveClip = useRecordingsStore((s) => s.moveClip);
   const beginClipEdit = useRecordingsStore((s) => s.beginClipEdit);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
@@ -268,7 +275,6 @@ export function TrackTimeline() {
   }, [recordingTrackId]);
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
-  const [offsets, setOffsets] = useState<Record<string, number>>({});
 
   const [selected, setSelected] = useState<{ trackId: string; blobId: string } | null>(null);
   const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
@@ -300,12 +306,28 @@ export function TrackTimeline() {
     : null;
   const selectedTrack = selected ? tracks.find((t) => t.id === selected.trackId) ?? null : null;
 
+  // Deferred-destroy: removing a clip is undoable (store history), but the audio
+  // blob in IndexedDB is not. Hold off on deleting the bytes so Undo can restore
+  // the clip with its audio intact; prune only if the toast wasn't undone and the
+  // blob is no longer referenced.
+  const pruneBlobsUnlessUndone = (blobIds: string[], message: string) => {
+    let undone = false;
+    toast(message, { action: { label: "Undo", onClick: () => { undone = true; recUndo(); } } });
+    window.setTimeout(() => {
+      if (undone) return;
+      const referenced = new Set(
+        useRecordingsStore.getState().tracks.flatMap((tr) => tr.clips.map((c) => c.blobId)),
+      );
+      blobIds.forEach((id) => { if (!referenced.has(id)) void deleteAudioBlob(id); });
+    }, 8000);
+  };
+
   const deleteClip = (trackId: string, blobId: string) => {
     removeClip(trackId, blobId);
-    void deleteAudioBlob(blobId);
     clearDecodedCache(blobId);
     invalidatePeaks(blobId);
     setSelected((s) => (s?.blobId === blobId ? null : s));
+    pruneBlobsUnlessUndone([blobId], "Clip deleted");
   };
 
   const duplicateClip = async (track: RecTrack, clip: RecClip) => {
@@ -462,14 +484,18 @@ export function TrackTimeline() {
   );
   const timelineW = displayBars * PX_PER_BAR;
 
-  const nudge = (tid: string, d: number) =>
-    setOffsets((o) => ({ ...o, [tid]: Math.max(-2000, Math.min(2000, (o[tid] || 0) + d)) }));
+  const nudge = (tid: string, d: number) => {
+    const cur = tracks.find((t) => t.id === tid)?.offsetMs ?? 0;
+    setTrackOffsetMs(tid, cur + d);
+  };
 
   const clearTrack = (t: RecTrack) => {
-    t.clips.forEach((c) => {
-      removeClip(t.id, c.blobId);
-      void deleteAudioBlob(c.blobId);
-    });
+    const blobIds = t.clips.map((c) => c.blobId);
+    if (blobIds.length === 0) return;
+    clearTrackClips(t.id);
+    blobIds.forEach((id) => { clearDecodedCache(id); invalidatePeaks(id); });
+    setSelected((s) => (s && s.trackId === t.id ? null : s));
+    pruneBlobsUnlessUndone(blobIds, "Track cleared");
   };
 
   /** Convert a pointer clientX to a timeline position in seconds, accounting for scroll. */
@@ -672,7 +698,7 @@ export function TrackTimeline() {
             {tracks.map((track) => {
               const isRec = recordingTrackId === track.id;
               const showDelay = delayOpen === track.id;
-              const offBars = ((offsets[track.id] || 0) / 1000 / secPerBar);
+              const offBars = ((track.offsetMs || 0) / 1000 / secPerBar);
               return (
                 <div key={track.id}>
                   <div className="flex items-stretch border-b border-border" style={{ minHeight: LANE_H }}>
@@ -734,9 +760,9 @@ export function TrackTimeline() {
                         >
                           <Timer className="h-3.5 w-3.5" />
                         </button>
-                        {offsets[track.id] ? (
+                        {track.offsetMs ? (
                           <span className="font-mono-chord text-[8.5px] text-ink-soft">
-                            {(offsets[track.id] > 0 ? "+" : "") + offsets[track.id]}ms
+                            {(track.offsetMs > 0 ? "+" : "") + track.offsetMs}ms
                           </span>
                         ) : null}
                       </div>
@@ -885,7 +911,7 @@ export function TrackTimeline() {
                   {showDelay && (
                     <div className="flex border-b border-border">
                       <div className="sticky left-0 z-[5]" style={{ width: "min(92vw, 320px)" }}>
-                        <DelayPanel offsetMs={offsets[track.id] || 0} onNudge={(d) => nudge(track.id, d)} />
+                        <DelayPanel offsetMs={track.offsetMs || 0} onNudge={(d) => nudge(track.id, d)} />
                       </div>
                     </div>
                   )}
