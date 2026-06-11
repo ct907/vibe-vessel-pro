@@ -147,9 +147,11 @@ async function scheduleClipForLoop(
   const offset = Math.max(0, Math.min(clip.trimStartSec, buffer.duration - 0.001));
   const body = Math.max(0.01, clip.trimEndSec - offset);
   const fillEnd = clip.startSec + Math.max(body, clip.loopSec ?? 0);
+  // Delay compensation: shift the whole track's clips on the timeline.
+  const trackOffsetSec = (track.offsetMs ?? 0) / 1000;
 
   for (let pos = clip.startSec; pos < fillEnd - 0.001; pos += body) {
-    const startTime = loopStart + pos;
+    const startTime = loopStart + pos + trackOffsetSec;
     if (startTime + 0.001 < ac.currentTime) continue;
     const remainingInFill = fillEnd - pos;
     const remainingInLoop = state.loopSec - pos;

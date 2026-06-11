@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useDndStore } from "@/store/dnd";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
@@ -12,7 +11,6 @@ import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
 import { ChordChip } from "@/components/chord/ChordChip";
-import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -211,6 +209,10 @@ function PatternBlock({
   const justDraggedAtRef = useRef<number>(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
+  // Right-edge drag-resize on the active chip: tracks pointer travel in beats,
+  // applying snapped half-beat deltas through the same resize action the
+  // toolbar steppers use.
+  const resizeDragRef = useRef<{ chordId: string; startX: number; pxPerBeat: number; appliedDelta: number } | null>(null);
   const isMobile = useIsMobile();
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setWhyChord = useUIStore((s) => s.setWhyChord);
@@ -419,6 +421,21 @@ function PatternBlock({
               <Sparkles className="h-4 w-4" style={{ color: "var(--primary)" }} />
             </button>
           )}
+          {canDeleteThisBlock && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRequestDeleteBlock(pattern.id);
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors text-[var(--ink-soft)] hover:text-destructive"
+              style={{ background: "var(--paper-shade)" }}
+              aria-label="Delete this block"
+              title="Delete this block"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -461,6 +478,7 @@ function PatternBlock({
           }
           return (
             <div
+              data-pattern-grid
               className="relative rounded-md flex items-stretch w-full"
               style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", minHeight: 80, paddingTop: 8, paddingBottom: 8, paddingLeft: 4, paddingRight: 4, gap: 3 }}
             >
@@ -499,20 +517,11 @@ function PatternBlock({
                 const slotIdx = item.slotIdx;
                 const basis = item.basis;
                 return (
-                  <Droppable
-                    key={`pslot-${itemIdx}`}
-                    droppableId={`pattern:${pattern.id}:${slotIdx}`}
-                    direction="horizontal"
-                    type="chord"
-                  >
-                    {(dropProvided, dropSnapshot) => (
                       <div
-                        ref={dropProvided.innerRef}
-                        {...dropProvided.droppableProps}
+                        key={`pslot-${itemIdx}`}
                         className={cn(
                           "relative min-w-0 flex items-stretch z-10",
                           !occupied && "border border-dashed border-transparent justify-center",
-                          dropSnapshot.isDraggingOver && "bg-accent/40 ring-1 ring-primary/50 rounded-sm",
                         )}
                         style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
@@ -607,7 +616,7 @@ function PatternBlock({
                                 )}
                                 style={{
                                   ...colors.style,
-                                  touchAction: "none",
+                                  touchAction: "pan-y",
                                 }}
                               >
                                 <span className="font-mono-chord font-semibold text-sm leading-tight truncate max-w-full">
@@ -650,7 +659,7 @@ function PatternBlock({
                                   <Play className="h-3.5 w-3.5 fill-current" />
                                 </button>
                               )}
-                              {(isActive || isSelected) && (
+                              {isActive && (
                                 <button
                                   type="button"
                                   className="absolute -top-1.5 -right-1.5 z-20 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
@@ -674,55 +683,55 @@ function PatternBlock({
                                   <X className="h-3.5 w-3.5" />
                                 </button>
                               )}
+                              {isActive && (
+                                <div
+                                  role="slider"
+                                  aria-label="Drag to resize chord length"
+                                  aria-valuenow={c.lengthBeats}
+                                  className="absolute inset-y-0 -right-1 z-20 w-3 cursor-ew-resize rounded-r-md"
+                                  style={{ touchAction: "none", background: "color-mix(in oklch, var(--primary) 55%, transparent)" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onPointerDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    const grid = (e.currentTarget as HTMLElement).closest("[data-pattern-grid]");
+                                    const gridW = grid?.getBoundingClientRect().width ?? 0;
+                                    if (gridW <= 0) return;
+                                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                                    resizeDragRef.current = {
+                                      chordId: c.id,
+                                      startX: e.clientX,
+                                      pxPerBeat: gridW / totalBeats,
+                                      appliedDelta: 0,
+                                    };
+                                  }}
+                                  onPointerMove={(e) => {
+                                    const d = resizeDragRef.current;
+                                    if (!d || d.chordId !== c.id) return;
+                                    const rawBeats = (e.clientX - d.startX) / d.pxPerBeat;
+                                    let snapped = Math.round(rawBeats / LENGTH_STEP) * LENGTH_STEP;
+                                    snapped = Math.max(snapped, LENGTH_STEP - c.lengthBeats + d.appliedDelta);
+                                    const step = snapped - d.appliedDelta;
+                                    if (step !== 0) {
+                                      resizePatternChordsWithOverflow(pattern.id, [c.id], step);
+                                      d.appliedDelta = snapped;
+                                    }
+                                  }}
+                                  onPointerUp={(e) => {
+                                    resizeDragRef.current = null;
+                                    try {
+                                      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                                    } catch { /* noop */ }
+                                  }}
+                                  onPointerCancel={() => { resizeDragRef.current = null; }}
+                                />
+                              )}
                             </div>
                           );
                         })()}
-                        {dropProvided.placeholder}
                       </div>
-                    )}
-                  </Droppable>
                 );
               })}
-
-              {/* Item 4 — left/right edge drop strips: dropping a chord onto
-                  these appends to the previous / next block when capacity
-                  allows. The actual neighbor lookup happens in onDragEnd. */}
-              <Droppable
-                droppableId={`pattern:${pattern.id}:edge-left`}
-                direction="horizontal"
-                type="chord"
-              >
-                {(p, snap) => (
-                  <div
-                    ref={p.innerRef}
-                    {...p.droppableProps}
-                    className={cn(
-                      "absolute left-0 top-0 bottom-0 w-3 z-20",
-                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
-                    )}
-                  >
-                    {p.placeholder}
-                  </div>
-                )}
-              </Droppable>
-              <Droppable
-                droppableId={`pattern:${pattern.id}:edge-right`}
-                direction="horizontal"
-                type="chord"
-              >
-                {(p, snap) => (
-                  <div
-                    ref={p.innerRef}
-                    {...p.droppableProps}
-                    className={cn(
-                      "absolute right-0 top-0 bottom-0 w-3 z-20",
-                      snap.isDraggingOver && "bg-primary/30 ring-1 ring-primary/60",
-                    )}
-                  >
-                    {p.placeholder}
-                  </div>
-                )}
-              </Droppable>
             </div>
           );
         })()}
@@ -1066,7 +1075,7 @@ function SectionGroup({
               updateSection(sectionId, { type: next, label: section?.label ?? "" });
             }
           }}
-          disabled={sortMode || totalSections === 1}
+          disabled={sortMode}
         >
           <SelectTrigger
             className="h-auto w-auto min-w-[120px] border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
@@ -1182,6 +1191,19 @@ function SectionGroup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => onMoveSection?.(sectionId, -1)}
+                  disabled={index === 0}
+                >
+                  <ArrowUp className="h-4 w-4" /> Move section up
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onMoveSection?.(sectionId, 1)}
+                  disabled={index >= totalSections - 1}
+                >
+                  <ArrowDown className="h-4 w-4" /> Move section down
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
                     onClick={() => setPendingKeyChange(true)}
@@ -1352,7 +1374,7 @@ function SectionGroup({
                 className="mr-auto rounded-lg border-2 border-dashed border-border/50 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border/80 min-h-[40px] transition-colors py-1.5"
               >
                 <Plus className="h-4 w-4" />
-                <span className="text-xs font-display uppercase tracking-wide">Add Chords</span>
+                <span className="text-xs font-display uppercase tracking-wide">Add block</span>
               </button>
               <button
                 type="button"
@@ -1443,12 +1465,10 @@ interface ProgressionsTabProps {
 
 /** Tiny helper that registers the progressions onDragEnd handler with the
  *  global DnD store. Lives inside ProgressionsTab so it has the right closure. */
-function ProgressionsDndRegistrar({ onDragEnd }: { onDragEnd: (r: DropResult) => void }) {
-  const ref = useRef(onDragEnd);
-  ref.current = onDragEnd;
+function ProgressionsDndRegistrar() {
   const setProgressionsHandlers = useDndStore((s) => s.setProgressionsHandlers);
   useEffect(() => {
-    setProgressionsHandlers((r) => ref.current(r));
+    setProgressionsHandlers(null);
     return () => setProgressionsHandlers(null);
   }, [setProgressionsHandlers]);
   return null;
@@ -1487,9 +1507,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, []);
 
   const sortAnimatingRef = useRef(false);
+  // Moves requested while an animation is in flight are queued and applied
+  // (without re-animating) once it finishes, so rapid clicks aren't dropped.
+  const pendingMovesRef = useRef<Array<{ id: string; direction: -1 | 1 }>>([]);
 
   const handleAnimatedMoveSection = useCallback((id: string, direction: -1 | 1) => {
-    if (sortAnimatingRef.current) return;
+    if (sortAnimatingRef.current) {
+      pendingMovesRef.current.push({ id, direction });
+      return;
+    }
     const el = document.querySelector<HTMLElement>(`[data-section-id="${id}"]`);
     if (!el) { moveSection(id, direction); return; }
     const parent = el.parentElement;
@@ -1515,6 +1541,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       neighbor.style.transform = "";
       sortAnimatingRef.current = false;
       moveSection(id, direction);
+      const queued = pendingMovesRef.current;
+      pendingMovesRef.current = [];
+      for (const m of queued) moveSection(m.id, m.direction);
     }, 400);
   }, [moveSection]);
 
@@ -1580,7 +1609,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
-  const [confirmDeleteBlock, setConfirmDeleteBlock] = useState<string | null>(null);
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
@@ -1681,31 +1709,39 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     }
   };
 
-  const onDragEnd = (result: DropResult) => {
-    const { destination } = result;
-    if (!destination) return;
-    const dst = destination.droppableId.split(":");
-    if (dst[0] !== "pattern") return;
-    if (dst[2] === "edge-left" || dst[2] === "edge-right") {
-      const state = useSongStore.getState();
-      const idx = state.progression.findIndex((p) => p.id === dst[1]);
-      if (idx < 0) return;
-      const neighborIdx = dst[2] === "edge-left" ? idx - 1 : idx + 1;
-      if (!state.progression[neighborIdx]) {
-        toast({ title: "No adjacent block", description: "There's no neighboring pattern block to move into.", variant: "destructive" });
-      }
-    }
+  const requestDeleteSection = (sectionId: string) => {
+    const undo = useSongStore.getState().undo;
+    removeSection(sectionId);
+    toast({
+      title: "Section deleted",
+      description: "Removed the section and its lyric linkage.",
+      action: (
+        <Button variant="outline" size="sm" onClick={() => undo()}>
+          Undo
+        </Button>
+      ),
+      duration: 6000,
+    });
   };
 
-  const requestDeleteSection = (sectionId: string) => removeSection(sectionId);
-
   const requestDeleteBlock = (patternId: string) => {
-    setConfirmDeleteBlock(patternId);
+    const undo = useSongStore.getState().undo;
+    removePatternBlock(patternId);
+    toast({
+      title: "Block deleted",
+      description: "Removed this pattern block.",
+      action: (
+        <Button variant="outline" size="sm" onClick={() => undo()}>
+          Undo
+        </Button>
+      ),
+      duration: 6000,
+    });
   };
 
   return (
     <div
-      className="relative space-y-4"
+      className="relative space-y-4 pb-24"
       ref={progressionsRootRef}
       onClick={(e) => { if (e.target === e.currentTarget) setActiveChordId(null); }}
     >
@@ -1730,7 +1766,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       {/* Register tab-level drag-end handler with the global DnD store.
           The single <DragDropContext> in Index.tsx routes drops here based
           on droppableId prefix. */}
-      <ProgressionsDndRegistrar onDragEnd={onDragEnd} />
+      <ProgressionsDndRegistrar />
 
       {groupedSections.map(({ section, blocks }, i) => (
         <SectionGroup
@@ -2096,7 +2132,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               style={{ background: "color-mix(in oklch, var(--ink-soft) 40%, transparent)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", borderTop: "1px solid color-mix(in oklch, var(--border) 60%, transparent)" }}
             >
               <div className="flex flex-wrap items-center justify-center gap-2">
-                {(["verse", "chorus", "pre-chorus", "bridge", "intro"] as const).map((t) => (
+                {(["verse", "chorus", "pre-chorus", "bridge", "intro", "outro"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => { addSection(t); setAddSectionOpen(false); }}
@@ -2137,7 +2173,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
       <ChordPickerSheet
         open={!!picker}
-        onOpenChange={(o) => { if (!o) { setPicker(null); setMultiSelected(new Map()); setActiveChordId(null); } }}
+        onOpenChange={(o) => { if (!o) setPicker(null); }}
         onPick={handlePick}
         headerRef={chordPickerHeaderRef}
         onPickBatch={(chords) => {
@@ -2173,7 +2209,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           sectionId={chordEditor.sectionId}
           patternId={chordEditor.patternId}
           chordId={chordEditor.chordId}
-          onClose={() => { setChordEditor(null); setMultiSelected(new Map()); setActiveChordId(null); }}
+          onClose={() => setChordEditor(null)}
           headerRef={focusedEditorHeaderRef}
         />
       )}
@@ -2184,25 +2220,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           sectionId={patternAddSlot.sectionId}
           patternId={patternAddSlot.patternId}
           atBeat={patternAddSlot.atBeat}
-          onClose={() => { setPatternAddSlot(null); setMultiSelected(new Map()); setActiveChordId(null); }}
+          onClose={() => setPatternAddSlot(null)}
           headerRef={focusedEditorHeaderRef}
         />
       )}
 
-      <ConfirmDeleteDialog
-        open={!!confirmDeleteBlock}
-        onOpenChange={(o) => {
-          if (!o) setConfirmDeleteBlock(null);
-        }}
-        title="Delete this pattern block?"
-        description="This removes only this pattern block. The section and its lyric lines stay intact. Any chord anchors in lyrics that mirrored this block will be detached."
-        confirmLabel="Delete block"
-        onConfirm={() => {
-          const id = confirmDeleteBlock;
-          setConfirmDeleteBlock(null);
-          if (id) removePatternBlock(id);
-        }}
-      />
       <WhyThisChordSheet />
     </div>
   );
