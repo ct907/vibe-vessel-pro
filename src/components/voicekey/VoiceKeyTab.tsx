@@ -205,6 +205,73 @@ function RangeBar({ lowMidi, highMidi }: { lowMidi: number; highMidi: number }) 
   );
 }
 
+// ─── Piano keyboard ───────────────────────────────────────────────────────────
+
+const WHITE_KEY_PCS = [0, 2, 4, 5, 7, 9, 11] as const;
+const BLACK_KEY_SLOTS: (number | null)[] = [1, 3, null, 6, 8, 10];
+
+function PianoKeyboard({
+  selectedPc,
+  onSelect,
+}: {
+  selectedPc: number | null;
+  onSelect: (pc: number) => void;
+}) {
+  const W = 7;
+  return (
+    <div className="relative h-20 w-full select-none" style={{ touchAction: "manipulation" }}>
+      {WHITE_KEY_PCS.map((pc, i) => {
+        const sel = selectedPc === pc;
+        return (
+          <button
+            key={pc}
+            type="button"
+            onClick={() => onSelect(pc)}
+            className={cn(
+              "absolute top-0 bottom-0 rounded-b-lg border border-border transition-colors",
+              sel
+                ? "bg-[var(--primary)] border-[var(--primary-strong)]"
+                : "bg-white hover:bg-[var(--primary-halo)] active:bg-[var(--primary-halo)]",
+            )}
+            style={{
+              left: `calc(${i} * 100% / ${W} + 1px)`,
+              width: `calc(100% / ${W} - 2px)`,
+            }}
+          >
+            <span
+              className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] font-mono-chord font-semibold pointer-events-none"
+              style={{ color: sel ? "white" : "var(--ink-soft)" }}
+            >
+              {pcToName(pc, false)}
+            </span>
+          </button>
+        );
+      })}
+      {BLACK_KEY_SLOTS.map((pc, i) => {
+        if (pc === null) return null;
+        const sel = selectedPc === pc;
+        return (
+          <button
+            key={pc}
+            type="button"
+            onClick={() => onSelect(pc)}
+            className={cn(
+              "absolute top-0 z-10 rounded-b-md transition-colors",
+              sel ? "bg-[var(--primary-strong)]" : "bg-[var(--ink)] hover:opacity-75",
+            )}
+            style={{
+              left: `calc(${i + 1} * 100% / ${W})`,
+              transform: "translateX(-50%)",
+              width: `calc(100% / ${W} * 0.6)`,
+              height: "58%",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Note chip ────────────────────────────────────────────────────────────────
 
 function NoteChip({ label, midi, index }: { label: string; midi: number; index: number }) {
@@ -400,6 +467,18 @@ export function VoiceKeyTab() {
     navigate("/app");
   };
 
+  const selectKeyDirectly = (pc: number) => {
+    pitchHandleRef.current?.stop();
+    pitchHandleRef.current = null;
+    setCurrentPitch(null);
+    setStabilityProgress(0);
+    stabilityBufRef.current = [];
+    setLockedMidi(60 + pc);
+    setTransposeOffset(0);
+    setKeyStateBoth("locked");
+    void playNotes([60 + pc], 0.4);
+  };
+
   // ── Vocal range state ─────────────────────────────────────────────────────
   type RangeStep = "idle" | "measuring-high" | "done-high" | "measuring-low" | "complete";
   const [rangeStep, setRangeStep] = useState<RangeStep>("idle");
@@ -520,13 +599,19 @@ export function VoiceKeyTab() {
           )}
 
           {keyState === "idle" && (
-            <button
-              type="button"
-              className="btn-sculpt-destructive inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
-              onClick={startListening}
-            >
-              <Mic className="h-4 w-4" /> Start Listening
-            </button>
+            <div className="space-y-5">
+              <button
+                type="button"
+                className="btn-sculpt-destructive inline-flex items-center gap-2 rounded-lg h-10 px-5 text-sm font-semibold"
+                onClick={startListening}
+              >
+                <Mic className="h-4 w-4" /> Start Listening
+              </button>
+              <div className="border-t border-border pt-4 space-y-2">
+                <p className="text-xs text-[var(--ink-soft)]">Or tap a key to choose directly</p>
+                <PianoKeyboard selectedPc={null} onSelect={selectKeyDirectly} />
+              </div>
+            </div>
           )}
 
           {keyState === "listening" && (
@@ -568,6 +653,12 @@ export function VoiceKeyTab() {
                     index={i}
                   />
                 ))}
+              </div>
+
+              {/* Keyboard */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-[var(--ink-soft)]">Tap to change key</p>
+                <PianoKeyboard selectedPc={keyPc} onSelect={selectKeyDirectly} />
               </div>
 
               {/* Play scale + transpose */}
