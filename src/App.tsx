@@ -22,6 +22,7 @@ import {
 import { hydrateTakesFromStorage, startTakesAutosave, useTakesStore } from "@/store/takes";
 import { pruneOrphanBlobs } from "@/lib/audio/blob-store";
 import { pushRecent } from "@/lib/recent-projects";
+import { startOfflineCheckpoints } from "@/store/drive";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => {
     const unsubRecordings = startRecordingsAutosave();
     const unsubTakes = startTakesAutosave();
     const unsubCrossTab = startCrossTabWarning();
+    const unsubCheckpoints = startOfflineCheckpoints();
 
     // Reclaim IndexedDB space from blobs no longer referenced by any restored
     // take or recording clip (e.g. left behind by older sessions or crashes).
@@ -96,7 +98,7 @@ const App = () => {
         pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
       } catch { /* ignore */ }
     });
-    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); unsubCrossTab(); };
+    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); unsubCrossTab(); unsubCheckpoints(); };
   }, []);
 
   useEffect(() => {

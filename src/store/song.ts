@@ -3847,7 +3847,7 @@ export function downloadProjectJSON(filename = "song.json") {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadProjectZip(filename = "song.zip") {
+export async function buildProjectZipBlob(): Promise<Blob> {
   const [{ default: JSZip }, { useRecordingsStore }, { getAudioBlob }, { extFromMime }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
@@ -3870,7 +3870,11 @@ export async function downloadProjectZip(filename = "song.zip") {
       }
     }
   }
-  const out = await zip.generateAsync({ type: "blob" });
+  return zip.generateAsync({ type: "blob" });
+}
+
+export async function downloadProjectZip(filename = "song.zip") {
+  const out = await buildProjectZipBlob();
   const url = URL.createObjectURL(out);
   const a = document.createElement("a");
   a.href = url;
