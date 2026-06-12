@@ -24,6 +24,7 @@ import { useSongStore, commitCurrentSongToRecents, downloadProjectZip } from "@/
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
+import { useUIStore } from "@/store/ui";
 import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
@@ -167,6 +168,10 @@ export default function Landing() {
       useTakesStore.getState().clear();
       useRecordingsStore.getState().clear();
       useOnboardingStore.getState().resetForNewSong();
+      // Both capture intents live on the Write surface — make sure we land there
+      // even if a prior session left the app in Arrange mode (WriteMode only
+      // mounts in write mode, and it's what consumes the capture param).
+      useUIStore.getState().setMode("write");
       navigate(`/app?capture=${capture}`);
     });
   };
