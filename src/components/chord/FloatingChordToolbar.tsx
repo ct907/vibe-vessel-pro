@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -69,7 +68,6 @@ export function FloatingChordToolbar({
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
-  const isMobile = useIsMobile();
   const focusedEditorOpen = useUIStore((s) => s.focusedEditorOpen);
   const setToolbarExpanded = useUIStore((s) => s.setToolbarExpanded);
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
@@ -77,7 +75,7 @@ export function FloatingChordToolbar({
   const chordToolbarOpen = useUIStore((s) => s.chordToolbarOpen);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const [expanded, setExpanded] = useState(false);
-  const visible = isMobile && !focusedEditorOpen;
+  const visible = !focusedEditorOpen;
   const effectiveExpanded = visible && expanded;
 
   useEffect(() => {

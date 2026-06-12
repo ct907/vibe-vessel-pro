@@ -64,6 +64,7 @@ import {
   Music2,
   KeyRound,
   Mic,
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -690,6 +691,26 @@ function SectionCard({
   const effectiveOffset = effectiveOffsets[index] ?? 0;
   const isFirstSection = index === 0;
 
+  // Play-from-section, mirroring the Arrange tab's section header button.
+  const sectionBlocks = useMemo(
+    () => progression.filter((p) => (p.sectionId ?? p.id) === section.id),
+    [progression, section.id],
+  );
+  const playbackCurrent = usePlaybackStore((s) => s.current);
+  const isGlobalPlaying = usePlaybackStore((s) => s.isPlaying);
+  const isSectionPlaying = isGlobalPlaying && sectionBlocks.some((b) => b.id === playbackCurrent?.patternId);
+  const firstSectionChord = useMemo(() => {
+    const blockOrder = new Map(sectionBlocks.map((b, i) => [b.id, i]));
+    const withPlacement = section.chords.filter((c) => c.progressionPlacement != null);
+    if (!withPlacement.length) return null;
+    return [...withPlacement].sort((a, b) => {
+      const ao = blockOrder.get(a.progressionPlacement!.patternId) ?? Infinity;
+      const bo = blockOrder.get(b.progressionPlacement!.patternId) ?? Infinity;
+      if (ao !== bo) return ao - bo;
+      return a.progressionPlacement!.startBeat - b.progressionPlacement!.startBeat;
+    })[0];
+  }, [section.chords, sectionBlocks]);
+
   useEffect(() => {
     setDraftLabel(section.label);
   }, [section.label]);
@@ -837,6 +858,28 @@ function SectionCard({
           </div>
         ) : (
           <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!firstSectionChord}
+              onClick={() => {
+                if (!firstSectionChord?.progressionPlacement) return;
+                usePlaybackStore.getState().setStartFromChord(
+                  firstSectionChord.progressionPlacement.patternId,
+                  firstSectionChord.id,
+                );
+                window.dispatchEvent(new Event("lovable:request-play"));
+              }}
+              className={cn(
+                "h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors",
+                isSectionPlaying
+                  ? "bg-[var(--primary)] text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+              aria-label="Play from this section"
+              title="Play from this section"
+            >
+              <Play className={cn("h-3.5 w-3.5", isSectionPlaying && "fill-white")} />
+            </button>
             <SectionColorPicker
               value={section.color}
               onChange={(c) => setSectionColor(section.id, c)}
@@ -1788,7 +1831,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         }}
       />
 
-      {isMobile && (() => {
+      {(() => {
         const activeCtx = (() => {
           if (!activeChordId) return null;
           for (const sec of sections) {
@@ -1816,8 +1859,31 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             ? [{ id: activeCtx.anchor.id, sectionId: activeCtx.sectionId, lineId: activeCtx.lineId }]
             : [];
         const slotsOf = targets.map((t) => lookupAnchor(t.id)?.anchor.slotIndex ?? 0);
-        const canShiftLeft = targets.length > 0 && slotsOf.every((s) => s > 0);
-        const canShiftRight = targets.length > 0 && slotsOf.every((s) => s < CHORD_ROW_SLOTS - 1);
+
+        // A single chord at the row edge wraps onto the adjacent line (crossing
+        // sections when needed): left from slot 0 lands at the end of the line
+        // above, right from the last slot lands at the start of the line below.
+        const adjacentLine = (sectionId: string, lineId: string, dir: -1 | 1) => {
+          const si = sections.findIndex((sec) => sec.id === sectionId);
+          if (si < 0) return null;
+          const li = sections[si].lines.findIndex((l) => l.id === lineId);
+          if (li < 0) return null;
+          const sameSection = sections[si].lines[li + dir];
+          if (sameSection) return { sectionId, lineId: sameSection.id };
+          const adjSec = sections[si + dir];
+          if (!adjSec || adjSec.lines.length === 0) return null;
+          const line = dir === -1 ? adjSec.lines[adjSec.lines.length - 1] : adjSec.lines[0];
+          return { sectionId: adjSec.id, lineId: line.id };
+        };
+        const singleTarget = !useMulti && targets.length === 1 ? targets[0] : null;
+        const canWrap = (dir: -1 | 1) =>
+          !!singleTarget && !!adjacentLine(singleTarget.sectionId, singleTarget.lineId, dir);
+        const canShiftLeft =
+          targets.length > 0 && (slotsOf.every((s) => s > 0) || (slotsOf[0] === 0 && canWrap(-1)));
+        const canShiftRight =
+          targets.length > 0 &&
+          (slotsOf.every((s) => s < CHORD_ROW_SLOTS - 1) ||
+            (slotsOf[0] === CHORD_ROW_SLOTS - 1 && canWrap(1)));
 
         // Vertical move is row-scoped: enabled only when the whole selection
         // sits on one line of one section.
@@ -1888,6 +1954,27 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               }
             }}
             onShift={(dir) => {
+              if (singleTarget) {
+                const found = lookupAnchor(singleTarget.id);
+                if (!found) return;
+                const slot = found.anchor.slotIndex ?? 0;
+                const atEdge = dir === -1 ? slot === 0 : slot === CHORD_ROW_SLOTS - 1;
+                if (atEdge) {
+                  const adj = adjacentLine(singleTarget.sectionId, singleTarget.lineId, dir);
+                  if (!adj) return;
+                  useSongStore.getState().moveChordAnchor(
+                    singleTarget.sectionId,
+                    singleTarget.lineId,
+                    singleTarget.id,
+                    adj.sectionId,
+                    adj.lineId,
+                    dir === -1 ? CHORD_ROW_SLOTS - 1 : 0,
+                  );
+                  return;
+                }
+                moveChordToSlot(singleTarget.sectionId, singleTarget.lineId, singleTarget.id, slot + dir);
+                return;
+              }
               for (const t of targets) {
                 const found = lookupAnchor(t.id);
                 if (!found) continue;

@@ -215,6 +215,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
+        <div className="absolute top-2 left-4 text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
+          {initialChord ? "Edit Chord" : "Add Chords"}
+        </div>
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
@@ -273,7 +276,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           </div>
 
           {nashvilleChords && nashvilleChords.length > 0 && (
-            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
+            <button
+              type="button"
+              onClick={() => handlePickNashville(nashvilleChords)}
+              className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg w-full text-left transition-all bg-[var(--paper-shade)] hover:bg-[var(--paper-card)] hover:ring-2 hover:ring-[var(--primary)]"
+              aria-label={`Add ${nashvilleChords.length} Nashville chords`}
+            >
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
               {nashvilleChords.map((c, i) => (
                 <span
@@ -285,7 +293,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
                 </span>
               ))}
               <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
-            </div>
+            </button>
           )}
 
           {!query.trim() && (

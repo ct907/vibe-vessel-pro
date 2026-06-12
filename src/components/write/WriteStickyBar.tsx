@@ -4,15 +4,13 @@ import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore, type SectionType } from "@/store/song";
-import { useUIStore, type TabName } from "@/store/ui";
+import { useUIStore } from "@/store/ui";
 import { useRecordingsStore } from "@/store/recordings";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
 
 interface Props {
-  onSwitchTab: (t: TabName) => void;
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
   onRecordComplete?: (blobId: string, durationSec: number, mime: string) => void;
   /** Called when Add Section / Edit Chords is used, so the parent can reveal its card-gated editor. */
@@ -30,12 +28,11 @@ export function requestStickyBarRecording() {
   window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
 }
 
-export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }: Props) {
+export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
-  const isMobile = useIsMobile();
 
   const recorderRef = useRef<RecorderHandle | null>(null);
   const [recording, setRecording] = useState(false);
@@ -126,11 +123,7 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
 
   const handleEditChords = () => {
     onEditorAction?.();
-    if (isMobile) {
-      setChordToolbarOpen(true);
-    } else {
-      onSwitchTab("chords");
-    }
+    setChordToolbarOpen(true);
   };
 
   return (

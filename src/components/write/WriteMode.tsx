@@ -112,10 +112,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
         )}
       </div>
 
-      <WriteStickyBar
-        onSwitchTab={onSwitchTab}
-        onEditorAction={() => setLyricsRevealed(true)}
-      />
+      <WriteStickyBar onEditorAction={() => setLyricsRevealed(true)} />
     </div>
   );
 }

@@ -817,7 +817,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start gap-2 border-0"
+                      className="flex-1 justify-start gap-2 border-0 whitespace-normal h-auto min-h-10 text-left"
                       style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
                       onClick={() => { void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip"); setNavOpen(false); }}
                     >
@@ -832,7 +832,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                         onChange={(e) => { handleLoad(e.target.files?.[0]); setNavOpen(false); }}
                       />
                       <span
-                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2 w-full justify-between border-0"
+                        className="inline-flex items-center gap-2 whitespace-normal rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-background hover:bg-accent hover:text-accent-foreground h-auto min-h-12 px-4 py-2 w-full justify-between border-0"
                       >
                         <Upload className="h-4 w-4" /> Load
                       </span>
@@ -841,7 +841,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border-0"
+                      className="flex-1 justify-start border-0 whitespace-normal h-auto min-h-10 text-left"
                       style={{ background: "var(--primary-inset)", color: "var(--primary-foreground)" }}
                       onClick={() => { setConfirmNewSong(true); setNavOpen(false); }}
                     >
@@ -849,7 +849,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border-0"
+                      className="flex-1 justify-start border-0 whitespace-normal h-auto min-h-10 text-left"
                       style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
                       onClick={() => { setExportOpen(true); setNavOpen(false); }}
                     >
@@ -859,7 +859,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border-0"
+                      className="flex-1 justify-start border-0 whitespace-normal h-auto min-h-10 text-left"
                       style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
                       onClick={() => {
                         const s = useSongStore.getState();
@@ -871,7 +871,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 justify-start border-0"
+                      className="flex-1 justify-start border-0 whitespace-normal h-auto min-h-10 text-left"
                       disabled={stemsProgress !== null}
                       style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
                       onClick={async () => {
