@@ -192,8 +192,15 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
       )}
 
       {/* Main cocoa bar */}
-      <div style={{ background: "var(--cocoa)" }}>
-        <div className="max-w-6xl mx-auto relative flex items-center justify-around px-4 py-3 gap-3">
+      <div
+        className="noise-texture border-t border-border/60"
+        style={{
+          background: "color-mix(in oklch, var(--card) 20%, transparent)",
+          backdropFilter: "blur(8px) saturate(200%)",
+          WebkitBackdropFilter: "blur(8px) saturate(200%)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto relative flex items-center justify-around px-4 py-3 gap-2">
           {/* Level indicator during recording */}
           {recording && (
             <div
@@ -217,7 +224,7 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
             onClick={toggle}
             disabled={pending || (trackIsRecording && !recording)}
             className={
-              "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold" +
+              "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1" +
               (recording ? " animate-rec-pulse" : "") +
               ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
             }
@@ -233,7 +240,7 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
           <button
             type="button"
             onClick={() => setAddSectionOpen((o) => !o)}
-            className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
+            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1"
             aria-expanded={addSectionOpen}
             aria-label="Add a song section"
           >
@@ -244,7 +251,7 @@ export function WriteStickyBar({ onSwitchTab, onRecordComplete, onEditorAction }
           <button
             type="button"
             onClick={handleEditChords}
-            className="btn-sculpt-cream inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold"
+            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1"
             aria-label="Open chord editing tools"
           >
             <Pencil className="h-4 w-4" />
