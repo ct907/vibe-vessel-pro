@@ -186,11 +186,21 @@ export function FocusedChordEditor(props: Props) {
     sectionOffset ? { ...transposeChord(c, sectionOffset), octave: c.octave } : c;
   const toStorage = (c: ChordSymbol): ChordSymbol =>
     sectionOffset ? { ...transposeChord(c, -sectionOffset), octave: c.octave } : c;
-  const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
     () => parseNashvilleInput(query.trim(), effective.root, effective.mode),
     [query, effective.root, effective.mode],
+  );
+  // A single Nashville number resolves to one chord — surface that chord's root
+  // variations in the grid (just like typing the root letter) so the user can
+  // pick any quality below the input. Multi-number sequences keep their grouped
+  // preview band instead.
+  const suggestions = useMemo(
+    () =>
+      nashvilleChords && nashvilleChords.length === 1
+        ? suggestChords(nashvilleChords[0].root)
+        : suggestChords(query),
+    [query, nashvilleChords],
   );
 
   const handlePickNashville = (chords: ChordSymbol[]) => {
@@ -378,28 +388,6 @@ export function FocusedChordEditor(props: Props) {
             Done
           </button>
         </div>
-
-        {/* NASHVILLE NUMBERS */}
-        {nashvilleChords && nashvilleChords.length > 0 && (
-          <button
-            type="button"
-            onClick={() => handlePickNashville(nashvilleChords)}
-            className="w-full flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0 hover:brightness-95 active:scale-[0.99] transition-all text-left"
-            style={{ background: "var(--paper-shade)" }}
-          >
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
-            {nashvilleChords.map((c, i) => (
-              <span
-                key={i}
-                className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
-                style={getChordColorClasses(c).style}
-              >
-                {c.display}
-              </span>
-            ))}
-            <span className="text-[10px] text-muted-foreground ml-auto">↩ {(isProgression || (!isProgressionAdd && !!anchorId)) ? "Confirm" : `Add ${nashvilleChords.length}`}</span>
-          </button>
-        )}
 
         {/* PREVIEW */}
         {!isProgression && !isProgressionAdd && liveChords.length > 0 && (
@@ -644,6 +632,30 @@ export function FocusedChordEditor(props: Props) {
         <div className="px-3 pb-2 shrink-0" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
           <SlashBassPicker query={query} onChange={setQuery} />
         </div>
+
+        {/* NASHVILLE NUMBERS — a typed multi-number sequence (e.g. 4 5 3 6)
+            groups its chords here, directly under the input. A single number
+            instead populates the variations grid below. */}
+        {nashvilleChords && nashvilleChords.length > 1 && (
+          <button
+            type="button"
+            onClick={() => handlePickNashville(nashvilleChords)}
+            className="mx-3 mt-2 mb-1 flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0 rounded-lg hover:brightness-95 active:scale-[0.99] transition-all text-left"
+            style={{ background: "var(--paper-shade)" }}
+          >
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
+            {nashvilleChords.map((c, i) => (
+              <span
+                key={i}
+                className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
+                style={getChordColorClasses(c).style}
+              >
+                {c.display}
+              </span>
+            ))}
+            <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
+          </button>
+        )}
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
           {!query.trim() && (
