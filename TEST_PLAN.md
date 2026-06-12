@@ -58,15 +58,78 @@ Tapping the **"Add Recording"** card (hint: "Tap to start recording") reveals th
 recordings strip and immediately begins recording (within the tap gesture so mic
 permission is granted in-context).
 
-### 1b. Lyrics
+### 1b. Lyrics — text editing
 
-**Continue writing after the first line.** ☐
-User wants a new lyric line.
-In the lyric line, pressing **Enter/Return** creates a new line below and focuses it.
+**Split a line at the caret with Enter.** ☐
+User wants to break a line mid-text, carrying the rest down.
+Placing the caret mid-line and pressing **Enter/Return** keeps the text *before*
+the caret on the line and moves the text *after* the caret to a new line below;
+the caret lands at the start of the new line.
 
-**Merge a line back up.** ☐
-User wants to remove an accidental line break.
-Pressing **Backspace** at the start of an empty line merges it into the previous line.
+**Split with Shift+Enter too.** ☐
+User reflexively uses Shift+Enter for a soft break.
+**Shift+Enter** behaves the same as Enter (splits at the caret) — no stray literal
+newline is inserted into the one-line-per-textarea model.
+
+**Enter at the end of a line adds a blank line.** ☐
+User wants a fresh empty line below.
+With the caret at the *end* of a line, **Enter** leaves the text in place and
+creates an empty line below, focused.
+
+**Enter at the start of a line pushes text down.** ☐
+User wants to insert a blank line above the current text.
+With the caret at column 0, **Enter** empties the current line and moves all its
+text to a new line below.
+
+**Merge a non-empty line up with Backspace.** ☐
+User wants to remove an accidental break and rejoin the text.
+Pressing **Backspace** at column 0 of a line appends that line's text onto the
+*end* of the previous line; the caret sits at the junction.
+
+**Merge an empty line up.** ☐
+User wants to delete an accidental empty line.
+**Backspace** at the start of an empty line removes it and focuses the end of the
+previous line. On the very first line at column 0 it is a no-op.
+
+**Forward-merge the next line with Delete.** ☐
+User wants to pull the next line up onto this one.
+Pressing **Delete** with the caret at the *end* of a line merges the following
+line's text onto the end of the current line.
+
+**Navigate between lines with arrows.** ☐
+User wants to move the caret across lines like any editor.
+**Arrow Up** from the top of a line moves to the previous line; **Arrow Down**
+from the bottom moves to the next line, preserving the caret column (clamped to
+that line's length).
+
+**Paste multi-line text.** ☐
+User pastes a verse copied from elsewhere.
+Pasting text containing newlines splits it into multiple lyric lines (inserted at
+the caret); the whole paste is a **single undo** step.
+
+**Restore the caret after undo/redo.** ☐
+User undoes an edit and keeps typing.
+**Ctrl/Cmd+Z** / redo refocuses the affected line and restores the caret position
+to where it was before.
+
+**Long lines are never auto-split.** ☐
+User writes a line longer than the row width.
+A line wider than the lyrics row wraps *visually* but is **not** broken into
+separate lines. After a refresh or reloading from Recent Projects the writer's
+exact line structure is preserved — only an explicit Enter creates a new line.
+
+**Split / merge keeps chords anchored.** ☐
+User splits or merges lines that have chords on them.
+On **split**, chords before the caret stay and chords after ride down to the new
+line; on **merge**, chords keep their order and stay in sync with the Progressions
+tab (mirrors intact).
+
+**Compose with an IME.** ☐
+User types via an IME (e.g. Japanese/Chinese) and confirms with Enter.
+Enter that *confirms* an IME composition does not split the line; a subsequent
+Enter does. Mobile soft-keyboard Enter splits via `insertLineBreak`.
+
+### 1c. Lyrics — writing flow
 
 **Type without flooding undo history.** ☐
 User types a burst of lyrics, then undoes.
@@ -91,7 +154,7 @@ Open **Export Lyrics**, toggle **Plain text** / **ChordPro**, then **Copy** or
 **Download** (`.txt` / `.cho`). ChordPro inlines `[Chord]` markers at the right
 positions and emits `{title}`, `{key}`, `{tempo}`, section directives.
 
-### 1c. Chords on lyrics
+### 1d. Chords on lyrics
 
 **Pin a chord above a word.** ☐
 User wants to place a chord on a lyric.
@@ -119,7 +182,7 @@ On editor close, chords auto-reflow onto continuation rows with a toast
 ("Auto-fit added N chord row(s)"). If still overflowing, a red toast advises
 removing chords or rotating to landscape.
 
-### 1d. Recordings strip (takes)
+### 1e. Recordings strip (takes)
 
 **Record a take.** ☐
 User wants to capture audio.
