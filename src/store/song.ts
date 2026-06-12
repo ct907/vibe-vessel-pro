@@ -1545,13 +1545,16 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }));
     return newLine.id;
   },
-  removeLine: (sectionId, id) => set((s) => ({
+  removeLine: (sectionId, id) => { pushHistory(get); return set((s) => ({
     sections: s.sections.map((sec) => {
       if (sec.id !== sectionId) return sec;
       if (sec.lines.length <= 1) return sec;
       return { ...sec, lines: sec.lines.filter((l) => l.id !== id) };
     }),
-    // Detach mirror links on all the section's pattern blocks for orphaned anchor ids
+    // Drop the deleted line's mirrored chords from the progression too. Detaching
+    // (rather than deleting) used to leave orphaned pattern chords that were
+    // invisible in Write but still showed in Arrange and got hit by the playhead.
+    // Undo restores the whole row, chords included.
     progression: (() => {
       const sec = s.sections.find((x) => x.id === sectionId);
       const removed = sec?.lines.find((l) => l.id === id);
@@ -1560,10 +1563,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       return s.progression.map((p) =>
         (p.sectionId ?? p.id) !== sectionId
           ? p
-          : { ...p, chords: p.chords.map((c) => (c.mirrorId && anchorIds.has(c.mirrorId) ? { ...c, mirrorId: undefined } : c)) },
+          : { ...p, chords: p.chords.filter((c) => !(c.mirrorId && anchorIds.has(c.mirrorId))) },
       );
     })(),
-  })),
+  })); },
   setLineText: (sectionId, id, text) => {
     const editKey = `${sectionId}:${id}`;
     const now = Date.now();
