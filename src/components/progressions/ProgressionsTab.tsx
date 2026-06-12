@@ -1640,6 +1640,39 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picker, patternAddSlot, chordEditor]);
 
+  // Clicking "Add block" creates the block immediately and opens an editor to
+  // fill it. If that editor is torn down without a chord being added — exactly
+  // what a screen rotation or the tab returning from standby does to an open
+  // sheet — the empty block lingers and renders an "Add chords" placeholder
+  // right next to "Add block". Prune empty blocks that sit beside a filled
+  // sibling (so the section keeps its chords), skipping any block an editor is
+  // currently targeting. Runs on mount, whenever an editor closes, and when the
+  // tab becomes visible again — clearing both existing strays and new ones.
+  useEffect(() => {
+    const prune = () => {
+      if (document.hidden) return;
+      const activeId = picker?.patternId ?? patternAddSlot?.patternId ?? chordEditor?.patternId ?? null;
+      const prog = useSongStore.getState().progression;
+      const bySection = new Map<string, typeof prog>();
+      for (const p of prog) {
+        const sid = p.sectionId ?? p.id;
+        const arr = bySection.get(sid) ?? [];
+        arr.push(p);
+        bySection.set(sid, arr);
+      }
+      const remove = useSongStore.getState().removePatternBlock;
+      for (const group of bySection.values()) {
+        if (!group.some((b) => b.chords.length > 0)) continue;
+        for (const b of group) {
+          if (b.chords.length === 0 && b.id !== activeId) remove(b.id);
+        }
+      }
+    };
+    prune();
+    document.addEventListener("visibilitychange", prune);
+    return () => document.removeEventListener("visibilitychange", prune);
+  }, [picker, patternAddSlot, chordEditor]);
+
   const sawEditorOpenAtStep3Ref = useRef(false);
   useEffect(() => {
     if (!onboardingEnabled) return;
