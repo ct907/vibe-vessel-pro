@@ -1705,12 +1705,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   };
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
+  // Sections without any pattern block still render: a lyrics-only section
+  // (e.g. pasted lyrics, no chords yet) must show its "Add chords" empty state
+  // here rather than silently disappearing from Arrange. The placeholder's
+  // onClick creates the missing block on demand.
   const groupedSections = sections
     .map((sec) => ({
       section: sec,
       blocks: progression.filter((p) => (p.sectionId ?? p.id) === sec.id),
-    }))
-    .filter((g) => g.blocks.length > 0);
+    }));
 
   const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
     if (isMobile && !replaceChordId) {
