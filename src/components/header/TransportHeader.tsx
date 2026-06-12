@@ -671,7 +671,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       await loadProjectFromFile(file);
       toast({ title: "Project loaded", description: file.name });
     } catch {
-      toast({ title: "Could not load file", description: "Make sure it's a valid song.json" });
+      toast({ title: "Could not load file", description: "Make sure it's a valid .zip or .json project file." });
     }
     setFileInputKey((k) => k + 1);
   };

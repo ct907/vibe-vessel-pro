@@ -3619,7 +3619,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       return;
     }
 
-    if (parsed.version !== 2 && parsed.version !== 3) return;
+    if (parsed.version !== 2 && parsed.version !== 3) throw new Error(`Unsupported project version: ${parsed.version}`);
     // Re-validate every chord through parseChord. Any chord whose display
     // can't be re-parsed is rejected — we replace the whole load with a
     // fresh empty section rather than letting malformed strings into the DOM.
@@ -3886,10 +3886,9 @@ export async function downloadProjectZip(filename = "song.zip") {
 }
 
 async function loadProjectFromZipFile(file: File): Promise<void> {
-  const [{ default: JSZip }, { useRecordingsStore }, { putAudioBlob }] = await Promise.all([
+  const [{ default: JSZip }, { useRecordingsStore }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
-    import("@/lib/audio/blob-store"),
   ]);
   const zip = await JSZip.loadAsync(file);
   const songFile = zip.file("song.json");
@@ -3908,9 +3907,12 @@ async function loadProjectFromZipFile(file: File): Promise<void> {
       const id = base.replace(/\.[^.]+$/, "");
       entries.push({ id, blob: file.async("blob") });
     });
-    for (const { id, blob } of entries) {
-      const b = await blob;
-      await putAudioBlob(id, b);
+    if (entries.length > 0) {
+      const { putAudioBlob } = await import("@/lib/audio/blob-store");
+      for (const { id, blob } of entries) {
+        const b = await blob;
+        await putAudioBlob(id, b);
+      }
     }
   }
 
