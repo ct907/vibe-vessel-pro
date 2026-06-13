@@ -10,6 +10,7 @@ import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
 import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
 import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
+import { QuickPickPanel } from "@/components/progressions/QuickPickPanel";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ import {
   Play,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { playChord } from "@/lib/music/audio";
+import { playChord, ensureAudio, playProgression, stopProgression, type ScheduledChord } from "@/lib/music/audio";
 import { ChordSymbol, transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { cn } from "@/lib/utils";
@@ -201,6 +202,9 @@ function PatternBlock({
   const [spiceOpen, setSpiceOpen] = useState(false);
   useEffect(() => { onSpiceOpenChange?.(spiceOpen); }, [spiceOpen, onSpiceOpenChange]);
   const [voiceLinesOpen, setVoiceLinesOpen] = useState(false);
+  const [quickPickIndex, setQuickPickIndex] = useState<number | null>(null);
+  const [previewChord, setPreviewChord] = useState<ChordSymbol | null>(null);
+  const bpm = useSongStore((s) => s.meta.bpm);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -252,6 +256,17 @@ function PatternBlock({
     ? getPatternChordsViaSSOT(ownerSection, pattern)
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const sortedChordsRef = useRef(sortedChords);
+
+  // Close the Quick Pick panel when the diagram is hidden or the tapped chord
+  // no longer exists.
+  useEffect(() => {
+    if (quickPickIndex == null) return;
+    if (!voiceLinesOpen || quickPickIndex >= sortedChords.length) {
+      setQuickPickIndex(null);
+      setPreviewChord(null);
+    }
+  }, [voiceLinesOpen, sortedChords.length, quickPickIndex]);
+
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
   const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
@@ -442,11 +457,48 @@ function PatternBlock({
       {/* Toolbar moved below the pattern grid (#7). */}
 
       <VoiceLeadingLinesPanel
-        chords={sortedChords.map((c) => c.chord)}
+        chords={sortedChords.map((c, i) =>
+          i === quickPickIndex && previewChord ? previewChord : c.chord,
+        )}
         isVisible={voiceLinesOpen && sortedChords.length >= 1}
+        onChordTap={voiceLinesOpen ? (i) => setQuickPickIndex((cur) => (cur === i ? null : i)) : undefined}
+        selectedIndex={quickPickIndex}
       />
 
-
+      {quickPickIndex != null && sortedChords[quickPickIndex] && (
+        <QuickPickPanel
+          isOpen={voiceLinesOpen}
+          chord={sortedChords[quickPickIndex].chord}
+          prev={quickPickIndex > 0 ? sortedChords[quickPickIndex - 1].chord : null}
+          next={quickPickIndex < sortedChords.length - 1 ? sortedChords[quickPickIndex + 1].chord : null}
+          onPreviewChord={setPreviewChord}
+          onAudition={(chord) => {
+            stopProgression();
+            void ensureAudio().then(() => {
+              let cursor = 0;
+              const events: ScheduledChord[] = sortedChords.map((c, i) => {
+                const raw = i === quickPickIndex ? chord : c.chord;
+                const ch = effectiveOffset ? transposeChord(raw, effectiveOffset) : raw;
+                const ev: ScheduledChord = {
+                  chord: { ...ch, octave: c.chord.octave ?? 3 },
+                  startBeat: cursor,
+                  lengthBeats: c.lengthBeats,
+                };
+                cursor += c.lengthBeats;
+                return ev;
+              });
+              void playProgression(events, bpm, { loopBeats: cursor });
+            });
+          }}
+          onApply={(chord) => {
+            updatePatternChord(pattern.id, sortedChords[quickPickIndex].id, { chord });
+          }}
+          onClose={() => {
+            setQuickPickIndex(null);
+            setPreviewChord(null);
+          }}
+        />
+      )}
 
       <div className="relative">
         {(() => {

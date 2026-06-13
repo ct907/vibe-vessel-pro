@@ -59,9 +59,14 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   // Carry the capture intent picked on the landing page straight into the
   // editor so tapping its empty-state card starts the same gesture here — no
   // second tap. The param is consumed once, then cleared.
+  //
+  // Index (and thus WriteMode) is mounted for the whole app lifetime — even
+  // while the landing page is shown on top of it — so this effect must react to
+  // the param appearing rather than fire once on mount, which would have run
+  // before any capture intent existed.
   const [searchParams, setSearchParams] = useSearchParams();
+  const capture = searchParams.get("capture");
   useEffect(() => {
-    const capture = searchParams.get("capture");
     if (!capture) return;
     if (capture === "record") {
       setRecRevealed(true);
@@ -70,10 +75,11 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       setLyricsRevealed(true);
       focusFirstLyricLine();
     }
-    searchParams.delete("capture");
-    setSearchParams(searchParams, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    next.delete("capture");
+    setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [capture]);
 
   return (
     <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">

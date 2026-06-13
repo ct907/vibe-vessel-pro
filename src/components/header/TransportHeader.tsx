@@ -3,6 +3,9 @@ import { nanoid } from "nanoid";
 import { useSongStore } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import { useDriveStore, saveProject, loadProjectFromDrive, loadLocalVersionIntoSong } from "@/store/drive";
+import { listLocalVersions, type LocalVersionMeta } from "@/lib/local-versions";
+import type { DriveFile } from "@/lib/drive/drive";
 import { startRecordingsEngine, stopRecordingsEngine, updateEngineBpm } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,9 @@ import {
   Compass,
   Piano,
   Layers,
+  Cloud,
+  CloudOff,
+  RotateCcw,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, updateScheduledBpm, ScheduledChord } from "@/lib/music/audio";
@@ -461,6 +467,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const recCanUndo = useRecordingsStore((s) => s.canUndo);
   const recCanRedo = useRecordingsStore((s) => s.canRedo);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const driveConfigured = useDriveStore((s) => s.configured);
+  const driveOnline = useDriveStore((s) => s.online);
+  const driveConnected = useDriveStore((s) => s.connected);
+  const driveConnect = useDriveStore((s) => s.connect);
+  const driveDisconnect = useDriveStore((s) => s.disconnect);
+  const [driveDialogOpen, setDriveDialogOpen] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [localVersions, setLocalVersions] = useState<LocalVersionMeta[]>([]);
+  const [hasLocalVersions, setHasLocalVersions] = useState(false);
   const [inspirationModalOpen, setInspirationModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
@@ -655,9 +671,76 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       await loadProjectFromFile(file);
       toast({ title: "Project loaded", description: file.name });
     } catch {
-      toast({ title: "Could not load file", description: "Make sure it's a valid song.json" });
+      toast({ title: "Could not load file", description: "Make sure it's a valid .zip or .json project file." });
     }
     setFileInputKey((k) => k + 1);
+  };
+
+  const handleSave = async () => {
+    try {
+      const result = await saveProject();
+      if (result.target === "drive") {
+        toast({ title: "Saved to Google Drive" });
+      } else if (result.reason === "drive-failed") {
+        toast({ title: "Saved offline", description: "Couldn't reach Drive — kept a local backup." });
+      } else {
+        toast({ title: "Saved offline", description: `Version saved locally (${listLocalVersions().length} of 3).` });
+      }
+    } catch {
+      toast({ title: "Save failed", description: "Could not save the project." });
+    }
+  };
+
+  const handleConnectDrive = async () => {
+    try {
+      await driveConnect();
+      toast({ title: "Connected to Google Drive" });
+      void refreshDriveFiles();
+    } catch {
+      toast({ title: "Could not connect to Drive" });
+    }
+  };
+
+  const refreshDriveFiles = async () => {
+    setDriveLoading(true);
+    try {
+      const { listProjects } = await import("@/lib/drive/drive");
+      setDriveFiles(await listProjects());
+    } catch {
+      setDriveFiles([]);
+    } finally {
+      setDriveLoading(false);
+    }
+  };
+
+  const openDriveDialog = () => {
+    setLocalVersions(listLocalVersions());
+    setDriveDialogOpen(true);
+    if (driveConnected) void refreshDriveFiles();
+  };
+
+  useEffect(() => {
+    if (navOpen) setHasLocalVersions(listLocalVersions().length > 0);
+  }, [navOpen]);
+
+  const handleOpenDriveFile = async (file: DriveFile) => {
+    try {
+      await loadProjectFromDrive(file.id);
+      toast({ title: "Project loaded", description: file.name });
+      setDriveDialogOpen(false);
+    } catch {
+      toast({ title: "Could not open from Drive" });
+    }
+  };
+
+  const handleRestoreVersion = async (v: LocalVersionMeta) => {
+    try {
+      await loadLocalVersionIntoSong(v.slot);
+      toast({ title: "Version restored", description: v.title });
+      setDriveDialogOpen(false);
+    } catch {
+      toast({ title: "Could not restore version" });
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -819,7 +902,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       variant="outline"
                       className="flex-1 justify-start gap-2 border-0 whitespace-normal h-auto min-h-10 text-left"
                       style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
-                      onClick={() => { void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip"); setNavOpen(false); }}
+                      onClick={() => { void handleSave(); setNavOpen(false); }}
                     >
                       <Save className="h-4 w-4" /> Save
                     </Button>
@@ -838,6 +921,24 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       </span>
                     </label>
                   </div>
+                  {(driveConfigured || hasLocalVersions) && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 justify-start gap-2 border-0"
+                        style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                        onClick={openDriveDialog}
+                      >
+                        {driveConnected ? <Cloud className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
+                        {driveConfigured ? (driveConnected ? "Google Drive" : "Connect Drive") : "Saved versions"}
+                      </Button>
+                      {driveConfigured && (
+                        <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">
+                          {!driveOnline ? "Offline" : driveConnected ? "Synced" : "Online"}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -1154,6 +1255,91 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <Dialog open={driveDialogOpen} onOpenChange={setDriveDialogOpen}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{driveConfigured ? "Google Drive" : "Saved versions"}</DialogTitle>
+          <DialogDescription>
+            {!driveConfigured
+              ? "Restore a recent offline version of your project."
+              : driveConnected
+              ? "Open a project from your Drive, or restore a recent offline version."
+              : "Connect your Google Drive to save and open projects across devices."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {driveConfigured && !driveConnected ? (
+          <Button
+            className="w-full justify-center gap-2"
+            disabled={!driveOnline}
+            onClick={() => void handleConnectDrive()}
+          >
+            <Cloud className="h-4 w-4" /> {driveOnline ? "Connect Google Drive" : "Offline — connect when online"}
+          </Button>
+        ) : driveConfigured && driveConnected ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Your Drive projects</span>
+              <Button variant="ghost" size="sm" onClick={() => void refreshDriveFiles()} disabled={driveLoading}>
+                <RotateCcw className="h-3.5 w-3.5" /> Refresh
+              </Button>
+            </div>
+            {driveLoading ? (
+              <p className="text-sm text-[var(--ink-soft)] py-2">Loading…</p>
+            ) : driveFiles.length === 0 ? (
+              <p className="text-sm text-[var(--ink-soft)] py-2">No projects saved to Drive yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {driveFiles.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      className="w-full text-left rounded-md px-3 py-2 hover:bg-accent flex items-center justify-between gap-2"
+                      onClick={() => void handleOpenDriveFile(f)}
+                    >
+                      <span className="truncate">{f.name}</span>
+                      <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">
+                        {new Date(f.modifiedTime).toLocaleDateString()}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button variant="ghost" size="sm" className="self-start" onClick={driveDisconnect}>
+              <CloudOff className="h-3.5 w-3.5" /> Disconnect
+            </Button>
+          </div>
+        ) : null}
+
+        {localVersions.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <span className="text-sm font-medium">Offline versions</span>
+            <ul className="flex flex-col gap-1">
+              {localVersions.map((v) => (
+                <li key={v.slot}>
+                  <button
+                    className="w-full text-left rounded-md px-3 py-2 hover:bg-accent flex items-center justify-between gap-2"
+                    onClick={() => void handleRestoreVersion(v)}
+                  >
+                    <span className="truncate">{v.title}</span>
+                    <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">
+                      {new Date(v.savedAt).toLocaleString()}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip")}>
+            <Save className="h-4 w-4" /> Download a copy (.zip)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

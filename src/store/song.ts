@@ -191,6 +191,14 @@ export interface SongState {
   addLine: (sectionId: string, afterId?: string) => string;
   removeLine: (sectionId: string, id: string) => void;
   setLineText: (sectionId: string, id: string, text: string) => void;
+  /** Split a lyric line at `caretIndex`: text before stays, text after (and its
+   *  chords) moves to a new line inserted below. Returns the new line's id. */
+  splitLine: (sectionId: string, id: string, caretIndex: number) => { newLineId: string } | null;
+  /** Merge a lyric line onto the END of the previous line (text + chords).
+   *  Returns the previous line's id and the caret index at the join. */
+  mergeLineUp: (sectionId: string, id: string) => { prevLineId: string; caretIndex: number } | null;
+  /** Record the active lyric caret so undo/redo can restore it. */
+  noteLyricCaret: (sectionId: string, lineId: string, caret: number) => void;
   setChordRowLen: (sectionId: string, id: string, len: number) => void;
   upsertChordAt: (sectionId: string, lineId: string, col: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
@@ -289,6 +297,10 @@ export interface SongState {
   redo: () => boolean;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  /** Caret position to restore after an undo/redo that moved a lyric line.
+   *  The lyrics editor consumes and clears it. */
+  pendingCaret: { sectionId: string; lineId: string; caret: number } | null;
+  clearPendingCaret: () => void;
 
   // ---- persistence ----
   loadFromJSON: (data: unknown) => void;
@@ -1182,15 +1194,21 @@ const seed = makeSection("verse");
 seed.section.chords = recomputeSectionChordsFromMirrors(seed.section, [seed.pattern]);
 
 // History stacks live outside the reactive state so snapshots don't trigger re-renders.
-type HistorySnapshot = { sections: Section[]; progression: PatternBlock[] };
+type CaretLoc = { sectionId: string; lineId: string; caret: number };
+type HistorySnapshot = { sections: Section[]; progression: PatternBlock[]; caret: CaretLoc | null };
 const undoStack: HistorySnapshot[] = [];
 const redoStack: HistorySnapshot[] = [];
 const HISTORY_LIMIT = 50;
+
+// Last known lyric caret, updated as the user edits. Snapshotted with history so
+// undo/redo can return the caret to where the edit happened.
+let lastCaret: CaretLoc | null = null;
 
 function snapshot(s: { sections: Section[]; progression: PatternBlock[] }): HistorySnapshot {
   return {
     sections: JSON.parse(JSON.stringify(s.sections)),
     progression: JSON.parse(JSON.stringify(s.progression)),
+    caret: lastCaret,
   };
 }
 
@@ -1270,6 +1288,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   sections: [seed.section],
   basket: [],
   progression: [seed.pattern],
+  pendingCaret: null,
   suppressCrossTabDeleteWarning: false,
   setSuppressCrossTabDeleteWarning: (v) => set({ suppressCrossTabDeleteWarning: v }),
   inspirationPhotos: [],
@@ -1634,6 +1653,84 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       };
     }),
   })); },
+
+  splitLine: (sectionId, id, caretIndex) => {
+    let newLineId: string | null = null;
+    // A split is its own atomic undo step (also ends any typing-coalesce run).
+    pushHistory(get);
+    // Re-anchor moved/kept chords in their existing left-to-right order.
+    const reindex = (arr: ChordAnchor[]): ChordAnchor[] =>
+      arr.map((c, i) => ({ ...c, wordIndex: undefined, chordCol: i, offset: i, slotIndex: undefined }));
+    set((s) => ({
+      sections: s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        const idx = sec.lines.findIndex((l) => l.id === id);
+        if (idx < 0) return sec;
+        const line = sec.lines[idx];
+        const caret = Math.max(0, Math.min(caretIndex, line.text.length));
+        const before = line.text.slice(0, caret);
+        const after = line.text.slice(caret);
+        // Bind chords to words first so each has a character position to test.
+        const snapped = snapLineToWords(line);
+        const words = getWords(line.text);
+        const charPosOf = (c: ChordAnchor) =>
+          c.wordIndex != null && words[c.wordIndex] ? words[c.wordIndex].start : (c.chordCol ?? c.offset ?? 0);
+        const keep: ChordAnchor[] = [];
+        const move: ChordAnchor[] = [];
+        snapped.chords.forEach((c) => (charPosOf(c) < caret ? keep : move).push(c));
+        const original = ensureSlotsForLine(
+          snapLineToWords({ ...line, text: before, chords: reindex(keep) }),
+        );
+        const newLine = ensureSlotsForLine(
+          snapLineToWords({ ...initialLine(), text: after, chords: reindex(move) }),
+        );
+        newLineId = newLine.id;
+        const lines = [...sec.lines];
+        lines.splice(idx, 1, original, newLine);
+        return { ...sec, lines };
+      }),
+    }));
+    return newLineId ? { newLineId } : null;
+  },
+
+  mergeLineUp: (sectionId, id) => {
+    const sec0 = get().sections.find((x) => x.id === sectionId);
+    if (!sec0) return null;
+    const idx0 = sec0.lines.findIndex((l) => l.id === id);
+    if (idx0 <= 0) return null; // no previous line to merge onto
+    const prev0 = sec0.lines[idx0 - 1];
+    const result = { prevLineId: prev0.id, caretIndex: prev0.text.length };
+    pushHistory(get);
+    const reindex = (arr: ChordAnchor[]): ChordAnchor[] =>
+      arr.map((c, i) => ({ ...c, wordIndex: undefined, chordCol: i, offset: i, slotIndex: undefined }));
+    set((s) => ({
+      sections: s.sections.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+        const idx = sec.lines.findIndex((l) => l.id === id);
+        if (idx <= 0) return sec;
+        const prev = sec.lines[idx - 1];
+        const cur = sec.lines[idx];
+        const prevSnapped = snapLineToWords(prev);
+        const merged = ensureSlotsForLine(
+          snapLineToWords({
+            ...prev,
+            text: prev.text + cur.text,
+            chords: [...prevSnapped.chords, ...reindex(cur.chords)],
+          }),
+        );
+        const lines = [...sec.lines];
+        lines.splice(idx - 1, 2, merged);
+        return { ...sec, lines };
+      }),
+    }));
+    return result;
+  },
+
+  noteLyricCaret: (sectionId, lineId, caret) => {
+    lastCaret = { sectionId, lineId, caret };
+  },
+
+  clearPendingCaret: () => set({ pendingCaret: null }),
 
   setChordRowLen: (sectionId, id, len) => { pushHistory(get); set((s) => ({
     sections: s.sections.map((sec) => {
@@ -3468,7 +3565,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const prev = undoStack.pop()!;
     redoStack.push(snapshot(cur));
     if (redoStack.length > HISTORY_LIMIT) redoStack.shift();
-    set({ sections: prev.sections, progression: prev.progression });
+    set({ sections: prev.sections, progression: prev.progression, pendingCaret: prev.caret });
+    lastCaret = prev.caret;
     return true;
   },
   redo: () => {
@@ -3478,7 +3576,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const next = redoStack.pop()!;
     undoStack.push(snapshot(cur));
     if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
-    set({ sections: next.sections, progression: next.progression });
+    set({ sections: next.sections, progression: next.progression, pendingCaret: next.caret });
+    lastCaret = next.caret;
     return true;
   },
   canUndo: () => undoStack.length > 0,
@@ -3523,7 +3622,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       return;
     }
 
-    if (parsed.version !== 2 && parsed.version !== 3) return;
+    if (parsed.version !== 2 && parsed.version !== 3) throw new Error(`Unsupported project version: ${parsed.version}`);
     // Re-validate every chord through parseChord. Any chord whose display
     // can't be re-parsed is rejected — we replace the whole load with a
     // fresh empty section rather than letting malformed strings into the DOM.
@@ -3751,7 +3850,7 @@ export function downloadProjectJSON(filename = "song.json") {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadProjectZip(filename = "song.zip") {
+export async function buildProjectZipBlob(): Promise<Blob> {
   const [{ default: JSZip }, { useRecordingsStore }, { getAudioBlob }, { extFromMime }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
@@ -3774,7 +3873,11 @@ export async function downloadProjectZip(filename = "song.zip") {
       }
     }
   }
-  const out = await zip.generateAsync({ type: "blob" });
+  return zip.generateAsync({ type: "blob" });
+}
+
+export async function downloadProjectZip(filename = "song.zip") {
+  const out = await buildProjectZipBlob();
   const url = URL.createObjectURL(out);
   const a = document.createElement("a");
   a.href = url;
@@ -3786,10 +3889,9 @@ export async function downloadProjectZip(filename = "song.zip") {
 }
 
 async function loadProjectFromZipFile(file: File): Promise<void> {
-  const [{ default: JSZip }, { useRecordingsStore }, { putAudioBlob }] = await Promise.all([
+  const [{ default: JSZip }, { useRecordingsStore }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
-    import("@/lib/audio/blob-store"),
   ]);
   const zip = await JSZip.loadAsync(file);
   const songFile = zip.file("song.json");
@@ -3808,9 +3910,12 @@ async function loadProjectFromZipFile(file: File): Promise<void> {
       const id = base.replace(/\.[^.]+$/, "");
       entries.push({ id, blob: file.async("blob") });
     });
-    for (const { id, blob } of entries) {
-      const b = await blob;
-      await putAudioBlob(id, b);
+    if (entries.length > 0) {
+      const { putAudioBlob } = await import("@/lib/audio/blob-store");
+      for (const { id, blob } of entries) {
+        const b = await blob;
+        await putAudioBlob(id, b);
+      }
     }
   }
 

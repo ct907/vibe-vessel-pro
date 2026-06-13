@@ -11,8 +11,10 @@ import {
  * Auto-layout engine for the lyrics chord row.
  *
  * Goal: ensure every chord on a line is visible at the user's current viewport
- * by (a) splitting long lyric lines at word boundaries to fit `charsPerLine`
- * and (b) repacking each line's chords left-to-right within `slotsPerLine`.
+ * by repacking each line's chords left-to-right within `slotsPerLine`, spilling
+ * any overflow onto synthesized chord-only continuation rows. Lyric *text* is
+ * never auto-split — long lines wrap visually and only the user's Enter creates
+ * a new line (see store `splitLine`).
  *
  * The engine is purely positional — chord identity, ordering across the
  * section's `chords: SectionChord[]` array (the SSOT) is preserved. Only
@@ -189,24 +191,14 @@ export function formatChordsAndLyrics(
     return { ...sc, lyricsPlacement: { lineId: parent, slotIndex: lp.slotIndex } };
   });
 
-  // 2) Split lyric lines on character width.
-  const splitLines: LyricLine[] = [];
+  // 2) Lyric lines are NEVER auto-split on character width. A line longer than
+  //    the row simply wraps visually inside its textarea; only an explicit user
+  //    Enter (store `splitLine`) creates a new lyric line. Keeping each line
+  //    as-is means refreshing or loading a project preserves the writer's exact
+  //    line structure instead of silently re-flowing overflow onto new lines.
+  const splitLines: LyricLine[] = compactedLines;
   const lineMapping = new Map<string, string[]>();
-  compactedLines.forEach((line) => {
-    if (line.text.length <= charsPerLine) {
-      splitLines.push(line);
-      lineMapping.set(line.id, [line.id]);
-      return;
-    }
-    const splits = splitLyricLine(line.text, charsPerLine);
-    const ids: string[] = [];
-    splits.forEach((text, idx) => {
-      const newId = idx === 0 ? line.id : nanoid();
-      splitLines.push({ id: newId, text, chords: [] as ChordAnchor[] });
-      ids.push(newId);
-    });
-    lineMapping.set(line.id, ids);
-  });
+  compactedLines.forEach((line) => lineMapping.set(line.id, [line.id]));
 
   // 3) Redistribute chord lyricsPlacements across the split lines.
   const remappedChords: SectionChord[] = reassignedChords.map((sc) => {

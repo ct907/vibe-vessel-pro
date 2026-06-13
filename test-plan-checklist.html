@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vibe Vessel — User Test Plan Checklist</title>
+<style>
+  :root {
+    --paper: #faf6ef;
+    --card: #fffdf8;
+    --ink: #2b2622;
+    --ink-soft: #6f655c;
+    --line: #e7ddcd;
+    --amber: #e0922f;
+    --amber-soft: #f6e6cf;
+    --pass: #2f8f57;
+    --fail: #c5453b;
+    --partial: #c9952a;
+    --skip: #9a9088;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 24px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  }
+  .header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; }
+  h1 small { font-weight: 400; color: var(--ink-soft); font-size: 13px; display: block; margin-top: 2px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button:hover { background: var(--amber-soft); }
+  button.primary { background: var(--amber); border-color: var(--amber); color: #fff; }
+  .progress-wrap { margin-top: 12px; }
+  .bar { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; display: flex; }
+  .bar > span { height: 100%; display: block; transition: width .2s; }
+  .bar .b-pass { background: var(--pass); }
+  .bar .b-partial { background: var(--partial); }
+  .bar .b-fail { background: var(--fail); }
+  .bar .b-skip { background: var(--skip); }
+  .stats { font-size: 12px; color: var(--ink-soft); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .stats b { color: var(--ink); }
+  main { max-width: 980px; margin: 0 auto; padding: 24px; }
+  section.group { margin-bottom: 28px; }
+  h2 {
+    font-size: 16px;
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--amber-soft);
+  }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); margin: 18px 0 8px; }
+  .case {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .case.done-pass { border-left: 4px solid var(--pass); }
+  .case.done-partial { border-left: 4px solid var(--partial); }
+  .case.done-fail { border-left: 4px solid var(--fail); }
+  .case.done-skip { border-left: 4px solid var(--skip); }
+  .case-head { display: flex; align-items: flex-start; gap: 10px; }
+  .case-title { font-weight: 600; flex: 1; }
+  .story { color: var(--ink-soft); font-style: italic; font-size: 13.5px; margin: 4px 0 2px 0; }
+  .flow { font-size: 13.5px; margin: 0; }
+  .flow code, .case-title code, .story code {
+    background: var(--amber-soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .status-pills { display: flex; gap: 4px; flex-shrink: 0; }
+  .pill {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    cursor: pointer;
+    font-size: 13px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0;
+    line-height: 1;
+  }
+  .pill[data-active="pass"]    { background: var(--pass); color: #fff; border-color: var(--pass); }
+  .pill[data-active="partial"] { background: var(--partial); color: #fff; border-color: var(--partial); }
+  .pill[data-active="fail"]    { background: var(--fail); color: #fff; border-color: var(--fail); }
+  .pill[data-active="skip"]    { background: var(--skip); color: #fff; border-color: var(--skip); }
+  .note {
+    margin-top: 8px;
+    width: 100%;
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    resize: vertical;
+    min-height: 0;
+    height: 32px;
+    display: none;
+  }
+  .case.expanded .note { display: block; }
+  .note-toggle { font-size: 11px; color: var(--amber); cursor: pointer; user-select: none; margin-top: 6px; display: inline-block; }
+  .meta-fields { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0 0; }
+  .meta-fields label { font-size: 12px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 3px; }
+  .meta-fields input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+  .legend { font-size: 12px; color: var(--ink-soft); display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .order { background: var(--amber-soft); border-radius: 10px; padding: 14px 18px; font-size: 13.5px; }
+  .order ol { margin: 6px 0 0; padding-left: 20px; }
+  @media print {
+    header { position: static; box-shadow: none; }
+    .controls, .note-toggle, .status-pills { display: none !important; }
+    .note { display: block !important; }
+    .case { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-row">
+    <h1>Vibe Vessel — User Test Plan
+      <small>Manual QA checklist · feature → user story → user flow</small>
+    </h1>
+    <div class="controls">
+      <button onclick="setAll('pass')">Mark all ✓</button>
+      <button onclick="setAll(null)">Reset</button>
+      <button class="primary" onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </div>
+  <div class="meta-fields">
+    <label>Tester<input id="meta-tester" placeholder="name" /></label>
+    <label>Build / commit<input id="meta-build" placeholder="version" /></label>
+    <label>Date<input id="meta-date" type="date" /></label>
+    <label>Device / browser<input id="meta-env" placeholder="e.g. iPhone 15 / Safari" /></label>
+  </div>
+  <div class="progress-wrap">
+    <div class="bar">
+      <span class="b-pass" id="bar-pass"></span>
+      <span class="b-partial" id="bar-partial"></span>
+      <span class="b-fail" id="bar-fail"></span>
+      <span class="b-skip" id="bar-skip"></span>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--pass)"></i>✓ Pass</span>
+      <span><i class="dot" style="background:var(--partial)"></i>~ Partial</span>
+      <span><i class="dot" style="background:var(--fail)"></i>✕ Fail</span>
+      <span><i class="dot" style="background:var(--skip)"></i>— Skip / N/A</span>
+    </div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<script>
+const PLAN = [
+  { group: "0. Landing / Home", id: "landing", cases: [
+    { t: "Start a new song by recording", s: "User wants to capture a melody idea immediately on opening the app.", f: "On Landing, tapping <b>“Tap/Click to Start Recording”</b> resets to a clean song and opens Write mode with recording armed (<code>?capture=record</code>)." },
+    { t: "Start a new song by writing", s: "User wants to jot down a lyric line first.", f: "Tapping <b>“Tap/Click to Write Lyrics”</b> opens Write mode with the editor revealed and the first line focused (<code>?capture=lyrics</code>)." },
+    { t: "Explore chords without a song", s: "User wants to browse the chord encyclopedia.", f: "Tapping <b>“Explore Chords”</b> opens the Explore Chords overlay (<code>?tab=chords</code>)." },
+    { t: "Find singing key and range", s: "User wants to discover their vocal key before writing.", f: "Tapping <b>“Find Your Key &amp; Range”</b> opens the Voice/Key tool (<code>?tab=voicekey</code>)." },
+    { t: "Reopen a recent project", s: "User wants to continue an earlier song.", f: "Under <b>Recent Projects</b>, tapping a name loads its snapshot; <b>⋮ → “Remove from recents”</b> deletes it." },
+    { t: "Guard unsaved audio when leaving", s: "User has recordings and opens a recent/new song.", f: "A <b>“Leave this song?”</b> dialog appears with <b>Cancel / Save first / Discard &amp; continue</b>." },
+  ]},
+  { group: "1. Write & Record mode", id: "write", subs: [
+    { h: "Capture cards (empty state)", cases: [
+      { t: "Reveal the lyric editor with one tap", s: "User wants to start typing.", f: "Tapping the <b>“Write Lyrics”</b> card reveals the editor and focuses the first line." },
+      { t: "Start recording with one tap", s: "User wants to record without hunting for a button.", f: "Tapping the <b>“Add Recording”</b> card reveals the strip and begins recording in the tap gesture (mic permission in-context)." },
+    ]},
+    { h: "Lyrics — text editing", cases: [
+      { t: "Split a line at the caret with Enter", s: "User wants to break a line mid-text, carrying the rest down.", f: "Placing the caret mid-line and pressing <b>Enter/Return</b> keeps text <i>before</i> the caret on the line and moves text <i>after</i> the caret to a new line below; caret lands at the start of the new line." },
+      { t: "Split with Shift+Enter too", s: "User reflexively uses Shift+Enter for a soft break.", f: "<b>Shift+Enter</b> behaves the same as Enter (splits at the caret) — no stray literal newline is inserted into the line." },
+      { t: "Enter at end of line adds a blank line", s: "User wants a fresh empty line below.", f: "With the caret at the <i>end</i> of a line, <b>Enter</b> leaves the text in place and creates an empty line below, focused." },
+      { t: "Enter at start of line pushes text down", s: "User wants to insert a blank line above the current text.", f: "With the caret at column 0, <b>Enter</b> empties the current line and moves all its text to a new line below." },
+      { t: "Merge a non-empty line up with Backspace", s: "User wants to remove an accidental break and rejoin the text.", f: "Pressing <b>Backspace</b> at column 0 of a line appends that line's text onto the <i>end</i> of the previous line; the caret sits at the junction." },
+      { t: "Merge an empty line up", s: "User wants to delete an accidental empty line.", f: "<b>Backspace</b> at the start of an empty line removes it and focuses the end of the previous line. On the very first line at column 0 it is a no-op." },
+      { t: "Forward-merge the next line with Delete", s: "User wants to pull the next line up onto this one.", f: "Pressing <b>Delete</b> with the caret at the <i>end</i> of a line merges the following line's text onto the end of the current line." },
+      { t: "Navigate between lines with arrows", s: "User wants to move the caret across lines like any editor.", f: "<b>Arrow Up</b> from the top of a line moves to the previous line; <b>Arrow Down</b> from the bottom moves to the next line, preserving the caret column (clamped to that line's length)." },
+      { t: "Paste multi-line text", s: "User pastes a verse copied from elsewhere.", f: "Pasting text containing newlines splits it into multiple lyric lines (inserted at the caret); the whole paste is a <b>single undo</b> step." },
+      { t: "Restore the caret after undo/redo", s: "User undoes an edit and keeps typing.", f: "<b>Ctrl/Cmd+Z</b> / redo refocuses the affected line and restores the caret position to where it was." },
+      { t: "Long lines are never auto-split", s: "User writes a line longer than the row width.", f: "A line wider than the lyrics row wraps <i>visually</i> but is <b>not</b> broken into separate lines. After a refresh or reloading from Recent Projects the writer's exact line structure is preserved — only an explicit Enter creates a new line." },
+      { t: "Split / merge keeps chords anchored", s: "User splits or merges lines that have chords on them.", f: "On <b>split</b>, chords before the caret stay and chords after ride down to the new line; on <b>merge</b>, chords keep their order and stay in sync with the Progressions tab (mirrors intact)." },
+      { t: "Compose with an IME", s: "User types via an IME (e.g. Japanese/Chinese) and confirms with Enter.", f: "Enter that <i>confirms</i> an IME composition does not split the line; a subsequent Enter does. Mobile soft-keyboard Enter splits via <code>insertLineBreak</code>." },
+    ]},
+    { h: "Lyrics — writing flow", cases: [
+      { t: "Undo a typing burst", s: "User types a burst, then undoes.", f: "<b>Ctrl/Cmd+Z</b> rolls back the whole 3s burst; <b>Shift+Z</b> / <b>Ctrl/Cmd+Y</b> redoes." },
+      { t: "Add a section from the keyboard", s: "User wants to start a chorus while typing.", f: "On an empty line, <b>“/”</b> opens a New section dialog (type dropdown, optional name, <b>Add section</b>)." },
+      { t: "Find a rhyme", s: "User is stuck on a rhyme.", f: "Rhyme button → <b>Find a Rhyme</b>: pick a line chip or type a word → Perfect / Near rhymes with syllables → tap to replace last word (<b>Undo</b> available). Closing reverts unkept replacements." },
+      { t: "Export the lyrics", s: "User wants lyrics out of the app.", f: "<b>Export Lyrics</b> → toggle <b>Plain text / ChordPro</b> → <b>Copy</b> or <b>Download</b> (.txt/.cho)." },
+    ]},
+    { h: "Chords on lyrics", cases: [
+      { t: "Pin a chord above a word", s: "User wants to place a chord on a lyric.", f: "Tap an empty slot → editor → type e.g. <code>Bbm9</code>, <code>Fmaj7</code> → confirm." },
+      { t: "Enter chords by Nashville numbers", s: "User thinks in scale degrees.", f: "Typing <code>2 5 1</code> surfaces matching chords with <b>Add N</b>; Enter inserts." },
+      { t: "Reorder / nudge a placed chord", s: "User wants to move a chord.", f: "Active chord: <b>Arrow Left/Right</b> (or Alt+Arrow in editor) moves; <b>Delete/Backspace</b> removes." },
+      { t: "Bulk-manage chords on mobile", s: "User wants to shift several at once.", f: "Floating chord toolbar: shift L/R, move up/down, octave, <b>Select all</b>, <b>Clear all</b>, delete." },
+      { t: "Auto-fit overflowing chords", s: "User places more chords than fit one row.", f: "On editor close, chords reflow onto continuation rows (toast). Still overflowing → red toast advises rotate/trim." },
+    ]},
+    { h: "Recordings strip (takes)", cases: [
+      { t: "Record a take", s: "User wants to capture audio.", f: "<b>Record</b> → <b>“Stop · MM:SS”</b> + level meter → <b>“Saving…”</b> → take card. Denied mic → instructional toast." },
+      { t: "Survive screen lock mid-record", s: "User's phone locks mid-recording.", f: "On visibilitychange the in-progress take is finalized/saved." },
+      { t: "Play back a take", s: "User wants to hear a take.", f: "Tap play on the card; tap again to stop." },
+      { t: "Rename / star / delete a take", s: "User wants to organize takes.", f: "<b>⋮ → Rename</b> (Enter/Esc), star = best take (max 5), <b>⋮ → Delete</b>." },
+      { t: "Import an audio file", s: "User has audio from elsewhere.", f: "<b>Import</b> → WAV/MP3/M4A; filename becomes take name. Bad files → guidance toast." },
+      { t: "Detect chords from a take", s: "User wants the chords a recording implies.", f: "<b>✨</b> → “Transcribing chords…” → <b>“Detected — drag to lyrics”</b>. Low-confidence faded; drag a chip onto a lyric slot." },
+      { t: "Auto-detect on every new take", s: "User doesn't want to press ✨ each time.", f: "<b>Auto-detect</b> toggle (off by default) transcribes new recorded/imported takes." },
+      { t: "Transcribe a melody to notes", s: "User wants the sung notes.", f: "<b>⋮ → Transcribe Melody</b> → scrollable note strip with <b>Copy</b>." },
+      { t: "Back up recordings off-device", s: "User is reminded recordings are local-only.", f: "Dismissible hint points to <b>Menu → Save</b>; X persists the dismissal." },
+    ]},
+  ]},
+  { group: "2. Arrange mode", id: "arrange", subs: [
+    { h: "View toggle", cases: [
+      { t: "Switch timeline vs chord grid", s: "User wants to work on recordings vs chords.", f: "<b>Track / Chords</b> toggle swaps TrackTimeline and the Progressions grid." },
+    ]},
+    { h: "Track timeline", cases: [
+      { t: "Drag a take into a track", s: "User wants a take on the timeline.", f: "From <b>“Takes — drag into a track”</b>, drag into a lane; lands at the playhead." },
+      { t: "Record directly into a track", s: "User wants to overdub.", f: "Track's red record button (pulses); recording lands in the lane." },
+      { t: "Trim / move / loop a clip", s: "User wants to edit a clip.", f: "Select → drag edges to trim, middle to move (cross-track), loop handle to repeat. Card: <b>Duplicate / Unloop / Delete</b>. Delete/Esc." },
+      { t: "Fix recording latency", s: "User's overdub is slightly off.", f: "<b>Delay compensation</b> nudges a clip ±1s/±100ms/±10ms; live offset shown." },
+      { t: "Add / clear tracks", s: "User wants more lanes or a clean lane.", f: "<b>Add track</b> adds a lane; trash clears (undo toast)." },
+    ]},
+    { h: "Chord progressions grid", cases: [
+      { t: "Add a chord to a block", s: "User wants to build a progression.", f: "Tap empty slot → picker → fills + auditions; also pins into the matching Lyrics section." },
+      { t: "Audition / edit / delete a chord", s: "User wants to hear or change a chord.", f: "Tap = play; long-press / dbl-click / right-click = edit; floating play + ✕ above an active chord." },
+      { t: "Resize a chord's beat length", s: "User wants a chord to last longer.", f: "Drag right edge in half-beats, or toolbar <b>−0.5b / +0.5b</b>, or <b>Arrow Up/Down</b>." },
+      { t: "Adjust a block's bars/beats", s: "User wants a longer block.", f: "Tap the <b>“X/Y beats · N bars”</b> label → popover with −/+ and input." },
+      { t: "Add / delete pattern blocks", s: "User wants another block.", f: "Block trash deletes (disabled if only block); blocks labeled “Block 1, 2…”." },
+      { t: "Browse preset progressions", s: "User wants a proven progression.", f: "<b>Popular Progressions</b>: filter band/spectrum/genre, <b>Play</b> to audition, <b>Use</b> to drop in." },
+      { t: "Spice up a progression", s: "User wants a richer variation.", f: "<b>✧ Add Spice</b> (2+ chords) → category → <b>Play</b> / <b>✓</b> apply (toast + <b>Undo</b>). Select a chord first to scope." },
+      { t: "See the voice leading", s: "User wants to see how voices move.", f: "Activity/lines icon → <b>Voice Leading Lines</b>; Spice sheet shows an <b>Original → Spiced</b> ribbon." },
+    ]},
+    { h: "Section management", cases: [
+      { t: "Change a section's type/name", s: "User wants to label a section.", f: "Header dropdown: Verse/Chorus/Pre-Chorus/Bridge/Intro/Outro/Custom; Custom → rename pencil." },
+      { t: "Color-code a section", s: "User wants visual organization.", f: "Color picker (16 swatches + Clear) tints the section." },
+      { t: "Add a key change", s: "User wants a modulation.", f: "<b>⋮ → Add Key Change</b> (not first section) → semitones (−11…+11); sticker “↑ 3”; Remove/Confirm." },
+      { t: "Toggle the arpeggiator", s: "User wants the section to arpeggiate.", f: "<b>⋮ → Arpeggiator</b> switch (armed by default) routes that section through the arpeggiator." },
+      { t: "Duplicate / reorder / delete sections", s: "User wants to restructure.", f: "<b>⋮ → Duplicate / Move up / Move down</b>; <b>Delete section</b> confirms (Lyrics + Progressions)." },
+      { t: "Play a single section", s: "User wants to hear just the chorus.", f: "Header <b>play</b> plays from that section's first chord (disabled if empty; amber while playing)." },
+      { t: "Reorder sections by drag", s: "User wants to rearrange the song.", f: "<b>Sort sections</b> → drag handles → <b>Done sorting</b>." },
+    ]},
+  ]},
+  { group: "3. Explore Chords", id: "explore", cases: [
+    { t: "Audition diatonic chords in key", s: "User wants chords that fit.", f: "Roman-numeral filters narrow the grid; <b>tap</b> = play, <b>hold</b> = sustain; change <b>Octave</b>; <b>Clear filter</b>." },
+    { t: "Understand why a chord works", s: "User wants the theory.", f: "<b>Long-press</b> → <b>“Why This Chord?”</b>: role, transition feel, borrowed origin, presets, “Heard in”, related chords." },
+    { t: "Send a chord/progression to the song", s: "User likes what they hear.", f: "<b>Add to song</b> drops the chord into the next slot; <b>Send to Progressions</b> sends a preset into the first block." },
+  ]},
+  { group: "4. Find Your Key & Range", id: "voicekey", cases: [
+    { t: "Detect a key by humming", s: "User wants a key suited to their voice.", f: "<b>Start Listening</b> → hum ~3s → stability bar fills → <b>“Key of X Major detected”</b>. <b>Try Again</b> re-detects." },
+    { t: "Play / transpose the scale", s: "User wants to check the scale.", f: "<b>Play Scale</b> plays seven notes; chips play individually; <b>− / +</b> transposes." },
+    { t: "Start a new song in the key", s: "User wants to commit the key.", f: "<b>“Use [Root] Major for New Song”</b> snapshots, resets, sets the key, opens the app." },
+    { t: "Measure vocal range", s: "User wants their range/voice type.", f: "<b>Record Highest</b> then <b>Record Lowest</b> (3s) → range bar + voice-type badge; <b>Redo</b> / <b>Test Again</b>." },
+  ]},
+  { group: "5. Transport & header", id: "transport", cases: [
+    { t: "Play the whole arrangement", s: "User wants synth + recorded tracks together.", f: "<b>Play</b> = unified playback; <b>Stop</b> clears the playhead. Empty → “Nothing to play yet”." },
+    { t: "Change tempo, live", s: "User wants a different BPM mid-playback.", f: "−/+ (40–220) or <b>Tap Tempo</b> (2+ taps) → <b>“Set N BPM”</b>. Applies without stopping." },
+    { t: "Use a metronome", s: "User wants a click track.", f: "<b>Metronome</b> toggle (off by default) + volume; click follows the time signature." },
+    { t: "Set key / mode", s: "User wants to change the song's key.", f: "Attributes pill → key root + mode dropdowns → chords relabel instantly." },
+    { t: "Change the time signature", s: "User wants a different meter.", f: "Dropdown (2/4…12/8). With chords placed, <b>“Change time signature?”</b> warns of re-flow." },
+    { t: "Transpose the whole song", s: "User wants to move everything up/down.", f: "Transpose −/+ shows offset; checkmark → <b>“Confirm Transposed Key”</b> resets the counter." },
+    { t: "Undo / redo everywhere", s: "User wants to revert a mistake.", f: "Header <b>Undo/Redo</b> or <b>Ctrl/Cmd+Z / +Shift+Z / +Y</b>; falls through song → recordings store." },
+    { t: "Add inspiration photos", s: "User wants mood references.", f: "Image button → up to 3 photos (WebP) float above the workspace; lightbox to navigate/remove. Save to persist." },
+  ]},
+  { group: "6. Menu, export & project", id: "menu", cases: [
+    { t: "Save the project to a file", s: "User wants a portable backup with audio.", f: "<b>Menu → Save</b> downloads <code>&lt;title&gt;.zip</code> (sections, chords, metadata, recordings)." },
+    { t: "Load a project", s: "User wants to restore a saved project.", f: "<b>Menu → Load</b> accepts .zip/.json; replaces the song. Bad files → error toast." },
+    { t: "Start a new song safely", s: "User wants a clean slate.", f: "<b>Menu → New</b> → “Start a new song?” (<b>Cancel / Save first / Start new song</b>)." },
+    { t: "Export ChordPro / MIDI / WAV stems", s: "User wants to hand off to other tools.", f: "<b>Export Lyrics</b> (Plain/ChordPro), <b>Export MIDI</b>, <b>Export Stems</b> (WAV ZIP, needs clips; shows progress)." },
+    { t: "Tune the synth sound", s: "User wants a different tone.", f: "<b>Menu → Sound</b>: preset, timbre, volume, ADSR, arpeggio, EQ, chorus, delay, reverb; <b>Preview</b>; <b>Reset to defaults</b>." },
+    { t: "Customize background & theme", s: "User wants a different look.", f: "Pattern (None/Checkerboard/Dot/Lined/Quarters), mask, tint, <b>Dark mode</b> switch." },
+    { t: "Set app-wide defaults (/defaults)", s: "User wants new chords/blocks created a certain way.", f: "Default chord length (beats), block length (bars), octave; <b>Reset</b> restores factory values." },
+    { t: "Read the manual (/help)", s: "User wants guidance.", f: "<b>Menu → Help &amp; User Manual</b>: 11-section manual + sticky TOC." },
+  ]},
+  { group: "7. Onboarding", id: "onboarding", cases: [
+    { t: "Get guided on first run", s: "A new user wants to learn the app.", f: "Coach marks 1/7 (tabs) → 2/7 (key/timing → Save Settings) → tab-specific steps." },
+    { t: "Skip the tutorial", s: "User already knows the app.", f: "<b>Skip Tutorial</b> (bottom-left) disables it; re-enable from the menu toggle." },
+  ]},
+  { group: "8. Data safety", id: "safety", cases: [
+    { t: "Recordings survive a refresh", s: "User refreshes the page.", f: "Take/track metadata restored from localStorage; audio blobs from IndexedDB." },
+    { t: "Storage-quota failures surface", s: "Device storage is full.", f: "Autosave failures raise a once-per-session quota warning toast." },
+    { t: "Concurrent edits are flagged", s: "User opens the same song in two tabs.", f: "Persistent toast warns of last-writer-wins the first time another tab writes." },
+    { t: "Orphaned audio is reclaimed", s: "Leftover blobs from old sessions exist.", f: "On startup, blobs not referenced by any take/clip are pruned." },
+  ]},
+];
+
+const STORAGE_KEY = "vv-test-plan-state-v1";
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+const allCaseIds = [];
+function caseId(groupId, idx) { return groupId + "-" + idx; }
+
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  let counter = 0;
+
+  PLAN.forEach(g => {
+    const sec = document.createElement("section");
+    sec.className = "group";
+    sec.innerHTML = `<h2>${g.group}</h2>`;
+    const blocks = g.subs ? g.subs : [{ h: null, cases: g.cases }];
+    blocks.forEach(block => {
+      if (block.h) {
+        const h3 = document.createElement("h3");
+        h3.textContent = block.h;
+        sec.appendChild(h3);
+      }
+      block.cases.forEach(c => {
+        const id = caseId(g.id, counter++);
+        allCaseIds.push(id);
+        const st = state[id] || {};
+        const div = document.createElement("div");
+        div.className = "case" + (st.status ? " done-" + st.status : "") + (st.note ? " expanded" : "");
+        div.dataset.id = id;
+        div.innerHTML = `
+          <div class="case-head">
+            <div>
+              <div class="case-title">${c.t}</div>
+              <div class="story">${c.s}</div>
+              <div class="flow">${c.f}</div>
+            </div>
+            <div class="status-pills">
+              <button class="pill" data-s="pass"    ${st.status==="pass"?'data-active="pass"':''}    title="Pass">✓</button>
+              <button class="pill" data-s="partial" ${st.status==="partial"?'data-active="partial"':''} title="Partial">~</button>
+              <button class="pill" data-s="fail"    ${st.status==="fail"?'data-active="fail"':''}    title="Fail">✕</button>
+              <button class="pill" data-s="skip"    ${st.status==="skip"?'data-active="skip"':''}    title="Skip / N/A">—</button>
+            </div>
+          </div>
+          <span class="note-toggle">＋ note</span>
+          <textarea class="note" placeholder="Notes, repro steps, bug link…">${st.note||""}</textarea>
+        `;
+        div.querySelectorAll(".pill").forEach(p => {
+          p.addEventListener("click", () => {
+            const s = p.dataset.s;
+            state[id] = state[id] || {};
+            state[id].status = state[id].status === s ? null : s;
+            save(); render();
+          });
+        });
+        const toggle = div.querySelector(".note-toggle");
+        const note = div.querySelector(".note");
+        toggle.addEventListener("click", () => { div.classList.toggle("expanded"); if (div.classList.contains("expanded")) note.focus(); });
+        note.addEventListener("input", () => { state[id] = state[id]||{}; state[id].note = note.value; save(); updateStats(); });
+        sec.appendChild(div);
+      });
+    });
+    app.appendChild(sec);
+  });
+
+  const order = document.createElement("section");
+  order.className = "group";
+  order.innerHTML = `<h2>Suggested test order</h2><div class="order"><ol>
+    <li>Landing → start writing → lyrics + Enter/Backspace/undo</li>
+    <li>Record a take → detect chords → drag to lyrics</li>
+    <li>Arrange: presets → spice → voice leading → per-section play</li>
+    <li>Transport: tempo/key/time-sig/transpose</li>
+    <li>Export: ChordPro, MIDI, Stems, Save/Load ZIP</li>
+    <li>Voice/Key + Explore Chords</li>
+    <li>Data safety: refresh, second tab, storage</li>
+  </ol></div>`;
+  app.appendChild(order);
+
+  updateStats();
+}
+
+function updateStats() {
+  const total = allCaseIds.length;
+  let pass=0, partial=0, fail=0, skip=0;
+  allCaseIds.forEach(id => {
+    const s = (state[id]||{}).status;
+    if (s==="pass") pass++; else if (s==="partial") partial++;
+    else if (s==="fail") fail++; else if (s==="skip") skip++;
+  });
+  const pct = n => total ? (n/total*100) : 0;
+  document.getElementById("bar-pass").style.width = pct(pass)+"%";
+  document.getElementById("bar-partial").style.width = pct(partial)+"%";
+  document.getElementById("bar-fail").style.width = pct(fail)+"%";
+  document.getElementById("bar-skip").style.width = pct(skip)+"%";
+  const done = pass+partial+fail+skip;
+  document.getElementById("stats").innerHTML =
+    `<span><b>${done}/${total}</b> tested</span>` +
+    `<span>✓ <b>${pass}</b></span><span>~ <b>${partial}</b></span>` +
+    `<span>✕ <b>${fail}</b></span><span>— <b>${skip}</b></span>`;
+}
+
+function setAll(status) {
+  allCaseIds.forEach(id => { state[id] = state[id]||{}; state[id].status = status; });
+  save(); render();
+}
+
+["tester","build","date","env"].forEach(k => {
+  const el = document.getElementById("meta-"+k);
+  el.value = (state.__meta && state.__meta[k]) || "";
+  el.addEventListener("input", () => { state.__meta = state.__meta||{}; state.__meta[k] = el.value; save(); });
+});
+
+render();
+</script>
+</body>
+</html>

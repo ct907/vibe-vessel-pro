@@ -4,6 +4,8 @@ import { chordToMidi, NOTES_SHARP, type ChordSymbol } from "@/lib/music/chords";
 interface Props {
   chords: ChordSymbol[];
   isVisible: boolean;
+  onChordTap?: (index: number) => void;
+  selectedIndex?: number | null;
 }
 
 const VOICE_COLORS = ["#E8C547", "#9CC27A", "#7FB0D6", "#D77A6B", "#C8956A"];
@@ -97,7 +99,7 @@ function Marker({ x, y, voiceIdx, label }: { x: number; y: number; voiceIdx: num
   );
 }
 
-export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
+export function VoiceLeadingLinesPanel({ chords, isVisible, onChordTap, selectedIndex }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -185,6 +187,16 @@ export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
               viewBox={`0 0 ${width} ${height}`}
               style={{ display: "block" }}
             >
+              {selectedIndex != null && selectedIndex >= 0 && selectedIndex < n && (
+                <rect
+                  x={selectedIndex * (width / n) + 2}
+                  y={PAD_TOP - 4}
+                  width={width / n - 4}
+                  height={height - PAD_TOP - PAD_BOTTOM + 8}
+                  rx={8}
+                  fill="var(--primary-halo, rgba(232,197,71,0.18))"
+                />
+              )}
               {[0, 1, 2, 3, 4].map((vi) => {
                 const segs: JSX.Element[] = [];
                 for (let i = 0; i < n - 1; i++) {
@@ -218,6 +230,19 @@ export function VoiceLeadingLinesPanel({ chords, isVisible }: Props) {
                   />
                 )),
               )}
+              {onChordTap &&
+                Array.from({ length: n }, (_, i) => (
+                  <rect
+                    key={`hit-${i}`}
+                    x={i * (width / n)}
+                    y={0}
+                    width={width / n}
+                    height={height}
+                    fill="transparent"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => onChordTap(i)}
+                  />
+                ))}
             </svg>
           );
         })()}

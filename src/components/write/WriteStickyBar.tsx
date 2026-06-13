@@ -41,6 +41,28 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const [elapsed, setElapsed] = useState(0);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
 
+  // Pin the bar to the top of the on-screen keyboard instead of the layout
+  // viewport bottom (where `fixed bottom-0` leaves it stranded behind/above the
+  // keyboard with a large gap). Same visualViewport overlap math the chord
+  // picker and rhyme sheets use.
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const overlap = window.innerHeight - (vv.height + vv.offsetTop);
+      setKeyboardOffset(overlap > 0 ? overlap : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
   // Live elapsed-time readout so the user knows how long a take has been rolling.
   useEffect(() => {
     if (!recording) {
@@ -127,7 +149,13 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[45]" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div
+      className="fixed left-0 right-0 z-[45] transition-[bottom] duration-150"
+      style={{
+        bottom: keyboardOffset,
+        paddingBottom: keyboardOffset > 0 ? 0 : "env(safe-area-inset-bottom, 0px)",
+      }}
+    >
       {/* Section type picker — slides up above bar */}
       {addSectionOpen && (
         <div

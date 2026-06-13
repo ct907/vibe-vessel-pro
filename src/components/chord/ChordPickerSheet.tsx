@@ -135,11 +135,21 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     sectionOffset ? { ...transposeChord(c, sectionOffset), octave: c.octave } : c;
   const toStorage = (c: ChordSymbol): ChordSymbol =>
     sectionOffset ? { ...transposeChord(c, -sectionOffset), octave: c.octave } : c;
-  const suggestions = useMemo(() => suggestChords(query), [query]);
   const exact = useMemo(() => parseChord(query.trim()), [query]);
   const nashvilleChords = useMemo(
     () => parseNashvilleInput(query.trim(), effective.root, effective.mode),
     [query, effective.root, effective.mode],
+  );
+  // A single Nashville number resolves to one chord — surface that chord's root
+  // variations in the grid (just like typing the root letter) so the user can
+  // pick any quality below the input. Multi-number sequences keep their grouped
+  // preview band instead.
+  const suggestions = useMemo(
+    () =>
+      nashvilleChords && nashvilleChords.length === 1
+        ? suggestChords(nashvilleChords[0].root)
+        : suggestChords(query),
+    [query, nashvilleChords],
   );
 
   // Picking a chord no longer auto-closes the sheet — user can keep adding chords.
@@ -275,13 +285,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
             </Select>
           </div>
 
-          {nashvilleChords && nashvilleChords.length > 0 && (
-            <button
-              type="button"
-              onClick={() => handlePickNashville(nashvilleChords)}
-              className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg w-full text-left transition-all bg-[var(--paper-shade)] hover:bg-[var(--paper-card)] hover:ring-2 hover:ring-[var(--primary)]"
-              aria-label={`Add ${nashvilleChords.length} Nashville chords`}
-            >
+          {nashvilleChords && nashvilleChords.length > 1 && (
+            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
               {nashvilleChords.map((c, i) => (
                 <span
