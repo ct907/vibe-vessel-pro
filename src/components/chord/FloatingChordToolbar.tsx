@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUIStore } from "@/store/ui";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   Pencil,
@@ -51,6 +52,36 @@ const ANIM_STYLE: React.CSSProperties = {
   transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
 };
 
+/** Desktop toolbar control: icon + text label in a single horizontal row. */
+function LabeledBtn({
+  icon,
+  label,
+  onClick,
+  disabled,
+  className,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn("h-9 px-2.5 gap-1.5 shrink-0", className)}
+    >
+      {icon}
+      <span className="text-sm whitespace-nowrap">{label}</span>
+    </Button>
+  );
+}
+
 export function FloatingChordToolbar({
   mode,
   hideTrigger = false,
@@ -71,6 +102,7 @@ export function FloatingChordToolbar({
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
+  const isDesktop = useIsDesktop();
   const focusedEditorOpen = useUIStore((s) => s.focusedEditorOpen);
   const setToolbarExpanded = useUIStore((s) => s.setToolbarExpanded);
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
@@ -137,6 +169,133 @@ export function FloatingChordToolbar({
   };
 
   const bottomClass = hideTrigger ? "bottom-16" : "bottom-4";
+
+  const lenBadge =
+    mode === "progression" && activeChord?.lengthBeats !== undefined ? (
+      <span className="px-1 text-xs font-mono-chord text-muted-foreground select-none">
+        {Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b
+      </span>
+    ) : null;
+  const divider = <div className="w-px h-6 bg-border mx-0.5" />;
+  const octaveSelect = (
+    <div className="flex items-center gap-1 shrink-0">
+      <span className="text-xs text-muted-foreground select-none">Oct</span>
+      <Select
+        value={octaveDisplay === "*" ? undefined : octaveDisplay}
+        disabled={octaveDisabled}
+        onValueChange={(v) => onOctaveChange?.(Number(v))}
+      >
+        <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
+          <SelectValue>{octaveDisplay}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {[2, 3, 4, 5, 6].map((o) => (
+            <SelectItem key={o} value={String(o)} className="text-sm font-mono-chord">
+              {o}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  // Desktop: a single horizontal row of labeled controls, centered above the
+  // sticky bar — the mobile version stacks icon-only controls in the corner.
+  if (isDesktop) {
+    return (
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[55] pointer-events-none">
+        <div
+          role="toolbar"
+          aria-label="Chord editing toolbar"
+          style={ANIM_STYLE}
+          className={cn(
+            "pointer-events-auto origin-bottom rounded-2xl border bg-popover shadow-lg px-3 py-2",
+            "flex flex-row items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto",
+            expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
+          )}
+        >
+          <LabeledBtn
+            icon={<ChevronLeft className="h-5 w-5" />}
+            label="Earlier"
+            disabled={shiftDisabled || !canShiftLeft}
+            onClick={() => onShift(-1)}
+          />
+          <span
+            className={cn(
+              "px-2 text-sm select-none truncate max-w-[8rem] shrink-0",
+              hasContext ? "font-mono-chord text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {middleLabel}
+          </span>
+          <LabeledBtn
+            icon={<ChevronRight className="h-5 w-5" />}
+            label="Later"
+            disabled={shiftDisabled || !canShiftRight}
+            onClick={() => onShift(1)}
+          />
+          {divider}
+          <LabeledBtn
+            icon={<ChevronUp className="h-5 w-5" />}
+            label={mode === "lyrics" ? "Up" : "Prev"}
+            disabled={!hasContext || !canMoveUp}
+            onClick={() => onMoveVertical?.(-1)}
+          />
+          <LabeledBtn
+            icon={<ChevronDown className="h-5 w-5" />}
+            label={mode === "lyrics" ? "Down" : "Next"}
+            disabled={!hasContext || !canMoveDown}
+            onClick={() => onMoveVertical?.(1)}
+          />
+          {divider}
+          {mode === "progression" && (
+            <>
+              <LabeledBtn
+                icon={<Minus className="h-5 w-5" />}
+                label="Shorter"
+                disabled={beatDisabled}
+                onClick={() => onResize?.(-0.5)}
+              />
+              {lenBadge}
+              <LabeledBtn
+                icon={<Plus className="h-5 w-5" />}
+                label="Longer"
+                disabled={beatDisabled}
+                onClick={() => onResize?.(0.5)}
+              />
+              {divider}
+            </>
+          )}
+          <LabeledBtn
+            icon={<ListChecks className="h-5 w-5" />}
+            label="All"
+            disabled={selectAllDisabled}
+            onClick={onSelectAll}
+          />
+          <LabeledBtn
+            icon={<CheckSquare className="h-5 w-5" />}
+            label={multiSelectMode ? "Exit" : "Multi"}
+            onClick={toggleMode}
+            className={cn(
+              multiSelectMode &&
+                "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+            )}
+          />
+          {divider}
+          {octaveSelect}
+          {divider}
+          <LabeledBtn
+            icon={<Trash2 className="h-5 w-5" />}
+            label="Delete"
+            disabled={!hasContext}
+            onClick={hasContext ? onDelete : undefined}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-60"
+          />
+          <LabeledBtn icon={<X className="h-5 w-5" />} label="Close" onClick={close} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`fixed ${bottomClass} right-4 z-[55] pointer-events-none`}>

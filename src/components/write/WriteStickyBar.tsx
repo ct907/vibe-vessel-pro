@@ -156,13 +156,14 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
         paddingBottom: keyboardOffset > 0 ? 0 : "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      {/* Section type picker — slides up above bar */}
+      {/* Section type picker — full-width bar on mobile; a centered floating
+          card above the bar on desktop. */}
       {addSectionOpen && (
         <div
-          className="animate-in slide-in-from-bottom-2 duration-200"
+          className="animate-in slide-in-from-bottom-2 duration-200 md:absolute md:bottom-full md:left-1/2 md:-translate-x-1/2 md:mb-3 md:rounded-2xl md:border md:border-border/60 md:shadow-lg"
           style={{ background: "var(--cocoa-deep)" }}
         >
-          <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
+          <div className="max-w-6xl mx-auto px-4 pt-4 pb-3 md:max-w-md md:py-3">
             <div className="flex flex-wrap items-center justify-center gap-2">
               {SECTION_TYPES.map((t) => (
                 <button
@@ -193,7 +194,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           WebkitBackdropFilter: "blur(8px) saturate(200%)",
         }}
       >
-        <div className="max-w-6xl mx-auto relative flex items-center justify-around px-4 py-3 gap-2">
+        <div className="max-w-6xl mx-auto relative flex items-center justify-around px-4 py-3 gap-2 md:justify-center md:gap-9">
           {/* Level indicator during recording */}
           {recording && (
             <div
@@ -217,7 +218,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             onClick={toggle}
             disabled={pending || (trackIsRecording && !recording)}
             className={
-              "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1" +
+              "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none" +
               (recording ? " animate-rec-pulse" : "") +
               ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
             }
@@ -233,7 +234,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           <button
             type="button"
             onClick={() => setAddSectionOpen((o) => !o)}
-            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1"
+            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none"
             aria-expanded={addSectionOpen}
             aria-label="Add a song section"
           >
@@ -244,7 +245,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           <button
             type="button"
             onClick={handleEditChords}
-            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-1"
+            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none"
             aria-label="Open chord editing tools"
           >
             <Pencil className="h-4 w-4" />
