@@ -355,17 +355,9 @@ function LineRow({
                     data-slot-index={slotIdx}
                     className={cn(
                       "relative shrink-0 h-9 flex items-center justify-start border border-solid transition-colors",
-                      hasActiveChordInLine
-                        ? "border-muted-foreground/20"
-                        : isMobile
-                          ? "border-muted-foreground/25"
-                          : "border-transparent group-hover:border-muted-foreground/40",
+                      hasActiveChordInLine ? "border-muted-foreground/20" : "border-transparent",
                       occupied ? "w-10" : "w-7",
-                      slotIdx > 0 && (hasActiveChordInLine
-                        ? "border-l-muted-foreground/35"
-                        : isMobile
-                          ? "border-l-muted-foreground/30"
-                          : "border-l-muted-foreground/12 group-hover:border-l-muted-foreground/35"),
+                      slotIdx > 0 && (hasActiveChordInLine ? "border-l-muted-foreground/35" : "border-l-transparent"),
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}

@@ -97,6 +97,7 @@ export interface SoundSettings {
   volume: number;     // dB, -40 to 6
   timbre: number;     // 0..1 (preset-defined meaning)
   bpmRamp: boolean;   // optional: smooth tempo changes
+  highLatencyMode: boolean; // use "playback" latencyHint for Bluetooth audio
   adsr: ADSR;
   eq: EQ3;
   fx: FX;
@@ -118,6 +119,7 @@ export const DEFAULT_SOUND: SoundSettings = {
   volume: -10,
   timbre: PRESET_BY_VALUE.rhodes.timbreDefault,
   bpmRamp: true,
+  highLatencyMode: false,
   adsr: { ...PRESET_DEFAULTS.rhodes },
   eq: { low: 0, mid: 0, high: 0 },
   fx: {
@@ -137,6 +139,7 @@ interface SoundState extends SoundSettings {
   setFX: (patch: Partial<FX>) => void;
   setVolume: (v: number) => void;
   setBpmRamp: (b: boolean) => void;
+  setHighLatencyMode: (b: boolean) => void;
   setArp: (patch: Partial<ArpSettings>) => void;
   reset: () => void;
   loadFrom: (s: Partial<SoundSettings> | undefined) => void;
@@ -157,6 +160,7 @@ export const useSoundStore = create<SoundState>((set, get) => ({
   setFX: (patch) => set((s) => ({ fx: { ...s.fx, ...patch } })),
   setVolume: (v) => set({ volume: v }),
   setBpmRamp: (b) => set({ bpmRamp: b }),
+  setHighLatencyMode: (b) => set({ highLatencyMode: b }),
   setArp: (patch) => set((s) => ({ arp: { ...s.arp, ...patch } })),
   reset: () => set({ ...DEFAULT_SOUND }),
   loadFrom: (data) => {
@@ -172,6 +176,7 @@ export const useSoundStore = create<SoundState>((set, get) => ({
       volume: data.volume ?? DEFAULT_SOUND.volume,
       timbre: data.timbre ?? PRESET_BY_VALUE[preset].timbreDefault,
       bpmRamp: data.bpmRamp ?? DEFAULT_SOUND.bpmRamp,
+      highLatencyMode: data.highLatencyMode ?? DEFAULT_SOUND.highLatencyMode,
       adsr: { ...PRESET_DEFAULTS[preset], ...(data.adsr ?? {}) },
       eq: { ...DEFAULT_SOUND.eq, ...(data.eq ?? {}) },
       fx: { ...DEFAULT_SOUND.fx, ...(data.fx ?? {}) },
@@ -179,7 +184,7 @@ export const useSoundStore = create<SoundState>((set, get) => ({
     });
   },
   toJSON: () => {
-    const { preset, volume, timbre, bpmRamp, adsr, eq, fx, arp } = get();
-    return { preset, volume, timbre, bpmRamp, adsr, eq, fx, arp };
+    const { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp } = get();
+    return { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp };
   },
 }));

@@ -247,6 +247,9 @@ export function FloatingChordToolbar({
           >
             <ChevronUp className="h-5 w-5" />
           </Button>
+          <span className="text-[10px] text-muted-foreground/70 select-none leading-tight text-center w-14">
+            move chord
+          </span>
           <Button
             size="icon"
             variant="ghost"
