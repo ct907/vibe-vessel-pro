@@ -2016,6 +2016,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               setActiveChordId(null);
               setMultiSelected(new Map());
             }}
+            onEnterMultiSelect={() => {
+              if (activeChordId && patternOfActive && !multiSelected.has(activeChordId)) {
+                toggleMultiSelected(activeChordId, patternOfActive.id);
+              }
+            }}
             onDelete={() => {
               const removeBatch = useSongStore.getState().removePatternChordsBatch;
               if (multiSelected.size > 0) {

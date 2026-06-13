@@ -39,6 +39,8 @@ export interface FloatingChordToolbarProps {
   onOctaveChange?: (oct: number) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
+  /** Entering multi-select seeds the selection with the active chord. */
+  onEnterMultiSelect?: () => void;
   onDelete?: () => void;
   onExitEdit: () => void;
 }
@@ -65,6 +67,7 @@ export function FloatingChordToolbar({
   onOctaveChange,
   onSelectAll,
   onClearAll,
+  onEnterMultiSelect,
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
@@ -123,6 +126,7 @@ export function FloatingChordToolbar({
       onClearAll();
     } else {
       setMultiSelectMode(true);
+      onEnterMultiSelect?.();
     }
   };
 

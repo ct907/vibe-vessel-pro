@@ -2010,6 +2010,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
             }}
+            onEnterMultiSelect={() => {
+              if (activeCtx && !lyricMultiSelected.has(activeCtx.anchor.id)) {
+                toggleLyricMultiSelected(activeCtx.anchor.id, {
+                  sectionId: activeCtx.sectionId,
+                  lineId: activeCtx.lineId,
+                });
+              }
+            }}
             onDelete={() => {
               if (targets.length === 0) return;
               const byLine = new Map<string, { sectionId: string; lineId: string; ids: string[] }>();
