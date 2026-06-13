@@ -13,7 +13,7 @@ import { usePlaybackStore } from "@/store/playback";
 import {
   Music2, RotateCcw, Play, Square, ChevronDown,
   ListIndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
-  LineStyle, Circle, ListEnd, ChartBarStacked, ListRestart, ChartNoAxesGantt,
+  LineStyle, Circle, ListEnd, ChartBarStacked, ListRestart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -150,6 +150,20 @@ export function SoundPanel({ open, onOpenChange }: Props) {
                 id="bpm-ramp"
                 checked={s.bpmRamp}
                 onCheckedChange={(b) => s.setBpmRamp(!!b)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="space-y-0.5">
+                <Label htmlFor="high-latency-mode" className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Bluetooth mode
+                </Label>
+                <p className="text-[10px] text-muted-foreground/60">Larger audio buffer — reduces crackling on Bluetooth. Takes effect on next audio start.</p>
+              </div>
+              <Switch
+                id="high-latency-mode"
+                checked={s.highLatencyMode}
+                onCheckedChange={(b) => s.setHighLatencyMode(!!b)}
               />
             </div>
           </section>
@@ -353,12 +367,6 @@ function ArpControls() {
           <TextRow options={BASS_REPEAT_OPTIONS} value={arp.bassRepeat} onChange={(v) => setArp({ bassRepeat: v })} />
         </Row>
       )}
-      <Row
-        label={<><ChartNoAxesGantt className="inline h-3 w-3 mr-1" />Swing</>}
-        value={`${Math.round(arp.swing * 100)}%`}
-      >
-        <Slider min={0.5} max={0.75} step={0.005} value={[arp.swing]} onValueChange={([v]) => setArp({ swing: v })} />
-      </Row>
     </div>
   );
 }
