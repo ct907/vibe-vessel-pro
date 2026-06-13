@@ -286,7 +286,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           </div>
 
           {nashvilleChords && nashvilleChords.length > 1 && (
-            <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg" style={{ background: "var(--paper-shade)" }}>
+            <button
+              type="button"
+              onClick={() => handlePickNashville(nashvilleChords)}
+              className="flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-lg w-full text-left transition-all bg-[var(--paper-shade)] hover:bg-[var(--paper-card)] hover:ring-2 hover:ring-[var(--primary)]"
+              aria-label={`Add ${nashvilleChords.length} Nashville chords`}
+            >
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
               {nashvilleChords.map((c, i) => (
                 <span
