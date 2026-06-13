@@ -1961,6 +1961,22 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               }
               movePatternChord(patternOfActive.id, activeChordId, dir);
             }}
+            canMoveUp={!useMulti && !!patternOfActive && !!adjacentBlock(-1)}
+            canMoveDown={!useMulti && !!patternOfActive && !!adjacentBlock(1)}
+            onMoveVertical={(dir) => {
+              if (useMulti || !patternOfActive || !activeChordId) return;
+              const adj = adjacentBlock(dir);
+              if (!adj) return;
+              const owner = sections.find((s) => s.id === (adj.sectionId ?? adj.id));
+              const adjLen = (owner ? getPatternChordsViaSSOT(owner, adj) : adj.chords).length;
+              // Land at the same position within the target block, clamped.
+              useSongStore.getState().movePatternChordToPatternAt(
+                patternOfActive.id,
+                adj.id,
+                activeChordId,
+                Math.min(Math.max(activeIdx, 0), adjLen),
+              );
+            }}
             onResize={(delta) => {
               if (useMulti) handleMultiResize(delta);
               else if (patternOfActive && activeChordId)
