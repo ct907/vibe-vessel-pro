@@ -1,7 +1,8 @@
 // Voice-leading "feel" model + voicing suggestion engine for the Quick Pick panel.
-// Inversions are expressed as slash chords (chord.bass); some feels also nudge
-// the chord quality (7ths for jazzy, sus for dreamy). All scoring is voicing-aware
-// (bass-sensitive), unlike frictionBetween() in analyzeChord.ts.
+// Suggestions are whole-progression re-voicings: a feel re-voices every chord in
+// the pattern block. Inversions are expressed as slash chords (chord.bass); some
+// feels also nudge the chord quality (7ths for jazzy, sus for dreamy). All scoring
+// is voicing-aware (bass-sensitive), unlike frictionBetween() in analyzeChord.ts.
 
 import {
   chordToMidi,
@@ -95,11 +96,9 @@ function tweakQuality(quality: Quality, feel: Feel): Quality | null {
   return null;
 }
 
-export interface VoicingOption {
-  id: string;
+interface VoicingOption {
   chord: ChordSymbol;
-  label: string;
-  score: number;
+  label: string; // "Root position" | "1st inversion" | ...
 }
 
 // All distinct chord tones (pitch classes) for a chord, in stacked order.
@@ -118,9 +117,9 @@ function chordTonePcs(chord: ChordSymbol): number[] {
   return pcs;
 }
 
-// Build candidate voicings: every inversion of the chord (root position + each
-// non-root chord tone as bass), optionally over a feel-tweaked quality.
-export function candidatesFor(chord: ChordSymbol, feel: Feel): VoicingOption[] {
+// Candidate voicings for a single chord under a feel: every inversion of the
+// chord, plus the feel-tweaked quality where one applies.
+function candidatesFor(chord: ChordSymbol, feel: Feel): VoicingOption[] {
   const useFlat = chord.root.includes("b");
   const qualities: Quality[] = [chord.quality];
   const tweaked = tweakQuality(chord.quality, feel);
@@ -135,98 +134,119 @@ export function candidatesFor(chord: ChordSymbol, feel: Feel): VoicingOption[] {
       const cand = withVoicing(chord, quality, bass);
       if (seen.has(cand.display)) return;
       seen.add(cand.display);
-      options.push({ id: cand.display, chord: cand, label: ORDINALS[idx] ?? `inversion`, score: 0 });
+      options.push({ chord: cand, label: ORDINALS[idx] ?? "inversion" });
     });
   }
   return options;
 }
 
-function scoreAgainstNeighbors(
-  cand: ChordSymbol,
-  prev: ChordSymbol | null,
-  next: ChordSymbol | null,
-): number {
-  const v = chordToMidi(cand, 4);
-  let s = 0;
-  if (prev) s += smoothScore(chordToMidi(prev, 4), v);
-  if (next) s += smoothScore(v, chordToMidi(next, 4));
-  return s;
+const isSus = (o: VoicingOption) => o.chord.quality === "sus2" || o.chord.quality === "sus4";
+const hasSeventh = (o: VoicingOption) => /7|9|11|13/.test(QUALITY_PRETTY[o.chord.quality]);
+
+type Pick = (cands: VoicingOption[], prev: number[] | null) => VoicingOption;
+
+// Build a per-chord picker: rank by `primary` (signature preference), tie-broken
+// by smoothness toward the previously chosen voicing (smoothSign -1 = prefer
+// smooth, +1 = prefer wild/large motion, 0 = ignore motion).
+function makePick(primary: (o: VoicingOption) => number, smoothSign: number): Pick {
+  return (cands, prev) => {
+    let best = cands[0];
+    let bestVal = -Infinity;
+    for (const c of cands) {
+      const motion = prev ? smoothScore(prev, chordToMidi(c.chord, 4)) : 0;
+      const val = primary(c) * 1000 + smoothSign * motion;
+      if (val > bestVal) {
+        bestVal = val;
+        best = c;
+      }
+    }
+    return best;
+  };
 }
 
-// Rank candidates for the chosen feel and return the top 2–4 options.
-export function suggestFor(
-  chord: ChordSymbol,
-  prev: ChordSymbol | null,
-  next: ChordSymbol | null,
-  feel: Feel,
-): VoicingOption[] {
-  const scored = candidatesFor(chord, feel).map((o) => ({
-    ...o,
-    score: scoreAgainstNeighbors(o.chord, prev, next),
-  }));
-
-  const smoothFirst = (a: VoicingOption, b: VoicingOption) => a.score - b.score;
-  const wildFirst = (a: VoicingOption, b: VoicingOption) => b.score - a.score;
-
-  let ranked: VoicingOption[];
-  switch (feel) {
-    case "calm":
-      // Lowest movement; root position floats up via the smooth sort + tie order.
-      ranked = scored.sort(smoothFirst);
-      break;
-    case "flowing":
-      ranked = scored.sort(smoothFirst);
-      break;
-    case "dreamy":
-      // Favor 2nd inversions and sus colors, then smoothness.
-      ranked = scored.sort((a, b) => dreaminess(b) - dreaminess(a) || a.score - b.score);
-      break;
-    case "jazzy":
-      // Favor 7th/slash candidates, then smoothness.
-      ranked = scored.sort((a, b) => jazziness(b) - jazziness(a) || a.score - b.score);
-      break;
-    case "dramatic":
-      ranked = scored.sort(wildFirst);
-      break;
-    case "tense":
-      ranked = scored.sort(wildFirst);
-      break;
+function buildArrangement(chords: ChordSymbol[], feel: Feel, pick: Pick): ChordSymbol[] {
+  const out: ChordSymbol[] = [];
+  let prevVoicing: number[] | null = null;
+  for (const ch of chords) {
+    const chosen = pick(candidatesFor(ch, feel), prevVoicing);
+    out.push(chosen.chord);
+    prevVoicing = chordToMidi(chosen.chord, 4);
   }
-
-  return ranked.slice(0, 4);
+  return out;
 }
 
-function dreaminess(o: VoicingOption): number {
-  let n = 0;
-  if (o.label === "2nd inversion") n += 2;
-  if (o.chord.quality === "sus2" || o.chord.quality === "sus4") n += 2;
-  return n;
+const ROOT = (o: VoicingOption) => (o.label === "Root position" ? 1 : 0);
+const FIRST = (o: VoicingOption) => (o.label === "1st inversion" ? 1 : 0);
+const SECOND = (o: VoicingOption) => (o.label === "2nd inversion" ? 1 : 0) + (isSus(o) ? 1 : 0);
+const SEVENTH = (o: VoicingOption) => (hasSeventh(o) ? 2 : 0) + (o.chord.bass ? 1 : 0);
+const SLASH = (o: VoicingOption) => (o.chord.bass ? 1 : 0);
+const NOTROOT = (o: VoicingOption) => (o.label === "Root position" ? 0 : 1);
+const ZERO = () => 0;
+
+// Per-feel arrangement strategies: each yields one whole-progression re-voicing.
+const STRATEGIES: Record<Feel, Array<{ label: string; pick: Pick }>> = {
+  calm: [
+    { label: "Root position", pick: makePick(ROOT, -1) },
+    { label: "Minimal movement", pick: makePick(ZERO, -1) },
+  ],
+  flowing: [
+    { label: "Smooth voice leading", pick: makePick(ZERO, -1) },
+    { label: "First inversions", pick: makePick(FIRST, -1) },
+  ],
+  dreamy: [
+    { label: "Floating inversions", pick: makePick(SECOND, -1) },
+    { label: "Gentle motion", pick: makePick(ZERO, -1) },
+  ],
+  jazzy: [
+    { label: "Rich 7ths", pick: makePick(SEVENTH, -1) },
+    { label: "Chromatic bass", pick: makePick(SLASH, 1) },
+  ],
+  dramatic: [
+    { label: "Wide leaps", pick: makePick(ZERO, 1) },
+    { label: "Bold inversions", pick: makePick(NOTROOT, 1) },
+  ],
+  tense: [
+    { label: "Maximum tension", pick: makePick(ZERO, 1) },
+    { label: "Edgy voicings", pick: makePick(SLASH, 1) },
+  ],
+};
+
+export interface ProgressionVoicing {
+  id: string;
+  chords: ChordSymbol[];
+  label: string;
 }
 
-function jazziness(o: VoicingOption): number {
-  let n = 0;
-  if (/7|9|11|13/.test(QUALITY_PRETTY[o.chord.quality])) n += 2;
-  if (o.chord.bass) n += 1;
-  return n;
+const arrangementKey = (chords: ChordSymbol[]) => chords.map((c) => c.display).join(" ");
+
+// Whole-progression voicing suggestions for the chosen feel (2–4, deduped).
+export function suggestProgressionVoicings(chords: ChordSymbol[], feel: Feel): ProgressionVoicing[] {
+  const seen = new Set<string>();
+  const out: ProgressionVoicing[] = [];
+  for (const { label, pick } of STRATEGIES[feel]) {
+    const voiced = buildArrangement(chords, feel, pick);
+    const key = arrangementKey(voiced);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: key, chords: voiced, label });
+  }
+  // Always offer the untouched original as a fallback so the list is never empty.
+  const originalKey = arrangementKey(chords);
+  if (out.length === 0 && !seen.has(originalKey)) {
+    out.push({ id: originalKey, chords, label: "Original" });
+  }
+  return out.slice(0, 4);
 }
 
-// Pick the feel that best matches the chord's current voicing in context, by
-// mapping its smoothness score onto the calm↔tense spectrum.
-export function bestFeelFor(
-  chord: ChordSymbol,
-  prev: ChordSymbol | null,
-  next: ChordSymbol | null,
-): Feel {
-  const current = scoreAgainstNeighbors(chord, prev, next);
-  const candidates = candidatesFor(chord, "calm").map((o) =>
-    scoreAgainstNeighbors(o.chord, prev, next),
-  );
-  const min = Math.min(current, ...candidates);
-  const max = Math.max(current, ...candidates);
-  if (max === min) return "calm";
-  const t = (current - min) / (max - min); // 0 = smoothest, 1 = roughest
-  if (chord.quality === "sus2" || chord.quality === "sus4") return "dreamy";
-  if (/7|9|11|13/.test(QUALITY_PRETTY[chord.quality])) return "jazzy";
+// Pick the feel that best matches the progression's current voicing, by mapping
+// its overall smoothness onto the calm↔tense spectrum.
+export function bestFeelForProgression(chords: ChordSymbol[]): Feel {
+  if (chords.length < 2) return "calm";
+  const current = progressionScore(chords);
+  const smoothest = progressionScore(buildArrangement(chords, "flowing", makePick(ZERO, -1)));
+  const roughest = progressionScore(buildArrangement(chords, "tense", makePick(ZERO, 1)));
+  if (roughest <= smoothest) return "calm";
+  const t = (current - smoothest) / (roughest - smoothest);
   if (t < 0.2) return "calm";
   if (t < 0.45) return "flowing";
   if (t < 0.7) return "dramatic";

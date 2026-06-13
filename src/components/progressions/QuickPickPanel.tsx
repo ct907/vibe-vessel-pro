@@ -1,57 +1,62 @@
 import { useEffect, useMemo, useState } from "react";
-import { Play, Check } from "lucide-react";
+import { Play, Square, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { ChordSymbol } from "@/lib/music/chords";
-import { FEELS, bestFeelFor, suggestFor, type Feel } from "@/lib/music/voicingFeel";
+import {
+  FEELS,
+  bestFeelForProgression,
+  suggestProgressionVoicings,
+  type Feel,
+} from "@/lib/music/voicingFeel";
 
 interface Props {
   isOpen: boolean;
-  chord: ChordSymbol;
-  prev: ChordSymbol | null;
-  next: ChordSymbol | null;
-  onPreviewChord: (chord: ChordSymbol | null) => void;
-  onAudition: (chord: ChordSymbol) => void;
-  onApply: (chord: ChordSymbol) => void;
+  chords: ChordSymbol[];
+  isPreviewPlaying: boolean;
+  onPreviewChords: (chords: ChordSymbol[] | null) => void;
+  onAudition: (chords: ChordSymbol[]) => void;
+  onStopPreview: () => void;
+  onApply: (chords: ChordSymbol[]) => void;
   onClose: () => void;
 }
 
 export function QuickPickPanel({
   isOpen,
-  chord,
-  prev,
-  next,
-  onPreviewChord,
+  chords,
+  isPreviewPlaying,
+  onPreviewChords,
   onAudition,
+  onStopPreview,
   onApply,
   onClose,
 }: Props) {
-  const chordKey = chord.display;
-  const [feel, setFeel] = useState<Feel>(() => bestFeelFor(chord, prev, next));
+  const chordsKey = useMemo(() => chords.map((c) => c.display).join("|"), [chords]);
+  const [feel, setFeel] = useState<Feel>(() => bestFeelForProgression(chords));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const options = useMemo(() => suggestFor(chord, prev, next, feel), [chord, prev, next, feel]);
+  const options = useMemo(() => suggestProgressionVoicings(chords, feel), [chords, feel]);
 
-  // Reset feel + selection whenever a different chord is tapped.
+  // Reset feel whenever the underlying progression changes.
   useEffect(() => {
-    setFeel(bestFeelFor(chord, prev, next));
+    setFeel(bestFeelForProgression(chords));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chordKey]);
+  }, [chordsKey]);
 
-  // When the option list changes, prefer the option matching the current
+  // When the option list changes, prefer the arrangement matching the current
   // voicing, otherwise the top suggestion; preview it live in the diagram.
   useEffect(() => {
     if (options.length === 0) return;
-    const match = options.find((o) => o.chord.display === chord.display);
+    const match = options.find((o) => o.id === chordsKey.replace(/\|/g, " "));
     const chosen = match ?? options[0];
     setSelectedId(chosen.id);
-    onPreviewChord(chosen.chord);
+    onPreviewChords(chosen.chords);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options]);
 
   // Clear the live preview when the panel closes.
   useEffect(() => {
-    if (!isOpen) onPreviewChord(null);
+    if (!isOpen) onPreviewChords(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -61,7 +66,7 @@ export function QuickPickPanel({
   return (
     <div
       className="overflow-hidden transition-all duration-300 ease-out"
-      style={{ maxHeight: isOpen ? 420 : 0, opacity: isOpen ? 1 : 0, marginTop: isOpen ? 8 : 0 }}
+      style={{ maxHeight: isOpen ? 460 : 0, opacity: isOpen ? 1 : 0, marginTop: isOpen ? 8 : 0 }}
       aria-hidden={!isOpen}
     >
       <div
@@ -99,14 +104,14 @@ export function QuickPickPanel({
           {selectedFeel.blurb}
         </p>
 
-        {/* Suggested voicings */}
+        {/* Suggested whole-progression voicings */}
         <RadioGroup
           className="mt-2"
           value={selectedId ?? undefined}
           onValueChange={(v) => {
             setSelectedId(v);
             const opt = options.find((o) => o.id === v);
-            if (opt) onPreviewChord(opt.chord);
+            if (opt) onPreviewChords(opt.chords);
           }}
         >
           {options.map((o) => (
@@ -118,13 +123,18 @@ export function QuickPickPanel({
                 o.id === selectedId ? "bg-accent" : "hover:bg-accent/50",
               )}
             >
-              <RadioGroupItem id={`vp-${o.id}`} value={o.id} />
-              <span className="font-mono-chord text-sm" style={{ color: "var(--ink)" }}>
-                {o.chord.display}
-              </span>
-              <span className="ml-auto text-[11px]" style={{ color: "var(--ink-soft)" }}>
-                {o.label}
-              </span>
+              <RadioGroupItem id={`vp-${o.id}`} value={o.id} className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold" style={{ color: "var(--ink-soft)" }}>
+                  {o.label}
+                </div>
+                <div
+                  className="font-mono-chord text-sm truncate"
+                  style={{ color: "var(--ink)" }}
+                >
+                  {o.chords.map((c) => c.display).join("  ")}
+                </div>
+              </div>
             </label>
           ))}
         </RadioGroup>
@@ -134,17 +144,29 @@ export function QuickPickPanel({
           <button
             type="button"
             disabled={!selected}
-            onClick={() => selected && onAudition(selected.chord)}
+            onClick={() => {
+              if (isPreviewPlaying) onStopPreview();
+              else if (selected) onAudition(selected.chords);
+            }}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold btn-sculpt-cream disabled:opacity-50"
           >
-            <Play className="h-3.5 w-3.5" />
-            Preview
+            {isPreviewPlaying ? (
+              <>
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5" />
+                Preview
+              </>
+            )}
           </button>
           <button
             type="button"
             disabled={!selected}
             onClick={() => {
-              if (selected) onApply(selected.chord);
+              if (selected) onApply(selected.chords);
               onClose();
             }}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold btn-sculpt-amber disabled:opacity-50"
