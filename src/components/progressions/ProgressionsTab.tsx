@@ -202,8 +202,9 @@ function PatternBlock({
   const [spiceOpen, setSpiceOpen] = useState(false);
   useEffect(() => { onSpiceOpenChange?.(spiceOpen); }, [spiceOpen, onSpiceOpenChange]);
   const [voiceLinesOpen, setVoiceLinesOpen] = useState(false);
-  const [quickPickIndex, setQuickPickIndex] = useState<number | null>(null);
-  const [previewChord, setPreviewChord] = useState<ChordSymbol | null>(null);
+  const [quickPickOpen, setQuickPickOpen] = useState(false);
+  const [previewChords, setPreviewChords] = useState<ChordSymbol[] | null>(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const bpm = useSongStore((s) => s.meta.bpm);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
@@ -257,15 +258,15 @@ function PatternBlock({
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const sortedChordsRef = useRef(sortedChords);
 
-  // Close the Quick Pick panel when the diagram is hidden or the tapped chord
-  // no longer exists.
+  // Close the Quick Pick panel and stop any preview when the diagram is hidden.
   useEffect(() => {
-    if (quickPickIndex == null) return;
-    if (!voiceLinesOpen || quickPickIndex >= sortedChords.length) {
-      setQuickPickIndex(null);
-      setPreviewChord(null);
+    if (!voiceLinesOpen && quickPickOpen) {
+      setQuickPickOpen(false);
+      setPreviewChords(null);
+      stopProgression();
+      setPreviewPlaying(false);
     }
-  }, [voiceLinesOpen, sortedChords.length, quickPickIndex]);
+  }, [voiceLinesOpen, quickPickOpen]);
 
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
@@ -457,27 +458,37 @@ function PatternBlock({
       {/* Toolbar moved below the pattern grid (#7). */}
 
       <VoiceLeadingLinesPanel
-        chords={sortedChords.map((c, i) =>
-          i === quickPickIndex && previewChord ? previewChord : c.chord,
-        )}
+        chords={previewChords ?? sortedChords.map((c) => c.chord)}
         isVisible={voiceLinesOpen && sortedChords.length >= 1}
-        onChordTap={voiceLinesOpen ? (i) => setQuickPickIndex((cur) => (cur === i ? null : i)) : undefined}
-        selectedIndex={quickPickIndex}
+        onChordTap={
+          voiceLinesOpen
+            ? () => {
+                if (quickPickOpen) {
+                  setQuickPickOpen(false);
+                  setPreviewChords(null);
+                  stopProgression();
+                  setPreviewPlaying(false);
+                } else {
+                  setQuickPickOpen(true);
+                }
+              }
+            : undefined
+        }
       />
 
-      {quickPickIndex != null && sortedChords[quickPickIndex] && (
+      {quickPickOpen && sortedChords.length >= 1 && (
         <QuickPickPanel
           isOpen={voiceLinesOpen}
-          chord={sortedChords[quickPickIndex].chord}
-          prev={quickPickIndex > 0 ? sortedChords[quickPickIndex - 1].chord : null}
-          next={quickPickIndex < sortedChords.length - 1 ? sortedChords[quickPickIndex + 1].chord : null}
-          onPreviewChord={setPreviewChord}
-          onAudition={(chord) => {
+          chords={sortedChords.map((c) => c.chord)}
+          isPreviewPlaying={previewPlaying}
+          onPreviewChords={setPreviewChords}
+          onAudition={(chords) => {
             stopProgression();
+            setPreviewPlaying(true);
             void ensureAudio().then(() => {
               let cursor = 0;
               const events: ScheduledChord[] = sortedChords.map((c, i) => {
-                const raw = i === quickPickIndex ? chord : c.chord;
+                const raw = chords[i] ?? c.chord;
                 const ch = effectiveOffset ? transposeChord(raw, effectiveOffset) : raw;
                 const ev: ScheduledChord = {
                   chord: { ...ch, octave: c.chord.octave ?? 3 },
@@ -487,15 +498,29 @@ function PatternBlock({
                 cursor += c.lengthBeats;
                 return ev;
               });
-              void playProgression(events, bpm, { loopBeats: cursor });
+              void playProgression(events, bpm, {
+                loopBeats: cursor,
+                onEnd: () => setPreviewPlaying(false),
+              });
             });
           }}
-          onApply={(chord) => {
-            updatePatternChord(pattern.id, sortedChords[quickPickIndex].id, { chord });
+          onStopPreview={() => {
+            stopProgression();
+            setPreviewPlaying(false);
+          }}
+          onApply={(chords) => {
+            stopProgression();
+            setPreviewPlaying(false);
+            replacePatternChords(
+              pattern.id,
+              sortedChords.map((c, i) => ({ ...(chords[i] ?? c.chord), octave: c.chord.octave })),
+            );
           }}
           onClose={() => {
-            setQuickPickIndex(null);
-            setPreviewChord(null);
+            setQuickPickOpen(false);
+            setPreviewChords(null);
+            stopProgression();
+            setPreviewPlaying(false);
           }}
         />
       )}
