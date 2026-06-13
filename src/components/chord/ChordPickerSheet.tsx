@@ -225,6 +225,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
+        <div className="absolute top-2 left-4 text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
+          {initialChord ? "Edit Chord" : "Add Chords"}
+        </div>
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
@@ -295,7 +298,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
                 </span>
               ))}
               <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
-            </div>
+            </button>
           )}
 
           {!query.trim() && (

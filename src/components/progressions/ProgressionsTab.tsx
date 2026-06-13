@@ -1664,6 +1664,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
+  const floatingToolbarExpanded = useUIStore((s) => s.toolbarExpanded);
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
@@ -1892,7 +1893,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         />
       ))}
 
-      {isMobile && (() => {
+      {(() => {
         const patternOfActive = activeChordId
           ? progression.find((p) => {
               const owner = sections.find((s) => s.id === (p.sectionId ?? p.id));
@@ -1921,8 +1922,20 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             })()
           : 0;
 
-        const canShiftLeftSingle = activeIdx > 0;
-        const canShiftRightSingle = activeIdx >= 0 && activeIdx < activeBlockLen - 1;
+        // Blocks flattened in section order — a single chord at the edge of its
+        // block can keep moving into the previous/next block in this order.
+        const orderedBlocks = sections.flatMap((sec) =>
+          progression.filter((p) => (p.sectionId ?? p.id) === sec.id),
+        );
+        const blockIdx = patternOfActive
+          ? orderedBlocks.findIndex((b) => b.id === patternOfActive.id)
+          : -1;
+        const adjacentBlock = (dir: -1 | 1) =>
+          blockIdx >= 0 ? orderedBlocks[blockIdx + dir] ?? null : null;
+
+        const canShiftLeftSingle = activeIdx > 0 || (activeIdx === 0 && !!adjacentBlock(-1));
+        const canShiftRightSingle =
+          activeIdx >= 0 && (activeIdx < activeBlockLen - 1 || !!adjacentBlock(1));
         const canShiftLeftMulti = multiSelected.size > 0 && (() => {
           for (const [chordId, patternId] of multiSelected) {
             const pat = progression.find((p) => p.id === patternId);
@@ -1979,8 +1992,42 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             canShiftLeft={canShiftLeft}
             canShiftRight={canShiftRight}
             onShift={(dir) => {
-              if (useMulti) handleMultiShift(dir);
-              else if (patternOfActive && activeChordId) movePatternChord(patternOfActive.id, activeChordId, dir);
+              if (useMulti) {
+                handleMultiShift(dir);
+                return;
+              }
+              if (!patternOfActive || !activeChordId) return;
+              const atEdge = dir === -1 ? activeIdx === 0 : activeIdx === activeBlockLen - 1;
+              if (atEdge) {
+                const adj = adjacentBlock(dir);
+                if (!adj) return;
+                const owner = sections.find((s) => s.id === (adj.sectionId ?? adj.id));
+                const adjLen = (owner ? getPatternChordsViaSSOT(owner, adj) : adj.chords).length;
+                useSongStore.getState().movePatternChordToPatternAt(
+                  patternOfActive.id,
+                  adj.id,
+                  activeChordId,
+                  dir === -1 ? adjLen : 0,
+                );
+                return;
+              }
+              movePatternChord(patternOfActive.id, activeChordId, dir);
+            }}
+            canMoveUp={!useMulti && !!patternOfActive && !!adjacentBlock(-1)}
+            canMoveDown={!useMulti && !!patternOfActive && !!adjacentBlock(1)}
+            onMoveVertical={(dir) => {
+              if (useMulti || !patternOfActive || !activeChordId) return;
+              const adj = adjacentBlock(dir);
+              if (!adj) return;
+              const owner = sections.find((s) => s.id === (adj.sectionId ?? adj.id));
+              const adjLen = (owner ? getPatternChordsViaSSOT(owner, adj) : adj.chords).length;
+              // Land at the same position within the target block, clamped.
+              useSongStore.getState().movePatternChordToPatternAt(
+                patternOfActive.id,
+                adj.id,
+                activeChordId,
+                Math.min(Math.max(activeIdx, 0), adjLen),
+              );
             }}
             onResize={(delta) => {
               if (useMulti) handleMultiResize(delta);
@@ -2021,6 +2068,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               setActiveChordId(null);
               setMultiSelected(new Map());
             }}
+            onEnterMultiSelect={() => {
+              if (activeChordId && patternOfActive && !multiSelected.has(activeChordId)) {
+                toggleMultiSelected(activeChordId, patternOfActive.id);
+              }
+            }}
             onDelete={() => {
               const removeBatch = useSongStore.getState().removePatternChordsBatch;
               if (multiSelected.size > 0) {
@@ -2047,8 +2099,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         );
       })()}
 
-      {/* Cross-block multi-select toolbar (desktop). Mobile uses FloatingChordToolbar. */}
-      {!isMobile && multiSelected.size > 0 && (
+      {/* Cross-block multi-select toolbar (desktop). Hidden while the floating
+          chord toolbar is expanded so the two don't stack. */}
+      {!isMobile && multiSelected.size > 0 && !floatingToolbarExpanded && (
         <div className="sticky bottom-10 z-30 flex justify-center pointer-events-none">
           <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-3 py-2 pointer-events-auto">
             <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handleMultiShift(-1)} aria-label="Move selection earlier" title="Move left (← also works)">

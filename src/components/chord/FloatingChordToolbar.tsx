@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useUIStore } from "@/store/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +39,8 @@ export interface FloatingChordToolbarProps {
   onOctaveChange?: (oct: number) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
+  /** Entering multi-select seeds the selection with the active chord. */
+  onEnterMultiSelect?: () => void;
   onDelete?: () => void;
   onExitEdit: () => void;
 }
@@ -66,10 +67,10 @@ export function FloatingChordToolbar({
   onOctaveChange,
   onSelectAll,
   onClearAll,
+  onEnterMultiSelect,
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
-  const isMobile = useIsMobile();
   const focusedEditorOpen = useUIStore((s) => s.focusedEditorOpen);
   const setToolbarExpanded = useUIStore((s) => s.setToolbarExpanded);
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
@@ -77,7 +78,7 @@ export function FloatingChordToolbar({
   const chordToolbarOpen = useUIStore((s) => s.chordToolbarOpen);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const [expanded, setExpanded] = useState(false);
-  const visible = isMobile && !focusedEditorOpen;
+  const visible = !focusedEditorOpen;
   const effectiveExpanded = visible && expanded;
 
   useEffect(() => {
@@ -125,6 +126,7 @@ export function FloatingChordToolbar({
       onClearAll();
     } else {
       setMultiSelectMode(true);
+      onEnterMultiSelect?.();
     }
   };
 
@@ -234,33 +236,29 @@ export function FloatingChordToolbar({
         </div>
 
         <div className="flex items-center gap-1">
-          {mode === "lyrics" && (
-            <>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                disabled={!hasContext || !canMoveUp}
-                onClick={() => onMoveVertical?.(-1)}
-                aria-label="Move chord(s) to the row above"
-                title="Move to row above"
-              >
-                <ChevronUp className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                disabled={!hasContext || !canMoveDown}
-                onClick={() => onMoveVertical?.(1)}
-                aria-label="Move chord(s) to the row below"
-                title="Move to row below"
-              >
-                <ChevronDown className="h-5 w-5" />
-              </Button>
-              <div className="w-px h-6 bg-border mx-0.5" />
-            </>
-          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9"
+            disabled={!hasContext || !canMoveUp}
+            onClick={() => onMoveVertical?.(-1)}
+            aria-label={mode === "lyrics" ? "Move chord(s) to the row above" : "Move chord to the previous block"}
+            title={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
+          >
+            <ChevronUp className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9"
+            disabled={!hasContext || !canMoveDown}
+            onClick={() => onMoveVertical?.(1)}
+            aria-label={mode === "lyrics" ? "Move chord(s) to the row below" : "Move chord to the next block"}
+            title={mode === "lyrics" ? "Move to row below" : "Move to next block"}
+          >
+            <ChevronDown className="h-5 w-5" />
+          </Button>
+          <div className="w-px h-6 bg-border mx-0.5" />
           {mode === "progression" && (
             <>
               <Button
