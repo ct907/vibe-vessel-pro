@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { isConnected, isDriveConfigured, connect as driveConnect, signOut as driveSignOut } from "@/lib/drive/auth";
 import { buildProjectZipBlob, loadProjectFromFile, useSongStore } from "@/store/song";
-import { saveLocalVersion, type LocalVersionMeta } from "@/lib/local-versions";
+import { saveLocalVersion, saveCheckpoint, type LocalVersionMeta } from "@/lib/local-versions";
 
 type SyncStatus = "idle" | "saving" | "loading";
 
@@ -87,9 +87,9 @@ export async function loadProjectFromDrive(fileId: string): Promise<void> {
   }
 }
 
-export async function loadLocalVersionIntoSong(slot: number): Promise<void> {
-  const { loadLocalVersion } = await import("@/lib/local-versions");
-  const blob = await loadLocalVersion(slot);
+export async function loadLocalVersionIntoSong(v: LocalVersionMeta): Promise<void> {
+  const { loadLocalVersion, loadCheckpoint } = await import("@/lib/local-versions");
+  const blob = v.kind === "auto" ? await loadCheckpoint(v.slot) : await loadLocalVersion(v.slot);
   if (!blob) throw new Error("Version not found");
   const file = new File([blob], "project.zip", { type: "application/zip" });
   await loadProjectFromFile(file);
@@ -119,7 +119,7 @@ export function startOfflineCheckpoints(): () => void {
     try {
       const blob = await buildProjectZipBlob();
       const title = useSongStore.getState().meta.title || "Untitled Song";
-      await saveLocalVersion(blob, title);
+      await saveCheckpoint(blob, title);
       lastCheckpoint = Date.now();
     } catch {
       dirty = true;

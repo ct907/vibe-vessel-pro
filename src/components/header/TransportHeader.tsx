@@ -4,7 +4,7 @@ import { useSongStore } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { useDriveStore, saveProject, loadProjectFromDrive, loadLocalVersionIntoSong } from "@/store/drive";
-import { listLocalVersions, type LocalVersionMeta } from "@/lib/local-versions";
+import { listLocalVersions, listCheckpoints, type LocalVersionMeta } from "@/lib/local-versions";
 import type { DriveFile } from "@/lib/drive/drive";
 import { startRecordingsEngine, stopRecordingsEngine, updateEngineBpm } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
@@ -32,6 +32,7 @@ import {
   Cloud,
   CloudOff,
   RotateCcw,
+  Archive,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, updateScheduledBpm, ScheduledChord } from "@/lib/music/audio";
@@ -476,6 +477,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [driveLoading, setDriveLoading] = useState(false);
   const [localVersions, setLocalVersions] = useState<LocalVersionMeta[]>([]);
+  const [checkpoints, setCheckpoints] = useState<LocalVersionMeta[]>([]);
   const [hasLocalVersions, setHasLocalVersions] = useState(false);
   const [inspirationModalOpen, setInspirationModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -684,7 +686,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       } else if (result.reason === "drive-failed") {
         toast({ title: "Saved offline", description: "Couldn't reach Drive — kept a local backup." });
       } else {
-        toast({ title: "Saved offline", description: `Version saved locally (${listLocalVersions().length} of 3).` });
+        toast({ title: "Saved in this browser", description: `Version ${listLocalVersions().length} of 5 saved in this browser.` });
       }
     } catch {
       toast({ title: "Save failed", description: "Could not save the project." });
@@ -715,12 +717,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
   const openDriveDialog = () => {
     setLocalVersions(listLocalVersions());
+    setCheckpoints(listCheckpoints());
     setDriveDialogOpen(true);
     if (driveConnected) void refreshDriveFiles();
   };
 
   useEffect(() => {
-    if (navOpen) setHasLocalVersions(listLocalVersions().length > 0);
+    if (navOpen) setHasLocalVersions(listLocalVersions().length > 0 || listCheckpoints().length > 0);
   }, [navOpen]);
 
   const handleOpenDriveFile = async (file: DriveFile) => {
@@ -735,7 +738,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
   const handleRestoreVersion = async (v: LocalVersionMeta) => {
     try {
-      await loadLocalVersionIntoSong(v.slot);
+      await loadLocalVersionIntoSong(v);
       toast({ title: "Version restored", description: v.title });
       setDriveDialogOpen(false);
     } catch {
@@ -1002,6 +1005,18 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                         : "Export Stems"}
                     </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="justify-start border-0 whitespace-normal h-auto min-h-10 text-left"
+                    style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                    title="Download a full project file (lyrics, chords + audio) to keep outside the browser, in case its cache is wiped."
+                    onClick={() => {
+                      void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip");
+                      setNavOpen(false);
+                    }}
+                  >
+                    <Archive className="h-4 w-4" /> Export Backup (.zip)
+                  </Button>
                   <Link
                     to="/help"
                     onClick={() => setNavOpen(false)}
@@ -1262,9 +1277,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           <DialogTitle>{driveConfigured ? "Google Drive" : "Saved versions"}</DialogTitle>
           <DialogDescription>
             {!driveConfigured
-              ? "Restore a recent offline version of your project."
+              ? "Restore a version saved in this browser. To keep a file outside the browser, use Export → Export Backup (.zip)."
               : driveConnected
-              ? "Open a project from your Drive, or restore a recent offline version."
+              ? "Open a project from your Drive, or restore a version saved in this browser."
               : "Connect your Google Drive to save and open projects across devices."}
           </DialogDescription>
         </DialogHeader>
@@ -1314,10 +1329,31 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
         {localVersions.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-border pt-3">
-            <span className="text-sm font-medium">Offline versions</span>
+            <span className="text-sm font-medium">Saved versions</span>
             <ul className="flex flex-col gap-1">
               {localVersions.map((v) => (
-                <li key={v.slot}>
+                <li key={`${v.kind}:${v.slot}`}>
+                  <button
+                    className="w-full text-left rounded-md px-3 py-2 hover:bg-accent flex items-center justify-between gap-2"
+                    onClick={() => void handleRestoreVersion(v)}
+                  >
+                    <span className="truncate">{v.title}</span>
+                    <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">
+                      {new Date(v.savedAt).toLocaleString()}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {checkpoints.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <span className="text-sm font-medium">Auto-saved checkpoints</span>
+            <ul className="flex flex-col gap-1">
+              {checkpoints.map((v) => (
+                <li key={`${v.kind}:${v.slot}`}>
                   <button
                     className="w-full text-left rounded-md px-3 py-2 hover:bg-accent flex items-center justify-between gap-2"
                     onClick={() => void handleRestoreVersion(v)}
@@ -1334,9 +1370,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip")}>
-            <Save className="h-4 w-4" /> Download a copy (.zip)
-          </Button>
+          <p className="text-xs text-[var(--ink-soft)]">
+            These versions live in this browser. To keep a file you can move or re-import, use Export → Export Backup (.zip) in the menu.
+          </p>
         </DialogFooter>
       </DialogContent>
     </Dialog>
