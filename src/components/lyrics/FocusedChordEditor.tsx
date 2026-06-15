@@ -295,20 +295,22 @@ export function FocusedChordEditor(props: Props) {
       if (isProgressionAdd) setProgAddCursor((c) => c + chords.length);
       const { enabled: ob, progressionsStep, setProgressionsStep } = useOnboardingStore.getState();
       if (ob && progressionsStep === 2) setProgressionsStep(3);
-      props.onClose();
+      // Replace mode commits one progression and closes; add mode keeps the
+      // editor open so the user can keep adding.
+      if (isProgression) { props.onClose(); return; }
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 30);
       return;
     }
     if (!line) return;
-    const placements: { chord: ChordSymbol; s: number }[] = [];
     let cur = slot;
     for (const chord of chords) {
-      placements.push({ chord, s: cur });
+      placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...toStorage(chord), octave });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
     }
-    for (const { chord: ch, s } of placements) {
-      placeChordInSlot(props.sectionId, lyricsLineId, s, { ...toStorage(ch), octave });
-    }
-    props.onClose();
+    setSlot(cur);
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
   };
 
 
