@@ -2209,7 +2209,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             useSongStore.getState().removePatternChordsBatch(toolbarContext.activePatternId, [activeChordId]);
             setActiveChordId(null);
           }}
-          onExitEdit={() => setActiveChordId(null)}
+          onExitEdit={() => { setActiveChordId(null); setMultiSelected(new Map()); }}
         />
       )}
 
