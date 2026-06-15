@@ -85,6 +85,111 @@ function LabeledBtn({
   );
 }
 
+/** A single d-pad direction button. */
+function DPadButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+  className,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn("h-8 w-8 rounded-md", className)}
+    >
+      {icon}
+    </Button>
+  );
+}
+
+/** Game-controller d-pad clustering the four move directions:
+ *  ←/→ shift the chord earlier/later (hopping into the adjacent block at the
+ *  edge), ↑/↓ move it to the previous/next block (Arrange) or the row
+ *  above/below (Write). */
+function MoveDPad({
+  mode,
+  onShift,
+  onMoveVertical,
+  canShiftLeft,
+  canShiftRight,
+  canMoveUp,
+  canMoveDown,
+  disabled,
+}: {
+  mode: Mode;
+  onShift: (direction: -1 | 1) => void;
+  onMoveVertical?: (direction: -1 | 1) => void;
+  canShiftLeft: boolean;
+  canShiftRight: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  disabled: boolean;
+}) {
+  const upLabel = mode === "lyrics" ? "Move to row above" : "Move to previous block";
+  const downLabel = mode === "lyrics" ? "Move to row below" : "Move to next block";
+  const cell = "flex items-center justify-center";
+  return (
+    <div
+      role="group"
+      aria-label="Move chord"
+      className="grid shrink-0 rounded-xl bg-muted/50 p-0.5"
+      style={{ gridTemplateColumns: "repeat(3, 2rem)", gridTemplateRows: "repeat(3, 2rem)" }}
+    >
+      <span />
+      <div className={cell}>
+        <DPadButton
+          icon={<ChevronUp className="h-5 w-5" />}
+          label={upLabel}
+          disabled={disabled || !canMoveUp}
+          onClick={() => onMoveVertical?.(-1)}
+        />
+      </div>
+      <span />
+      <div className={cell}>
+        <DPadButton
+          icon={<ChevronLeft className="h-5 w-5" />}
+          label="Move earlier"
+          disabled={disabled || !canShiftLeft}
+          onClick={() => onShift(-1)}
+        />
+      </div>
+      <span className="flex items-center justify-center text-[8px] uppercase tracking-wide text-muted-foreground/70 select-none">
+        move
+      </span>
+      <div className={cell}>
+        <DPadButton
+          icon={<ChevronRight className="h-5 w-5" />}
+          label="Move later"
+          disabled={disabled || !canShiftRight}
+          onClick={() => onShift(1)}
+        />
+      </div>
+      <span />
+      <div className={cell}>
+        <DPadButton
+          icon={<ChevronDown className="h-5 w-5" />}
+          label={downLabel}
+          disabled={disabled || !canMoveDown}
+          onClick={() => onMoveVertical?.(1)}
+        />
+      </div>
+      <span />
+    </div>
+  );
+}
+
 export function FloatingChordToolbar({
   mode,
   hideTrigger = false,
@@ -147,7 +252,6 @@ export function FloatingChordToolbar({
       : activeChord
         ? activeChord.display
         : "Tap a chord to edit";
-  const shiftDisabled = !hasContext;
   const beatDisabled = !hasContext;
   const octaveDisplay: string =
     selectedOctaves && selectedOctaves.length > 0
@@ -222,12 +326,17 @@ export function FloatingChordToolbar({
             expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
           )}
         >
-          <LabeledBtn
-            icon={<ChevronLeft className="h-5 w-5" />}
-            label="Earlier"
-            disabled={shiftDisabled || !canShiftLeft}
-            onClick={() => onShift(-1)}
+          <MoveDPad
+            mode={mode}
+            onShift={onShift}
+            onMoveVertical={onMoveVertical}
+            canShiftLeft={canShiftLeft}
+            canShiftRight={canShiftRight}
+            canMoveUp={canMoveUp}
+            canMoveDown={canMoveDown}
+            disabled={!hasContext}
           />
+          {divider}
           <span
             className={cn(
               "px-2 text-sm select-none truncate max-w-[8rem] shrink-0",
@@ -236,25 +345,6 @@ export function FloatingChordToolbar({
           >
             {middleLabel}
           </span>
-          <LabeledBtn
-            icon={<ChevronRight className="h-5 w-5" />}
-            label="Later"
-            disabled={shiftDisabled || !canShiftRight}
-            onClick={() => onShift(1)}
-          />
-          {divider}
-          <LabeledBtn
-            icon={<ChevronUp className="h-5 w-5" />}
-            label={mode === "lyrics" ? "Up" : "Prev"}
-            disabled={!hasContext || !canMoveUp}
-            onClick={() => onMoveVertical?.(-1)}
-          />
-          <LabeledBtn
-            icon={<ChevronDown className="h-5 w-5" />}
-            label={mode === "lyrics" ? "Down" : "Next"}
-            disabled={!hasContext || !canMoveDown}
-            onClick={() => onMoveVertical?.(1)}
-          />
           {divider}
           {mode === "progression" && (
             <>
