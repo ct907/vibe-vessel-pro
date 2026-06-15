@@ -10,6 +10,7 @@ import {
   getSectionDisplayName,
   getLineChordsViaSSOT,
   withHistoryGroup,
+  patternPlayBeats,
   CHORD_ROW_SLOTS,
   type LyricLine,
   type Section,
@@ -713,7 +714,7 @@ function getSectionStartSec(
   for (const sec of allSections) {
     if (sec.id === sectionId) return cursor * spb;
     const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
-    for (const p of patterns) cursor += p.bars * p.beatsPerBar;
+    for (const p of patterns) cursor += patternPlayBeats(p);
   }
   return cursor * spb;
 }

@@ -127,7 +127,25 @@ export interface PatternBlock {
   label: string;
   bars: number;
   beatsPerBar: number;
+  /**
+   * Crop-to-fit override: the block's *effective* played length in beats,
+   * independent of its `bars × beatsPerBar` capacity. When set, playback uses
+   * this duration (so the playhead jumps to the next block sooner) and the
+   * grid is drawn shrunk to it. Absent = play the full capacity.
+   */
+  playBeats?: number;
   chords: PatternChord[];
+}
+
+/**
+ * A block's effective played length in beats. Honors the crop-to-fit
+ * `playBeats` override (clamped to capacity); otherwise the full
+ * `bars × beatsPerBar`. Use for timeline/offset math — NOT for chord-capacity
+ * checks, which always use the full capacity.
+ */
+export function patternPlayBeats(p: PatternBlock): number {
+  const cap = p.bars * p.beatsPerBar;
+  return p.playBeats != null ? Math.min(Math.max(0, p.playBeats), cap) : cap;
 }
 
 export interface BasketItem {
@@ -260,6 +278,8 @@ export interface SongState {
 
   // ---- progression (binding-aware) ----
   updatePattern: (id: string, patch: Partial<Pick<PatternBlock, "bars" | "beatsPerBar">>) => void;
+  /** Crop a block to a played length (beats), or pass null to restore full length. */
+  setPatternPlayBeats: (id: string, playBeats: number | null) => void;
   addChordToPattern: (patternId: string, chord: ChordSymbol, atBeat: number, lengthBeats?: number) => void;
   updatePatternChord: (patternId: string, chordId: string, patch: Partial<Omit<PatternChord, "id" | "mirrorId">>) => void;
   removePatternChord: (patternId: string, chordId: string) => void;
@@ -2689,6 +2709,18 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ({ sections: nextSections, progression: rebuilt, [SSOT_MODE]: true } as any);
   }),
+
+  setPatternPlayBeats: (id, playBeats) => { pushHistory(get); return set((s) => ({
+    progression: s.progression.map((p) => {
+      if (p.id !== id) return p;
+      if (playBeats == null) {
+        const { playBeats: _drop, ...rest } = p;
+        return rest;
+      }
+      const cap = p.bars * p.beatsPerBar;
+      return { ...p, playBeats: Math.max(0.5, Math.min(playBeats, cap)) };
+    }),
+  })); },
 
   // Add chord into pattern (SSOT-first). Creates a SectionChord targeting the
   // specific pattern; mirrors derive `line.chords` + `pattern.chords`.

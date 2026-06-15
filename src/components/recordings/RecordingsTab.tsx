@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useSongStore } from "@/store/song";
+import { useSongStore, patternPlayBeats } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import {
   MAX_TRACKS,
@@ -43,7 +43,7 @@ function computeLoopBeats(): number {
   let total = 0;
   for (const sec of sections) {
     const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
-    for (const p of patterns) total += p.bars * p.beatsPerBar;
+    for (const p of patterns) total += patternPlayBeats(p);
   }
   return total;
 }
@@ -56,7 +56,7 @@ function useLoopSec(): number {
     let total = 0;
     for (const sec of sections) {
       const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
-      for (const p of patterns) total += p.bars * p.beatsPerBar;
+      for (const p of patterns) total += patternPlayBeats(p);
     }
     if (total === 0) return 8; // sensible fallback while user has no chords
     return (total * 60) / bpm;
@@ -80,7 +80,7 @@ function useBarsStrip(): BarSegment[] {
     for (const sec of sections) {
       const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
       for (const p of patterns) {
-        const patternBeats = p.bars * p.beatsPerBar;
+        const patternBeats = patternPlayBeats(p);
         const sorted = [...p.chords].sort((a, b) => a.startBeat - b.startBeat);
         if (sorted.length === 0) {
           out.push({
