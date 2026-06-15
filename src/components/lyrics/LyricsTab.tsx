@@ -10,6 +10,7 @@ import {
   getSectionDisplayName,
   getLineChordsViaSSOT,
   withHistoryGroup,
+  patternPlayBeats,
   CHORD_ROW_SLOTS,
   type LyricLine,
   type Section,
@@ -713,7 +714,7 @@ function getSectionStartSec(
   for (const sec of allSections) {
     if (sec.id === sectionId) return cursor * spb;
     const patterns = progression.filter((p) => (p.sectionId ?? p.id) === sec.id);
-    for (const p of patterns) cursor += p.bars * p.beatsPerBar;
+    for (const p of patterns) cursor += patternPlayBeats(p);
   }
   return cursor * spb;
 }
@@ -730,6 +731,8 @@ interface SectionCardProps {
   activeLineId?: string;
   onPickerOpen: (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => void;
   onPickerClose: () => void;
+  /** Open the chord editor for an unplaced (progression-only) chord (Door B). */
+  onEditProgChord: (sectionId: string, patternId: string, chordId: string) => void;
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
   /** Tab-level active chord for X chip (one across all sections). */
@@ -751,6 +754,7 @@ function SectionCard({
   activeLineId,
   onPickerOpen,
   onPickerClose,
+  onEditProgChord,
   sortMode,
   onMoveSection,
   activeChordId,
@@ -775,6 +779,8 @@ function SectionCard({
     setSectionArpArmed,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
+    movePatternChord,
+    removeChordAnchorsBatch,
     undo,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
@@ -800,6 +806,21 @@ function SectionCard({
     () => progression.filter((p) => (p.sectionId ?? p.id) === section.id),
     [progression, section.id],
   );
+
+  // Unplaced (progression-only) chords: a block anchor but no lyric word.
+  // Ordered by block order then position within the block, mirroring the
+  // Arrange/ProgressionsTab layout — they are NOT pinned to any lyric line, so
+  // they never travel when lyrics move. Rendered in their own chord row below.
+  const unplacedChords = useMemo(() => {
+    const blockOrder = new Map(sectionBlocks.map((b, i) => [b.id, i]));
+    return section.chords
+      .filter((sc) => sc.progressionPlacement && !sc.lyricsPlacement)
+      .map((sc) => {
+        const pp = sc.progressionPlacement!;
+        return { sc, patternId: pp.patternId, key: (blockOrder.get(pp.patternId) ?? 1e6) * 1e6 + pp.startBeat };
+      })
+      .sort((a, b) => a.key - b.key);
+  }, [section.chords, sectionBlocks]);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isGlobalPlaying = usePlaybackStore((s) => s.isPlaying);
   const isSectionPlaying = isGlobalPlaying && sectionBlocks.some((b) => b.id === playbackCurrent?.patternId);
@@ -1161,6 +1182,71 @@ function SectionCard({
 
           {/* Basket chords are now drag-and-dropped directly into chord-row slots. */}
 
+          {/* Progression-only chords: anchored to blocks, not lyric words.
+              Tap to select, again (or long-press) to edit; reorder with the
+              arrows; X removes. They follow block order, not the lyrics. */}
+          {unplacedChords.length > 0 && (
+            <div
+              className="mt-2 rounded-md px-2 py-2"
+              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)" }}
+              onClick={() => onSetActiveChordId(null)}
+            >
+              <div className="mb-1.5 flex items-center gap-1 text-[11px] uppercase tracking-wide text-[var(--ink-soft)]">
+                <Music2 className="h-3 w-3" />
+                Chords
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {unplacedChords.map(({ sc, patternId }) => {
+                  const selected = activeChordId === sc.id;
+                  return (
+                    <div key={sc.id} className="inline-flex items-center" onClick={(e) => e.stopPropagation()}>
+                      <ChordChip
+                        chord={sc.chord}
+                        keyChangeOffset={effectiveOffset}
+                        selected={selected}
+                        onClick={() =>
+                          selected ? onEditProgChord(section.id, patternId, sc.id) : onSetActiveChordId(sc.id)
+                        }
+                        onLongPress={() => onEditProgChord(section.id, patternId, sc.id)}
+                      />
+                      {selected && (
+                        <span className="ml-0.5 inline-flex items-center">
+                          <button
+                            type="button"
+                            aria-label="Move chord earlier"
+                            onClick={() => movePatternChord(patternId, sc.id, -1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Move chord later"
+                            onClick={() => movePatternChord(patternId, sc.id, 1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Remove chord"
+                            onClick={() => {
+                              removeChordAnchorsBatch(section.id, "", [sc.id]);
+                              onSetActiveChordId(null);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Comment textarea (toggle button is in the section header) */}
           {commentOpen && (
             <div className="mt-3 w-full">
@@ -1237,6 +1323,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const {
     sections,
     upsertChordAt,
+    updatePatternChord,
     addSection,
     moveSection,
     moveChordToSlot,
@@ -1251,6 +1338,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     /** Target slot in the chord row (0..19). */
     slotIndex: number;
     anchorId?: string;
+    /** Set when editing an unplaced progression-only chord (Door B): edits
+     *  route to updatePatternChord and never touch lyrics placement. */
+    prog?: { patternId: string; chordId: string };
   } | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
 
@@ -1369,6 +1459,13 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const openPicker = (sectionId: string, lineId: string, slotIndex: number, anchorId?: string) => {
     if (Date.now() - justDraggedAtRef.current < 350) return;
     setPicker({ sectionId, lineId, slotIndex, anchorId });
+  };
+
+  // Edit an unplaced progression-only chord. Reuses the chord picker but
+  // commits through the progression door (updatePatternChord), so the chord
+  // stays unplaced and never acquires a lyrics placement.
+  const openProgPicker = (sectionId: string, patternId: string, chordId: string) => {
+    setPicker({ sectionId, lineId: "", slotIndex: 0, anchorId: chordId, prog: { patternId, chordId } });
   };
 
   // Auto-layout watchdog: when a section's chord count grows, debounce a
@@ -1628,7 +1725,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const activeSection = picker ? sections.find((s) => s.id === picker.sectionId) : undefined;
   const activeLine = activeSection?.lines.find((l) => l.id === picker?.lineId);
-  const initialChord = activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
+  const initialChord = picker?.prog
+    ? activeSection?.chords.find((c) => c.id === picker.prog!.chordId)?.chord
+    : activeLine?.chords.find((c) => c.id === picker?.anchorId)?.chord;
 
   useEffect(() => {
     if (picker) setPickerQuery(initialChord?.display ?? "");
@@ -1638,6 +1737,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
+    // Door B: editing an unplaced progression-only chord — swap the symbol on
+    // the block chord without ever creating a lyrics placement.
+    if (picker.prog) {
+      updatePatternChord(picker.prog.patternId, picker.prog.chordId, { chord });
+      setPickerQuery("");
+      setPicker(null);
+      return;
+    }
     const sec = sections.find((s) => s.id === picker.sectionId);
     const line = sec?.lines.find((l) => l.id === picker.lineId);
     if (!sec || !line) return;
@@ -1731,6 +1838,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             activeLineId={picker?.sectionId === sec.id ? picker?.lineId : undefined}
             onPickerOpen={openPicker}
             onPickerClose={() => setPicker(null)}
+            onEditProgChord={openProgPicker}
             activeChordId={activeChordId}
             onSetActiveChordId={setActiveChordId}
             multiSelectedIds={lyricMultiSelectedIds}
@@ -1909,7 +2017,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       {/* On mobile, the inline bottom-sheet picker fights the on-screen
           keyboard and sticky headers — render a full-screen overlay instead.
           Desktop continues to use the bottom sheet for fast inline editing. */}
-      {isMobile && picker ? (
+      {isMobile && picker && !picker.prog ? (
         <FocusedChordEditor
           sectionId={picker.sectionId}
           lineId={picker.lineId}
@@ -1934,6 +2042,13 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           onQueryChange={setPickerQuery}
           onOctaveChange={(oct) => {
             if (!picker?.anchorId) return;
+            if (picker.prog) {
+              const sec = sections.find((s) => s.id === picker.sectionId);
+              const cur = sec?.chords.find((c) => c.id === picker.prog!.chordId)?.chord;
+              if (!cur) return;
+              updatePatternChord(picker.prog.patternId, picker.prog.chordId, { chord: { ...cur, octave: oct } });
+              return;
+            }
             const sec = sections.find((s) => s.id === picker.sectionId);
             const line = sec?.lines.find((l) => l.id === picker.lineId);
             const cur = line?.chords.find((c) => c.id === picker.anchorId)?.chord;

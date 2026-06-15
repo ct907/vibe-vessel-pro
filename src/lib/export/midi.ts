@@ -3,6 +3,7 @@
 
 import { chordToMidi, transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
+import { patternPlayBeats } from "@/store/song";
 import type { Section, PatternBlock, SongState } from "@/store/song";
 
 const TICKS = 480; // ticks per quarter note
@@ -73,7 +74,7 @@ export function buildMidiBytes(
     let accBeats = 0;
     for (const p of sectionPatterns) {
       patternOffset.set(p.id, accBeats);
-      accBeats += p.bars * p.beatsPerBar;
+      accBeats += patternPlayBeats(p);
     }
 
     const chordList = sec.chords.length > 0

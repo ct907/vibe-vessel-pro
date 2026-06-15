@@ -44,6 +44,8 @@ import {
   KeyRound,
   Sparkles,
   Play,
+  Scissors,
+  Maximize2,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -185,6 +187,7 @@ function PatternBlock({
 }: PatternProps) {
   const {
     updatePattern,
+    setPatternPlayBeats,
     movePatternChord,
     removePatternChordsBatch,
     setPatternChordLength,
@@ -253,6 +256,28 @@ function PatternBlock({
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const canDeleteThisBlock = totalBlocksInSong > 1;
+  // Crop-to-fit: effective played length (capped at capacity). When cropped,
+  // the grid is drawn shrunk to this many beats while the card keeps its width.
+  const isCropped = pattern.playBeats != null;
+  const gridBeats = isCropped ? Math.min(pattern.playBeats!, totalBeats) : totalBeats;
+  const canCrop = usedBeats > 0.5 && usedBeats < totalBeats - 1e-6;
+  // Lyric lines this block's chords sit on (distinct, in chord order) — shown
+  // above the grid to anchor the progression to its words.
+  const blockLyricLines = useMemo(() => {
+    if (!ownerSection) return [] as string[];
+    const lineById = new Map(ownerSection.lines.map((l) => [l.id, l] as const));
+    const scById = new Map(ownerSection.chords.map((c) => [c.id, c] as const));
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of sortedChords) {
+      const lid = scById.get(c.id)?.lyricsPlacement?.lineId;
+      if (!lid || seen.has(lid)) continue;
+      seen.add(lid);
+      const text = lineById.get(lid)?.text?.trim();
+      if (text) out.push(text);
+    }
+    return out;
+  }, [ownerSection, sortedChords]);
 
   const activeChordInThisBlock = activeChordId
     ? sortedChords.find((c) => c.id === activeChordId) ?? null
@@ -289,11 +314,12 @@ function PatternBlock({
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (activeIdxRef.current > 0) movePatternChordRef.current(pattern.id, id, -1);
+        // movePatternChord swaps within the block, or hops into the previous
+        // block when the chord is already at the left edge.
+        movePatternChordRef.current(pattern.id, id, -1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (activeIdxRef.current < sortedChordsRef.current.length - 1)
-          movePatternChordRef.current(pattern.id, id, 1);
+        movePatternChordRef.current(pattern.id, id, 1);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         resizePatternChordsWithOverflowRef.current(pattern.id, [id], LENGTH_STEP);
@@ -403,6 +429,21 @@ function PatternBlock({
               <Sparkles className="h-4 w-4" style={{ color: "var(--primary)" }} />
             </button>
           )}
+          {(canCrop || isCropped) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPatternPlayBeats(pattern.id, isCropped ? null : usedBeats);
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors"
+              style={{ background: "var(--paper-shade)", color: isCropped ? "var(--primary-strong)" : "var(--ink-soft)" }}
+              aria-label={isCropped ? "Restore full block length" : "Crop block to fit its chords"}
+              title={isCropped ? "Restore full length" : "Crop to fit"}
+            >
+              {isCropped ? <Maximize2 className="h-4 w-4" /> : <Scissors className="h-4 w-4" />}
+            </button>
+          )}
           {canDeleteThisBlock && (
             <button
               type="button"
@@ -423,9 +464,20 @@ function PatternBlock({
 
       {/* Toolbar moved below the pattern grid (#7). */}
 
+      {blockLyricLines.length > 0 && (
+        <div className="mb-1.5 flex flex-col gap-0.5">
+          {blockLyricLines.map((text, i) => (
+            <span key={i} className="text-[12px] leading-tight text-[var(--ink-soft)] truncate">
+              {text}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="relative">
         {(() => {
-          const slotCount = Math.max(1, pattern.bars * pattern.beatsPerBar);
+          const slotCount = Math.max(1, Math.ceil(gridBeats - 1e-6));
+          const beatsPerBar = pattern.beatsPerBar;
           // Build a flush flex track: chord items take basis = lengthBeats,
           // followed by 1-beat empty droppable slots filling the remaining
           // beats. A fractional spacer keeps empty slots aligned to beat lines.
@@ -454,25 +506,28 @@ function PatternBlock({
           return (
             <div
               data-pattern-grid
-              className="relative rounded-md flex items-stretch w-full"
-              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", minHeight: 80, paddingTop: 8, paddingBottom: 8, paddingLeft: 4, paddingRight: 4, gap: 3 }}
+              className="relative rounded-md flex items-stretch"
+              style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", minHeight: 80, paddingTop: 8, paddingBottom: 8, paddingLeft: 4, paddingRight: 4, gap: 3, width: `${(gridBeats / totalBeats) * 100}%` }}
             >
-              {/* Bar separators */}
-              {Array.from({ length: pattern.bars + 1 }).map((_, i) => (
-                <div
-                  key={`bar-${i}`}
-                  className="absolute top-0 bottom-0 pointer-events-none z-0"
-                  style={{ left: `${(i / pattern.bars) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}
-                />
-              ))}
+              {/* Bar separators (over the cropped/effective length) */}
+              {Array.from({ length: Math.floor(gridBeats / beatsPerBar) + 1 }).map((_, i) => {
+                const beat = Math.min(i * beatsPerBar, gridBeats);
+                return (
+                  <div
+                    key={`bar-${i}`}
+                    className="absolute top-0 bottom-0 pointer-events-none z-0"
+                    style={{ left: `${(beat / gridBeats) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}
+                  />
+                );
+              })}
               {/* Beat dividers */}
-              {Array.from({ length: pattern.bars * pattern.beatsPerBar }).map((_, i) => {
-                if (i % pattern.beatsPerBar === 0) return null;
+              {Array.from({ length: Math.ceil(gridBeats) }).map((_, i) => {
+                if (i === 0 || i % beatsPerBar === 0 || i >= gridBeats) return null;
                 return (
                   <div
                     key={`beat-${i}`}
                     className="absolute top-2 bottom-2 pointer-events-none z-0"
-                    style={{ left: `${(i / (pattern.bars * pattern.beatsPerBar)) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 8%, transparent)" }}
+                    style={{ left: `${(i / gridBeats) * 100}%`, borderLeft: "1px solid color-mix(in oklch, var(--cocoa-deep) 8%, transparent)" }}
                   />
                 );
               })}
@@ -676,7 +731,7 @@ function PatternBlock({
                                     resizeDragRef.current = {
                                       chordId: c.id,
                                       startX: e.clientX,
-                                      pxPerBeat: gridW / totalBeats,
+                                      pxPerBeat: gridW / gridBeats,
                                       appliedDelta: 0,
                                     };
                                   }}

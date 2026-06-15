@@ -127,7 +127,25 @@ export interface PatternBlock {
   label: string;
   bars: number;
   beatsPerBar: number;
+  /**
+   * Crop-to-fit override: the block's *effective* played length in beats,
+   * independent of its `bars × beatsPerBar` capacity. When set, playback uses
+   * this duration (so the playhead jumps to the next block sooner) and the
+   * grid is drawn shrunk to it. Absent = play the full capacity.
+   */
+  playBeats?: number;
   chords: PatternChord[];
+}
+
+/**
+ * A block's effective played length in beats. Honors the crop-to-fit
+ * `playBeats` override (clamped to capacity); otherwise the full
+ * `bars × beatsPerBar`. Use for timeline/offset math — NOT for chord-capacity
+ * checks, which always use the full capacity.
+ */
+export function patternPlayBeats(p: PatternBlock): number {
+  const cap = p.bars * p.beatsPerBar;
+  return p.playBeats != null ? Math.min(Math.max(0, p.playBeats), cap) : cap;
 }
 
 export interface BasketItem {
@@ -260,6 +278,8 @@ export interface SongState {
 
   // ---- progression (binding-aware) ----
   updatePattern: (id: string, patch: Partial<Pick<PatternBlock, "bars" | "beatsPerBar">>) => void;
+  /** Crop a block to a played length (beats), or pass null to restore full length. */
+  setPatternPlayBeats: (id: string, playBeats: number | null) => void;
   addChordToPattern: (patternId: string, chord: ChordSymbol, atBeat: number, lengthBeats?: number) => void;
   updatePatternChord: (patternId: string, chordId: string, patch: Partial<Omit<PatternChord, "id" | "mirrorId">>) => void;
   removePatternChord: (patternId: string, chordId: string) => void;
@@ -952,11 +972,18 @@ function deriveMirrorsFromSectionChords(
   // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
   const anchorsByLine = new Map<string, ChordAnchor[]>();
   section.lines.forEach((l) => anchorsByLine.set(l.id, []));
+  // Pointer self-heal: a lyricsPlacement aimed at a line that no longer exists
+  // is a phantom-in-waiting — invisible in Write yet kept alive by its
+  // progressionPlacement and re-rendered in Arrange. Repair it at this single
+  // chokepoint (every SSOT mutation flows through here) by demoting the chord
+  // to progression-only, rather than silently skipping the anchor while
+  // leaving the dangling pointer in the SSOT.
+  const danglingLyricIds = new Set<string>();
   for (const sc of section.chords) {
     const lp = sc.lyricsPlacement;
     if (!lp) continue;
     const bucket = anchorsByLine.get(lp.lineId);
-    if (!bucket) continue;
+    if (!bucket) { danglingLyricIds.add(sc.id); continue; }
     bucket.push({
       id: sc.id,
       offset: lp.slotIndex,
@@ -1038,11 +1065,17 @@ function deriveMirrorsFromSectionChords(
   }
 
   // Build updated section with possibly-remapped SC placements.
-  const nextSectionChords = section.chords.map((sc) => {
-    const np = remappedPlacement.get(sc.id);
-    if (!np) return sc;
-    return { ...sc, progressionPlacement: np };
-  });
+  const nextSectionChords = section.chords
+    .map((sc) => {
+      const cleaned = danglingLyricIds.has(sc.id)
+        ? { ...sc, lyricsPlacement: undefined }
+        : sc;
+      const np = remappedPlacement.get(sc.id);
+      return np ? { ...cleaned, progressionPlacement: np } : cleaned;
+    })
+    // Drop chords left with no placement on either side — neither view can
+    // show them, so keeping them only re-seeds the phantom problem.
+    .filter((sc) => sc.lyricsPlacement || sc.progressionPlacement);
   const nextSection: Section = {
     ...section,
     chords: nextSectionChords,
@@ -2677,6 +2710,18 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return ({ sections: nextSections, progression: rebuilt, [SSOT_MODE]: true } as any);
   }),
 
+  setPatternPlayBeats: (id, playBeats) => { pushHistory(get); return set((s) => ({
+    progression: s.progression.map((p) => {
+      if (p.id !== id) return p;
+      if (playBeats == null) {
+        const { playBeats: _drop, ...rest } = p;
+        return rest;
+      }
+      const cap = p.bars * p.beatsPerBar;
+      return { ...p, playBeats: Math.max(0.5, Math.min(playBeats, cap)) };
+    }),
+  })); },
+
   // Add chord into pattern (SSOT-first). Creates a SectionChord targeting the
   // specific pattern; mirrors derive `line.chords` + `pattern.chords`.
   addChordToPattern: (patternId, chord, atBeat, lengthBeats) => set((s) => {
@@ -3311,17 +3356,17 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       });
       return;
     }
-    // Edge — try moving into the neighbor block (Item 4).
+    // Edge — hop into the neighbor block (Item 4). Land at the end of the
+    // previous block (moving left) or the start of the next block (moving
+    // right). movePatternChordToPatternAt takes a chord INDEX within the
+    // destination block; SSOT re-bins/overflows if the neighbor is full.
     const progIdx = sBefore.progression.findIndex((p) => p.id === patternId);
-    const neighborIdx = progIdx + direction;
-    const neighbor = sBefore.progression[neighborIdx];
+    const neighbor = sBefore.progression[progIdx + direction];
     if (!neighbor) return;
-    const movingLen = inPattern[idx].progressionPlacement?.lengthBeats ?? 0;
-    const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
-    const neighborCap = neighbor.bars * neighbor.beatsPerBar;
-    if (neighborUsed + movingLen > neighborCap + 1e-9) return;
-    const toSlot = direction > 0 ? Math.floor(neighborUsed) : Math.max(0, neighborCap - movingLen);
-    get().movePatternChordToPatternAt(patternId, neighbor.id, chordId, toSlot);
+    const owner = sBefore.sections.find((x) => x.id === (neighbor.sectionId ?? neighbor.id));
+    const neighborChords = owner ? getPatternChordsViaSSOT(owner, neighbor) : neighbor.chords;
+    const toIndex = direction === -1 ? neighborChords.length : 0;
+    get().movePatternChordToPatternAt(patternId, neighbor.id, chordId, toIndex);
   },
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
@@ -3684,6 +3729,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         const lp = sc.lyricsPlacement;
         if (!lp || validLineIds.has(lp.lineId)) return sc;
         orphansHealed++;
+        // Still anchored to a block: leave it unplaced so Write's progression
+        // chord row shows it, instead of pinning it onto a lyric line where it
+        // would travel with lyric edits. Only a chord with no block home is
+        // re-homed to a visible row so it isn't lost entirely.
+        if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
         if (!target) return { ...sc, lyricsPlacement: undefined };
         const slotIndex = Math.min(CHORD_ROW_SLOTS - 1, cursor++);
         target.chords.push({

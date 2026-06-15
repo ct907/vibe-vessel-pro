@@ -180,7 +180,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     } else {
       stamped.forEach((c) => onPick(c));
     }
-    onOpenChange(false);
+    // Adding a preset progression keeps the picker open (like single-chord and
+    // typed-Nashville adds) so the user can keep building. PresetList only
+    // shows in add mode, so we never need to close here.
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
   };
 
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.

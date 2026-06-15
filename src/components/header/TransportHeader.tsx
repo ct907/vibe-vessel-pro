@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { useSongStore } from "@/store/song";
+import { useSongStore, patternPlayBeats } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
 import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
 import { useDriveStore, saveProject, loadProjectFromDrive, loadLocalVersionIntoSong } from "@/store/drive";
@@ -145,7 +145,7 @@ function buildPlayback(
     let accBeats = 0;
     for (const p of sectionPatterns) {
       patternOffset.set(p.id, accBeats);
-      accBeats += p.bars * p.beatsPerBar;
+      accBeats += patternPlayBeats(p);
     }
     if (sec.chords.length > 0) {
       for (const sc of sec.chords) {
