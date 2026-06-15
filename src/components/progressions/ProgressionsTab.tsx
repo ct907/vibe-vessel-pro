@@ -47,6 +47,7 @@ import {
   ListChecks,
   Music2,
   Pencil,
+  ListMusic,
   MessageSquare,
   KeyRound,
   Sparkles,
@@ -723,7 +724,25 @@ function PatternBlock({
                                   }}
                                   aria-label="Delete chord"
                                 >
-                                  <X className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  className="absolute -bottom-1.5 -left-1.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
+                                  style={{ touchAction: "manipulation" }}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onPointerUp={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditChordOpen(pattern.id, c.id);
+                                  }}
+                                  aria-label="Open chord editor"
+                                >
+                                  <ListMusic className="h-3.5 w-3.5" />
                                 </button>
                               )}
                               {isActive && (
@@ -2134,14 +2153,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             const bIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
             const adjBlock = orderedBlocks[bIdx + dir];
             if (!adjBlock) return;
-            const owner = s.find((sec) => sec.id === (patternOfActive.sectionId ?? patternOfActive.id));
-            const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-            const chordIdx = chords.findIndex((c) => c.id === activeChordId);
             const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
             const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
             useSongStore.getState().movePatternChordToPatternAt(
               patternOfActive.id, adjBlock.id, activeChordId,
-              Math.min(Math.max(chordIdx, 0), adjChords.length),
+              adjChords.length,
             );
             setChordEditorRef.current((prev) =>
               prev?.chordId === activeChordId

@@ -1,0 +1,2391 @@
+{
+  "version": 3,
+  "meta": {
+    "beatsPerBar": 4,
+    "beatUnit": 4,
+    "title": "Dream On",
+    "keyRoot": "B",
+    "keyMode": "maj",
+    "bpm": 97
+  },
+  "sections": [
+    {
+      "id": "rvujJ8YFLaG32dSDG82Ti",
+      "type": "intro",
+      "label": "Intro",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "2Sl3PzMO23KsEU10cqzc5",
+          "text": "(Intro)",
+          "chords": [
+            {
+              "id": "NR6k1vU-eoABgluf7WrTZ",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "NR6k1vU-eoABgluf7WrTZ"
+            },
+            {
+              "id": "cszWS5Uw-yLLcaLZjlR7L",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "D#",
+                "quality": "min",
+                "display": "D#m",
+                "octave": 3
+              }
+            },
+            {
+              "id": "sNOO8_vf3J-HqFar6vQlr",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "sNOO8_vf3J-HqFar6vQlr"
+            },
+            {
+              "id": "bs-zBWJUD0N-TxhS83SNl",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "bs-zBWJUD0N-TxhS83SNl"
+            },
+            {
+              "id": "wGX20tG64ma9WzTb807Hv",
+              "offset": 8,
+              "slotIndex": 8,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "wGX20tG64ma9WzTb807Hv"
+            },
+            {
+              "id": "JY1oH3FMzXtThXvniu0OA",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "JY1oH3FMzXtThXvniu0OA"
+            },
+            {
+              "id": "MXkXTDXaVLW2HvcWx8P7X",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "MXkXTDXaVLW2HvcWx8P7X"
+            },
+            {
+              "id": "gZP4vbHigkpsqlUAUB2Op",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "gZP4vbHigkpsqlUAUB2Op"
+            },
+            {
+              "id": "TVgDJioxX-sXPHMlSr5nh",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "TVgDJioxX-sXPHMlSr5nh"
+            }
+          ],
+          "chordRowLen": 86
+        }
+      ],
+      "chords": [
+        {
+          "id": "NR6k1vU-eoABgluf7WrTZ",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "rvujJ8YFLaG32dSDG82Ti",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "cszWS5Uw-yLLcaLZjlR7L",
+          "chord": {
+            "root": "D#",
+            "quality": "min",
+            "display": "D#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 2
+          }
+        },
+        {
+          "id": "sNOO8_vf3J-HqFar6vQlr",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "MFC0Q73CFz_Zj9veCNkX2",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "bs-zBWJUD0N-TxhS83SNl",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "MFC0Q73CFz_Zj9veCNkX2",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "wGX20tG64ma9WzTb807Hv",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 8
+          },
+          "progressionPlacement": {
+            "patternId": "MFC0Q73CFz_Zj9veCNkX2",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "JY1oH3FMzXtThXvniu0OA",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "MFC0Q73CFz_Zj9veCNkX2",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "MXkXTDXaVLW2HvcWx8P7X",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "rvujJ8YFLaG32dSDG82Ti",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "gZP4vbHigkpsqlUAUB2Op",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "rvujJ8YFLaG32dSDG82Ti",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "TVgDJioxX-sXPHMlSr5nh",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "2Sl3PzMO23KsEU10cqzc5",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "rvujJ8YFLaG32dSDG82Ti",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        }
+      ],
+      "arpArmed": false
+    },
+    {
+      "id": "B8_JzI5n-fHmtv5uDmt7x",
+      "type": "verse",
+      "label": "Verse",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "ZlXuqH7scKsMLTOTz__V7",
+          "text": "Kept up all night by now your shoulder needs a shoulder to cry",
+          "chords": [
+            {
+              "id": "UA0n7ZmtICdO5FwG3MN2g",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "UA0n7ZmtICdO5FwG3MN2g"
+            },
+            {
+              "id": "XfOdtLN8-t3UBHiK76eqq",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min9",
+                "display": "G#m9",
+                "octave": 3
+              },
+              "mirrorId": "XfOdtLN8-t3UBHiK76eqq"
+            },
+            {
+              "id": "53eI3A-ZNiuOK0EKqVCA5",
+              "offset": 5,
+              "slotIndex": 5,
+              "chord": {
+                "root": "C#",
+                "quality": "min7",
+                "display": "C#m7",
+                "octave": 4
+              },
+              "mirrorId": "53eI3A-ZNiuOK0EKqVCA5"
+            },
+            {
+              "id": "tH7p0taWj8ZMt5nhVm0fb",
+              "offset": 8,
+              "slotIndex": 8,
+              "chord": {
+                "root": "F#",
+                "quality": "7b9",
+                "display": "F#7b9",
+                "octave": 3
+              },
+              "mirrorId": "tH7p0taWj8ZMt5nhVm0fb"
+            }
+          ]
+        },
+        {
+          "id": "tRMmGhWpa9CSdcQrLjmw0",
+          "text": "Watching a quiet movie fading from my tired eyes",
+          "chords": [
+            {
+              "id": "366Ld0b1zD0rRhygbQotv",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "366Ld0b1zD0rRhygbQotv"
+            },
+            {
+              "id": "RFF0RWho5IBmx-w5I-_hh",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "RFF0RWho5IBmx-w5I-_hh"
+            },
+            {
+              "id": "DUGme81DpMcFyLaDHGCnI",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "DUGme81DpMcFyLaDHGCnI"
+            },
+            {
+              "id": "1NA95jHJEF_IbWdnrVvCe",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "F#",
+                "quality": "7b9",
+                "display": "F#7b9",
+                "octave": 3
+              },
+              "mirrorId": "1NA95jHJEF_IbWdnrVvCe"
+            }
+          ]
+        }
+      ],
+      "chords": [
+        {
+          "id": "UA0n7ZmtICdO5FwG3MN2g",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZlXuqH7scKsMLTOTz__V7",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "B8_JzI5n-fHmtv5uDmt7x",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "XfOdtLN8-t3UBHiK76eqq",
+          "chord": {
+            "root": "G#",
+            "quality": "min9",
+            "display": "G#m9",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZlXuqH7scKsMLTOTz__V7",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "B8_JzI5n-fHmtv5uDmt7x",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "53eI3A-ZNiuOK0EKqVCA5",
+          "chord": {
+            "root": "C#",
+            "quality": "min7",
+            "display": "C#m7",
+            "octave": 4
+          },
+          "lyricsPlacement": {
+            "lineId": "ZlXuqH7scKsMLTOTz__V7",
+            "slotIndex": 5
+          },
+          "progressionPlacement": {
+            "patternId": "B8_JzI5n-fHmtv5uDmt7x",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "tH7p0taWj8ZMt5nhVm0fb",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZlXuqH7scKsMLTOTz__V7",
+            "slotIndex": 8
+          },
+          "progressionPlacement": {
+            "patternId": "B8_JzI5n-fHmtv5uDmt7x",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "366Ld0b1zD0rRhygbQotv",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "tRMmGhWpa9CSdcQrLjmw0",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "0FyTTNUUpeVj4XARGadug",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "RFF0RWho5IBmx-w5I-_hh",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "tRMmGhWpa9CSdcQrLjmw0",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "0FyTTNUUpeVj4XARGadug",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "DUGme81DpMcFyLaDHGCnI",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "tRMmGhWpa9CSdcQrLjmw0",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "0FyTTNUUpeVj4XARGadug",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "1NA95jHJEF_IbWdnrVvCe",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "tRMmGhWpa9CSdcQrLjmw0",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "0FyTTNUUpeVj4XARGadug",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "ECUSZWSe-maUd3xjLZ3SW",
+      "type": "pre-chorus",
+      "label": "Pre-Chorus",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "nrd5mZ8KJKPCiG_FNrlaO",
+          "text": "Afraid of being right afraid of being afraid",
+          "chords": [
+            {
+              "id": "u5vrNRgqOuZh-DCohJL-2",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "D#",
+                "quality": "maj",
+                "display": "D#",
+                "octave": 3
+              },
+              "mirrorId": "u5vrNRgqOuZh-DCohJL-2"
+            },
+            {
+              "id": "d9vV1lyyTuKRFIM8DXJIa",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "d9vV1lyyTuKRFIM8DXJIa"
+            },
+            {
+              "id": "Ht1AarfoOmc0PCuEEfsjN",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "C#",
+                "quality": "min7",
+                "display": "C#m7",
+                "octave": 3
+              },
+              "mirrorId": "Ht1AarfoOmc0PCuEEfsjN"
+            },
+            {
+              "id": "7EDLYRxP_290vERcAexq0",
+              "offset": 7,
+              "slotIndex": 7,
+              "chord": {
+                "root": "C#",
+                "quality": "min6",
+                "display": "C#m6",
+                "octave": 3
+              },
+              "mirrorId": "7EDLYRxP_290vERcAexq0"
+            }
+          ]
+        },
+        {
+          "id": "IPhmAjho3sik4SF_-3Qfk",
+          "text": "Keeping my chin up so those tears can fall behind out of sight",
+          "chords": [
+            {
+              "id": "8Gw-4eRRaF47b5URmyFHT",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "D#",
+                "quality": "7",
+                "display": "D#7",
+                "octave": 3
+              },
+              "mirrorId": "8Gw-4eRRaF47b5URmyFHT"
+            },
+            {
+              "id": "9gmud3uZ292vdKwrbayxQ",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min9",
+                "display": "G#m9",
+                "octave": 3
+              },
+              "mirrorId": "9gmud3uZ292vdKwrbayxQ"
+            },
+            {
+              "id": "8aLTTLcdx0HrG6BCKEKoX",
+              "offset": 5,
+              "slotIndex": 5,
+              "chord": {
+                "root": "E",
+                "quality": "maj",
+                "display": "E",
+                "octave": 3
+              },
+              "mirrorId": "8aLTTLcdx0HrG6BCKEKoX"
+            },
+            {
+              "id": "0avhxEq22DXEP6CBHN32F",
+              "offset": 7,
+              "slotIndex": 7,
+              "chord": {
+                "root": "F#",
+                "quality": "7b9",
+                "display": "F#7b9",
+                "octave": 3
+              },
+              "mirrorId": "0avhxEq22DXEP6CBHN32F"
+            }
+          ]
+        }
+      ],
+      "chords": [
+        {
+          "id": "u5vrNRgqOuZh-DCohJL-2",
+          "chord": {
+            "root": "D#",
+            "quality": "maj",
+            "display": "D#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "nrd5mZ8KJKPCiG_FNrlaO",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "ECUSZWSe-maUd3xjLZ3SW",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "d9vV1lyyTuKRFIM8DXJIa",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "nrd5mZ8KJKPCiG_FNrlaO",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "ECUSZWSe-maUd3xjLZ3SW",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "Ht1AarfoOmc0PCuEEfsjN",
+          "chord": {
+            "root": "C#",
+            "quality": "min7",
+            "display": "C#m7",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "nrd5mZ8KJKPCiG_FNrlaO",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "ECUSZWSe-maUd3xjLZ3SW",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "7EDLYRxP_290vERcAexq0",
+          "chord": {
+            "root": "C#",
+            "quality": "min6",
+            "display": "C#m6",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "nrd5mZ8KJKPCiG_FNrlaO",
+            "slotIndex": 7
+          },
+          "progressionPlacement": {
+            "patternId": "ECUSZWSe-maUd3xjLZ3SW",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "8Gw-4eRRaF47b5URmyFHT",
+          "chord": {
+            "root": "D#",
+            "quality": "7",
+            "display": "D#7",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "IPhmAjho3sik4SF_-3Qfk",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "D9UcC1zWQlWIzXDFoZjxd",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "9gmud3uZ292vdKwrbayxQ",
+          "chord": {
+            "root": "G#",
+            "quality": "min9",
+            "display": "G#m9",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "IPhmAjho3sik4SF_-3Qfk",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "D9UcC1zWQlWIzXDFoZjxd",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "8aLTTLcdx0HrG6BCKEKoX",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "IPhmAjho3sik4SF_-3Qfk",
+            "slotIndex": 5
+          },
+          "progressionPlacement": {
+            "patternId": "D9UcC1zWQlWIzXDFoZjxd",
+            "startBeat": 8,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "0avhxEq22DXEP6CBHN32F",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "IPhmAjho3sik4SF_-3Qfk",
+            "slotIndex": 7
+          },
+          "progressionPlacement": {
+            "patternId": "D9UcC1zWQlWIzXDFoZjxd",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "l_ISwNSqHmih_dZvCQywQ",
+      "type": "chorus",
+      "label": "Chorus",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "ZFon-SzyFGHKP_AVIo0AM",
+          "text": "Again again tell me I gotta Dream on Dream on",
+          "chords": [
+            {
+              "id": "OjX-HL422cpbBAeT3eKDr",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "OjX-HL422cpbBAeT3eKDr"
+            },
+            {
+              "id": "2KXvzzXJWRLWbnctOjvNW",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "F#",
+                "quality": "7",
+                "display": "F#7",
+                "octave": 3
+              },
+              "mirrorId": "2KXvzzXJWRLWbnctOjvNW"
+            },
+            {
+              "id": "cGoFdpACuGfsncZU8ePKa",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "cGoFdpACuGfsncZU8ePKa"
+            },
+            {
+              "id": "ZBVpnbhkxqvSUC3J_Ucuo",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "A#",
+                "quality": "dim",
+                "display": "A#dim",
+                "octave": 3
+              },
+              "mirrorId": "ZBVpnbhkxqvSUC3J_Ucuo"
+            },
+            {
+              "id": "-Pmq1MZ5GwKnXa9Cgw3cc",
+              "offset": 9,
+              "slotIndex": 9,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "-Pmq1MZ5GwKnXa9Cgw3cc"
+            },
+            {
+              "id": "KZa-7SsQksES9jBddo6K6",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "A#",
+                "quality": "min",
+                "display": "A#m",
+                "octave": 3
+              },
+              "mirrorId": "KZa-7SsQksES9jBddo6K6"
+            },
+            {
+              "id": "1v0b7hpOjSfE_Q0iQSECZ",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "G#",
+                "quality": "min7",
+                "display": "G#m7",
+                "octave": 3
+              },
+              "mirrorId": "1v0b7hpOjSfE_Q0iQSECZ"
+            }
+          ]
+        },
+        {
+          "id": "BnbEQqUkD1t7lUPC6STlp",
+          "text": "End of line what have I to Dream On Dream On?",
+          "chords": [
+            {
+              "id": "B-fl82dpYTPUwJPUyIa06",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "B-fl82dpYTPUwJPUyIa06"
+            },
+            {
+              "id": "hd5YbkhAFUzMuHOQ-_49K",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "hd5YbkhAFUzMuHOQ-_49K"
+            },
+            {
+              "id": "lPEekbsdNfwxA1rHKYn4F",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "lPEekbsdNfwxA1rHKYn4F"
+            },
+            {
+              "id": "gcfRWtj7NDfmmesedeJAv",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "A#",
+                "quality": "dim",
+                "display": "A#dim",
+                "octave": 3
+              },
+              "mirrorId": "gcfRWtj7NDfmmesedeJAv"
+            },
+            {
+              "id": "ifGwVevGsudf-DHQA0s8G",
+              "offset": 9,
+              "slotIndex": 9,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "ifGwVevGsudf-DHQA0s8G"
+            }
+          ]
+        },
+        {
+          "id": "rVtHeDI-GHv27SO_YoAIX",
+          "text": "Kill the lights say we’re fine in a world on fire",
+          "chords": [
+            {
+              "id": "7jk_zQjs9Phv2tuv5YoWu",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "E",
+                "quality": "maj",
+                "display": "E",
+                "octave": 3
+              },
+              "mirrorId": "7jk_zQjs9Phv2tuv5YoWu"
+            },
+            {
+              "id": "g8sjeT8CI5sWdWDI49_Yp",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "E",
+                "quality": "maj",
+                "display": "E",
+                "octave": 3
+              },
+              "mirrorId": "g8sjeT8CI5sWdWDI49_Yp"
+            },
+            {
+              "id": "jO1FCEsvQZmCWSMkbCu_N",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "jO1FCEsvQZmCWSMkbCu_N"
+            },
+            {
+              "id": "6e49Mf85CfGihT4CwwqiZ",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "6e49Mf85CfGihT4CwwqiZ"
+            },
+            {
+              "id": "nLTWOD7hvSS6IMy9meizV",
+              "offset": 8,
+              "slotIndex": 8,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "nLTWOD7hvSS6IMy9meizV"
+            }
+          ]
+        },
+        {
+          "id": "4BnbRO4Y9VhSMKzSEePL5",
+          "text": "All i do all I can do is",
+          "chords": [
+            {
+              "id": "VPFgrfIbz6KgQRX71mjXb",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "VPFgrfIbz6KgQRX71mjXb"
+            },
+            {
+              "id": "7FXy4jhmXvLBKEBcR4htt",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 3
+              },
+              "mirrorId": "7FXy4jhmXvLBKEBcR4htt"
+            },
+            {
+              "id": "aNM1yM9LnwrgTTXSEpzo_",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "aNM1yM9LnwrgTTXSEpzo_"
+            }
+          ]
+        }
+      ],
+      "chords": [
+        {
+          "id": "OjX-HL422cpbBAeT3eKDr",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "l_ISwNSqHmih_dZvCQywQ",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "2KXvzzXJWRLWbnctOjvNW",
+          "chord": {
+            "root": "F#",
+            "quality": "7",
+            "display": "F#7",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "l_ISwNSqHmih_dZvCQywQ",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "cGoFdpACuGfsncZU8ePKa",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "l_ISwNSqHmih_dZvCQywQ",
+            "startBeat": 8,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "ZBVpnbhkxqvSUC3J_Ucuo",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "l_ISwNSqHmih_dZvCQywQ",
+            "startBeat": 10,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "-Pmq1MZ5GwKnXa9Cgw3cc",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 9
+          },
+          "progressionPlacement": {
+            "patternId": "l_ISwNSqHmih_dZvCQywQ",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "KZa-7SsQksES9jBddo6K6",
+          "chord": {
+            "root": "A#",
+            "quality": "min",
+            "display": "A#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 0,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "1v0b7hpOjSfE_Q0iQSECZ",
+          "chord": {
+            "root": "G#",
+            "quality": "min7",
+            "display": "G#m7",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "ZFon-SzyFGHKP_AVIo0AM",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 2,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "B-fl82dpYTPUwJPUyIa06",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "BnbEQqUkD1t7lUPC6STlp",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "utcF7D51s6i6BwlTpZxzr",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "hd5YbkhAFUzMuHOQ-_49K",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "BnbEQqUkD1t7lUPC6STlp",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "utcF7D51s6i6BwlTpZxzr",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "lPEekbsdNfwxA1rHKYn4F",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "BnbEQqUkD1t7lUPC6STlp",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "utcF7D51s6i6BwlTpZxzr",
+            "startBeat": 8,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "gcfRWtj7NDfmmesedeJAv",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "BnbEQqUkD1t7lUPC6STlp",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "utcF7D51s6i6BwlTpZxzr",
+            "startBeat": 10,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "ifGwVevGsudf-DHQA0s8G",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "BnbEQqUkD1t7lUPC6STlp",
+            "slotIndex": 9
+          },
+          "progressionPlacement": {
+            "patternId": "utcF7D51s6i6BwlTpZxzr",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "7jk_zQjs9Phv2tuv5YoWu",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "rVtHeDI-GHv27SO_YoAIX",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 6,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "g8sjeT8CI5sWdWDI49_Yp",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "rVtHeDI-GHv27SO_YoAIX",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 8,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "jO1FCEsvQZmCWSMkbCu_N",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "rVtHeDI-GHv27SO_YoAIX",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 10,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "6e49Mf85CfGihT4CwwqiZ",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "rVtHeDI-GHv27SO_YoAIX",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 12,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "nLTWOD7hvSS6IMy9meizV",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "rVtHeDI-GHv27SO_YoAIX",
+            "slotIndex": 8
+          },
+          "progressionPlacement": {
+            "patternId": "mxFn6BkhchZxZuhHVpheW",
+            "startBeat": 14,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "VPFgrfIbz6KgQRX71mjXb",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "4BnbRO4Y9VhSMKzSEePL5",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "f7g2Ja5HZ8ya6O3EPUGpn",
+            "startBeat": 0,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "7FXy4jhmXvLBKEBcR4htt",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "4BnbRO4Y9VhSMKzSEePL5",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "f7g2Ja5HZ8ya6O3EPUGpn",
+            "startBeat": 2,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "aNM1yM9LnwrgTTXSEpzo_",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "4BnbRO4Y9VhSMKzSEePL5",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "f7g2Ja5HZ8ya6O3EPUGpn",
+            "startBeat": 4,
+            "lengthBeats": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "7QQIKXZp3yPtad76a8fO5",
+      "type": "custom",
+      "label": "INSTR",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "Q8ElwNOsm_gXUxHQE5vFP",
+          "text": "Dream On Dream On",
+          "chords": [
+            {
+              "id": "Xit_ltNbHD3XqkoWt1WeL",
+              "offset": 0,
+              "slotIndex": 0,
+              "chord": {
+                "root": "C#",
+                "quality": "min",
+                "display": "C#m",
+                "octave": 4
+              },
+              "mirrorId": "Xit_ltNbHD3XqkoWt1WeL"
+            },
+            {
+              "id": "v7-pfJ5D3mmI7JdY45wtK",
+              "offset": 2,
+              "slotIndex": 2,
+              "chord": {
+                "root": "F#",
+                "quality": "maj",
+                "display": "F#",
+                "octave": 3
+              },
+              "mirrorId": "v7-pfJ5D3mmI7JdY45wtK"
+            },
+            {
+              "id": "tJJuOtertpA7HcYLYQ77t",
+              "offset": 4,
+              "slotIndex": 4,
+              "chord": {
+                "root": "B",
+                "quality": "maj",
+                "display": "B",
+                "octave": 3
+              },
+              "mirrorId": "tJJuOtertpA7HcYLYQ77t"
+            },
+            {
+              "id": "mJm3xJSyMOGkmfkmnM2Ie",
+              "offset": 6,
+              "slotIndex": 6,
+              "chord": {
+                "root": "A#",
+                "quality": "dim",
+                "display": "A#dim",
+                "octave": 3
+              },
+              "mirrorId": "mJm3xJSyMOGkmfkmnM2Ie"
+            },
+            {
+              "id": "T_5aBWrW7LNYGcyDDwUll",
+              "offset": 9,
+              "slotIndex": 9,
+              "chord": {
+                "root": "G#",
+                "quality": "min",
+                "display": "G#m",
+                "octave": 3
+              },
+              "mirrorId": "T_5aBWrW7LNYGcyDDwUll"
+            }
+          ]
+        },
+        {
+          "id": "POcYZk1Lw-Vz5Bj8RAL1O",
+          "text": "Dream On Dream On Dream On",
+          "chords": []
+        }
+      ],
+      "chords": [
+        {
+          "id": "Xit_ltNbHD3XqkoWt1WeL",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 4
+          },
+          "lyricsPlacement": {
+            "lineId": "Q8ElwNOsm_gXUxHQE5vFP",
+            "slotIndex": 0
+          },
+          "progressionPlacement": {
+            "patternId": "7QQIKXZp3yPtad76a8fO5",
+            "startBeat": 0,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "v7-pfJ5D3mmI7JdY45wtK",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "Q8ElwNOsm_gXUxHQE5vFP",
+            "slotIndex": 2
+          },
+          "progressionPlacement": {
+            "patternId": "7QQIKXZp3yPtad76a8fO5",
+            "startBeat": 4,
+            "lengthBeats": 4
+          }
+        },
+        {
+          "id": "tJJuOtertpA7HcYLYQ77t",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "Q8ElwNOsm_gXUxHQE5vFP",
+            "slotIndex": 4
+          },
+          "progressionPlacement": {
+            "patternId": "7QQIKXZp3yPtad76a8fO5",
+            "startBeat": 8,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "mJm3xJSyMOGkmfkmnM2Ie",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "Q8ElwNOsm_gXUxHQE5vFP",
+            "slotIndex": 6
+          },
+          "progressionPlacement": {
+            "patternId": "7QQIKXZp3yPtad76a8fO5",
+            "startBeat": 10,
+            "lengthBeats": 2
+          }
+        },
+        {
+          "id": "T_5aBWrW7LNYGcyDDwUll",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "lyricsPlacement": {
+            "lineId": "Q8ElwNOsm_gXUxHQE5vFP",
+            "slotIndex": 9
+          },
+          "progressionPlacement": {
+            "patternId": "7QQIKXZp3yPtad76a8fO5",
+            "startBeat": 12,
+            "lengthBeats": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "RUK_YyqKsHVREDr3XCmKq",
+      "type": "verse",
+      "label": "Verse",
+      "collapsed": false,
+      "lines": [
+        {
+          "id": "SOv7RSHV_uEJPOID-r-IG",
+          "text": " This is the time when i ",
+          "chords": []
+        },
+        {
+          "id": "f_dU7syh37NPg1zv0RRkD",
+          "text": "Cuz when I find the words you skip all the lines I, Im frozen",
+          "chords": []
+        }
+      ],
+      "chords": []
+    }
+  ],
+  "progression": [
+    {
+      "id": "rvujJ8YFLaG32dSDG82Ti",
+      "sectionId": "rvujJ8YFLaG32dSDG82Ti",
+      "label": "Intro",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "NR6k1vU-eoABgluf7WrTZ",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "NR6k1vU-eoABgluf7WrTZ"
+        },
+        {
+          "id": "MXkXTDXaVLW2HvcWx8P7X",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "MXkXTDXaVLW2HvcWx8P7X"
+        },
+        {
+          "id": "gZP4vbHigkpsqlUAUB2Op",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "gZP4vbHigkpsqlUAUB2Op"
+        },
+        {
+          "id": "TVgDJioxX-sXPHMlSr5nh",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "TVgDJioxX-sXPHMlSr5nh"
+        }
+      ]
+    },
+    {
+      "id": "MFC0Q73CFz_Zj9veCNkX2",
+      "sectionId": "rvujJ8YFLaG32dSDG82Ti",
+      "label": "Intro (cont.)",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "sNOO8_vf3J-HqFar6vQlr",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "sNOO8_vf3J-HqFar6vQlr"
+        },
+        {
+          "id": "bs-zBWJUD0N-TxhS83SNl",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "bs-zBWJUD0N-TxhS83SNl"
+        },
+        {
+          "id": "wGX20tG64ma9WzTb807Hv",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "wGX20tG64ma9WzTb807Hv"
+        },
+        {
+          "id": "JY1oH3FMzXtThXvniu0OA",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "JY1oH3FMzXtThXvniu0OA"
+        }
+      ]
+    },
+    {
+      "id": "B8_JzI5n-fHmtv5uDmt7x",
+      "sectionId": "B8_JzI5n-fHmtv5uDmt7x",
+      "label": "Verse",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "UA0n7ZmtICdO5FwG3MN2g",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "UA0n7ZmtICdO5FwG3MN2g"
+        },
+        {
+          "id": "XfOdtLN8-t3UBHiK76eqq",
+          "chord": {
+            "root": "G#",
+            "quality": "min9",
+            "display": "G#m9",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "XfOdtLN8-t3UBHiK76eqq"
+        },
+        {
+          "id": "53eI3A-ZNiuOK0EKqVCA5",
+          "chord": {
+            "root": "C#",
+            "quality": "min7",
+            "display": "C#m7",
+            "octave": 4
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "53eI3A-ZNiuOK0EKqVCA5"
+        },
+        {
+          "id": "tH7p0taWj8ZMt5nhVm0fb",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "tH7p0taWj8ZMt5nhVm0fb"
+        }
+      ]
+    },
+    {
+      "id": "0FyTTNUUpeVj4XARGadug",
+      "sectionId": "B8_JzI5n-fHmtv5uDmt7x",
+      "label": "Verse (cont.)",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "366Ld0b1zD0rRhygbQotv",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "366Ld0b1zD0rRhygbQotv"
+        },
+        {
+          "id": "RFF0RWho5IBmx-w5I-_hh",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "RFF0RWho5IBmx-w5I-_hh"
+        },
+        {
+          "id": "DUGme81DpMcFyLaDHGCnI",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "DUGme81DpMcFyLaDHGCnI"
+        },
+        {
+          "id": "1NA95jHJEF_IbWdnrVvCe",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "1NA95jHJEF_IbWdnrVvCe"
+        }
+      ]
+    },
+    {
+      "id": "ECUSZWSe-maUd3xjLZ3SW",
+      "sectionId": "ECUSZWSe-maUd3xjLZ3SW",
+      "label": "Pre-Chorus",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "u5vrNRgqOuZh-DCohJL-2",
+          "chord": {
+            "root": "D#",
+            "quality": "maj",
+            "display": "D#",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "u5vrNRgqOuZh-DCohJL-2"
+        },
+        {
+          "id": "d9vV1lyyTuKRFIM8DXJIa",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "d9vV1lyyTuKRFIM8DXJIa"
+        },
+        {
+          "id": "Ht1AarfoOmc0PCuEEfsjN",
+          "chord": {
+            "root": "C#",
+            "quality": "min7",
+            "display": "C#m7",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "Ht1AarfoOmc0PCuEEfsjN"
+        },
+        {
+          "id": "7EDLYRxP_290vERcAexq0",
+          "chord": {
+            "root": "C#",
+            "quality": "min6",
+            "display": "C#m6",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "7EDLYRxP_290vERcAexq0"
+        }
+      ]
+    },
+    {
+      "id": "D9UcC1zWQlWIzXDFoZjxd",
+      "sectionId": "ECUSZWSe-maUd3xjLZ3SW",
+      "label": "Pre-Chorus",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "8Gw-4eRRaF47b5URmyFHT",
+          "chord": {
+            "root": "D#",
+            "quality": "7",
+            "display": "D#7",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "8Gw-4eRRaF47b5URmyFHT"
+        },
+        {
+          "id": "9gmud3uZ292vdKwrbayxQ",
+          "chord": {
+            "root": "G#",
+            "quality": "min9",
+            "display": "G#m9",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "9gmud3uZ292vdKwrbayxQ"
+        },
+        {
+          "id": "8aLTTLcdx0HrG6BCKEKoX",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 4,
+          "mirrorId": "8aLTTLcdx0HrG6BCKEKoX"
+        },
+        {
+          "id": "0avhxEq22DXEP6CBHN32F",
+          "chord": {
+            "root": "F#",
+            "quality": "7b9",
+            "display": "F#7b9",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "0avhxEq22DXEP6CBHN32F"
+        }
+      ]
+    },
+    {
+      "id": "l_ISwNSqHmih_dZvCQywQ",
+      "sectionId": "l_ISwNSqHmih_dZvCQywQ",
+      "label": "Chorus",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "OjX-HL422cpbBAeT3eKDr",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "OjX-HL422cpbBAeT3eKDr"
+        },
+        {
+          "id": "2KXvzzXJWRLWbnctOjvNW",
+          "chord": {
+            "root": "F#",
+            "quality": "7",
+            "display": "F#7",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "2KXvzzXJWRLWbnctOjvNW"
+        },
+        {
+          "id": "cGoFdpACuGfsncZU8ePKa",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 2,
+          "mirrorId": "cGoFdpACuGfsncZU8ePKa"
+        },
+        {
+          "id": "ZBVpnbhkxqvSUC3J_Ucuo",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "startBeat": 10,
+          "lengthBeats": 2,
+          "mirrorId": "ZBVpnbhkxqvSUC3J_Ucuo"
+        },
+        {
+          "id": "-Pmq1MZ5GwKnXa9Cgw3cc",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "-Pmq1MZ5GwKnXa9Cgw3cc"
+        }
+      ]
+    },
+    {
+      "id": "utcF7D51s6i6BwlTpZxzr",
+      "sectionId": "l_ISwNSqHmih_dZvCQywQ",
+      "label": "Chorus (cont.)",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "B-fl82dpYTPUwJPUyIa06",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "B-fl82dpYTPUwJPUyIa06"
+        },
+        {
+          "id": "hd5YbkhAFUzMuHOQ-_49K",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "hd5YbkhAFUzMuHOQ-_49K"
+        },
+        {
+          "id": "lPEekbsdNfwxA1rHKYn4F",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 2,
+          "mirrorId": "lPEekbsdNfwxA1rHKYn4F"
+        },
+        {
+          "id": "gcfRWtj7NDfmmesedeJAv",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "startBeat": 10,
+          "lengthBeats": 2,
+          "mirrorId": "gcfRWtj7NDfmmesedeJAv"
+        },
+        {
+          "id": "ifGwVevGsudf-DHQA0s8G",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "ifGwVevGsudf-DHQA0s8G"
+        }
+      ]
+    },
+    {
+      "id": "mxFn6BkhchZxZuhHVpheW",
+      "sectionId": "l_ISwNSqHmih_dZvCQywQ",
+      "label": "Chorus (cont.) (cont.)",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "KZa-7SsQksES9jBddo6K6",
+          "chord": {
+            "root": "A#",
+            "quality": "min",
+            "display": "A#m",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 2,
+          "mirrorId": "KZa-7SsQksES9jBddo6K6"
+        },
+        {
+          "id": "1v0b7hpOjSfE_Q0iQSECZ",
+          "chord": {
+            "root": "G#",
+            "quality": "min7",
+            "display": "G#m7",
+            "octave": 3
+          },
+          "startBeat": 2,
+          "lengthBeats": 4,
+          "mirrorId": "1v0b7hpOjSfE_Q0iQSECZ"
+        },
+        {
+          "id": "7jk_zQjs9Phv2tuv5YoWu",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "startBeat": 6,
+          "lengthBeats": 2,
+          "mirrorId": "7jk_zQjs9Phv2tuv5YoWu"
+        },
+        {
+          "id": "g8sjeT8CI5sWdWDI49_Yp",
+          "chord": {
+            "root": "E",
+            "quality": "maj",
+            "display": "E",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 2,
+          "mirrorId": "g8sjeT8CI5sWdWDI49_Yp"
+        },
+        {
+          "id": "jO1FCEsvQZmCWSMkbCu_N",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 10,
+          "lengthBeats": 2,
+          "mirrorId": "jO1FCEsvQZmCWSMkbCu_N"
+        },
+        {
+          "id": "6e49Mf85CfGihT4CwwqiZ",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 2,
+          "mirrorId": "6e49Mf85CfGihT4CwwqiZ"
+        },
+        {
+          "id": "nLTWOD7hvSS6IMy9meizV",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 14,
+          "lengthBeats": 2,
+          "mirrorId": "nLTWOD7hvSS6IMy9meizV"
+        }
+      ]
+    },
+    {
+      "id": "f7g2Ja5HZ8ya6O3EPUGpn",
+      "sectionId": "l_ISwNSqHmih_dZvCQywQ",
+      "label": "Chorus (cont.) (cont.) (cont.) (cont.)",
+      "bars": 2,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "VPFgrfIbz6KgQRX71mjXb",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 0,
+          "lengthBeats": 2,
+          "mirrorId": "VPFgrfIbz6KgQRX71mjXb"
+        },
+        {
+          "id": "7FXy4jhmXvLBKEBcR4htt",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 3
+          },
+          "startBeat": 2,
+          "lengthBeats": 2,
+          "mirrorId": "7FXy4jhmXvLBKEBcR4htt"
+        },
+        {
+          "id": "aNM1yM9LnwrgTTXSEpzo_",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 2,
+          "mirrorId": "aNM1yM9LnwrgTTXSEpzo_"
+        }
+      ]
+    },
+    {
+      "id": "7QQIKXZp3yPtad76a8fO5",
+      "sectionId": "7QQIKXZp3yPtad76a8fO5",
+      "label": "INSTR",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": [
+        {
+          "id": "Xit_ltNbHD3XqkoWt1WeL",
+          "chord": {
+            "root": "C#",
+            "quality": "min",
+            "display": "C#m",
+            "octave": 4
+          },
+          "startBeat": 0,
+          "lengthBeats": 4,
+          "mirrorId": "Xit_ltNbHD3XqkoWt1WeL"
+        },
+        {
+          "id": "v7-pfJ5D3mmI7JdY45wtK",
+          "chord": {
+            "root": "F#",
+            "quality": "maj",
+            "display": "F#",
+            "octave": 3
+          },
+          "startBeat": 4,
+          "lengthBeats": 4,
+          "mirrorId": "v7-pfJ5D3mmI7JdY45wtK"
+        },
+        {
+          "id": "tJJuOtertpA7HcYLYQ77t",
+          "chord": {
+            "root": "B",
+            "quality": "maj",
+            "display": "B",
+            "octave": 3
+          },
+          "startBeat": 8,
+          "lengthBeats": 2,
+          "mirrorId": "tJJuOtertpA7HcYLYQ77t"
+        },
+        {
+          "id": "mJm3xJSyMOGkmfkmnM2Ie",
+          "chord": {
+            "root": "A#",
+            "quality": "dim",
+            "display": "A#dim",
+            "octave": 3
+          },
+          "startBeat": 10,
+          "lengthBeats": 2,
+          "mirrorId": "mJm3xJSyMOGkmfkmnM2Ie"
+        },
+        {
+          "id": "T_5aBWrW7LNYGcyDDwUll",
+          "chord": {
+            "root": "G#",
+            "quality": "min",
+            "display": "G#m",
+            "octave": 3
+          },
+          "startBeat": 12,
+          "lengthBeats": 4,
+          "mirrorId": "T_5aBWrW7LNYGcyDDwUll"
+        }
+      ]
+    },
+    {
+      "id": "RUK_YyqKsHVREDr3XCmKq",
+      "sectionId": "RUK_YyqKsHVREDr3XCmKq",
+      "label": "Verse",
+      "bars": 4,
+      "beatsPerBar": 4,
+      "chords": []
+    }
+  ],
+  "suppressCrossTabDeleteWarning": true,
+  "sound": {
+    "preset": "piano",
+    "volume": -10,
+    "timbre": 0.5,
+    "bpmRamp": true,
+    "highLatencyMode": false,
+    "adsr": {
+      "attack": 0.005,
+      "decay": 0.5,
+      "sustain": 0.25,
+      "release": 1.2
+    },
+    "eq": {
+      "low": -1.5,
+      "mid": -3.5,
+      "high": -5
+    },
+    "fx": {
+      "delayWet": 0,
+      "delayTime": 0.25,
+      "delaySync": true,
+      "delayDivision": "1/8",
+      "delayFeedback": 0.25,
+      "reverbWet": 0.18,
+      "reverbDecay": 2.2,
+      "chorusWet": 0,
+      "chorusRate": 0.8,
+      "chorusDepth": 0.4
+    },
+    "arp": {
+      "pattern": "all",
+      "repeat": "1/2",
+      "bassMode": "bass",
+      "bassRepeat": "1/4",
+      "swing": 0.5
+    }
+  },
+  "appTint": null,
+  "appBackground": {
+    "pattern": "none",
+    "mask": "none"
+  },
+  "layoutMeta": {
+    "lastEditedScreenWidth": 384,
+    "lastEditedDevice": "mobile",
+    "lastEditedAt": 1781541809014
+  },
+  "recordings": {
+    "tracks": []
+  }
+}
