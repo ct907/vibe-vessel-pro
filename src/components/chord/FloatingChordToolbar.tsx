@@ -321,24 +321,15 @@ export function FloatingChordToolbar({
         style={ANIM_STYLE}
         className={cn(
           "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
-          "rounded-2xl border bg-popover shadow-lg px-2 py-2 flex flex-col gap-1.5 min-w-[18rem]",
+          "rounded-2xl border bg-popover shadow-lg px-2 py-2 flex flex-col gap-1.5 min-w-[20rem]",
           expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
         )}
       >
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9"
-            disabled={shiftDisabled || !canShiftLeft}
-            onClick={() => onShift(-1)}
-            aria-label="Move chord earlier"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+        {/* Header: chord name / status + close */}
+        <div className="flex items-center gap-1 px-1 pb-0.5">
           <span
             className={cn(
-              "flex-1 text-center text-sm select-none px-1 truncate",
+              "flex-1 text-center text-sm font-semibold select-none truncate",
               hasContext ? "font-mono-chord text-foreground" : "text-muted-foreground",
             )}
           >
@@ -347,54 +338,37 @@ export function FloatingChordToolbar({
           <Button
             size="icon"
             variant="ghost"
+            className="h-7 w-7"
+            onClick={close}
+            aria-label="Close toolbar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Row 1: left/right shift · up/down row-move · delete */}
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9"
+            disabled={shiftDisabled || !canShiftLeft}
+            onClick={() => onShift(-1)}
+            aria-label="Move chord left"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
             className="h-9 w-9"
             disabled={shiftDisabled || !canShiftRight}
             onClick={() => onShift(1)}
-            aria-label="Move chord later"
+            aria-label="Move chord right"
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
           <div className="w-px h-6 bg-border mx-0.5" />
-          <Button
-            size="icon"
-            variant="ghost"
-            className={cn(
-              "h-9 w-9",
-              multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
-            )}
-            onClick={toggleMode}
-            aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
-            title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
-          >
-            <CheckSquare className="h-5 w-5" />
-          </Button>
-          <Button
-            size="icon"
-            className={cn(
-              "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
-              !hasContext && "opacity-60 cursor-not-allowed",
-            )}
-            aria-disabled={!hasContext}
-            onClick={hasContext ? onDelete : undefined}
-            aria-label="Delete selected chord(s)"
-            title="Delete"
-          >
-            <Trash2 className="h-5 w-5" />
-          </Button>
-          <div className="w-px h-6 bg-border mx-0.5" />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9"
-            onClick={close}
-            aria-label="Close toolbar"
-            title="Close"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-1">
           <Button
             size="icon"
             variant="ghost"
@@ -419,6 +393,49 @@ export function FloatingChordToolbar({
             title={mode === "lyrics" ? "Move to row below" : "Move to next block"}
           >
             <ChevronDown className="h-5 w-5" />
+          </Button>
+          <div className="w-px h-6 bg-border mx-0.5" />
+          <Button
+            size="icon"
+            className={cn(
+              "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
+              !hasContext && "opacity-60 cursor-not-allowed",
+            )}
+            aria-disabled={!hasContext}
+            onClick={hasContext ? onDelete : undefined}
+            aria-label="Delete selected chord(s)"
+            title="Delete"
+          >
+            <Trash2 className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Row 2: select-all/multi · progression resize · chord octave */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground select-none">Select</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9"
+            disabled={selectAllDisabled}
+            onClick={onSelectAll}
+            aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
+            title="Select all"
+          >
+            <ListChecks className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "h-9 w-9",
+              multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+            )}
+            onClick={toggleMode}
+            aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
+            title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
+          >
+            <CheckSquare className="h-5 w-5" />
           </Button>
           <div className="w-px h-6 bg-border mx-0.5" />
           {mode === "progression" && (
@@ -453,19 +470,7 @@ export function FloatingChordToolbar({
               <div className="w-px h-6 bg-border mx-0.5" />
             </>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9"
-            disabled={selectAllDisabled}
-            onClick={onSelectAll}
-            aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
-            title="Select all"
-          >
-            <ListChecks className="h-5 w-5" />
-          </Button>
-          <div className="w-px h-6 bg-border mx-0.5" />
-          <span className="text-xs text-muted-foreground select-none">Oct</span>
+          <span className="text-xs text-muted-foreground select-none">Chord Octave</span>
           <Select
             value={octaveDisplay === "*" ? undefined : octaveDisplay}
             disabled={octaveDisabled}
