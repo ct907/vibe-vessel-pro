@@ -8,9 +8,6 @@ import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
-import { VoiceLeadingRibbon } from "@/components/progressions/VoiceLeadingRibbon";
-import { VoiceLeadingLinesPanel } from "@/components/progressions/VoiceLeadingLinesPanel";
-import { QuickPickPanel } from "@/components/progressions/QuickPickPanel";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,12 +42,11 @@ import {
   Pencil,
   MessageSquare,
   KeyRound,
-  Activity,
   Sparkles,
   Play,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
-import { playChord, ensureAudio, playProgression, stopProgression, type ScheduledChord } from "@/lib/music/audio";
+import { playChord } from "@/lib/music/audio";
 import { ChordSymbol, transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { cn } from "@/lib/utils";
@@ -195,17 +191,11 @@ function PatternBlock({
     resizePatternChordsWithOverflow,
     updatePatternChord,
     bulkSetChordOctave,
-    replacePatternChords,
   } = useSongStore();
   
   const [previewingSpiceChords, setPreviewingSpiceChords] = useState<ChordSymbol[] | null>(null);
   const [spiceOpen, setSpiceOpen] = useState(false);
   useEffect(() => { onSpiceOpenChange?.(spiceOpen); }, [spiceOpen, onSpiceOpenChange]);
-  const [voiceLinesOpen, setVoiceLinesOpen] = useState(false);
-  const [quickPickOpen, setQuickPickOpen] = useState(false);
-  const [previewChords, setPreviewChords] = useState<ChordSymbol[] | null>(null);
-  const [previewPlaying, setPreviewPlaying] = useState(false);
-  const bpm = useSongStore((s) => s.meta.bpm);
   const setFocusedPattern = usePlaybackStore((s) => s.setFocusedPattern);
   const playbackCurrent = usePlaybackStore((s) => s.current);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -257,17 +247,6 @@ function PatternBlock({
     ? getPatternChordsViaSSOT(ownerSection, pattern)
     : [...pattern.chords].sort((a, b) => a.startBeat - b.startBeat);
   const sortedChordsRef = useRef(sortedChords);
-
-  // Close the Quick Pick panel and stop any preview when the diagram is hidden.
-  useEffect(() => {
-    if (!voiceLinesOpen && quickPickOpen) {
-      setQuickPickOpen(false);
-      setPreviewChords(null);
-      stopProgression();
-      setPreviewPlaying(false);
-    }
-  }, [voiceLinesOpen, quickPickOpen]);
-
   const movePatternChordRef = useRef(movePatternChord);
   const setPatternChordLengthRef = useRef(setPatternChordLength);
   const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
@@ -406,19 +385,6 @@ function PatternBlock({
           </PopoverContent>
         </Popover>
         <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setVoiceLinesOpen((v) => !v);
-            }}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors"
-            style={{ background: "var(--paper-shade)", color: voiceLinesOpen ? "var(--primary-strong)" : undefined }}
-            aria-label="Voice leading lines"
-            title="Voice leading lines"
-          >
-            <Activity className="h-4 w-4" />
-          </button>
           {sortedChords.length >= 2 && (
             <button
               ref={spiceButtonRef}
@@ -456,74 +422,6 @@ function PatternBlock({
       </div>
 
       {/* Toolbar moved below the pattern grid (#7). */}
-
-      <VoiceLeadingLinesPanel
-        chords={previewChords ?? sortedChords.map((c) => c.chord)}
-        isVisible={voiceLinesOpen && sortedChords.length >= 1}
-        onChordTap={
-          voiceLinesOpen
-            ? () => {
-                if (quickPickOpen) {
-                  setQuickPickOpen(false);
-                  setPreviewChords(null);
-                  stopProgression();
-                  setPreviewPlaying(false);
-                } else {
-                  setQuickPickOpen(true);
-                }
-              }
-            : undefined
-        }
-      />
-
-      {quickPickOpen && sortedChords.length >= 1 && (
-        <QuickPickPanel
-          isOpen={voiceLinesOpen}
-          chords={sortedChords.map((c) => c.chord)}
-          isPreviewPlaying={previewPlaying}
-          onPreviewChords={setPreviewChords}
-          onAudition={(chords) => {
-            stopProgression();
-            setPreviewPlaying(true);
-            void ensureAudio().then(() => {
-              let cursor = 0;
-              const events: ScheduledChord[] = sortedChords.map((c, i) => {
-                const raw = chords[i] ?? c.chord;
-                const ch = effectiveOffset ? transposeChord(raw, effectiveOffset) : raw;
-                const ev: ScheduledChord = {
-                  chord: { ...ch, octave: c.chord.octave ?? 3 },
-                  startBeat: cursor,
-                  lengthBeats: c.lengthBeats,
-                };
-                cursor += c.lengthBeats;
-                return ev;
-              });
-              void playProgression(events, bpm, {
-                loopBeats: cursor,
-                onEnd: () => setPreviewPlaying(false),
-              });
-            });
-          }}
-          onStopPreview={() => {
-            stopProgression();
-            setPreviewPlaying(false);
-          }}
-          onApply={(chords) => {
-            stopProgression();
-            setPreviewPlaying(false);
-            replacePatternChords(
-              pattern.id,
-              sortedChords.map((c, i) => ({ ...(chords[i] ?? c.chord), octave: c.chord.octave })),
-            );
-          }}
-          onClose={() => {
-            setQuickPickOpen(false);
-            setPreviewChords(null);
-            stopProgression();
-            setPreviewPlaying(false);
-          }}
-        />
-      )}
 
       <div className="relative">
         {(() => {
@@ -993,12 +891,6 @@ function PatternBlock({
         </div>
       )}
 
-
-      <VoiceLeadingRibbon
-        originalChords={sortedChords.map((c) => c.chord)}
-        spicedChords={previewingSpiceChords}
-        isVisible={!!previewingSpiceChords && sortedChords.length >= 2}
-      />
 
       <SpiceSheet
         open={spiceOpen}
