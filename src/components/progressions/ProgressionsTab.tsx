@@ -706,7 +706,7 @@ function PatternBlock({
                               {isActive && (
                                 <button
                                   type="button"
-                                  className="absolute -top-1.5 -right-1.5 z-20 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                                  className="absolute -top-1.5 -right-1.5 z-30 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
                                   style={{ touchAction: "manipulation" }}
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onPointerUp={(e) => e.stopPropagation()}
@@ -2190,6 +2190,41 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                 return next;
               });
             }
+          }}
+          onDuplicate={() => {
+            const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
+            const dupOne = (patternId: string, chordId: string) => {
+              const pat = prog.find((p) => p.id === patternId);
+              const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
+              if (!sec || !pat) return;
+              const chords = getPatternChordsViaSSOT(sec, pat);
+              const idx = chords.findIndex((c) => c.id === chordId);
+              if (idx < 0) return;
+              const c = chords[idx];
+              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats);
+            };
+            if (multiSelected.size > 0) {
+              const byPattern = new Map<string, string[]>();
+              for (const [cid, pid] of multiSelected) {
+                const arr = byPattern.get(pid) ?? [];
+                arr.push(cid);
+                byPattern.set(pid, arr);
+              }
+              for (const [pid, cids] of byPattern) {
+                const pat = prog.find((p) => p.id === pid);
+                const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
+                if (!sec || !pat) continue;
+                const order = getPatternChordsViaSSOT(sec, pat).map((c) => c.id);
+                // Insert from the rightmost selection first so earlier indices
+                // stay valid as copies shift later chords rightward.
+                [...cids]
+                  .sort((a, b) => order.indexOf(b) - order.indexOf(a))
+                  .forEach((cid) => dupOne(pid, cid));
+              }
+              return;
+            }
+            if (!activeChordId || !toolbarContext.activePatternId) return;
+            dupOne(toolbarContext.activePatternId, activeChordId);
           }}
           onDelete={() => {
             if (multiSelected.size > 0) {

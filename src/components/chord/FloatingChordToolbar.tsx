@@ -14,6 +14,7 @@ import {
   Plus,
   CheckSquare,
   ListChecks,
+  Copy,
   Trash2,
   X,
 } from "lucide-react";
@@ -42,6 +43,8 @@ export interface FloatingChordToolbarProps {
   onClearAll: () => void;
   /** Entering multi-select seeds the selection with the active chord. */
   onEnterMultiSelect?: () => void;
+  /** Duplicate the active chord / current selection in place. */
+  onDuplicate?: () => void;
   onDelete?: () => void;
   onExitEdit: () => void;
 }
@@ -99,6 +102,7 @@ export function FloatingChordToolbar({
   onSelectAll,
   onClearAll,
   onEnterMultiSelect,
+  onDuplicate,
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
@@ -111,7 +115,13 @@ export function FloatingChordToolbar({
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const [expanded, setExpanded] = useState(false);
   const visible = !focusedEditorOpen;
-  const effectiveExpanded = visible && expanded;
+  const hasSelection = selectedCount > 0;
+  const hasContext = !!activeChord || hasSelection;
+  // On mobile the menu follows the selection: tapping a chord (which sets an
+  // active chord) opens it and clearing the selection closes it, so a tap
+  // toggles the menu. Desktop keeps the explicit open/close via the trigger
+  // button and the chordToolbarOpen signal.
+  const effectiveExpanded = visible && (expanded || (!isDesktop && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {
@@ -130,8 +140,6 @@ export function FloatingChordToolbar({
 
   if (!visible) return null;
 
-  const hasSelection = selectedCount > 0;
-  const hasContext = !!activeChord || hasSelection;
   const middleLabel = hasSelection
     ? `${selectedCount} selected`
     : multiSelectMode
@@ -285,6 +293,12 @@ export function FloatingChordToolbar({
           {octaveSelect}
           {divider}
           <LabeledBtn
+            icon={<Copy className="h-5 w-5" />}
+            label="Duplicate"
+            disabled={!hasContext}
+            onClick={hasContext ? onDuplicate : undefined}
+          />
+          <LabeledBtn
             icon={<Trash2 className="h-5 w-5" />}
             label="Delete"
             disabled={!hasContext}
@@ -423,6 +437,17 @@ export function FloatingChordToolbar({
                 title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
               >
                 <CheckSquare className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                disabled={!hasContext}
+                onClick={onDuplicate}
+                aria-label="Duplicate selected chord(s)"
+                title="Duplicate"
+              >
+                <Copy className="h-5 w-5" />
               </Button>
               <div className="w-px h-6 bg-border mx-0.5" />
               <Button
