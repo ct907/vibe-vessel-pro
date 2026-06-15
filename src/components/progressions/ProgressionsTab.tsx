@@ -16,6 +16,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -158,6 +165,7 @@ interface PatternProps {
   spiceHeaderRef?: React.RefObject<HTMLDivElement | null>;
   onVariationApplied?: () => void;
   onSpiceOpenChange?: (open: boolean) => void;
+  onChordClick: (patternId: string, chordId: string) => void;
 }
 
 function formatBeats(n: number) {
@@ -184,6 +192,7 @@ function PatternBlock({
   spiceHeaderRef,
   onVariationApplied,
   onSpiceOpenChange,
+  onChordClick,
 }: PatternProps) {
   const {
     updatePattern,
@@ -320,17 +329,6 @@ function PatternBlock({
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         movePatternChordRef.current(pattern.id, id, 1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        resizePatternChordsWithOverflowRef.current(pattern.id, [id], LENGTH_STEP);
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const chord = activeChordInThisBlockRef.current;
-        setPatternChordLengthRef.current(
-          pattern.id,
-          id,
-          Math.max(MIN_LEN, chord.lengthBeats - LENGTH_STEP),
-        );
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         removePatternChordsBatch(pattern.id, [id]);
@@ -568,6 +566,8 @@ function PatternBlock({
                           const isSelected = multiSelected.has(c.id);
                           return (
                             <div className="relative flex items-stretch w-full">
+                              <ContextMenu>
+                              <ContextMenuTrigger asChild>
                               <div
                                 data-pattern-chord={c.id}
                                 role="button"
@@ -606,11 +606,11 @@ function PatternBlock({
                                   }
                                 }}
                                 onContextMenu={(e) => {
-                                  e.preventDefault();
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
-                                  if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
-                                  onSetActiveChordId(null);
-                                  onEditChordOpen(pattern.id, c.id);
+                                  if (e.shiftKey) {
+                                    e.preventDefault();
+                                    onToggleMultiSelected(c.id, pattern.id);
+                                  }
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
@@ -628,7 +628,7 @@ function PatternBlock({
                                   }
                                   setFocusedPattern(pattern.id);
                                   void playChord(displayChord, undefined, c.chord.octave ?? 3);
-                                  onSetActiveChordId(activeChordId === c.id ? null : c.id);
+                                  onChordClick(pattern.id, c.id);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
@@ -656,6 +656,20 @@ function PatternBlock({
                                   {formatBeats(c.lengthBeats)}b
                                 </span>
                               </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => onEditChordOpen(pattern.id, c.id)}>
+                                  <Pencil className="h-4 w-4 mr-2" /> Replace chord
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                  onClick={() => { removePatternChordsBatch(pattern.id, [c.id]); onSetActiveChordId(null); }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                              </ContextMenu>
                               {effectiveOffset !== 0 && (
                                 <span
                                   aria-hidden
@@ -982,6 +996,7 @@ interface SectionGroupProps {
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
+  onChordClick: (patternId: string, chordId: string) => void;
   addChordsRef?: React.RefObject<HTMLButtonElement | null>;
   firstBlockRef?: React.RefObject<HTMLDivElement | null>;
   firstSpiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
@@ -1009,6 +1024,7 @@ function SectionGroup({
   onToggleMultiSelected,
   onClearMultiSelected,
   onAddNewBlockRequest,
+  onChordClick,
   addChordsRef,
   firstBlockRef,
   firstSpiceButtonRef,
@@ -1083,7 +1099,7 @@ function SectionGroup({
       {/* Section header */}
       <div
         className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4]"
-        style={{ color: "var(--pill-rest-fg)" }}
+        style={{ color: "oklch(0.3267 0.027 60.1)" }}
       >
         <Select
           value={section?.type ?? "verse"}
@@ -1335,6 +1351,7 @@ function SectionGroup({
                     onPickerOpen={onPickerOpen}
                     onRequestDeleteBlock={onRequestDeleteBlock}
                     onEditChordOpen={onEditChordOpen}
+                    onChordClick={onChordClick}
                     activeChordId={activeChordId}
                     onSetActiveChordId={onSetActiveChordId}
                     multiSelected={multiSelected}
@@ -1632,6 +1649,56 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [multiSelected.size]);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
+  const setChordEditorRef = useRef(setChordEditor);
+  setChordEditorRef.current = setChordEditor;
+
+  // ArrowUp / ArrowDown moves the active chord into the block above or below.
+  useEffect(() => {
+    if (!activeChordId || multiSelected.size > 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      const dir = (e.key === "ArrowUp" ? -1 : 1) as -1 | 1;
+      const { sections: s, progression: prog } = useSongStore.getState();
+      const orderedBlocks = s.flatMap((sec) => prog.filter((p) => (p.sectionId ?? p.id) === sec.id));
+      const patternOfActive = orderedBlocks.find((p) => {
+        const owner = s.find((sec) => sec.id === (p.sectionId ?? p.id));
+        return (owner ? getPatternChordsViaSSOT(owner, p) : p.chords).some((c) => c.id === activeChordId);
+      });
+      if (!patternOfActive) return;
+      const blockIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
+      const adjBlock = orderedBlocks[blockIdx + dir];
+      if (!adjBlock) return;
+      const owner = s.find((sec) => sec.id === (patternOfActive.sectionId ?? patternOfActive.id));
+      const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+      const chordIdx = chords.findIndex((c) => c.id === activeChordId);
+      const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
+      const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
+      useSongStore.getState().movePatternChordToPatternAt(
+        patternOfActive.id,
+        adjBlock.id,
+        activeChordId,
+        Math.min(Math.max(chordIdx, 0), adjChords.length),
+      );
+      // Keep chordEditor tracking the moved chord in its new block
+      setChordEditorRef.current((prev) =>
+        prev?.chordId === activeChordId
+          ? { patternId: adjBlock.id, chordId: activeChordId, sectionId: adjBlock.sectionId ?? adjBlock.id }
+          : prev,
+      );
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChordId, multiSelected.size]);
+
+  // Close the chord editor whenever the active chord is cleared (delete, escape, click-away).
+  useEffect(() => {
+    if (!activeChordId) setChordEditorRef.current(null);
+  }, [activeChordId]);
+
   const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
 
   const isMobile = useIsMobile();
@@ -1726,6 +1793,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       setPicker({ patternId, atBeat, replaceChordId: chordId });
       return;
     }
+    setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
+  };
+
+  const handleChordClick = (patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    // Toggle: clicking the same chord closes the editor
+    if (chordEditor?.patternId === patternId && chordEditor?.chordId === chordId) {
+      setChordEditor(null);
+      setActiveChordId(null);
+      return;
+    }
+    setActiveChordId(chordId);
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 
@@ -1842,6 +1922,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
           onEditChordOpen={openChordEditor}
+          onChordClick={handleChordClick}
           sortMode={sortMode}
           onMoveSection={handleAnimatedMoveSection}
           activeChordId={activeChordId}
@@ -1950,6 +2031,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             mode="progression"
             hideTrigger
             activeChord={
+              chordEditor !== null ? null :
               activeChordData
                 ? {
                     id: activeChordData.id,
