@@ -3729,6 +3729,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         const lp = sc.lyricsPlacement;
         if (!lp || validLineIds.has(lp.lineId)) return sc;
         orphansHealed++;
+        // Still anchored to a block: leave it unplaced so Write's progression
+        // chord row shows it, instead of pinning it onto a lyric line where it
+        // would travel with lyric edits. Only a chord with no block home is
+        // re-homed to a visible row so it isn't lost entirely.
+        if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
         if (!target) return { ...sc, lyricsPlacement: undefined };
         const slotIndex = Math.min(CHORD_ROW_SLOTS - 1, cursor++);
         target.chords.push({
