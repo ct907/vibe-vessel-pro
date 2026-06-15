@@ -14,6 +14,7 @@ import {
   Plus,
   CheckSquare,
   ListChecks,
+  Copy,
   Trash2,
   X,
 } from "lucide-react";
@@ -42,6 +43,8 @@ export interface FloatingChordToolbarProps {
   onClearAll: () => void;
   /** Entering multi-select seeds the selection with the active chord. */
   onEnterMultiSelect?: () => void;
+  /** Duplicate the active chord / current selection in place. */
+  onDuplicate?: () => void;
   onDelete?: () => void;
   onExitEdit: () => void;
 }
@@ -204,6 +207,7 @@ export function FloatingChordToolbar({
   onSelectAll,
   onClearAll,
   onEnterMultiSelect,
+  onDuplicate,
   onDelete,
   onExitEdit,
 }: FloatingChordToolbarProps) {
@@ -216,7 +220,13 @@ export function FloatingChordToolbar({
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const [expanded, setExpanded] = useState(false);
   const visible = !focusedEditorOpen;
-  const effectiveExpanded = visible && expanded;
+  const hasSelection = selectedCount > 0;
+  const hasContext = !!activeChord || hasSelection;
+  // On mobile the menu follows the selection: tapping a chord (which sets an
+  // active chord) opens it and clearing the selection closes it, so a tap
+  // toggles the menu. Desktop keeps the explicit open/close via the trigger
+  // button and the chordToolbarOpen signal.
+  const effectiveExpanded = visible && (expanded || (!isDesktop && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {
@@ -235,8 +245,6 @@ export function FloatingChordToolbar({
 
   if (!visible) return null;
 
-  const hasSelection = selectedCount > 0;
-  const hasContext = !!activeChord || hasSelection;
   const middleLabel = hasSelection
     ? `${selectedCount} selected`
     : multiSelectMode
@@ -375,6 +383,12 @@ export function FloatingChordToolbar({
           {octaveSelect}
           {divider}
           <LabeledBtn
+            icon={<Copy className="h-5 w-5" />}
+            label="Duplicate"
+            disabled={!hasContext}
+            onClick={hasContext ? onDuplicate : undefined}
+          />
+          <LabeledBtn
             icon={<Trash2 className="h-5 w-5" />}
             label="Delete"
             disabled={!hasContext}
@@ -436,111 +450,164 @@ export function FloatingChordToolbar({
           </Button>
         </div>
 
-        {/* Row 1: d-pad move cluster (left) · delete (right) */}
-        <div className="flex items-center gap-2">
-          <MoveDPad
-            mode={mode}
-            onShift={onShift}
-            onMoveVertical={onMoveVertical}
-            canShiftLeft={canShiftLeft}
-            canShiftRight={canShiftRight}
-            canMoveUp={canMoveUp}
-            canMoveDown={canMoveDown}
-            disabled={!hasContext}
-          />
-          <div className="flex-1" />
-          <Button
-            size="icon"
-            className={cn(
-              "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
-              !hasContext && "opacity-60 cursor-not-allowed",
-            )}
-            aria-disabled={!hasContext}
-            onClick={hasContext ? onDelete : undefined}
-            aria-label="Delete selected chord(s)"
-            title="Delete"
-          >
-            <Trash2 className="h-5 w-5" />
-          </Button>
-        </div>
+        {/* Body: a cross-shaped D-pad of movement controls (occupying two rows
+            of height) on the left, with the remaining controls stacked in two
+            rows on the right to fill the space the D-pad leaves. */}
+        <div className="flex items-stretch gap-2">
+          {/* D-pad — cross over a 3×2 grid, buttons sized 120% of the standard 36px control. */}
+          <div className="grid grid-cols-3 grid-rows-2 gap-0.5 shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-[43px] w-[43px] col-start-2 row-start-1"
+              disabled={!hasContext || !canMoveUp}
+              onClick={() => onMoveVertical?.(-1)}
+              aria-label={mode === "lyrics" ? "Move chord(s) to the row above" : "Move chord to the previous block"}
+              title={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
+            >
+              <ChevronUp className="h-6 w-6" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-[43px] w-[43px] col-start-1 row-start-1 row-span-2 self-center"
+              disabled={shiftDisabled || !canShiftLeft}
+              onClick={() => onShift(-1)}
+              aria-label="Move chord left"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-[43px] w-[43px] col-start-3 row-start-1 row-span-2 self-center"
+              disabled={shiftDisabled || !canShiftRight}
+              onClick={() => onShift(1)}
+              aria-label="Move chord right"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-[43px] w-[43px] col-start-2 row-start-2"
+              disabled={!hasContext || !canMoveDown}
+              onClick={() => onMoveVertical?.(1)}
+              aria-label={mode === "lyrics" ? "Move chord(s) to the row below" : "Move chord to the next block"}
+              title={mode === "lyrics" ? "Move to row below" : "Move to next block"}
+            >
+              <ChevronDown className="h-6 w-6" />
+            </Button>
+          </div>
 
-        {/* Row 2: select-all/multi · progression resize · chord octave */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground select-none">Select</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9"
-            disabled={selectAllDisabled}
-            onClick={onSelectAll}
-            aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
-            title="Select all"
-          >
-            <ListChecks className="h-5 w-5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className={cn(
-              "h-9 w-9",
-              multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
-            )}
-            onClick={toggleMode}
-            aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
-            title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
-          >
-            <CheckSquare className="h-5 w-5" />
-          </Button>
-          <div className="w-px h-6 bg-border mx-0.5" />
-          {mode === "progression" && (
-            <>
+          {/* Remaining controls, stacked in two rows. */}
+          <div className="flex flex-1 flex-col justify-center gap-1.5 min-w-0">
+            {/* Row 1: select-all · multi-select · delete */}
+            <div className="flex items-center justify-end gap-1">
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9"
-                disabled={beatDisabled}
-                onClick={() => onResize?.(-0.5)}
-                aria-label="Decrease beat length"
-                title="-½ beat"
+                disabled={selectAllDisabled}
+                onClick={onSelectAll}
+                aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
+                title="Select all"
               >
-                <Minus className="h-5 w-5" />
+                <ListChecks className="h-5 w-5" />
               </Button>
-              {activeChord?.lengthBeats !== undefined && (
-                <span className="px-1 text-xs font-mono-chord text-muted-foreground select-none">
-                  {Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b
-                </span>
-              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "h-9 w-9",
+                  multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+                )}
+                onClick={toggleMode}
+                aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
+                title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
+              >
+                <CheckSquare className="h-5 w-5" />
+              </Button>
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9"
-                disabled={beatDisabled}
-                onClick={() => onResize?.(0.5)}
-                aria-label="Increase beat length"
-                title="+½ beat"
+                disabled={!hasContext}
+                onClick={onDuplicate}
+                aria-label="Duplicate selected chord(s)"
+                title="Duplicate"
               >
-                <Plus className="h-5 w-5" />
+                <Copy className="h-5 w-5" />
               </Button>
               <div className="w-px h-6 bg-border mx-0.5" />
-            </>
-          )}
-          <span className="text-xs text-muted-foreground select-none">Chord Octave</span>
-          <Select
-            value={octaveDisplay === "*" ? undefined : octaveDisplay}
-            disabled={octaveDisabled}
-            onValueChange={(v) => onOctaveChange?.(Number(v))}
-          >
-            <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
-              <SelectValue>{octaveDisplay}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {[2, 3, 4, 5, 6].map((o) => (
-                <SelectItem key={o} value={String(o)} className="text-sm font-mono-chord">
-                  {o}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Button
+                size="icon"
+                className={cn(
+                  "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
+                  !hasContext && "opacity-60 cursor-not-allowed",
+                )}
+                aria-disabled={!hasContext}
+                onClick={hasContext ? onDelete : undefined}
+                aria-label="Delete selected chord(s)"
+                title="Delete"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Row 2: progression resize · chord octave */}
+            <div className="flex items-center justify-end gap-1">
+              {mode === "progression" && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9"
+                    disabled={beatDisabled}
+                    onClick={() => onResize?.(-0.5)}
+                    aria-label="Decrease beat length"
+                    title="-½ beat"
+                  >
+                    <Minus className="h-5 w-5" />
+                  </Button>
+                  {activeChord?.lengthBeats !== undefined && (
+                    <span className="px-0.5 text-xs font-mono-chord text-muted-foreground select-none">
+                      {Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b
+                    </span>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9"
+                    disabled={beatDisabled}
+                    onClick={() => onResize?.(0.5)}
+                    aria-label="Increase beat length"
+                    title="+½ beat"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </Button>
+                  <div className="w-px h-6 bg-border mx-0.5" />
+                </>
+              )}
+              <span className="text-xs text-muted-foreground select-none">Oct</span>
+              <Select
+                value={octaveDisplay === "*" ? undefined : octaveDisplay}
+                disabled={octaveDisabled}
+                onValueChange={(v) => onOctaveChange?.(Number(v))}
+              >
+                <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
+                  <SelectValue>{octaveDisplay}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6].map((o) => (
+                    <SelectItem key={o} value={String(o)} className="text-sm font-mono-chord">
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </div>
     </div>

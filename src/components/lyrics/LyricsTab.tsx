@@ -2256,6 +2256,30 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                 });
               }
             }}
+            onDuplicate={() => {
+              if (targets.length === 0) return;
+              const place = useSongStore.getState().upsertChordAt;
+              for (const t of targets) {
+                const found = lookupAnchor(t.id);
+                if (!found) continue;
+                const sec = useSongStore.getState().sections.find((x) => x.id === t.sectionId);
+                const line = sec?.lines.find((l) => l.id === t.lineId);
+                if (!line) continue;
+                const occupied = new Set(line.chords.map((c) => c.slotIndex ?? 0));
+                const start = (found.anchor.slotIndex ?? 0) + 1;
+                let slot = -1;
+                for (let cand = start; cand < CHORD_ROW_SLOTS; cand++) {
+                  if (!occupied.has(cand)) { slot = cand; break; }
+                }
+                if (slot < 0) {
+                  for (let cand = CHORD_ROW_SLOTS - 1; cand >= 0; cand--) {
+                    if (!occupied.has(cand)) { slot = cand; break; }
+                  }
+                }
+                if (slot < 0) continue;
+                place(t.sectionId, t.lineId, slot, found.anchor.chord);
+              }
+            }}
             onDelete={() => {
               if (targets.length === 0) return;
               const byLine = new Map<string, { sectionId: string; lineId: string; ids: string[] }>();
