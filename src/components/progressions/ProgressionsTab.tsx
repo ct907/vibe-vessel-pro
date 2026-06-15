@@ -4,7 +4,6 @@ import { useDndStore } from "@/store/dnd";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
-import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
@@ -15,6 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -158,6 +164,7 @@ interface PatternProps {
   spiceHeaderRef?: React.RefObject<HTMLDivElement | null>;
   onVariationApplied?: () => void;
   onSpiceOpenChange?: (open: boolean) => void;
+  onChordClick: (patternId: string, chordId: string) => void;
 }
 
 function formatBeats(n: number) {
@@ -184,6 +191,7 @@ function PatternBlock({
   spiceHeaderRef,
   onVariationApplied,
   onSpiceOpenChange,
+  onChordClick,
 }: PatternProps) {
   const {
     updatePattern,
@@ -320,17 +328,6 @@ function PatternBlock({
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         movePatternChordRef.current(pattern.id, id, 1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        resizePatternChordsWithOverflowRef.current(pattern.id, [id], LENGTH_STEP);
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const chord = activeChordInThisBlockRef.current;
-        setPatternChordLengthRef.current(
-          pattern.id,
-          id,
-          Math.max(MIN_LEN, chord.lengthBeats - LENGTH_STEP),
-        );
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         removePatternChordsBatch(pattern.id, [id]);
@@ -568,6 +565,8 @@ function PatternBlock({
                           const isSelected = multiSelected.has(c.id);
                           return (
                             <div className="relative flex items-stretch w-full">
+                              <ContextMenu>
+                              <ContextMenuTrigger asChild>
                               <div
                                 data-pattern-chord={c.id}
                                 role="button"
@@ -606,11 +605,11 @@ function PatternBlock({
                                   }
                                 }}
                                 onContextMenu={(e) => {
-                                  e.preventDefault();
                                   if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
-                                  if (e.shiftKey) { onToggleMultiSelected(c.id, pattern.id); return; }
-                                  onSetActiveChordId(null);
-                                  onEditChordOpen(pattern.id, c.id);
+                                  if (e.shiftKey) {
+                                    e.preventDefault();
+                                    onToggleMultiSelected(c.id, pattern.id);
+                                  }
                                 }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
@@ -628,14 +627,14 @@ function PatternBlock({
                                   }
                                   setFocusedPattern(pattern.id);
                                   void playChord(displayChord, undefined, c.chord.octave ?? 3);
-                                  onSetActiveChordId(activeChordId === c.id ? null : c.id);
+                                  onChordClick(pattern.id, c.id);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     void playChord(displayChord, undefined, c.chord.octave ?? 3);
-                                    onSetActiveChordId(c.id);
+                                    onChordClick(pattern.id, c.id);
                                   }
                                 }}
                                 className={cn(
@@ -656,6 +655,20 @@ function PatternBlock({
                                   {formatBeats(c.lengthBeats)}b
                                 </span>
                               </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => onEditChordOpen(pattern.id, c.id)}>
+                                  <Pencil className="h-4 w-4 mr-2" /> Replace chord
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                  onClick={() => { removePatternChordsBatch(pattern.id, [c.id]); onSetActiveChordId(null); }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                              </ContextMenu>
                               {effectiveOffset !== 0 && (
                                 <span
                                   aria-hidden
@@ -799,152 +812,6 @@ function PatternBlock({
           })()}
       </div>
 
-      {/* Floating chord toolbar — reorder, bar-length, multi-select.
-          Hidden on mobile; mobile uses the global FloatingChordToolbar. */}
-      {!isMobile && activeChordInThisBlock && (
-        <div className="mt-2 flex justify-center">
-          <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-2 py-1.5 flex-wrap">
-            {/* ← → reorder */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              disabled={activeIdx <= 0 || blockSelectedIds.size > 1}
-              onClick={(e) => {
-                e.stopPropagation();
-                movePatternChord(pattern.id, activeChordId!, -1);
-              }}
-              aria-label="Move chord earlier"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <span className="px-1 text-base font-mono-chord text-muted-foreground">
-              {(effectiveOffset ? transposeChord(activeChordInThisBlock.chord, effectiveOffset) : activeChordInThisBlock.chord).display}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              disabled={activeIdx >= sortedChords.length - 1 || blockSelectedIds.size > 1}
-              onClick={(e) => {
-                e.stopPropagation();
-                movePatternChord(pattern.id, activeChordId!, 1);
-              }}
-              aria-label="Move chord later"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
-
-            <div className="w-px h-6 bg-border mx-0.5" />
-
-            {/* Bar-length −½ / display / +½ */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={(e) => {
-                e.stopPropagation();
-                resizePatternChordsWithOverflow(
-                  pattern.id,
-                  blockSelectedIds.size > 0 ? Array.from(blockSelectedIds) : [activeChordId!],
-                  -LENGTH_STEP,
-                );
-              }}
-              aria-label="Decrease bar length by half"
-              title="-½ bar"
-            >
-              <Minus className="h-5 w-5" />
-            </Button>
-            <span className="px-0.5 text-sm font-mono-chord text-muted-foreground select-none">
-              {formatBeats(activeChordInThisBlock.lengthBeats)}b
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={(e) => {
-                e.stopPropagation();
-                resizePatternChordsWithOverflow(
-                  pattern.id,
-                  blockSelectedIds.size > 0 ? Array.from(blockSelectedIds) : [activeChordId!],
-                  LENGTH_STEP,
-                );
-              }}
-              aria-label="Increase bar length by half"
-              title="+½ bar"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-
-            <div className="w-px h-6 bg-border mx-0.5" />
-
-            {/* Multi-select toggle: adds/removes active chord to/from cross-block selection */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-9 w-9",
-                blockSelectedIds.has(activeChordId!) && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleMultiSelected(activeChordId!, pattern.id);
-              }}
-              aria-label="Toggle multi-select"
-              title="Shift+click or use this button to multi-select"
-            >
-              <CheckSquare className="h-5 w-5" />
-            </Button>
-
-            {/* Select all in this block */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={(e) => {
-                e.stopPropagation();
-                sortedChords.forEach((ch) => {
-                  if (!multiSelected.has(ch.id)) onToggleMultiSelected(ch.id, pattern.id);
-                });
-              }}
-              aria-label="Select all chords in block"
-              title="Select all"
-            >
-              <ListChecks className="h-5 w-5" />
-            </Button>
-
-            <div className="w-px h-6 bg-border mx-0.5" />
-
-            {/* Octave picker */}
-            <span className="text-xs text-muted-foreground select-none">Oct</span>
-            <Select
-              value={String(activeChordInThisBlock.chord.octave ?? 3)}
-              onValueChange={(v) => {
-                const oct = Number(v);
-                const ids = blockSelectedIds.size > 0 ? Array.from(blockSelectedIds) : [activeChordId!];
-                if (ids.length > 1) {
-                  bulkSetChordOctave(pattern.id, ids, oct);
-                } else {
-                  updatePatternChord(pattern.id, activeChordId!, {
-                    chord: { ...activeChordInThisBlock.chord, octave: oct },
-                  });
-                }
-              }}
-            >
-              <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5, 6].map((o) => (
-                  <SelectItem key={o} value={String(o)} className="text-sm font-mono-chord">
-                    {o}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
 
 
       <SpiceSheet
@@ -982,6 +849,7 @@ interface SectionGroupProps {
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
+  onChordClick: (patternId: string, chordId: string) => void;
   addChordsRef?: React.RefObject<HTMLButtonElement | null>;
   firstBlockRef?: React.RefObject<HTMLDivElement | null>;
   firstSpiceButtonRef?: React.RefObject<HTMLButtonElement | null>;
@@ -1009,6 +877,7 @@ function SectionGroup({
   onToggleMultiSelected,
   onClearMultiSelected,
   onAddNewBlockRequest,
+  onChordClick,
   addChordsRef,
   firstBlockRef,
   firstSpiceButtonRef,
@@ -1083,7 +952,7 @@ function SectionGroup({
       {/* Section header */}
       <div
         className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4]"
-        style={{ color: "var(--pill-rest-fg)" }}
+        style={{ color: "oklch(0.3267 0.027 60.1)" }}
       >
         <Select
           value={section?.type ?? "verse"}
@@ -1335,6 +1204,7 @@ function SectionGroup({
                     onPickerOpen={onPickerOpen}
                     onRequestDeleteBlock={onRequestDeleteBlock}
                     onEditChordOpen={onEditChordOpen}
+                    onChordClick={onChordClick}
                     activeChordId={activeChordId}
                     onSetActiveChordId={onSetActiveChordId}
                     multiSelected={multiSelected}
@@ -1632,11 +1502,60 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [multiSelected.size]);
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
+  const setChordEditorRef = useRef(setChordEditor);
+  setChordEditorRef.current = setChordEditor;
+
+  // ArrowUp / ArrowDown moves the active chord into the block above or below.
+  useEffect(() => {
+    if (!activeChordId || multiSelected.size > 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      const dir = (e.key === "ArrowUp" ? -1 : 1) as -1 | 1;
+      const { sections: s, progression: prog } = useSongStore.getState();
+      const orderedBlocks = s.flatMap((sec) => prog.filter((p) => (p.sectionId ?? p.id) === sec.id));
+      const patternOfActive = orderedBlocks.find((p) => {
+        const owner = s.find((sec) => sec.id === (p.sectionId ?? p.id));
+        return (owner ? getPatternChordsViaSSOT(owner, p) : p.chords).some((c) => c.id === activeChordId);
+      });
+      if (!patternOfActive) return;
+      const blockIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
+      const adjBlock = orderedBlocks[blockIdx + dir];
+      if (!adjBlock) return;
+      const owner = s.find((sec) => sec.id === (patternOfActive.sectionId ?? patternOfActive.id));
+      const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+      const chordIdx = chords.findIndex((c) => c.id === activeChordId);
+      const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
+      const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
+      useSongStore.getState().movePatternChordToPatternAt(
+        patternOfActive.id,
+        adjBlock.id,
+        activeChordId,
+        Math.min(Math.max(chordIdx, 0), adjChords.length),
+      );
+      // Keep chordEditor tracking the moved chord in its new block
+      setChordEditorRef.current((prev) =>
+        prev?.chordId === activeChordId
+          ? { patternId: adjBlock.id, chordId: activeChordId, sectionId: adjBlock.sectionId ?? adjBlock.id }
+          : prev,
+      );
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChordId, multiSelected.size]);
+
+  // Close the chord editor whenever the active chord is cleared (delete, escape, click-away).
+  useEffect(() => {
+    if (!activeChordId) setChordEditorRef.current(null);
+  }, [activeChordId]);
+
   const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const floatingToolbarExpanded = useUIStore((s) => s.toolbarExpanded);
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
@@ -1726,6 +1645,19 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       setPicker({ patternId, atBeat, replaceChordId: chordId });
       return;
     }
+    setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
+  };
+
+  const handleChordClick = (patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    // Toggle: clicking the same chord closes the editor
+    if (chordEditor?.patternId === patternId && chordEditor?.chordId === chordId) {
+      setChordEditor(null);
+      setActiveChordId(null);
+      return;
+    }
+    setActiveChordId(chordId);
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 
@@ -1842,6 +1774,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
           onEditChordOpen={openChordEditor}
+          onChordClick={handleChordClick}
           sortMode={sortMode}
           onMoveSection={handleAnimatedMoveSection}
           activeChordId={activeChordId}
@@ -1865,215 +1798,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         />
       ))}
 
-      {(() => {
-        const patternOfActive = activeChordId
-          ? progression.find((p) => {
-              const owner = sections.find((s) => s.id === (p.sectionId ?? p.id));
-              const chords = owner ? getPatternChordsViaSSOT(owner, p) : p.chords;
-              return chords.some((c) => c.id === activeChordId);
-            }) ?? null
-          : null;
-        const activeChordData = (() => {
-          if (!patternOfActive || !activeChordId) return null;
-          const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
-          const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-          return chords.find((c) => c.id === activeChordId) ?? null;
-        })();
-        const activeIdx = patternOfActive && activeChordId
-          ? (() => {
-              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
-              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-              return chords.findIndex((c) => c.id === activeChordId);
-            })()
-          : -1;
-        const activeBlockLen = patternOfActive
-          ? (() => {
-              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
-              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-              return chords.length;
-            })()
-          : 0;
-
-        // Blocks flattened in section order — a single chord at the edge of its
-        // block can keep moving into the previous/next block in this order.
-        const orderedBlocks = sections.flatMap((sec) =>
-          progression.filter((p) => (p.sectionId ?? p.id) === sec.id),
-        );
-        const blockIdx = patternOfActive
-          ? orderedBlocks.findIndex((b) => b.id === patternOfActive.id)
-          : -1;
-        const adjacentBlock = (dir: -1 | 1) =>
-          blockIdx >= 0 ? orderedBlocks[blockIdx + dir] ?? null : null;
-
-        const canShiftLeftSingle = activeIdx > 0 || (activeIdx === 0 && !!adjacentBlock(-1));
-        const canShiftRightSingle =
-          activeIdx >= 0 && (activeIdx < activeBlockLen - 1 || !!adjacentBlock(1));
-        const canShiftLeftMulti = multiSelected.size > 0 && (() => {
-          for (const [chordId, patternId] of multiSelected) {
-            const pat = progression.find((p) => p.id === patternId);
-            if (!pat) return false;
-            const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
-            const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
-            const idx = chords.findIndex((c) => c.id === chordId);
-            if (idx <= 0) return false;
-          }
-          return true;
-        })();
-        const canShiftRightMulti = multiSelected.size > 0 && (() => {
-          for (const [chordId, patternId] of multiSelected) {
-            const pat = progression.find((p) => p.id === patternId);
-            if (!pat) return false;
-            const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
-            const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
-            const idx = chords.findIndex((c) => c.id === chordId);
-            if (idx < 0 || idx >= chords.length - 1) return false;
-          }
-          return true;
-        })();
-
-        const useMulti = multiSelected.size > 0;
-        const canShiftLeft = useMulti ? canShiftLeftMulti : canShiftLeftSingle;
-        const canShiftRight = useMulti ? canShiftRightMulti : canShiftRightSingle;
-
-        const selectedOctaves: number[] = [];
-        multiSelected.forEach((patternId, chordId) => {
-          const pat = progression.find((p) => p.id === patternId);
-          if (!pat) return;
-          const owner = sections.find((s) => s.id === (pat.sectionId ?? pat.id));
-          const chords = owner ? getPatternChordsViaSSOT(owner, pat) : pat.chords;
-          const c = chords.find((cc) => cc.id === chordId);
-          if (c?.chord.octave !== undefined) selectedOctaves.push(c.chord.octave);
-        });
-
-        return (
-          <FloatingChordToolbar
-            mode="progression"
-            hideTrigger
-            activeChord={
-              activeChordData
-                ? {
-                    id: activeChordData.id,
-                    display: activeChordData.chord.display,
-                    octave: activeChordData.chord.octave,
-                    lengthBeats: activeChordData.lengthBeats,
-                  }
-                : null
-            }
-            selectedCount={multiSelected.size}
-            selectedOctaves={selectedOctaves}
-            canShiftLeft={canShiftLeft}
-            canShiftRight={canShiftRight}
-            onShift={(dir) => {
-              if (useMulti) {
-                handleMultiShift(dir);
-                return;
-              }
-              if (!patternOfActive || !activeChordId) return;
-              const atEdge = dir === -1 ? activeIdx === 0 : activeIdx === activeBlockLen - 1;
-              if (atEdge) {
-                const adj = adjacentBlock(dir);
-                if (!adj) return;
-                const owner = sections.find((s) => s.id === (adj.sectionId ?? adj.id));
-                const adjLen = (owner ? getPatternChordsViaSSOT(owner, adj) : adj.chords).length;
-                useSongStore.getState().movePatternChordToPatternAt(
-                  patternOfActive.id,
-                  adj.id,
-                  activeChordId,
-                  dir === -1 ? adjLen : 0,
-                );
-                return;
-              }
-              movePatternChord(patternOfActive.id, activeChordId, dir);
-            }}
-            canMoveUp={!useMulti && !!patternOfActive && !!adjacentBlock(-1)}
-            canMoveDown={!useMulti && !!patternOfActive && !!adjacentBlock(1)}
-            onMoveVertical={(dir) => {
-              if (useMulti || !patternOfActive || !activeChordId) return;
-              const adj = adjacentBlock(dir);
-              if (!adj) return;
-              const owner = sections.find((s) => s.id === (adj.sectionId ?? adj.id));
-              const adjLen = (owner ? getPatternChordsViaSSOT(owner, adj) : adj.chords).length;
-              // Land at the same position within the target block, clamped.
-              useSongStore.getState().movePatternChordToPatternAt(
-                patternOfActive.id,
-                adj.id,
-                activeChordId,
-                Math.min(Math.max(activeIdx, 0), adjLen),
-              );
-            }}
-            onResize={(delta) => {
-              if (useMulti) handleMultiResize(delta);
-              else if (patternOfActive && activeChordId)
-                resizePatternChordsWithOverflow(patternOfActive.id, [activeChordId], delta);
-            }}
-            onOctaveChange={(oct) => {
-              if (useMulti) {
-                const byPattern = new Map<string, string[]>();
-                multiSelected.forEach((patternId, chordId) => {
-                  const arr = byPattern.get(patternId) ?? [];
-                  arr.push(chordId);
-                  byPattern.set(patternId, arr);
-                });
-                byPattern.forEach((chordIds, patternId) => bulkSetChordOctave(patternId, chordIds, oct));
-                if (patternOfActive) {
-                  const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
-                  const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-                  const firstSelected = chords.find((c) => multiSelected.has(c.id));
-                  if (firstSelected) void playChord(firstSelected.chord, undefined, oct);
-                }
-              } else if (patternOfActive && activeChordData) {
-                updatePatternChord(patternOfActive.id, activeChordData.id, {
-                  chord: { ...activeChordData.chord, octave: oct },
-                });
-                void playChord(activeChordData.chord, undefined, oct);
-              }
-            }}
-            onSelectAll={() => {
-              if (!patternOfActive) return;
-              const owner = sections.find((s) => s.id === (patternOfActive.sectionId ?? patternOfActive.id));
-              const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
-              chords.forEach((c) => {
-                if (!multiSelected.has(c.id)) toggleMultiSelected(c.id, patternOfActive.id);
-              });
-            }}
-            onClearAll={() => {
-              setActiveChordId(null);
-              setMultiSelected(new Map());
-            }}
-            onEnterMultiSelect={() => {
-              if (activeChordId && patternOfActive && !multiSelected.has(activeChordId)) {
-                toggleMultiSelected(activeChordId, patternOfActive.id);
-              }
-            }}
-            onDelete={() => {
-              const removeBatch = useSongStore.getState().removePatternChordsBatch;
-              if (multiSelected.size > 0) {
-                const byPattern = new Map<string, string[]>();
-                for (const [chordId, patternId] of multiSelected) {
-                  const arr = byPattern.get(patternId) ?? [];
-                  arr.push(chordId);
-                  byPattern.set(patternId, arr);
-                }
-                for (const [patId, ids] of byPattern) {
-                  removeBatch(patId, ids);
-                }
-                setMultiSelected(new Map());
-              } else if (activeChordId && patternOfActive) {
-                removeBatch(patternOfActive.id, [activeChordId]);
-              }
-              setActiveChordId(null);
-            }}
-            onExitEdit={() => {
-              setActiveChordId(null);
-              setMultiSelected(new Map());
-            }}
-          />
-        );
-      })()}
-
-      {/* Cross-block multi-select toolbar (desktop). Hidden while the floating
-          chord toolbar is expanded so the two don't stack. */}
-      {!isMobile && multiSelected.size > 0 && !floatingToolbarExpanded && (
+      {/* Cross-block multi-select toolbar (desktop). */}
+      {!isMobile && multiSelected.size > 0 && (
         <div className="sticky bottom-10 z-30 flex justify-center pointer-events-none">
           <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-3 py-2 pointer-events-auto">
             <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handleMultiShift(-1)} aria-label="Move selection earlier" title="Move left (← also works)">
