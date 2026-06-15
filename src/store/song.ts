@@ -952,11 +952,18 @@ function deriveMirrorsFromSectionChords(
   // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
   const anchorsByLine = new Map<string, ChordAnchor[]>();
   section.lines.forEach((l) => anchorsByLine.set(l.id, []));
+  // Pointer self-heal: a lyricsPlacement aimed at a line that no longer exists
+  // is a phantom-in-waiting — invisible in Write yet kept alive by its
+  // progressionPlacement and re-rendered in Arrange. Repair it at this single
+  // chokepoint (every SSOT mutation flows through here) by demoting the chord
+  // to progression-only, rather than silently skipping the anchor while
+  // leaving the dangling pointer in the SSOT.
+  const danglingLyricIds = new Set<string>();
   for (const sc of section.chords) {
     const lp = sc.lyricsPlacement;
     if (!lp) continue;
     const bucket = anchorsByLine.get(lp.lineId);
-    if (!bucket) continue;
+    if (!bucket) { danglingLyricIds.add(sc.id); continue; }
     bucket.push({
       id: sc.id,
       offset: lp.slotIndex,
@@ -1038,11 +1045,17 @@ function deriveMirrorsFromSectionChords(
   }
 
   // Build updated section with possibly-remapped SC placements.
-  const nextSectionChords = section.chords.map((sc) => {
-    const np = remappedPlacement.get(sc.id);
-    if (!np) return sc;
-    return { ...sc, progressionPlacement: np };
-  });
+  const nextSectionChords = section.chords
+    .map((sc) => {
+      const cleaned = danglingLyricIds.has(sc.id)
+        ? { ...sc, lyricsPlacement: undefined }
+        : sc;
+      const np = remappedPlacement.get(sc.id);
+      return np ? { ...cleaned, progressionPlacement: np } : cleaned;
+    })
+    // Drop chords left with no placement on either side — neither view can
+    // show them, so keeping them only re-seeds the phantom problem.
+    .filter((sc) => sc.lyricsPlacement || sc.progressionPlacement);
   const nextSection: Section = {
     ...section,
     chords: nextSectionChords,
