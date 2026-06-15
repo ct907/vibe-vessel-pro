@@ -223,6 +223,7 @@ function PatternBlock({
   const isMobile = useIsMobile();
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setWhyChord = useUIStore((s) => s.setWhyChord);
+  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
 
@@ -694,13 +695,11 @@ function PatternBlock({
                                   onTouchStart={(e) => e.stopPropagation()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    usePlaybackStore.getState().setStartFromChord(pattern.id, c.id);
-                                    window.dispatchEvent(new Event("lovable:request-play"));
-                                    onSetActiveChordId(null);
+                                    setChordToolbarOpen(true);
                                   }}
-                                  aria-label="Play from here"
+                                  aria-label="Edit chord"
                                 >
-                                  <Play className="h-3.5 w-3.5 fill-current" />
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </button>
                               )}
                               {isActive && (
@@ -1557,7 +1556,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
@@ -1698,12 +1696,12 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [activeChordId, multiSelected, sections, progression]);
 
   const handleChordClick = (_patternId: string, chordId: string) => {
+    // Tapping a chord only selects it — the pencil overlay opens the editor.
     if (activeChordId === chordId) {
       setActiveChordId(null);
       return;
     }
     setActiveChordId(chordId);
-    setChordToolbarOpen(true);
   };
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
@@ -2113,6 +2111,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         <FloatingChordToolbar
           mode="progression"
           hideTrigger
+          autoExpandOnContext={false}
           activeChord={toolbarContext.activeChordData}
           selectedCount={multiSelected.size}
           selectedOctaves={toolbarContext.selectedOctaves}

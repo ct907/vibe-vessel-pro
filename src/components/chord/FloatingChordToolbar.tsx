@@ -25,6 +25,10 @@ export interface FloatingChordToolbarProps {
   mode: Mode;
   /** When true, the Pencil FAB trigger button is hidden (sticky bar provides it). */
   hideTrigger?: boolean;
+  /** On mobile, auto-expand the menu whenever a chord is active/selected.
+   *  Progressions opts out: tapping a chord shows a pencil overlay that opens
+   *  the menu explicitly instead. Defaults to true. */
+  autoExpandOnContext?: boolean;
   activeChord:
     | { id: string; display: string; octave?: number; lengthBeats?: number }
     | null;
@@ -193,6 +197,7 @@ function MoveDPad({
 export function FloatingChordToolbar({
   mode,
   hideTrigger = false,
+  autoExpandOnContext = true,
   activeChord,
   selectedCount,
   selectedOctaves,
@@ -226,7 +231,8 @@ export function FloatingChordToolbar({
   // active chord) opens it and clearing the selection closes it, so a tap
   // toggles the menu. Desktop keeps the explicit open/close via the trigger
   // button and the chordToolbarOpen signal.
-  const effectiveExpanded = visible && (expanded || (!isDesktop && hasContext));
+  const effectiveExpanded =
+    visible && (expanded || (autoExpandOnContext && !isDesktop && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {
@@ -425,16 +431,17 @@ export function FloatingChordToolbar({
         style={ANIM_STYLE}
         className={cn(
           "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
-          "rounded-2xl border bg-popover shadow-lg px-2 py-2 flex flex-col gap-1.5 min-w-[20rem]",
+          "rounded-2xl border bg-[var(--paper-card)] shadow-lg overflow-hidden",
+          "w-[22rem] max-w-[calc(100vw-2rem)]",
           expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
         )}
       >
         {/* Header: chord name / status + close */}
-        <div className="flex items-center gap-1 px-1 pb-0.5">
+        <div className="flex items-center gap-1 border-b px-3 py-1.5">
           <span
             className={cn(
-              "flex-1 text-center text-sm font-semibold select-none truncate",
-              hasContext ? "font-mono-chord text-foreground" : "text-muted-foreground",
+              "flex-1 text-center text-base font-mono-chord font-semibold select-none truncate",
+              hasContext ? "text-foreground" : "capitalize text-[var(--ink-soft)]",
             )}
           >
             {middleLabel}
@@ -442,84 +449,68 @@ export function FloatingChordToolbar({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7"
+            className="h-7 w-7 shrink-0"
             onClick={close}
             aria-label="Close toolbar"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Body: a cross-shaped D-pad of movement controls (occupying two rows
-            of height) on the left, with the remaining controls stacked in two
-            rows on the right to fill the space the D-pad leaves. */}
-        <div className="flex items-stretch gap-2">
-          {/* D-pad — cross over a 3×2 grid, buttons sized 120% of the standard 36px control. */}
-          <div className="grid grid-cols-3 grid-rows-2 gap-0.5 shrink-0">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-[43px] w-[43px] col-start-2 row-start-1"
+        {/* Body grid: a Move cross on the left, the Select / Length / Octave
+            rows stacked in the middle, and a full-height Delete on the right —
+            each region separated by hairline dividers. */}
+        <div className="flex items-stretch">
+          {/* Move cross — chevrons around a bold "Move" label. */}
+          <div
+            role="group"
+            aria-label="Move chord"
+            className="grid shrink-0 place-items-center border-r px-1 py-2"
+            style={{ gridTemplateColumns: "auto auto auto", gridTemplateRows: "auto auto auto" }}
+          >
+            <span />
+            <DPadButton
+              icon={<ChevronUp className="h-6 w-6" />}
+              label={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
               disabled={!hasContext || !canMoveUp}
               onClick={() => onMoveVertical?.(-1)}
-              aria-label={mode === "lyrics" ? "Move chord(s) to the row above" : "Move chord to the previous block"}
-              title={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
-            >
-              <ChevronUp className="h-6 w-6" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-[43px] w-[43px] col-start-1 row-start-1 row-span-2 self-center"
-              disabled={shiftDisabled || !canShiftLeft}
+            />
+            <span />
+            <DPadButton
+              icon={<ChevronLeft className="h-6 w-6" />}
+              label="Move earlier"
+              disabled={!hasContext || !canShiftLeft}
               onClick={() => onShift(-1)}
-              aria-label="Move chord left"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-[43px] w-[43px] col-start-3 row-start-1 row-span-2 self-center"
-              disabled={shiftDisabled || !canShiftRight}
+            />
+            <span className="px-1 text-base font-semibold text-foreground select-none">Move</span>
+            <DPadButton
+              icon={<ChevronRight className="h-6 w-6" />}
+              label="Move later"
+              disabled={!hasContext || !canShiftRight}
               onClick={() => onShift(1)}
-              aria-label="Move chord right"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-[43px] w-[43px] col-start-2 row-start-2"
+            />
+            <span />
+            <DPadButton
+              icon={<ChevronDown className="h-6 w-6" />}
+              label={mode === "lyrics" ? "Move to row below" : "Move to next block"}
               disabled={!hasContext || !canMoveDown}
               onClick={() => onMoveVertical?.(1)}
-              aria-label={mode === "lyrics" ? "Move chord(s) to the row below" : "Move chord to the next block"}
-              title={mode === "lyrics" ? "Move to row below" : "Move to next block"}
-            >
-              <ChevronDown className="h-6 w-6" />
-            </Button>
+            />
+            <span />
           </div>
 
-          {/* Remaining controls, stacked in two rows. */}
-          <div className="flex flex-1 flex-col justify-center gap-1.5 min-w-0">
-            {/* Row 1: select-all · multi-select · delete */}
-            <div className="flex items-center justify-end gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                disabled={selectAllDisabled}
-                onClick={onSelectAll}
-                aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
-                title="Select all"
-              >
-                <ListChecks className="h-5 w-5" />
-              </Button>
+          {/* Middle: stacked control rows. */}
+          <div className="flex min-w-0 flex-1 flex-col divide-y">
+            {/* Select: multi-select · select-all · duplicate */}
+            <div className="flex items-center gap-1 px-3 py-2">
+              <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+                Select
+              </span>
               <Button
                 size="icon"
                 variant="ghost"
                 className={cn(
-                  "h-9 w-9",
+                  "h-8 w-8",
                   multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
                 )}
                 onClick={toggleMode}
@@ -531,7 +522,18 @@ export function FloatingChordToolbar({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-8 w-8"
+                disabled={selectAllDisabled}
+                onClick={onSelectAll}
+                aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
+                title="Select all"
+              >
+                <ListChecks className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
                 disabled={!hasContext}
                 onClick={onDuplicate}
                 aria-label="Duplicate selected chord(s)"
@@ -539,63 +541,55 @@ export function FloatingChordToolbar({
               >
                 <Copy className="h-5 w-5" />
               </Button>
-              <div className="w-px h-6 bg-border mx-0.5" />
-              <Button
-                size="icon"
-                className={cn(
-                  "h-9 w-9 text-destructive border border-destructive/40 bg-destructive/5 hover:text-destructive hover:bg-destructive/10",
-                  !hasContext && "opacity-60 cursor-not-allowed",
-                )}
-                aria-disabled={!hasContext}
-                onClick={hasContext ? onDelete : undefined}
-                aria-label="Delete selected chord(s)"
-                title="Delete"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
             </div>
 
-            {/* Row 2: progression resize · chord octave */}
-            <div className="flex items-center justify-end gap-1">
-              {mode === "progression" && (
-                <>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-9 w-9"
-                    disabled={beatDisabled}
-                    onClick={() => onResize?.(-0.5)}
-                    aria-label="Decrease beat length"
-                    title="-½ beat"
-                  >
-                    <Minus className="h-5 w-5" />
-                  </Button>
-                  {activeChord?.lengthBeats !== undefined && (
-                    <span className="px-0.5 text-xs font-mono-chord text-muted-foreground select-none">
-                      {Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b
-                    </span>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-9 w-9"
-                    disabled={beatDisabled}
-                    onClick={() => onResize?.(0.5)}
-                    aria-label="Increase beat length"
-                    title="+½ beat"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                  <div className="w-px h-6 bg-border mx-0.5" />
-                </>
-              )}
-              <span className="text-xs text-muted-foreground select-none">Oct</span>
+            {/* Length (progression only): −½ · beats · +½ */}
+            {mode === "progression" && (
+              <div className="flex items-center gap-1 px-3 py-2">
+                <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+                  Length
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  disabled={beatDisabled}
+                  onClick={() => onResize?.(-0.5)}
+                  aria-label="Decrease beat length"
+                  title="-½ beat"
+                >
+                  <Minus className="h-5 w-5" />
+                </Button>
+                <span className="w-9 text-center text-sm font-mono-chord text-muted-foreground select-none">
+                  {activeChord?.lengthBeats !== undefined
+                    ? `${Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b`
+                    : "—"}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  disabled={beatDisabled}
+                  onClick={() => onResize?.(0.5)}
+                  aria-label="Increase beat length"
+                  title="+½ beat"
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </div>
+            )}
+
+            {/* Chord Octave */}
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+                Chord Octave
+              </span>
               <Select
                 value={octaveDisplay === "*" ? undefined : octaveDisplay}
                 disabled={octaveDisabled}
                 onValueChange={(v) => onOctaveChange?.(Number(v))}
               >
-                <SelectTrigger className="h-8 w-16 text-sm font-mono-chord border-0 shadow-none focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="h-8 w-16 rounded-lg border-0 bg-[var(--paper-shade)] text-sm font-mono-chord shadow-none focus:ring-0 focus:ring-offset-0">
                   <SelectValue>{octaveDisplay}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -607,6 +601,24 @@ export function FloatingChordToolbar({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Delete — full-height, right column. */}
+          <div className="flex items-center justify-center border-l px-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10",
+                !hasContext && "opacity-50 cursor-not-allowed",
+              )}
+              aria-disabled={!hasContext}
+              onClick={hasContext ? onDelete : undefined}
+              aria-label="Delete selected chord(s)"
+              title="Delete"
+            >
+              <Trash2 className="h-6 w-6" />
+            </Button>
           </div>
         </div>
       </div>
