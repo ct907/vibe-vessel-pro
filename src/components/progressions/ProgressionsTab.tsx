@@ -5,6 +5,7 @@ import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type Patt
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
+import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
 import { ChordChip } from "@/components/chord/ChordChip";
@@ -1556,6 +1557,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
+  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
@@ -1648,17 +1650,60 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 
-  const handleChordClick = (patternId: string, chordId: string) => {
-    const pat = progression.find((p) => p.id === patternId);
-    if (!pat) return;
-    // Toggle: clicking the same chord closes the editor
-    if (chordEditor?.patternId === patternId && chordEditor?.chordId === chordId) {
-      setChordEditor(null);
+  const toolbarContext = useMemo(() => {
+    const orderedBlocks = sections.flatMap((sec) =>
+      progression.filter((p) => (p.sectionId ?? p.id) === sec.id),
+    );
+
+    let activePatternId: string | null = null;
+    let activeChordData: { id: string; display: string; octave?: number; lengthBeats?: number } | null = null;
+    let activeChordIdx = -1;
+    let chordsInActiveBlock: ReturnType<typeof getPatternChordsViaSSOT> = [];
+
+    if (activeChordId) {
+      outer: for (const sec of sections) {
+        for (const pat of progression.filter((p) => (p.sectionId ?? p.id) === sec.id)) {
+          const chords = getPatternChordsViaSSOT(sec, pat);
+          const idx = chords.findIndex((c) => c.id === activeChordId);
+          if (idx >= 0) {
+            activePatternId = pat.id;
+            activeChordIdx = idx;
+            chordsInActiveBlock = chords;
+            const chord = chords[idx];
+            activeChordData = { id: chord.id, display: chord.chord.display, octave: chord.chord.octave, lengthBeats: chord.lengthBeats };
+            break outer;
+          }
+        }
+      }
+    }
+
+    const blockIdx = activePatternId ? orderedBlocks.findIndex((b) => b.id === activePatternId) : -1;
+    const canMoveUp = blockIdx > 0;
+    const canMoveDown = blockIdx >= 0 && blockIdx < orderedBlocks.length - 1;
+    const canShiftLeft = multiSelected.size > 0 || activeChordIdx > 0;
+    const canShiftRight = multiSelected.size > 0 || (activeChordIdx >= 0 && activeChordIdx < chordsInActiveBlock.length - 1);
+
+    const selectedOctaves: number[] = [];
+    for (const [chordId, patternId] of multiSelected) {
+      const pat = progression.find((p) => p.id === patternId);
+      const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
+      if (sec && pat) {
+        const chord = getPatternChordsViaSSOT(sec, pat).find((c) => c.id === chordId);
+        if (chord?.chord.octave != null) selectedOctaves.push(chord.chord.octave);
+      }
+    }
+
+    return { activeChordData, activePatternId, canMoveUp, canMoveDown, canShiftLeft, canShiftRight, selectedOctaves };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChordId, multiSelected, sections, progression]);
+
+  const handleChordClick = (_patternId: string, chordId: string) => {
+    if (activeChordId === chordId) {
       setActiveChordId(null);
       return;
     }
     setActiveChordId(chordId);
-    setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
+    setChordToolbarOpen(true);
   };
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
@@ -2061,6 +2106,110 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           atBeat={patternAddSlot.atBeat}
           onClose={() => setPatternAddSlot(null)}
           headerRef={focusedEditorHeaderRef}
+        />
+      )}
+
+      {(activeChordId !== null || multiSelected.size > 0) && (
+        <FloatingChordToolbar
+          mode="progression"
+          hideTrigger
+          activeChord={toolbarContext.activeChordData}
+          selectedCount={multiSelected.size}
+          selectedOctaves={toolbarContext.selectedOctaves}
+          canShiftLeft={toolbarContext.canShiftLeft}
+          canShiftRight={toolbarContext.canShiftRight}
+          onShift={(dir) => {
+            if (multiSelected.size > 0) { handleMultiShift(dir); return; }
+            if (!activeChordId || !toolbarContext.activePatternId) return;
+            movePatternChord(toolbarContext.activePatternId, activeChordId, dir);
+          }}
+          onMoveVertical={(dir) => {
+            if (!activeChordId) return;
+            const { sections: s, progression: prog } = useSongStore.getState();
+            const orderedBlocks = s.flatMap((sec) => prog.filter((p) => (p.sectionId ?? p.id) === sec.id));
+            const patternOfActive = orderedBlocks.find((p) => {
+              const owner = s.find((sec) => sec.id === (p.sectionId ?? p.id));
+              return (owner ? getPatternChordsViaSSOT(owner, p) : p.chords).some((c) => c.id === activeChordId);
+            });
+            if (!patternOfActive) return;
+            const bIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
+            const adjBlock = orderedBlocks[bIdx + dir];
+            if (!adjBlock) return;
+            const owner = s.find((sec) => sec.id === (patternOfActive.sectionId ?? patternOfActive.id));
+            const chords = owner ? getPatternChordsViaSSOT(owner, patternOfActive) : patternOfActive.chords;
+            const chordIdx = chords.findIndex((c) => c.id === activeChordId);
+            const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
+            const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
+            useSongStore.getState().movePatternChordToPatternAt(
+              patternOfActive.id, adjBlock.id, activeChordId,
+              Math.min(Math.max(chordIdx, 0), adjChords.length),
+            );
+            setChordEditorRef.current((prev) =>
+              prev?.chordId === activeChordId
+                ? { patternId: adjBlock.id, chordId: activeChordId, sectionId: adjBlock.sectionId ?? adjBlock.id }
+                : prev,
+            );
+          }}
+          canMoveUp={toolbarContext.canMoveUp}
+          canMoveDown={toolbarContext.canMoveDown}
+          onResize={(delta) => {
+            if (multiSelected.size > 0) { handleMultiResize(delta); return; }
+            if (!activeChordId || !toolbarContext.activePatternId) return;
+            resizePatternChordsWithOverflow(toolbarContext.activePatternId, [activeChordId], delta);
+          }}
+          onOctaveChange={(oct) => {
+            if (multiSelected.size > 0) {
+              const byPattern = new Map<string, string[]>();
+              for (const [cid, pid] of multiSelected) {
+                const arr = byPattern.get(pid) ?? [];
+                arr.push(cid);
+                byPattern.set(pid, arr);
+              }
+              for (const [pid, cids] of byPattern) bulkSetChordOctave(pid, cids, oct);
+              return;
+            }
+            if (!activeChordId || !toolbarContext.activePatternId) return;
+            const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
+            const chord = pat?.chords.find((c) => c.id === activeChordId);
+            if (!chord) return;
+            updatePatternChord(toolbarContext.activePatternId, activeChordId, { chord: { ...chord.chord, octave: oct } });
+          }}
+          onSelectAll={() => {
+            if (!toolbarContext.activePatternId) return;
+            const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
+            const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
+            const chords = sec && pat ? getPatternChordsViaSSOT(sec, pat) : (pat?.chords ?? []);
+            setMultiSelected(new Map(chords.map((c) => [c.id, toolbarContext.activePatternId!])));
+          }}
+          onClearAll={() => setMultiSelected(new Map())}
+          onEnterMultiSelect={() => {
+            if (activeChordId && toolbarContext.activePatternId) {
+              setMultiSelected((prev) => {
+                const next = new Map(prev);
+                next.set(activeChordId, toolbarContext.activePatternId!);
+                return next;
+              });
+            }
+          }}
+          onDelete={() => {
+            if (multiSelected.size > 0) {
+              const byPattern = new Map<string, string[]>();
+              for (const [cid, pid] of multiSelected) {
+                const arr = byPattern.get(pid) ?? [];
+                arr.push(cid);
+                byPattern.set(pid, arr);
+              }
+              const removeBatch = useSongStore.getState().removePatternChordsBatch;
+              for (const [pid, cids] of byPattern) removeBatch(pid, cids);
+              setMultiSelected(new Map());
+              setActiveChordId(null);
+              return;
+            }
+            if (!activeChordId || !toolbarContext.activePatternId) return;
+            useSongStore.getState().removePatternChordsBatch(toolbarContext.activePatternId, [activeChordId]);
+            setActiveChordId(null);
+          }}
+          onExitEdit={() => setActiveChordId(null)}
         />
       )}
 
