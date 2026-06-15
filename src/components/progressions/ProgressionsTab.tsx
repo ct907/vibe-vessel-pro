@@ -314,11 +314,12 @@ function PatternBlock({
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (activeIdxRef.current > 0) movePatternChordRef.current(pattern.id, id, -1);
+        // movePatternChord swaps within the block, or hops into the previous
+        // block when the chord is already at the left edge.
+        movePatternChordRef.current(pattern.id, id, -1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (activeIdxRef.current < sortedChordsRef.current.length - 1)
-          movePatternChordRef.current(pattern.id, id, 1);
+        movePatternChordRef.current(pattern.id, id, 1);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         resizePatternChordsWithOverflowRef.current(pattern.id, [id], LENGTH_STEP);

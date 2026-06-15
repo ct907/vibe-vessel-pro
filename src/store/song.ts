@@ -3356,17 +3356,17 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       });
       return;
     }
-    // Edge — try moving into the neighbor block (Item 4).
+    // Edge — hop into the neighbor block (Item 4). Land at the end of the
+    // previous block (moving left) or the start of the next block (moving
+    // right). movePatternChordToPatternAt takes a chord INDEX within the
+    // destination block; SSOT re-bins/overflows if the neighbor is full.
     const progIdx = sBefore.progression.findIndex((p) => p.id === patternId);
-    const neighborIdx = progIdx + direction;
-    const neighbor = sBefore.progression[neighborIdx];
+    const neighbor = sBefore.progression[progIdx + direction];
     if (!neighbor) return;
-    const movingLen = inPattern[idx].progressionPlacement?.lengthBeats ?? 0;
-    const neighborUsed = neighbor.chords.reduce((s, c) => s + c.lengthBeats, 0);
-    const neighborCap = neighbor.bars * neighbor.beatsPerBar;
-    if (neighborUsed + movingLen > neighborCap + 1e-9) return;
-    const toSlot = direction > 0 ? Math.floor(neighborUsed) : Math.max(0, neighborCap - movingLen);
-    get().movePatternChordToPatternAt(patternId, neighbor.id, chordId, toSlot);
+    const owner = sBefore.sections.find((x) => x.id === (neighbor.sectionId ?? neighbor.id));
+    const neighborChords = owner ? getPatternChordsViaSSOT(owner, neighbor) : neighbor.chords;
+    const toIndex = direction === -1 ? neighborChords.length : 0;
+    get().movePatternChordToPatternAt(patternId, neighbor.id, chordId, toIndex);
   },
 
   removePatternChordsBatch: (patternId, chordIds) => set((s) => {
