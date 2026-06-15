@@ -221,6 +221,7 @@ function LineRow({
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
+  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const onMultiSelectTapRef = useRef(onMultiSelectTap);
   onMultiSelectTapRef.current = onMultiSelectTap;
 
@@ -411,6 +412,20 @@ function LineRow({
                             aria-hidden
                             className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
                           />
+                        )}
+                        {activeChordId === anchor!.id && (
+                          <button
+                            type="button"
+                            className="absolute -top-2 -left-2 z-20 h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
+                            aria-label="Edit chord"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChordToolbarOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
                         )}
                         {activeChordId === anchor!.id && (
                           <button
@@ -2150,6 +2165,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           <FloatingChordToolbar
             mode="lyrics"
             hideTrigger
+            autoExpandOnContext={false}
             activeChord={
               activeCtx
                 ? {
