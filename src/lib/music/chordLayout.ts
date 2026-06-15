@@ -165,6 +165,13 @@ export function formatChordsAndLyrics(
     if (!lp) return sc;
     if (validLineIds.has(lp.lineId)) return sc;
     orphanCount += 1;
+    // The lyric line this chord pointed at is gone. If it still has a
+    // progression placement, demote it to progression-only so the step-4.5
+    // rescue lands it on its own chord row at the end — rather than piling it
+    // onto the first lyric line, where it corrupts line 1 and "travels" with
+    // later edits. Only a chord with nowhere else to live falls back to the
+    // first line so it isn't lost.
+    if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
     if (!firstLineId) return { ...sc, lyricsPlacement: undefined };
     return { ...sc, lyricsPlacement: { lineId: firstLineId, slotIndex: 0 } };
   });
