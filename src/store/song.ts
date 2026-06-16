@@ -3919,22 +3919,45 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         .filter((l) => !l._isChordOverflow)
         .map((l) => ({ ...l, chords: [...l.chords] }));
       const lineById = new Map(lines.map((l) => [l.id, l] as const));
+      // Each overflow row is packed from slot 0, so a chord on overflow row 2
+      // and a chord on the parent row can share slotIndex 0. Re-homing them onto
+      // the parent must therefore allocate a FREE slot per chord (in SSOT =
+      // reading order) rather than reuse the per-row index — otherwise we write
+      // two chords onto one (line, slot), which renders as overlapping/ghost
+      // chords on reload. Seed occupancy from the chords already on each parent.
+      const occupied = new Map<string, Set<number>>();
+      for (const sc of sec.chords) {
+        const lp = sc.lyricsPlacement;
+        if (!lp || parentOf.has(lp.lineId)) continue;
+        let set = occupied.get(lp.lineId);
+        if (!set) { set = new Set<number>(); occupied.set(lp.lineId, set); }
+        set.add(lp.slotIndex);
+      }
+      const claimFreeSlot = (lineId: string) => {
+        let set = occupied.get(lineId);
+        if (!set) { set = new Set<number>(); occupied.set(lineId, set); }
+        let slot = 0;
+        while (set.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+        set.add(slot);
+        return slot;
+      };
       const chords = sec.chords.map((sc) => {
         const lp = sc.lyricsPlacement;
         if (!lp) return sc;
         const parent = parentOf.get(lp.lineId);
         if (!parent) return sc;
+        const slotIndex = claimFreeSlot(parent);
         const pline = lineById.get(parent);
         if (pline && !pline.chords.some((a) => a.id === sc.id)) {
           pline.chords.push({
             id: sc.id,
-            offset: lp.slotIndex,
-            slotIndex: lp.slotIndex,
+            offset: slotIndex,
+            slotIndex,
             chord: sc.chord,
             mirrorId: sc.progressionPlacement ? sc.id : undefined,
           });
         }
-        return { ...sc, lyricsPlacement: { ...lp, lineId: parent } };
+        return { ...sc, lyricsPlacement: { lineId: parent, slotIndex } };
       });
       return { ...sec, lines, chords };
     });
