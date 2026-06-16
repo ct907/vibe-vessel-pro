@@ -567,7 +567,7 @@ function PatternBlock({
                           const isActive = activeChordId === c.id;
                           const isSelected = multiSelected.has(c.id);
                           return (
-                            <div className="relative flex items-stretch w-full">
+                            <div data-chord-keep className="relative flex items-stretch w-full">
                               <ContextMenu>
                               <ContextMenuTrigger asChild>
                               <div
@@ -1722,6 +1722,20 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     }
     setActiveChordId(chordId);
   };
+
+  // Tapping anywhere outside a chord, its overlay icons, the chord-editing
+  // toolbar, or any open menu/sheet clears the active-chord selection.
+  useEffect(() => {
+    if (!activeChordId) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
+      setActiveChordId(null);
+      setMultiSelected(new Map());
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [activeChordId]);
 
   // Group pattern blocks by sectionId, preserving section order from `sections`.
   // Sections without any pattern block still render: a lyrics-only section

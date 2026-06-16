@@ -321,7 +321,7 @@ export function FloatingChordToolbar({
   // sticky bar — the mobile version stacks icon-only controls in the corner.
   if (isDesktop) {
     return (
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[55] pointer-events-none">
+      <div data-chord-keep className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[55] pointer-events-none">
         <div
           role="toolbar"
           aria-label="Chord editing toolbar"
@@ -408,7 +408,7 @@ export function FloatingChordToolbar({
   }
 
   return (
-    <div className={`fixed ${bottomClass} right-4 z-[55] pointer-events-none`}>
+    <div data-chord-keep className={`fixed ${bottomClass} right-4 z-[55] pointer-events-none`}>
       {!hideTrigger && (
         <button
           type="button"
