@@ -480,6 +480,7 @@ function LineRow({
         const currentSlot = activeAnchor.slotIndex ?? 0;
         return (
           <div
+            data-chord-keep
             className="mt-1 mb-1 flex items-center gap-1 w-fit rounded-lg border bg-popover shadow-md px-1.5 py-1"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -1832,30 +1833,26 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     return () => setLyricsOnDragEnd(null);
   }, [setLyricsOnDragEnd]);
 
+  // Tapping anywhere outside a chord, its overlay icons, the chord-editing
+  // toolbar/menu, or any open menu/sheet clears the active-chord selection.
   useEffect(() => {
-    if (!activeChordId || isMobile) return;
-
-    const activeRow = document
-      .querySelector(`[data-chip-anchor="${activeChordId}"]`)
-      ?.closest("[data-chord-row]");
-
+    if (!activeChordId) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setActiveChordId(null);
     };
     const handlePointer = (e: PointerEvent) => {
-      const target = e.target as Element | null;
-      if (!target) return;
-      if (activeRow && activeRow.contains(target)) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('[data-chip-anchor],[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
       setActiveChordId(null);
+      setLyricMultiSelected(new Map());
     };
-
     document.addEventListener("keydown", handleKey);
-    document.addEventListener("pointerdown", handlePointer);
+    document.addEventListener("pointerdown", handlePointer, true);
     return () => {
       document.removeEventListener("keydown", handleKey);
-      document.removeEventListener("pointerdown", handlePointer);
+      document.removeEventListener("pointerdown", handlePointer, true);
     };
-  }, [activeChordId, isMobile]);
+  }, [activeChordId]);
 
   return (
     <div className="relative space-y-4" ref={lyricsRootRef}>
