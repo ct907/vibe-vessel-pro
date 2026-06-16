@@ -85,6 +85,7 @@ export function FocusedChordEditor(props: Props) {
   const updatePatternChord = useSongStore((s) => s.updatePatternChord);
   const addChordToPatternSlot = useSongStore((s) => s.addChordToPatternSlot);
   const removePatternChordsBatch = useSongStore((s) => s.removePatternChordsBatch);
+  const autoLayoutSection = useSongStore((s) => s.autoLayoutSection);
   const progression = useSongStore((s) => s.progression);
 
   const isProgression = props.mode === "progression";
@@ -234,6 +235,13 @@ export function FocusedChordEditor(props: Props) {
       placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...toStorage(chord), octave });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
     }
+    // A bulk entry (several Nashville numbers / a preset at once) can pile more
+    // chords onto one row than it can show. Reflow immediately so they space out
+    // by the 1-slot rule and spill onto continuation rows, instead of sitting
+    // off-screen on one row until the editor closes.
+    if (chords.length > 1 && typeof window !== "undefined") {
+      autoLayoutSection(props.sectionId, window.innerWidth, 28);
+    }
     setSlot(cur);
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
@@ -307,6 +315,13 @@ export function FocusedChordEditor(props: Props) {
     for (const chord of chords) {
       placeChordInSlot(props.sectionId, lyricsLineId, cur, { ...toStorage(chord), octave });
       cur = Math.min(CHORD_ROW_SLOTS - 1, cur + chordSlotWidth(chord.display) + 1);
+    }
+    // A bulk entry (several Nashville numbers / a preset at once) can pile more
+    // chords onto one row than it can show. Reflow immediately so they space out
+    // by the 1-slot rule and spill onto continuation rows, instead of sitting
+    // off-screen on one row until the editor closes.
+    if (chords.length > 1 && typeof window !== "undefined") {
+      autoLayoutSection(props.sectionId, window.innerWidth, 28);
     }
     setSlot(cur);
     setQuery("");
