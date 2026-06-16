@@ -3779,6 +3779,35 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         })
         .filter((sc): sc is NonNullable<typeof sc> => !!sc),
     }));
+    const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
+    const migratedProgression = progressionLoaded.map((p) => ({
+      ...p,
+      sectionId: p.sectionId ?? p.id,
+      chords: repackChords(
+        (p.chords as Array<{ chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string }>)
+          .map((c) => {
+            const v = validateChord(c.chord);
+            if (!v) { invalidCount++; return null; }
+            return { ...c, chord: v };
+          })
+          .filter((c): c is { chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string } => !!c),
+        p.bars * p.beatsPerBar,
+      ),
+    }));
+    // Reconstruct each section's SSOT (`section.chords`) from its line + pattern
+    // mirrors, then drop any duplicate SectionChord ids. A mirror-rebuild emits
+    // one SectionChord per line anchor, so a chord whose anchor was mistakenly
+    // mirrored onto two rows (e.g. a stale overflow-row remnant) would otherwise
+    // surface twice — the duplicate-chord bug. The load then treats this SSOT as
+    // authoritative (see the SSOT_MODE set below) and rebuilds the mirrors from
+    // it, so the repairs that follow actually stick.
+    const ssotSections: Section[] = sectionsLoaded.map((sec) => {
+      const sectionPatterns = migratedProgression.filter((p) => (p.sectionId ?? p.id) === sec.id);
+      const rebuilt = recomputeSectionChordsFromMirrors(sec, sectionPatterns);
+      const seen = new Set<string>();
+      const chords = rebuilt.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+      return { ...sec, chords };
+    });
     // Self-heal: re-home any SectionChord whose lyricsPlacement points to a
     // line that no longer exists (e.g. an overflow row stripped by a prior
     // save). Such a chord is invisible in Write & Record yet still played and
@@ -3788,7 +3817,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // change, so it can't be relied on to repair existing projects).
     let orphansHealed = 0;
     let collisionsHealed = 0;
-    const reconciledSections: Section[] = sectionsLoaded.map((sec) => {
+    const reconciledSections: Section[] = ssotSections.map((sec) => {
       const validLineIds = new Set(sec.lines.map((l) => l.id));
       // Pre-scan for two repairable defects:
       //  • orphan — a lyric anchor pointing at a line that no longer exists.
@@ -3873,21 +3902,6 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       // eslint-disable-next-line no-console
       console.warn(`[song.load] repaired ${orphansHealed} orphaned + ${collisionsHealed} colliding chord anchor(s)`);
     }
-    const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
-    const migratedProgression = progressionLoaded.map((p) => ({
-      ...p,
-      sectionId: p.sectionId ?? p.id,
-      chords: repackChords(
-        (p.chords as Array<{ chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string }>)
-          .map((c) => {
-            const v = validateChord(c.chord);
-            if (!v) { invalidCount++; return null; }
-            return { ...c, chord: v };
-          })
-          .filter((c): c is { chord: ChordSymbol; id: string; startBeat: number; lengthBeats: number; mirrorId?: string } => !!c),
-        p.bars * p.beatsPerBar,
-      ),
-    }));
     if (invalidCount > 0 && typeof window !== "undefined") {
       // eslint-disable-next-line no-console
       console.warn(`[song.load] dropped ${invalidCount} invalid chord(s) from imported file`);
@@ -3899,7 +3913,12 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       basket: [],
       suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
       inspirationPhotos: Array.isArray(parsed.inspirationPhotos) ? parsed.inspirationPhotos : [],
-    });
+      // SSOT-first load: section.chords (reconstructed + repaired above) is
+      // authoritative; rebuild line.chords + pattern.chords from it so stale or
+      // duplicated mirror entries in the file can never resurface.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      [SSOT_MODE]: true,
+    } as any);
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
     // App background tint also travels with the project.
