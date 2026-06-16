@@ -1474,25 +1474,30 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const src = state.sections[idx];
     const srcPatterns = state.progression.filter((p) => (p.sectionId ?? p.id) === id);
     const newId = nanoid();
-    // Rebuild lines + chords with fresh ids and mirror relationships.
-    const idMap = new Map<string, string>(); // oldAnchorId -> newAnchorId
+    // Rebuild lines + chords with fresh ids. A mirrored chord shares ONE id
+    // across its lyric anchor and its pattern chord (id === mirrorId), which is
+    // the invariant recomputeSectionChordsFromMirrors pairs on — assigning the
+    // anchor and pattern chord *different* ids splits each chord into a
+    // lyric-only + a progression-only ghost (doubling the section's chords).
+    const idMap = new Map<string, string>(); // old shared id -> new shared id
+    const mapId = (oldId: string) => {
+      let n = idMap.get(oldId);
+      if (!n) { n = nanoid(); idMap.set(oldId, n); }
+      return n;
+    };
     const newLines: LyricLine[] = src.lines.map((l) => ({
       id: nanoid(),
       text: l.text,
       _isChordOverflow: l._isChordOverflow,
-      chords: l.chords.map((a) => {
-        const newAnchorId = nanoid();
-        idMap.set(a.id, newAnchorId);
-        return {
-          id: newAnchorId,
-          offset: a.offset,
-          slotIndex: a.slotIndex,
-          wordIndex: a.wordIndex,
-          chordCol: a.chordCol,
-          chord: a.chord,
-          mirrorId: undefined,
-        };
-      }),
+      chords: l.chords.map((a) => ({
+        id: mapId(a.id),
+        offset: a.offset,
+        slotIndex: a.slotIndex,
+        wordIndex: a.wordIndex,
+        chordCol: a.chordCol,
+        chord: a.chord,
+        mirrorId: a.mirrorId ? mapId(a.mirrorId) : undefined,
+      })),
     }));
     const newSection: Section = {
       id: newId,
@@ -1509,17 +1514,13 @@ export const useSongStore = create<SongState>((rawSet, get) => {
           label: pi === 0 ? newSection.label : srcPattern.label,
           bars: srcPattern.bars,
           beatsPerBar: srcPattern.beatsPerBar,
-          chords: srcPattern.chords.map((c) => {
-            const newPcId = nanoid();
-            const linkedAnchor = c.mirrorId ? idMap.get(c.mirrorId) : undefined;
-            if (linkedAnchor) {
-              for (const ln of newLines) {
-                const found = ln.chords.find((a) => a.id === linkedAnchor);
-                if (found) found.mirrorId = newPcId;
-              }
-            }
-            return { id: newPcId, chord: c.chord, startBeat: c.startBeat, lengthBeats: c.lengthBeats, mirrorId: linkedAnchor };
-          }),
+          chords: srcPattern.chords.map((c) => ({
+            id: mapId(c.id),
+            chord: c.chord,
+            startBeat: c.startBeat,
+            lengthBeats: c.lengthBeats,
+            mirrorId: c.mirrorId ? mapId(c.mirrorId) : undefined,
+          })),
         }))
       : [{ id: newId, sectionId: newId, label: newSection.label, bars: 4, beatsPerBar: 4, chords: [] }];
 
@@ -2237,8 +2238,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     set((s) => {
       const next = {
         sections: s.sections.map((sec) => {
+          // Last-resort self-heal: collapse any duplicate SectionChord ids
+          // before reflowing, so pressing Format always returns the song to a
+          // consistent state regardless of how it got there. (Collisions and
+          // orphans are then handled by formatChordsAndLyrics + the SSOT_MODE
+          // rebuild below.)
+          const seen = new Set<string>();
           const snapped: Section = {
             ...sec,
+            chords: sec.chords.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))),
             lines: sec.lines.map((l) => snapLineToWords(l)),
           };
           return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
@@ -3978,15 +3986,20 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       //     them back onto their parent would reuse low indices.
       //   • any pre-existing same-line/same-slot pair.
       // A chord keeps its slot when it's free; otherwise it slides to the next
-      // free slot. Nothing is ever dropped or demoted on save.
+      // free slot. If a row is genuinely full (or a chord has no valid slot —
+      // a "hidden" chord), it is surfaced to Write's progression chord row
+      // instead of being persisted where no row can show it.
       const occupied = new Map<string, Set<number>>();
+      // Returns a free slot in [0, CHORD_ROW_SLOTS), or -1 when the row is full.
       const claim = (lineId: string, desired: number, forceScan: boolean) => {
         let set = occupied.get(lineId);
         if (!set) { set = new Set<number>(); occupied.set(lineId, set); }
-        let slot = desired;
-        if (forceScan || slot >= CHORD_ROW_SLOTS || set.has(slot)) {
+        const wantValid = Number.isInteger(desired) && desired >= 0 && desired < CHORD_ROW_SLOTS;
+        let slot = (!forceScan && wantValid && !set.has(desired)) ? desired : -1;
+        if (slot < 0) {
           slot = 0;
-          while (set.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+          while (slot < CHORD_ROW_SLOTS && set.has(slot)) slot++;
+          if (slot >= CHORD_ROW_SLOTS) return -1;
         }
         set.add(slot);
         return slot;
@@ -4000,6 +4013,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         if (!pline) return sc; // line stripped (shouldn't happen) — leave as-is
         // Overflow chords always re-slot; parent chords keep their slot if free.
         const slotIndex = claim(lineId, lp.slotIndex, onOverflow);
+        if (slotIndex < 0) {
+          // No showable slot. Surface block-anchored chords in Write's
+          // progression chord row (still visible + editable); a chord with no
+          // block home keeps the last slot so it is never silently lost.
+          if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
+          const last = CHORD_ROW_SLOTS - 1;
+          pline.chords.push({ id: sc.id, offset: last, slotIndex: last, chord: sc.chord, mirrorId: undefined });
+          return { ...sc, lyricsPlacement: { lineId, slotIndex: last } };
+        }
         pline.chords.push({
           id: sc.id,
           offset: slotIndex,
