@@ -62,6 +62,7 @@ import {
   Sparkles,
   Pencil,
   ListMusic,
+  Type,
   WholeWord,
   Music2,
   KeyRound,
@@ -813,6 +814,7 @@ function SectionCard({
     setSuppressCrossTabDeleteWarning,
     movePatternChord,
     removeChordAnchorsBatch,
+    attachChordToLyrics,
     undo,
   } = useSongStore();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
@@ -1219,6 +1221,7 @@ function SectionCard({
               arrows; X removes. They follow block order, not the lyrics. */}
           {unplacedChords.length > 0 && (
             <div
+              data-chord-keep
               className="mt-2 rounded-md px-2 py-2"
               style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)" }}
               onClick={() => onSetActiveChordId(null)}
@@ -1243,6 +1246,23 @@ function SectionCard({
                       />
                       {selected && (
                         <span className="ml-0.5 inline-flex items-center">
+                          <button
+                            type="button"
+                            aria-label="Edit chord"
+                            onClick={() => onEditProgChord(section.id, patternId, sc.id)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Add to lyrics"
+                            title="Add to lyric line"
+                            onClick={() => attachChordToLyrics(section.id, sc.id)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                          >
+                            <Type className="h-4 w-4" />
+                          </button>
                           <button
                             type="button"
                             aria-label="Move chord earlier"

@@ -221,6 +221,10 @@ export interface SongState {
   upsertChordAt: (sectionId: string, lineId: string, col: number, chord: ChordSymbol, anchorId?: string) => void;
   removeChordAnchor: (sectionId: string, lineId: string, anchorId: string) => void;
   removeChordAnchorsBatch: (sectionId: string, lineId: string, anchorIds: string[]) => void;
+  /** Anchor a progression-only chord to a lyric line (default: first line),
+   *  giving it a lyricsPlacement so it joins the lyric row and becomes
+   *  editable like any word-anchored chord. */
+  attachChordToLyrics: (sectionId: string, chordId: string, lineId?: string) => void;
   shiftChordAnchors: (sectionId: string, lineId: string, anchorIds: string[], deltaCols: number) => void;
   moveSelectedChordsByOrder: (sectionId: string, lineId: string, anchorIds: string[], direction: -1 | 1) => void;
   moveChordAnchor: (
@@ -1865,6 +1869,35 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const idSet = new Set(anchorIds);
     const sections = s.sections.map((sec) =>
       sec.id !== sectionId ? sec : { ...sec, chords: sec.chords.filter((sc) => !idSet.has(sc.id)) },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
+  }); },
+
+  attachChordToLyrics: (sectionId, chordId, lineId) => { pushHistory(get); return set((s) => {
+    const sec = s.sections.find((x) => x.id === sectionId);
+    if (!sec) return {};
+    const target = (lineId && sec.lines.find((l) => l.id === lineId))
+      ?? sec.lines.find((l) => !l._isChordOverflow)
+      ?? sec.lines[0];
+    if (!target) return {};
+    // Land it on the first free slot of the target line so it never collides.
+    const occupied = new Set<number>();
+    for (const c of sec.chords) {
+      const lp = c.lyricsPlacement;
+      if (lp?.lineId === target.id && c.id !== chordId) occupied.add(lp.slotIndex);
+    }
+    let slot = 0;
+    while (occupied.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+    const sections = s.sections.map((x) =>
+      x.id !== sectionId
+        ? x
+        : {
+            ...x,
+            chords: x.chords.map((c) =>
+              c.id !== chordId ? c : { ...c, lyricsPlacement: { lineId: target.id, slotIndex: slot } },
+            ),
+          },
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ({ sections, [SSOT_MODE]: true } as any);
