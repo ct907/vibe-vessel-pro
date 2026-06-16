@@ -946,6 +946,47 @@ function recomputeLyricsSlotsForSection(section: Section): Section {
 }
 
 /**
+ * Guarantees lyric slot uniqueness per line. Two SectionChords sharing a
+ * (lineId, slotIndex) render as overlapping chips in the Write tab — this
+ * happens when a chord is moved between pattern blocks but keeps its stale
+ * lyric anchor on the old row. The first chord (in section.chords order) to
+ * claim a slot keeps it; each later duplicate is repaired the same way the
+ * load-time orphan heal does: a block-anchored duplicate drops its lyric
+ * anchor (it stays visible via the progression / Arrange views), while a
+ * pure-lyric duplicate slides to the next free slot so nothing is lost.
+ *
+ * Idempotent: returns the input section unchanged when no collisions exist.
+ */
+function resolveLyricSlotCollisions(section: Section): Section {
+  const firstSlots = new Map<string, Set<number>>();
+  const dupIds = new Set<string>();
+  for (const sc of section.chords) {
+    const lp = sc.lyricsPlacement;
+    if (!lp) continue;
+    let s = firstSlots.get(lp.lineId);
+    if (!s) { s = new Set<number>(); firstSlots.set(lp.lineId, s); }
+    if (s.has(lp.slotIndex)) dupIds.add(sc.id);
+    else s.add(lp.slotIndex);
+  }
+  if (dupIds.size === 0) return section;
+  const occupied = new Map<string, Set<number>>();
+  for (const [lid, s] of firstSlots) occupied.set(lid, new Set(s));
+  return {
+    ...section,
+    chords: section.chords.map((sc) => {
+      if (!dupIds.has(sc.id)) return sc;
+      const lp = sc.lyricsPlacement!;
+      if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
+      const s = occupied.get(lp.lineId)!;
+      let slot = 0;
+      while (s.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+      s.add(slot);
+      return { ...sc, lyricsPlacement: { ...lp, slotIndex: slot } };
+    }),
+  };
+}
+
+/**
  * Inverse of `recomputeSectionChordsFromMirrors`: given an updated
  * `section.chords` (SSOT), rebuild `line.chords` and the section's pattern
  * blocks' chords so the legacy mirrors stay in sync.
@@ -968,7 +1009,7 @@ function deriveMirrorsFromSectionChords(
   // array order. Without this, dragging a chord in ProgressionsTab would
   // shuffle the SSOT but leave stale slot indices behind, so the lyric
   // row would render in the old order.
-  const section = recomputeLyricsSlotsForSection(rawSection);
+  const section = resolveLyricSlotCollisions(recomputeLyricsSlotsForSection(rawSection));
   // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
   const anchorsByLine = new Map<string, ChordAnchor[]>();
   section.lines.forEach((l) => anchorsByLine.set(l.id, []));
@@ -3713,43 +3754,91 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // unconditionally on load (the Lyrics-tab reflow only fires on a width
     // change, so it can't be relied on to repair existing projects).
     let orphansHealed = 0;
+    let collisionsHealed = 0;
     const reconciledSections: Section[] = sectionsLoaded.map((sec) => {
       const validLineIds = new Set(sec.lines.map((l) => l.id));
-      const hasOrphan = sec.chords.some(
-        (sc) => sc.lyricsPlacement && !validLineIds.has(sc.lyricsPlacement.lineId),
-      );
-      if (!hasOrphan) return sec;
+      // Pre-scan for two repairable defects:
+      //  • orphan — a lyric anchor pointing at a line that no longer exists.
+      //  • collision — two chords sharing a (line, slot), which renders as
+      //    overlapping chips in Write. This is the symptom the user hit when a
+      //    chord moved between pattern blocks but kept a stale anchor on its
+      //    old row. The first chord (array order) to claim a slot is the
+      //    keeper; later occupants are duplicates to repair.
+      const keptSlots = new Map<string, Set<number>>();
+      const dupIds = new Set<string>();
+      let hasOrphan = false;
+      for (const sc of sec.chords) {
+        const lp = sc.lyricsPlacement;
+        if (!lp) continue;
+        if (!validLineIds.has(lp.lineId)) { hasOrphan = true; continue; }
+        let s = keptSlots.get(lp.lineId);
+        if (!s) { s = new Set<number>(); keptSlots.set(lp.lineId, s); }
+        if (s.has(lp.slotIndex)) dupIds.add(sc.id);
+        else s.add(lp.slotIndex);
+      }
+      if (!hasOrphan && dupIds.size === 0) return sec;
+
       const lines = sec.lines.map((l) => ({ ...l, chords: [...l.chords] }));
-      const target =
+      const lineById = new Map(lines.map((l) => [l.id, l] as const));
+      const homeRow =
         [...lines].reverse().find((l) => !l._isChordOverflow) ?? lines[lines.length - 1] ?? null;
-      let cursor = target
-        ? Math.max(-1, ...target.chords.map((a) => a.slotIndex ?? 0)) + 1
-        : 0;
+      // Seed occupancy with the keeper slots so re-homed orphans and re-slotted
+      // duplicates never land on a slot a valid chord already holds.
+      const occupied = new Map<string, Set<number>>();
+      for (const [lid, s] of keptSlots) occupied.set(lid, new Set(s));
+      const nextFree = (lineId: string) => {
+        let s = occupied.get(lineId);
+        if (!s) { s = new Set<number>(); occupied.set(lineId, s); }
+        let slot = 0;
+        while (s.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+        s.add(slot);
+        return slot;
+      };
       const chords = sec.chords.map((sc) => {
         const lp = sc.lyricsPlacement;
-        if (!lp || validLineIds.has(lp.lineId)) return sc;
-        orphansHealed++;
-        // Still anchored to a block: leave it unplaced so Write's progression
-        // chord row shows it, instead of pinning it onto a lyric line where it
-        // would travel with lyric edits. Only a chord with no block home is
-        // re-homed to a visible row so it isn't lost entirely.
-        if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
-        if (!target) return { ...sc, lyricsPlacement: undefined };
-        const slotIndex = Math.min(CHORD_ROW_SLOTS - 1, cursor++);
-        target.chords.push({
-          id: sc.id,
-          offset: slotIndex,
-          slotIndex,
-          chord: sc.chord,
-          mirrorId: sc.progressionPlacement ? sc.id : undefined,
-        });
-        return { ...sc, lyricsPlacement: { lineId: target.id, slotIndex } };
+        if (!lp) return sc;
+        // Orphan: lyric anchor points at a line that no longer exists.
+        if (!validLineIds.has(lp.lineId)) {
+          orphansHealed++;
+          // Still anchored to a block: leave it unplaced so Write's progression
+          // chord row shows it, instead of pinning it onto a lyric line where it
+          // would travel with lyric edits. Only a chord with no block home is
+          // re-homed to a visible row so it isn't lost entirely.
+          if (sc.progressionPlacement) return { ...sc, lyricsPlacement: undefined };
+          if (!homeRow) return { ...sc, lyricsPlacement: undefined };
+          const slotIndex = Math.min(CHORD_ROW_SLOTS - 1, nextFree(homeRow.id));
+          homeRow.chords.push({
+            id: sc.id,
+            offset: slotIndex,
+            slotIndex,
+            chord: sc.chord,
+            mirrorId: sc.progressionPlacement ? sc.id : undefined,
+          });
+          return { ...sc, lyricsPlacement: { lineId: homeRow.id, slotIndex } };
+        }
+        // Collision: a later occupant of an already-claimed (line, slot).
+        if (dupIds.has(sc.id)) {
+          collisionsHealed++;
+          // Block-anchored chords drop the stale anchor (they survive in the
+          // progression / Arrange views); pure-lyric chords slide to a free
+          // slot on the same line.
+          if (sc.progressionPlacement) {
+            const ln = lineById.get(lp.lineId);
+            if (ln) ln.chords = ln.chords.filter((a) => a.id !== sc.id);
+            return { ...sc, lyricsPlacement: undefined };
+          }
+          const slot = Math.min(CHORD_ROW_SLOTS - 1, nextFree(lp.lineId));
+          const a = lineById.get(lp.lineId)?.chords.find((x) => x.id === sc.id);
+          if (a) { a.slotIndex = slot; a.offset = slot; }
+          return { ...sc, lyricsPlacement: { ...lp, slotIndex: slot } };
+        }
+        return sc;
       });
       return { ...sec, lines, chords };
     });
-    if (orphansHealed > 0 && typeof window !== "undefined") {
+    if ((orphansHealed > 0 || collisionsHealed > 0) && typeof window !== "undefined") {
       // eslint-disable-next-line no-console
-      console.warn(`[song.load] re-homed ${orphansHealed} orphaned chord(s) to a visible row`);
+      console.warn(`[song.load] repaired ${orphansHealed} orphaned + ${collisionsHealed} colliding chord anchor(s)`);
     }
     const progressionLoaded: PatternBlock[] = parsed.progression?.length ? parsed.progression : [makeSection().pattern];
     const migratedProgression = progressionLoaded.map((p) => ({
@@ -3828,24 +3917,45 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       }
       const lines = sec.lines
         .filter((l) => !l._isChordOverflow)
-        .map((l) => ({ ...l, chords: [...l.chords] }));
+        .map((l) => ({ ...l, chords: [] as ChordAnchor[] }));
       const lineById = new Map(lines.map((l) => [l.id, l] as const));
+      // Resolve the final lyric line + a COLLISION-FREE slot for every chord, in
+      // SSOT (reading) order. Two sources of collisions are handled here so the
+      // file is guaranteed clean regardless of in-memory state:
+      //   • overflow rows are device-specific and packed from slot 0, so merging
+      //     them back onto their parent would reuse low indices.
+      //   • any pre-existing same-line/same-slot pair.
+      // A chord keeps its slot when it's free; otherwise it slides to the next
+      // free slot. Nothing is ever dropped or demoted on save.
+      const occupied = new Map<string, Set<number>>();
+      const claim = (lineId: string, desired: number, forceScan: boolean) => {
+        let set = occupied.get(lineId);
+        if (!set) { set = new Set<number>(); occupied.set(lineId, set); }
+        let slot = desired;
+        if (forceScan || slot >= CHORD_ROW_SLOTS || set.has(slot)) {
+          slot = 0;
+          while (set.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+        }
+        set.add(slot);
+        return slot;
+      };
       const chords = sec.chords.map((sc) => {
         const lp = sc.lyricsPlacement;
         if (!lp) return sc;
-        const parent = parentOf.get(lp.lineId);
-        if (!parent) return sc;
-        const pline = lineById.get(parent);
-        if (pline && !pline.chords.some((a) => a.id === sc.id)) {
-          pline.chords.push({
-            id: sc.id,
-            offset: lp.slotIndex,
-            slotIndex: lp.slotIndex,
-            chord: sc.chord,
-            mirrorId: sc.progressionPlacement ? sc.id : undefined,
-          });
-        }
-        return { ...sc, lyricsPlacement: { ...lp, lineId: parent } };
+        const onOverflow = parentOf.has(lp.lineId);
+        const lineId = onOverflow ? parentOf.get(lp.lineId)! : lp.lineId;
+        const pline = lineById.get(lineId);
+        if (!pline) return sc; // line stripped (shouldn't happen) — leave as-is
+        // Overflow chords always re-slot; parent chords keep their slot if free.
+        const slotIndex = claim(lineId, lp.slotIndex, onOverflow);
+        pline.chords.push({
+          id: sc.id,
+          offset: slotIndex,
+          slotIndex,
+          chord: sc.chord,
+          mirrorId: sc.progressionPlacement ? sc.id : undefined,
+        });
+        return { ...sc, lyricsPlacement: { lineId, slotIndex } };
       });
       return { ...sec, lines, chords };
     });
