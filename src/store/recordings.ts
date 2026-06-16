@@ -129,6 +129,12 @@ interface RecordingsState {
   playheadSec: number;
   setPlayheadSec: (sec: number) => void;
 
+  /** Cross-mode handoff: a section overdub requested from the lyrics view (write
+   *  mode) that the multitrack timeline (arrange mode) picks up once mounted.
+   *  Transient — never persisted, never part of undo history. */
+  pendingOverdub: { trackId: RecTrackId; startSec: number } | null;
+  setPendingOverdub: (req: { trackId: RecTrackId; startSec: number } | null) => void;
+
   addTrack: () => RecTrackId | null;
   removeTrack: (id: RecTrackId) => void;
   renameTrack: (id: RecTrackId, name: string) => void;
@@ -190,6 +196,9 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
 
   playheadSec: 0,
   setPlayheadSec: (sec) => set({ playheadSec: Math.max(0, sec) }),
+
+  pendingOverdub: null,
+  setPendingOverdub: (pendingOverdub) => set({ pendingOverdub }),
 
   addTrack: () => {
     const tracks = get().tracks;
@@ -384,7 +393,7 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   clear: () => {
     undoStack.length = 0;
     redoStack.length = 0;
-    set({ tracks: [], selectedTrackId: null, isRecording: false, recordingTrackId: null, monitorLevel: 0 });
+    set({ tracks: [], selectedTrackId: null, isRecording: false, recordingTrackId: null, monitorLevel: 0, pendingOverdub: null });
   },
   toJSON: () => ({ tracks: get().tracks }),
 }));
