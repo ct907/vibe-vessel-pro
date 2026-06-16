@@ -1090,11 +1090,12 @@ function SectionCard({
                         onClick={() => {
                           setOverdubOpen(false);
                           const startSec = getSectionStartSec(section.id, allSections, progression, bpm);
-                          window.dispatchEvent(
-                            new CustomEvent("lovable:begin-section-overdub", {
-                              detail: { trackId: t.id, startSec },
-                            }),
-                          );
+                          // The multitrack recorder lives in arrange mode's
+                          // TrackTimeline. Hand the request off through the store
+                          // and switch surfaces so it's mounted to receive it.
+                          useRecordingsStore.getState().setPendingOverdub({ trackId: t.id, startSec });
+                          useUIStore.getState().setArrangeView("track");
+                          useUIStore.getState().setMode("arrange");
                         }}
                       >
                         <span

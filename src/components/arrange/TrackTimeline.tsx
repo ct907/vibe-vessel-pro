@@ -13,13 +13,19 @@ import {
   clipSpanSec,
 } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
+import { usePlaybackStore } from "@/store/playback";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob, deleteAudioBlob, getAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
 import { decodeBlob, cachedPeaks, invalidatePeaks } from "@/lib/audio/waveform";
-import { clearDecodedCache } from "@/lib/audio/recordings-engine";
+import {
+  clearDecodedCache,
+  getLoopStartCtxTime,
+  getLoopSec,
+  isEngineRunning,
+} from "@/lib/audio/recordings-engine";
 
 const PX_PER_BAR = 26;
 
@@ -236,6 +242,80 @@ function DelayPanel({ offsetMs, onNudge }: { offsetMs: number; onNudge: (d: numb
   );
 }
 
+/**
+ * The destructive-red playhead bar. Isolated from TrackTimeline so the per-frame
+ * position updates during playback re-render only this thin overlay, not the
+ * full track/clip/waveform tree. While the transport runs it follows the shared
+ * recordings-engine clock (the same clock the progression and metronome ride),
+ * so it scrubs in lockstep with the lyrics/pattern playhead; when idle it sits
+ * at the user-set anchor where clicks land and new clips are dropped.
+ */
+function Playhead({
+  secPerBar,
+  labelW,
+  isPlaying,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  secPerBar: number;
+  labelW: number;
+  isPlaying: boolean;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+}) {
+  const staticSec = useRecordingsStore((s) => s.playheadSec);
+  const [liveSec, setLiveSec] = useState(0);
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    const tick = () => {
+      if (isEngineRunning()) {
+        const ls = getLoopSec();
+        if (ls > 0) {
+          const elapsed = getAudioContext().currentTime - getLoopStartCtxTime();
+          setLiveSec(((elapsed % ls) + ls) % ls);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying]);
+
+  const sec = isPlaying ? liveSec : staticSec;
+  const x = labelW + (sec / secPerBar) * PX_PER_BAR;
+  const bar = Math.floor(sec / secPerBar) + 1;
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-0 top-0 z-[6] w-0.5"
+      style={{ left: x, background: "var(--destructive)" }}
+    >
+      {/* Draggable handle — overlaps ruler so the user can grab it */}
+      <div
+        className="pointer-events-auto absolute -top-[18px] flex cursor-col-resize flex-col items-center"
+        style={{ left: -9, width: 18 }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <span
+          className="font-mono-chord select-none whitespace-nowrap text-[8px] font-bold leading-none"
+          style={{ color: "var(--destructive)" }}
+        >
+          {bar}
+        </span>
+        <div
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ background: "var(--destructive)", marginTop: 1 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** BandLab-style rolling timeline. */
 export function TrackTimeline() {
   const isMobile = useIsMobile();
@@ -255,8 +335,10 @@ export function TrackTimeline() {
   const beginClipEdit = useRecordingsStore((s) => s.beginClipEdit);
   const recordingTrackId = useRecordingsStore((s) => s.recordingTrackId);
   const setRecording = useRecordingsStore((s) => s.setRecording);
-  const playheadSec = useRecordingsStore((s) => s.playheadSec);
   const setPlayheadSec = useRecordingsStore((s) => s.setPlayheadSec);
+  const pendingOverdub = useRecordingsStore((s) => s.pendingOverdub);
+  const setPendingOverdub = useRecordingsStore((s) => s.setPendingOverdub);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
   const [pendingTid, setPendingTid] = useState<string | null>(null);
@@ -537,9 +619,6 @@ export function TrackTimeline() {
     (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
   };
 
-  const playheadX = LABEL_W + (playheadSec / secPerBar) * PX_PER_BAR;
-  const playheadBar = Math.floor(playheadSec / secPerBar) + 1;
-
   const toggleRecord = async (tid: string) => {
     if (recordingTrackId === tid) {
       const handle = recorderRef.current;
@@ -596,6 +675,23 @@ export function TrackTimeline() {
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
+
+  // Section overdub handed off from the lyrics view: drop the playhead at the
+  // section start and arm recording on the requested track. Consumed once.
+  useEffect(() => {
+    if (!pendingOverdub) return;
+    const { trackId, startSec } = pendingOverdub;
+    setPendingOverdub(null);
+    const st = useRecordingsStore.getState();
+    if (st.recordingTrackId) {
+      toast.info("A track is already recording");
+      return;
+    }
+    if (!st.tracks.some((t) => t.id === trackId)) return;
+    setPlayheadSec(startSec);
+    void toggleRecord(trackId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOverdub]);
 
   return (
     <div className="pb-4">
@@ -667,33 +763,14 @@ export function TrackTimeline() {
 
           {/* Track lanes */}
           <div className="relative">
-            {/* Playhead */}
-            <div
-              className="pointer-events-none absolute bottom-0 top-0 z-[6] w-0.5"
-              style={{ left: playheadX, background: "var(--destructive)" }}
-            >
-              {/* Draggable handle — overlaps ruler so the user can grab it */}
-              <div
-                className="pointer-events-auto absolute -top-[18px] flex cursor-col-resize flex-col items-center"
-                style={{ left: -9, width: 18 }}
-                onPointerDown={handlePlayheadPointerDown}
-                onPointerMove={handlePlayheadPointerMove}
-                onPointerUp={handlePlayheadPointerUp}
-              >
-                {/* Bar label */}
-                <span
-                  className="font-mono-chord select-none whitespace-nowrap text-[8px] font-bold leading-none"
-                  style={{ color: "var(--destructive)" }}
-                >
-                  {playheadBar}
-                </span>
-                {/* Circle */}
-                <div
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: "var(--destructive)", marginTop: 1 }}
-                />
-              </div>
-            </div>
+            <Playhead
+              secPerBar={secPerBar}
+              labelW={LABEL_W}
+              isPlaying={isPlaying}
+              onPointerDown={handlePlayheadPointerDown}
+              onPointerMove={handlePlayheadPointerMove}
+              onPointerUp={handlePlayheadPointerUp}
+            />
 
             {tracks.map((track) => {
               const isRec = recordingTrackId === track.id;
