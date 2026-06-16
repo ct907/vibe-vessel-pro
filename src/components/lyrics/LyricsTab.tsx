@@ -2249,14 +2249,16 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                 if (atEdge) {
                   const adj = adjacentLine(singleTarget.sectionId, singleTarget.lineId, dir);
                   if (!adj) return;
-                  useSongStore.getState().moveChordAnchor(
+                  // Hop to the adjacent row via the SSOT move (conserves the
+                  // chord + stays collision-free; moveChordAnchor split it into
+                  // a lyric-only + leftover progression-only chord).
+                  const res = useSongStore.getState().moveChordsToAdjacentRow(
                     singleTarget.sectionId,
                     singleTarget.lineId,
-                    singleTarget.id,
-                    adj.sectionId,
-                    adj.lineId,
-                    dir === -1 ? CHORD_ROW_SLOTS - 1 : 0,
+                    [singleTarget.id],
+                    dir,
                   );
+                  if (res.moved) setActiveChordId(res.movedIds[0] ?? null);
                   return;
                 }
                 moveChordToSlot(singleTarget.sectionId, singleTarget.lineId, singleTarget.id, slot + dir);
