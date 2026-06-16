@@ -2237,8 +2237,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     set((s) => {
       const next = {
         sections: s.sections.map((sec) => {
+          // Last-resort self-heal: collapse any duplicate SectionChord ids
+          // before reflowing, so pressing Format always returns the song to a
+          // consistent state regardless of how it got there. (Collisions and
+          // orphans are then handled by formatChordsAndLyrics + the SSOT_MODE
+          // rebuild below.)
+          const seen = new Set<string>();
           const snapped: Section = {
             ...sec,
+            chords: sec.chords.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))),
             lines: sec.lines.map((l) => snapLineToWords(l)),
           };
           return formatChordsAndLyrics(snapped, { screenWidth: w, slotWidth: 28 }).section;
