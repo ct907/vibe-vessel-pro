@@ -61,6 +61,7 @@ import {
   Wand2,
   Sparkles,
   Pencil,
+  ListMusic,
   WholeWord,
   Music2,
   KeyRound,
@@ -416,7 +417,7 @@ function LineRow({
                         {activeChordId === anchor!.id && (
                           <button
                             type="button"
-                            className="absolute -top-2 -left-2 z-20 h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
+                            className="absolute -top-2.5 -left-2.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
                             aria-label="Edit chord"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -424,13 +425,28 @@ function LineRow({
                               setChordToolbarOpen(true);
                             }}
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
                         )}
                         {activeChordId === anchor!.id && (
                           <button
                             type="button"
-                            className="absolute -top-2 -right-2 z-20 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+                            className="absolute -bottom-2.5 -left-2.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
+                            aria-label="Edit chord quality"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSetActiveChordId(null);
+                              onPickerOpen(line.id, slotIdx, anchor!.id);
+                            }}
+                          >
+                            <ListMusic className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {activeChordId === anchor!.id && (
+                          <button
+                            type="button"
+                            className="absolute -top-2.5 -right-2.5 z-20 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
                             aria-label="Delete chord"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -439,7 +455,7 @@ function LineRow({
                               onSetActiveChordId(null);
                             }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
