@@ -3917,47 +3917,45 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       }
       const lines = sec.lines
         .filter((l) => !l._isChordOverflow)
-        .map((l) => ({ ...l, chords: [...l.chords] }));
+        .map((l) => ({ ...l, chords: [] as ChordAnchor[] }));
       const lineById = new Map(lines.map((l) => [l.id, l] as const));
-      // Each overflow row is packed from slot 0, so a chord on overflow row 2
-      // and a chord on the parent row can share slotIndex 0. Re-homing them onto
-      // the parent must therefore allocate a FREE slot per chord (in SSOT =
-      // reading order) rather than reuse the per-row index — otherwise we write
-      // two chords onto one (line, slot), which renders as overlapping/ghost
-      // chords on reload. Seed occupancy from the chords already on each parent.
+      // Resolve the final lyric line + a COLLISION-FREE slot for every chord, in
+      // SSOT (reading) order. Two sources of collisions are handled here so the
+      // file is guaranteed clean regardless of in-memory state:
+      //   • overflow rows are device-specific and packed from slot 0, so merging
+      //     them back onto their parent would reuse low indices.
+      //   • any pre-existing same-line/same-slot pair.
+      // A chord keeps its slot when it's free; otherwise it slides to the next
+      // free slot. Nothing is ever dropped or demoted on save.
       const occupied = new Map<string, Set<number>>();
-      for (const sc of sec.chords) {
-        const lp = sc.lyricsPlacement;
-        if (!lp || parentOf.has(lp.lineId)) continue;
-        let set = occupied.get(lp.lineId);
-        if (!set) { set = new Set<number>(); occupied.set(lp.lineId, set); }
-        set.add(lp.slotIndex);
-      }
-      const claimFreeSlot = (lineId: string) => {
+      const claim = (lineId: string, desired: number, forceScan: boolean) => {
         let set = occupied.get(lineId);
         if (!set) { set = new Set<number>(); occupied.set(lineId, set); }
-        let slot = 0;
-        while (set.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+        let slot = desired;
+        if (forceScan || slot >= CHORD_ROW_SLOTS || set.has(slot)) {
+          slot = 0;
+          while (set.has(slot) && slot < CHORD_ROW_SLOTS - 1) slot++;
+        }
         set.add(slot);
         return slot;
       };
       const chords = sec.chords.map((sc) => {
         const lp = sc.lyricsPlacement;
         if (!lp) return sc;
-        const parent = parentOf.get(lp.lineId);
-        if (!parent) return sc;
-        const slotIndex = claimFreeSlot(parent);
-        const pline = lineById.get(parent);
-        if (pline && !pline.chords.some((a) => a.id === sc.id)) {
-          pline.chords.push({
-            id: sc.id,
-            offset: slotIndex,
-            slotIndex,
-            chord: sc.chord,
-            mirrorId: sc.progressionPlacement ? sc.id : undefined,
-          });
-        }
-        return { ...sc, lyricsPlacement: { lineId: parent, slotIndex } };
+        const onOverflow = parentOf.has(lp.lineId);
+        const lineId = onOverflow ? parentOf.get(lp.lineId)! : lp.lineId;
+        const pline = lineById.get(lineId);
+        if (!pline) return sc; // line stripped (shouldn't happen) — leave as-is
+        // Overflow chords always re-slot; parent chords keep their slot if free.
+        const slotIndex = claim(lineId, lp.slotIndex, onOverflow);
+        pline.chords.push({
+          id: sc.id,
+          offset: slotIndex,
+          slotIndex,
+          chord: sc.chord,
+          mirrorId: sc.progressionPlacement ? sc.id : undefined,
+        });
+        return { ...sc, lyricsPlacement: { lineId, slotIndex } };
       });
       return { ...sec, lines, chords };
     });

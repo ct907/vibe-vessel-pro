@@ -54,6 +54,21 @@ describe("overflow row save/reload roundtrip", () => {
     // The serialized file itself must be collision-free…
     expect(serializedCollisions(saved), "collisions written to disk").toBe(0);
 
+    // …and its line.chords mirror must be a faithful bijection of the SSOT
+    // (no ghost anchors, none missing) so the renderers' defensive fallbacks
+    // can never surface a phantom chord.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const sec of (saved as any).sections) {
+      const lyricSCs = sec.chords.filter((c: any) => c.lyricsPlacement);
+      const anchorKeys = new Set<string>();
+      for (const line of sec.lines)
+        for (const a of line.chords) anchorKeys.add(`${a.id}|${line.id}|${a.slotIndex}`);
+      const scKeys = new Set<string>(
+        lyricSCs.map((c: any) => `${c.id}|${c.lyricsPlacement.lineId}|${c.lyricsPlacement.slotIndex}`),
+      );
+      expect([...anchorKeys].sort(), `mirror mismatch in ${sec.label}`).toEqual([...scKeys].sort());
+    }
+
     // …and reloading must neither lose nor duplicate any lyric-anchored chord.
     useSongStore.getState().loadFromJSON(saved);
     const after = lyricAnchoredIds();
