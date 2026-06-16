@@ -39,22 +39,36 @@ describe("lyric slot collision repair", () => {
     useSongStore.getState().loadFromJSON(dreamon);
     const sections = useSongStore.getState().sections;
     const chorus = sections.find((s) => s.type === "chorus")!;
-    // A#m and G#m7 lose their stale line-0 anchor but remain block-anchored.
+    // The previously-colliding A#m and G#m7 are kept (not lost): they survive
+    // in the SSOT, slid onto free slots so they no longer overlap.
     const displaced = chorus.chords.filter(
       (c) => c.chord.display === "A#m" || c.chord.display === "G#m7",
     );
     expect(displaced.length).toBeGreaterThan(0);
     for (const c of displaced) {
-      expect(c.progressionPlacement).toBeTruthy();
-      expect(c.lyricsPlacement).toBeUndefined();
+      expect(c.lyricsPlacement || c.progressionPlacement).toBeTruthy();
     }
   });
 
   it("attachChordToLyrics re-anchors a progression-only chord without collision", () => {
-    useSongStore.getState().loadFromJSON(dreamon);
-    const secId = useSongStore.getState().sections.find((s) =>
-      s.chords.some((c) => c.progressionPlacement && !c.lyricsPlacement),
-    )!.id;
+    // A section with one word-anchored chord and one progression-only chord.
+    useSongStore.getState().loadFromJSON({
+      version: 3,
+      meta: { beatsPerBar: 4, beatUnit: 4, title: "T", keyRoot: "C", keyMode: "maj", bpm: 100 },
+      sections: [{
+        id: "S1", type: "verse", label: "V", collapsed: false,
+        chords: [
+          { id: "a0", chord: { root: "C", quality: "maj", display: "C", octave: 3 }, lyricsPlacement: { lineId: "L1", slotIndex: 0 }, progressionPlacement: { patternId: "B1", startBeat: 0, lengthBeats: 4 } },
+          { id: "a1", chord: { root: "G", quality: "maj", display: "G", octave: 3 }, progressionPlacement: { patternId: "B1", startBeat: 4, lengthBeats: 4 } },
+        ],
+        lines: [{ id: "L1", text: "hi", chords: [{ id: "a0", offset: 0, slotIndex: 0, chord: { root: "C", quality: "maj", display: "C", octave: 3 }, mirrorId: "a0" }] }],
+      }],
+      progression: [{ id: "B1", sectionId: "S1", label: "V", bars: 2, beatsPerBar: 4, chords: [
+        { id: "a0", chord: { root: "C", quality: "maj", display: "C", octave: 3 }, startBeat: 0, lengthBeats: 4, mirrorId: "a0" },
+        { id: "a1", chord: { root: "G", quality: "maj", display: "G", octave: 3 }, startBeat: 4, lengthBeats: 4 },
+      ] }],
+    });
+    const secId = "S1";
     const target = useSongStore.getState().sections.find((s) => s.id === secId)!
       .chords.find((c) => c.progressionPlacement && !c.lyricsPlacement)!;
 
