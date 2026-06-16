@@ -41,6 +41,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -68,6 +71,7 @@ import {
   KeyRound,
   Mic,
   Play,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -888,6 +892,18 @@ function SectionCard({
     setCustomRenameOpen(false);
   };
 
+  const changeSectionType = (next: SectionType) => {
+    if (next === "custom") {
+      prevTypeRef.current = section.type;
+      prevLabelRef.current = section.label;
+      updateSection(section.id, { type: next, label: section.label || "Section" });
+      setDraftLabel(section.label && section.type === "custom" ? section.label : "");
+      setCustomRenameOpen(true);
+    } else {
+      updateSection(section.id, { type: next, label: section.label });
+    }
+  };
+
   const focusPrevLine = (lineId: string) => {
     const idx = section.lines.findIndex((l) => l.id === lineId);
     if (idx <= 0) return;
@@ -927,48 +943,35 @@ function SectionCard({
       className={cn("noise-texture-surface rounded-xl px-2 py-2 shadow-none border-0")}
     >
       {/* Section header */}
-      <div className="flex items-center gap-2 -ml-4 select-none [-webkit-touch-callout:none] [-webkit-user-select:none]" style={{ paddingLeft: 8 }}>
-        <Select
-          value={section.type}
-          onValueChange={(v) => {
-            const next = v as SectionType;
-            if (next === "custom") {
-              prevTypeRef.current = section.type;
-              prevLabelRef.current = section.label;
-              updateSection(section.id, { type: next, label: section.label || "Section" });
-              setDraftLabel(section.label && section.type === "custom" ? section.label : "");
-              setCustomRenameOpen(true);
-            } else {
-              updateSection(section.id, { type: next, label: section.label });
-            }
+      <div
+        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
+        style={{ color: "oklch(0.3267 0.027 60.1)" }}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSectionCollapsed(section.id)}
+          disabled={sortMode}
+          aria-expanded={!section.collapsed}
+          aria-label={section.collapsed ? "Expand section" : "Collapse section"}
+          title={section.collapsed ? "Expand section" : "Collapse section"}
+          className="inline-flex min-w-0 items-center gap-2 rounded-[var(--pill-radius,8px)] disabled:opacity-100"
+          style={{
+            padding: "5px 12px",
+            background: "transparent",
+            color: "inherit",
+            fontFamily: "'Nunito', system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
           }}
-          disabled={sortMode || total === 1}
         >
-          <SelectTrigger
-            className="h-auto w-auto min-w-[120px] ml-2 border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
-            style={{
-              padding: "7px 16px",
-              borderRadius: "var(--pill-radius, 8px)",
-              background: "var(--pill-rest-bg)",
-              color: "var(--pill-rest-fg)",
-              fontFamily: "'Nunito', system-ui, sans-serif",
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            <Music2 className="h-3.5 w-3.5 shrink-0" />
-            <SelectValue>{displayName}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {SECTION_TYPES.map((t) => (
-              <SelectItem key={t} value={t} className="text-xs capitalize">
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Music2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate">{displayName}</span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 shrink-0 transition-transform", section.collapsed && "-rotate-90")}
+          />
+        </button>
 
         {section.type === "custom" && !sortMode && (
           <Button
@@ -1029,15 +1032,15 @@ function SectionCard({
                 window.dispatchEvent(new Event("lovable:request-play"));
               }}
               className={cn(
-                "h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors",
+                "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
                 isSectionPlaying
                   ? "bg-[var(--primary)] text-white"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed",
+                  : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
               aria-label="Play from this section"
               title="Play from this section"
             >
-              <Play className={cn("h-3.5 w-3.5", isSectionPlaying && "fill-white")} />
+              <Play className={cn("h-4 w-4", isSectionPlaying && "fill-white")} />
             </button>
             <SectionColorPicker
               value={section.color}
@@ -1045,38 +1048,41 @@ function SectionCard({
               className={isMobile ? "hidden" : undefined}
             />
             <button
-              onClick={() => setCommentOpen((o) => !o)}
-              className="relative h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              onClick={() => {
+                if (section.collapsed) toggleSectionCollapsed(section.id);
+                setCommentOpen((o) => !o);
+              }}
+              className="relative h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
               aria-label={hasComment ? "View comment" : "Add comment"}
             >
-              <Plus className="h-3 w-3 absolute top-1.5 left-1.5" />
-              <MessageSquare className="h-3.5 w-3.5" />
+              <Plus className="h-3 w-3 absolute top-2 left-2" />
+              <MessageSquare className="h-4 w-4" />
               {hasComment && (
                 <span
                   aria-hidden
-                  className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary"
+                  className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary"
                 />
               )}
             </button>
             <button
               type="button"
               onClick={() => duplicateSection(section.id)}
-              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
               aria-label="Duplicate section"
               title="Duplicate section"
             >
-              <Copy className="h-3.5 w-3.5" />
+              <Copy className="h-4 w-4" />
             </button>
             {recTracks.length > 0 && (
               <Popover open={overdubOpen} onOpenChange={setOverdubOpen}>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-destructive/90 hover:text-destructive transition-colors"
                     aria-label="Overdub this section"
                     title="Overdub this section"
                   >
-                    <Mic className="h-3.5 w-3.5" />
+                    <Mic className="h-4 w-4" />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-52 p-2">
@@ -1111,12 +1117,34 @@ function SectionCard({
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-7 w-7">
+                <button
+                  type="button"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+                  aria-label="Section options"
+                >
                   <MoreVertical className="h-4 w-4" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Section</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Music2 className="h-4 w-4" /> Change type
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {SECTION_TYPES.map((t) => (
+                      <DropdownMenuItem
+                        key={t}
+                        className="capitalize"
+                        onClick={() => changeSectionType(t)}
+                      >
+                        {t}
+                        {section.type === t && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 {isMobile && (
                   <>
                     <DropdownMenuSeparator />
@@ -1187,9 +1215,10 @@ function SectionCard({
       </div>
 
       {/* Body */}
-      <>
+      {!section.collapsed && (
+        <>
 
-          <div className="space-y-1">
+          <div className="mt-2 space-y-1">
             {section.lines.map((line, i) => (
               <LineRow
                 key={line.id}
@@ -1312,6 +1341,7 @@ function SectionCard({
             </div>
           )}
         </>
+      )}
 
 
       {/* Custom name dialog */}
