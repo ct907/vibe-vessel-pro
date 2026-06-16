@@ -49,4 +49,27 @@ describe("lyric slot collision repair", () => {
       expect(c.lyricsPlacement).toBeUndefined();
     }
   });
+
+  it("attachChordToLyrics re-anchors a progression-only chord without collision", () => {
+    useSongStore.getState().loadFromJSON(dreamon);
+    const secId = useSongStore.getState().sections.find((s) =>
+      s.chords.some((c) => c.progressionPlacement && !c.lyricsPlacement),
+    )!.id;
+    const target = useSongStore.getState().sections.find((s) => s.id === secId)!
+      .chords.find((c) => c.progressionPlacement && !c.lyricsPlacement)!;
+
+    useSongStore.getState().attachChordToLyrics(secId, target.id);
+
+    const sec = useSongStore.getState().sections.find((s) => s.id === secId)!;
+    const moved = sec.chords.find((c) => c.id === target.id)!;
+    // It now sits on a lyric line, still has its block placement, and shares no
+    // (line, slot) with any other chord.
+    expect(moved.lyricsPlacement).toBeTruthy();
+    expect(moved.progressionPlacement).toBeTruthy();
+    const lp = moved.lyricsPlacement!;
+    const sameSlot = sec.chords.filter(
+      (c) => c.id !== moved.id && c.lyricsPlacement?.lineId === lp.lineId && c.lyricsPlacement?.slotIndex === lp.slotIndex,
+    );
+    expect(sameSlot).toEqual([]);
+  });
 });
