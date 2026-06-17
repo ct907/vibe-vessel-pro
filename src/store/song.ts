@@ -3265,9 +3265,32 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const anchorBeforeId = insertAt === 0 ? null : targetSCs[insertAt - 1].id;
 
     // Reassign moved SC's patternId; clear its concrete startBeat (recomputed
-    // by deriveMirrorsFromSectionChords).
+    // by deriveMirrorsFromSectionChords). When moving to a different block,
+    // also migrate lyricsPlacement to the target block's lyric line so the
+    // Write tab and Progression view stay in agreement. Without this, a chord
+    // moved from Block N to Block M keeps its anchor on Block N's lyric line,
+    // causing its progressionPlacement to later overflow back to Block M's
+    // start via deriveMirrorsFromSectionChords' lyric-order packing.
+    let newLyricsPlacement = moving.lyricsPlacement;
+    if (fromPatternId !== toPatternId && moving.lyricsPlacement) {
+      const sectionBlocks = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+      const toBlockIdx = sectionBlocks.findIndex((p) => p.id === toPatternId);
+      const nonOverflowLines = sec.lines.filter((l) => !l._isChordOverflow);
+      const targetLine = nonOverflowLines[toBlockIdx >= 0 ? toBlockIdx : 0] ?? nonOverflowLines[0];
+      if (targetLine && targetLine.id !== moving.lyricsPlacement.lineId) {
+        const occupied = new Set<number>();
+        sec.chords.forEach((c) => {
+          if (c.id !== chordId && c.lyricsPlacement?.lineId === targetLine.id) {
+            occupied.add(c.lyricsPlacement.slotIndex);
+          }
+        });
+        const slot = nearestFreeSlot(occupied, moving.lyricsPlacement.slotIndex);
+        newLyricsPlacement = slot >= 0 ? { lineId: targetLine.id, slotIndex: slot } : undefined;
+      }
+    }
     const remapped: SectionChord = {
       ...moving,
+      lyricsPlacement: newLyricsPlacement,
       progressionPlacement: {
         ...moving.progressionPlacement,
         patternId: toPatternId,
