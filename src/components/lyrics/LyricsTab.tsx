@@ -82,7 +82,7 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
-import { useUIStore } from "@/store/ui";
+import { useUIStore, type ClipboardChord } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
@@ -421,7 +421,9 @@ function LineRow({
                               onShiftSelectTapRef.current?.(anchor!.id);
                               return;
                             }
-                            onSetActiveChordId(activeChordId === anchor!.id ? null : anchor!.id);
+                            const nextActive = activeChordId === anchor!.id ? null : anchor!.id;
+                            onSetActiveChordId(nextActive);
+                            if (nextActive) setChordToolbarOpen(true);
                           }}
                           onLongPress={() => {
                             onSetActiveChordId(null);
@@ -1430,6 +1432,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     moveChordToSlot,
     setLineText,
     placeChordInSlot,
+    pasteChordsAt,
     autoLayoutSection,
     updatePattern,
     setSectionChordsLength,
@@ -1555,6 +1558,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     },
     [sections, activeChordId, toggleLyricMultiSelected],
   );
+  const chordClipboard = useUIStore((s) => s.chordClipboard);
+  const setChordClipboard = useUIStore((s) => s.setChordClipboard);
+  const [pastePending, setPastePending] = useState<{
+    chords: ClipboardChord[];
+    target: { sectionId: string; lineId: string; atCol: number } | null;
+  } | null>(null);
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
   const [rhymeTarget, setRhymeTarget] = useState<{
@@ -1564,6 +1573,61 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     lineIds: string[];
     activeIdx: number;
   } | null>(null);
+
+  const handleCopyChords = useCallback(() => {
+    const sec = sections;
+    const getChordData = (anchorId: string, sectionId: string): ClipboardChord | null => {
+      const section = sec.find((s) => s.id === sectionId);
+      const sc = section?.chords.find((c) => c.id === anchorId);
+      if (!sc) return null;
+      return { chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats };
+    };
+    let copied: ClipboardChord[] = [];
+    if (lyricMultiSelected.size > 0) {
+      const sorted = Array.from(lyricMultiSelected.entries()).map(([id, ctx]) => {
+        const section = sec.find((s) => s.id === ctx.sectionId);
+        const anchor = section?.lines.find((l) => l.id === ctx.lineId)?.chords.find((c) => c.id === id);
+        return { id, ctx, slotIndex: anchor?.slotIndex ?? 0 };
+      }).sort((a, b) => a.slotIndex - b.slotIndex);
+      copied = sorted.flatMap(({ id, ctx }) => {
+        const data = getChordData(id, ctx.sectionId);
+        return data ? [data] : [];
+      });
+    } else if (activeChordId) {
+      for (const section of sec) {
+        const sc = section.chords.find((c) => c.id === activeChordId);
+        if (sc) {
+          copied = [{ chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats }];
+          break;
+        }
+      }
+    }
+    if (copied.length > 0) setChordClipboard(copied);
+  }, [sections, lyricMultiSelected, activeChordId, setChordClipboard]);
+
+  const handlePasteRequest = useCallback(() => {
+    if (chordClipboard.length === 0) return;
+    // Default target: after active chord, or slot 0 of active section's first line
+    let target: { sectionId: string; lineId: string; atCol: number } | null = null;
+    if (activeChordId) {
+      for (const section of sections) {
+        for (const line of section.lines) {
+          const anchor = line.chords.find((c) => c.id === activeChordId);
+          if (anchor) {
+            target = { sectionId: section.id, lineId: line.id, atCol: (anchor.slotIndex ?? 0) + 1 };
+            break;
+          }
+        }
+        if (target) break;
+      }
+    }
+    if (!target && sections.length > 0) {
+      const sec = sections[0];
+      const line = sec.lines[0];
+      if (line) target = { sectionId: sec.id, lineId: line.id, atCol: 0 };
+    }
+    setPastePending({ chords: chordClipboard, target });
+  }, [chordClipboard, sections, activeChordId]);
 
   const handleLineTextFocus = (sectionId: string, lineId: string) => {
     setFocusedLineInfo({ sectionId, lineId });
@@ -2075,6 +2139,28 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     return () => setLyricsOnDragEnd(null);
   }, [setLyricsOnDragEnd]);
 
+  // Ctrl+C / Ctrl+V keyboard shortcuts for chord copy/paste.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "c" || e.key === "C") {
+        if (activeChordId || lyricMultiSelected.size > 0) {
+          e.preventDefault();
+          handleCopyChords();
+        }
+      } else if (e.key === "v" || e.key === "V") {
+        if (chordClipboard.length > 0) {
+          e.preventDefault();
+          handlePasteRequest();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [activeChordId, lyricMultiSelected, chordClipboard, handleCopyChords, handlePasteRequest]);
+
   // Tapping anywhere outside a chord, its overlay icons, the chord-editing
   // toolbar/menu, or any open menu/sheet clears the active-chord selection.
   useEffect(() => {
@@ -2582,6 +2668,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
             }}
+            onCopy={handleCopyChords}
+            canPaste={chordClipboard.length > 0}
+            onPaste={handlePasteRequest}
             onExitEdit={() => {
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
@@ -2671,6 +2760,70 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         </Sheet>
       );
     })()}
+    {/* ── Paste confirmation ──────────────────────────────────────────────── */}
+    {pastePending && (
+      <Sheet open onOpenChange={(o) => { if (!o) setPastePending(null); }}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl flex flex-col p-0 [&>button[type=button]]:hidden"
+          style={{ background: "var(--paper)", maxHeight: "80vh" }}
+        >
+          <SheetHeader className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+            <SheetTitle className="font-display text-lg" style={{ color: "var(--ink)" }}>
+              Paste {pastePending.chords.length} chord{pastePending.chords.length !== 1 ? "s" : ""}
+            </SheetTitle>
+            <div className="flex gap-1.5 flex-wrap mt-1">
+              {pastePending.chords.map((c, i) => (
+                <ChordChip key={i} chord={c.chord} size="sm" variant="ink" audition={false} />
+              ))}
+            </div>
+          </SheetHeader>
+          <div className="flex flex-col gap-2 px-4 py-4 overflow-y-auto">
+            <p className="text-xs" style={{ color: "var(--ink-soft)" }}>Choose where to paste:</p>
+            {sections.flatMap((sec) =>
+              sec.lines.filter((l) => !l._isChordOverflow).map((line, li) => {
+                const isActive = pastePending.target?.sectionId === sec.id && pastePending.target?.lineId === line.id;
+                return (
+                  <button
+                    key={line.id}
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm transition-colors",
+                      isActive ? "btn-sculpt-amber" : "btn-sculpt-cream",
+                    )}
+                    onClick={() => setPastePending((p) => p ? { ...p, target: { sectionId: sec.id, lineId: line.id, atCol: 0 } } : p)}
+                  >
+                    <span className="font-semibold truncate">{getSectionDisplayName(sections, sec.id)}</span>
+                    {sec.lines.filter((l) => !l._isChordOverflow).length > 1 && (
+                      <span className="text-xs opacity-70">line {li + 1}</span>
+                    )}
+                    <span className="ml-auto text-xs opacity-60 font-mono-chord">{line.text.slice(0, 20) || "(empty)"}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="flex gap-2 px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+            <Button
+              className="flex-1 btn-sculpt-amber"
+              disabled={!pastePending.target}
+              onClick={() => {
+                if (!pastePending.target) return;
+                const { sectionId, lineId, atCol } = pastePending.target;
+                pasteChordsAt(
+                  sectionId, lineId, atCol,
+                  pastePending.chords.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
+                );
+                setPastePending(null);
+              }}
+            >
+              Paste here
+            </Button>
+            <Button variant="ghost" onClick={() => setPastePending(null)}>Cancel</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )}
     </>
   );
 }
