@@ -1853,6 +1853,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     );
   };
 
+  // Nashville batch insert: picker.slotIndex is stale inside a forEach closure
+  // because React batches the setPicker updates. We track the slot synchronously
+  // using the actual placed-slot returned by placeChordInSlot (Zustand set is
+  // synchronous, so each call sees state from the previous one).
+  const handlePickBatch = (chords: ChordSymbol[]) => {
+    if (!picker || picker.prog || picker.anchorId) return;
+    let nextSlot = picker.slotIndex;
+    for (const chord of chords) {
+      const result = placeChordInSlot(picker.sectionId, picker.lineId, nextSlot, chord);
+      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+    }
+    setPickerQuery("");
+    setPicker((prev) => (prev ? { ...prev, anchorId: undefined, slotIndex: nextSlot } : prev));
+  };
+
   // Detected-chord chips (from the recordings strip) are the only draggables
   // that target lyric slots. Their draggableId is `detected:<chordId>`; the
   // slot droppableId is `slot:<sectionId>:<lineId>:<slotIndex>`. Resolve the
@@ -2114,6 +2129,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           headerRef={chordPickerHeaderRef}
           initialChord={initialChord}
           onPick={handlePick}
+          onPickBatch={handlePickBatch}
           sectionId={picker?.sectionId}
           activeLineId={picker?.lineId}
           activeSlotIndex={picker?.slotIndex}
