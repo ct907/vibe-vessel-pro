@@ -1825,6 +1825,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   useEffect(() => {
     if (!activeChordId) return;
     const onPointerDown = (e: PointerEvent) => {
+      // The full-screen chord editor is a modal that owns its own dismissal
+      // (backdrop + Done button). A scroll/drag inside it still fires a
+      // document pointerdown — ignore it so it doesn't clear the active chord
+      // and tear the editor down mid-scroll.
+      if (useUIStore.getState().focusedEditorOpen) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
       setActiveChordId(null);
@@ -2418,8 +2423,24 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                       onClick={() => {
                         if (!sec) return;
                         const store = useSongStore.getState();
+                        // addChordToPattern clamps the new chord's length to the
+                        // block's free space (and resets it on overflow), so
+                        // after each insert force the exact copied length — the
+                        // SSOT derive then overflows it into continuation blocks
+                        // while preserving the beat length.
+                        let knownIds = new Set(
+                          store.sections.find((s) => s.id === sec.id)?.chords.map((c) => c.id) ?? [],
+                        );
                         for (const c of pastePending.chords) {
                           store.addChordToPattern(pat.id, c.chord, usedBeats, c.lengthBeats);
+                          const fresh = useSongStore.getState().sections.find((s) => s.id === sec.id);
+                          const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
+                          if (added?.progressionPlacement && c.lengthBeats != null) {
+                            store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
+                          }
+                          knownIds = new Set(
+                            useSongStore.getState().sections.find((s) => s.id === sec.id)?.chords.map((x) => x.id) ?? [],
+                          );
                         }
                         setPastePending(null);
                       }}

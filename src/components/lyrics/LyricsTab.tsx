@@ -2169,6 +2169,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       if (e.key === "Escape") setActiveChordId(null);
     };
     const handlePointer = (e: PointerEvent) => {
+      // Ignore pointer events while the full-screen chord editor is open — it's
+      // a modal that owns dismissal, and a scroll inside it must not clear the
+      // selection out from under it.
+      if (useUIStore.getState().focusedEditorOpen) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('[data-chip-anchor],[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
       setActiveChordId(null);
@@ -2810,10 +2814,27 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               onClick={() => {
                 if (!pastePending.target) return;
                 const { sectionId, lineId, atCol } = pastePending.target;
+                const beforeIds = new Set(
+                  useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
+                );
                 pasteChordsAt(
                   sectionId, lineId, atCol,
                   pastePending.chords.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
                 );
+                // pasteChordsAt places chords at the default length; restore the
+                // copied beat lengths. New chords land on this line with
+                // increasing slotIndex, matching the clipboard order.
+                const store = useSongStore.getState();
+                const after = store.sections.find((s) => s.id === sectionId);
+                const newChords = (after?.chords ?? [])
+                  .filter((c) => !beforeIds.has(c.id) && c.lyricsPlacement?.lineId === lineId && c.progressionPlacement)
+                  .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex);
+                newChords.forEach((nc, i) => {
+                  const want = pastePending.chords[i]?.lengthBeats;
+                  if (want != null && nc.progressionPlacement) {
+                    store.setPatternChordLength(nc.progressionPlacement.patternId, nc.id, want);
+                  }
+                });
                 setPastePending(null);
               }}
             >
