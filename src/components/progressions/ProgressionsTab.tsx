@@ -66,7 +66,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
-import { useUIStore } from "@/store/ui";
+import { useUIStore, type ClipboardChord } from "@/store/ui";
 import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -156,6 +156,7 @@ interface PatternProps {
   /** Cross-block multi-selection: chordId → patternId. */
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
   /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
   effectiveOffset: number;
@@ -185,6 +186,7 @@ function PatternBlock({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onShiftSelectChord,
   onClearMultiSelected,
   effectiveOffset,
   extendBackground = false,
@@ -624,8 +626,12 @@ function PatternBlock({
                                   if (Date.now() - justDraggedAtRef.current < 350) return;
                                   if (longPressDidFireRef.current) { longPressDidFireRef.current = false; return; }
                                   e.stopPropagation();
-                                  if (multiSelectModeRef.current || e.shiftKey || isShiftDownRef.current) {
+                                  if (e.ctrlKey || e.metaKey || multiSelectModeRef.current) {
                                     onToggleMultiSelected(c.id, pattern.id);
+                                    return;
+                                  }
+                                  if (e.shiftKey || isShiftDownRef.current) {
+                                    onShiftSelectChord?.(pattern.id, c.id);
                                     return;
                                   }
                                   setFocusedPattern(pattern.id);
@@ -866,6 +872,7 @@ interface SectionGroupProps {
   onSetActiveChordId: (id: string | null) => void;
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
   onChordClick: (patternId: string, chordId: string) => void;
@@ -894,6 +901,7 @@ function SectionGroup({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onShiftSelectChord,
   onClearMultiSelected,
   onAddNewBlockRequest,
   onChordClick,
@@ -1228,6 +1236,7 @@ function SectionGroup({
                     onSetActiveChordId={onSetActiveChordId}
                     multiSelected={multiSelected}
                     onToggleMultiSelected={onToggleMultiSelected}
+                    onShiftSelectChord={onShiftSelectChord}
                     onClearMultiSelected={onClearMultiSelected}
                     effectiveOffset={effectiveOffset}
                     blockRef={i === 0 ? firstBlockRef : undefined}
@@ -1410,7 +1419,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const multiSelectedRef = useRef(multiSelected);
   multiSelectedRef.current = multiSelected;
 
+  const rangeAnchorRef = useRef<{ patternId: string; chordId: string } | null>(null);
+
   const toggleMultiSelected = useCallback((chordId: string, patternId: string) => {
+    rangeAnchorRef.current = { patternId, chordId };
     setMultiSelected((prev) => {
       const next = new Map(prev);
       if (next.has(chordId)) next.delete(chordId);
@@ -1418,6 +1430,70 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       return next;
     });
   }, []);
+
+  const rangeSelectProgChords = useCallback((patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    const sectionId = pat.sectionId ?? pat.id;
+    const sectionBlocks = progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+    const sec = sections.find((s) => s.id === sectionId);
+    const ordered = sectionBlocks.flatMap((b) => {
+      const chords = sec ? getPatternChordsViaSSOT(sec, b) : b.chords;
+      return [...chords].sort((a, b) => a.startBeat - b.startBeat).map((c) => ({ chordId: c.id, patternId: b.id }));
+    });
+    const fromId = rangeAnchorRef.current?.chordId ?? activeChordId;
+    if (!fromId) {
+      toggleMultiSelected(chordId, patternId);
+      return;
+    }
+    const fromIdx = ordered.findIndex((x) => x.chordId === fromId);
+    const toIdx = ordered.findIndex((x) => x.chordId === chordId);
+    if (fromIdx < 0 || toIdx < 0) {
+      toggleMultiSelected(chordId, patternId);
+      return;
+    }
+    const lo = Math.min(fromIdx, toIdx);
+    const hi = Math.max(fromIdx, toIdx);
+    setMultiSelected((prev) => {
+      const next = new Map(prev);
+      for (let i = lo; i <= hi; i++) {
+        next.set(ordered[i].chordId, ordered[i].patternId);
+      }
+      return next;
+    });
+  }, [progression, sections, activeChordId, toggleMultiSelected]);
+
+  const chordClipboard = useUIStore((s) => s.chordClipboard);
+  const setChordClipboard = useUIStore((s) => s.setChordClipboard);
+  const [pastePending, setPastePending] = useState<{ chords: ClipboardChord[] } | null>(null);
+
+  const handleCopyChords = useCallback(() => {
+    let copied: ClipboardChord[] = [];
+    if (multiSelected.size > 0) {
+      const items: { chord: ClipboardChord; startBeat: number }[] = [];
+      for (const [cid, pid] of multiSelected) {
+        const pat = progression.find((p) => p.id === pid);
+        const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
+        const chords = sec && pat ? getPatternChordsViaSSOT(sec, pat) : (pat?.chords ?? []);
+        const c = chords.find((x) => x.id === cid);
+        if (c) items.push({ chord: { chord: c.chord, lengthBeats: c.lengthBeats }, startBeat: c.startBeat });
+      }
+      copied = items.sort((a, b) => a.startBeat - b.startBeat).map((x) => x.chord);
+    } else if (activeChordId) {
+      for (const p of progression) {
+        const sec = sections.find((s) => s.id === (p.sectionId ?? p.id));
+        const chords = sec ? getPatternChordsViaSSOT(sec, p) : p.chords;
+        const c = chords.find((x) => x.id === activeChordId);
+        if (c) { copied = [{ chord: c.chord, lengthBeats: c.lengthBeats }]; break; }
+      }
+    }
+    if (copied.length > 0) setChordClipboard(copied);
+  }, [multiSelected, activeChordId, progression, sections, setChordClipboard]);
+
+  const handlePasteRequest = useCallback(() => {
+    if (chordClipboard.length === 0) return;
+    setPastePending({ chords: chordClipboard });
+  }, [chordClipboard]);
 
   const sortAnimatingRef = useRef(false);
   // Moves requested while an animation is in flight are queued and applied
@@ -1519,6 +1595,27 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [multiSelected.size]);
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "c" || e.key === "C") {
+        if (activeChordId || multiSelected.size > 0) {
+          e.preventDefault();
+          handleCopyChords();
+        }
+      } else if (e.key === "v" || e.key === "V") {
+        if (chordClipboard.length > 0) {
+          e.preventDefault();
+          handlePasteRequest();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [activeChordId, multiSelected, chordClipboard, handleCopyChords, handlePasteRequest]);
+
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
   const setChordEditorRef = useRef(setChordEditor);
@@ -1857,6 +1954,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onSetActiveChordId={setActiveChordId}
           multiSelected={multiSelected}
           onToggleMultiSelected={toggleMultiSelected}
+          onShiftSelectChord={rangeSelectProgChords}
           onClearMultiSelected={() => setMultiSelected(new Map())}
           addChordsRef={i === 0 ? addChordsRef : undefined}
           firstBlockRef={i === 0 ? firstBlockRef : undefined}
@@ -2273,9 +2371,72 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             useSongStore.getState().removePatternChordsBatch(toolbarContext.activePatternId, [activeChordId]);
             setActiveChordId(null);
           }}
+          onCopy={handleCopyChords}
+          canPaste={chordClipboard.length > 0}
+          onPaste={handlePasteRequest}
           onExitEdit={() => { setActiveChordId(null); setMultiSelected(new Map()); }}
         />
       )}
+
+      {/* ── Paste confirmation for progressions ─────────────────────────── */}
+      {pastePending && (() => {
+        const pasteTargets = progression.map((p) => {
+          const sec = sections.find((s) => s.id === (p.sectionId ?? p.id));
+          return { pat: p, sec };
+        });
+        return (
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center"
+            style={{ background: "rgba(0,0,0,0.4)" }}
+            onClick={() => setPastePending(null)}
+          >
+            <div
+              className="w-full max-w-lg rounded-t-2xl p-0 overflow-hidden"
+              style={{ background: "var(--paper)", maxHeight: "80vh" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+                <p className="font-display text-lg font-semibold" style={{ color: "var(--ink)" }}>
+                  Paste {pastePending.chords.length} chord{pastePending.chords.length !== 1 ? "s" : ""}
+                </p>
+                <div className="flex gap-1.5 flex-wrap mt-1">
+                  {pastePending.chords.map((c, i) => (
+                    <ChordChip key={i} chord={c.chord} size="sm" variant="ink" audition={false} />
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 px-4 py-4 overflow-y-auto" style={{ maxHeight: "40vh" }}>
+                <p className="text-xs" style={{ color: "var(--ink-soft)" }}>Choose block to paste into:</p>
+                {pasteTargets.map(({ pat, sec }) => {
+                  const chords = sec ? getPatternChordsViaSSOT(sec, pat) : pat.chords;
+                  const usedBeats = chords.reduce((s, c) => s + c.lengthBeats, 0);
+                  return (
+                    <button
+                      key={pat.id}
+                      type="button"
+                      className="btn-sculpt-cream flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm"
+                      onClick={() => {
+                        if (!sec) return;
+                        const store = useSongStore.getState();
+                        for (const c of pastePending.chords) {
+                          store.addChordToPattern(pat.id, c.chord, usedBeats, c.lengthBeats);
+                        }
+                        setPastePending(null);
+                      }}
+                    >
+                      <span className="font-semibold truncate">{pat.label}</span>
+                      <span className="text-xs opacity-60 ml-auto">{usedBeats}/{pat.bars * pat.beatsPerBar} beats</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+                <Button variant="ghost" className="w-full" onClick={() => setPastePending(null)}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <WhyThisChordSheet />
     </div>

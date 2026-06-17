@@ -24,6 +24,11 @@ export type AppMode = "write" | "arrange";
 /** Arrange sub-view, chosen in the song-meta row. */
 export type ArrangeView = "track" | "chords";
 
+export interface ClipboardChord {
+  chord: ChordSymbol;
+  lengthBeats?: number;
+}
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
@@ -42,6 +47,9 @@ interface UIState {
   /** One-shot signal: WriteStickyBar requests FloatingChordToolbar to expand. */
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
+  /** Chord clipboard shared across tabs. */
+  chordClipboard: ClipboardChord[];
+  setChordClipboard: (chords: ClipboardChord[]) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -61,5 +69,7 @@ export const useUIStore = create<UIState>((set) => ({
   setArrangeView: (arrangeView) => set({ arrangeView }),
   chordToolbarOpen: false,
   setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
+  chordClipboard: [],
+  setChordClipboard: (chords) => set({ chordClipboard: chords }),
 }));
 

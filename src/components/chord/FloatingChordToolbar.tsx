@@ -15,6 +15,7 @@ import {
   CheckSquare,
   ListChecks,
   Copy,
+  ClipboardPaste,
   Trash2,
   X,
 } from "lucide-react";
@@ -50,6 +51,10 @@ export interface FloatingChordToolbarProps {
   /** Duplicate the active chord / current selection in place. */
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onCopy?: () => void;
+  /** True when there are chords in the clipboard ready to paste. */
+  canPaste?: boolean;
+  onPaste?: () => void;
   onExitEdit: () => void;
 }
 
@@ -214,6 +219,9 @@ export function FloatingChordToolbar({
   onEnterMultiSelect,
   onDuplicate,
   onDelete,
+  onCopy,
+  canPaste = false,
+  onPaste,
   onExitEdit,
 }: FloatingChordToolbarProps) {
   const isDesktop = useIsDesktop();
@@ -232,7 +240,7 @@ export function FloatingChordToolbar({
   // toggles the menu. Desktop keeps the explicit open/close via the trigger
   // button and the chordToolbarOpen signal.
   const effectiveExpanded =
-    visible && (expanded || (autoExpandOnContext && !isDesktop && hasContext));
+    visible && (expanded || (autoExpandOnContext && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {
@@ -394,6 +402,20 @@ export function FloatingChordToolbar({
             disabled={!hasContext}
             onClick={hasContext ? onDuplicate : undefined}
           />
+          {divider}
+          <LabeledBtn
+            icon={<Copy className="h-5 w-5" />}
+            label="Copy"
+            disabled={!hasContext}
+            onClick={hasContext ? onCopy : undefined}
+          />
+          <LabeledBtn
+            icon={<ClipboardPaste className="h-5 w-5" />}
+            label="Paste"
+            disabled={!canPaste}
+            onClick={canPaste ? onPaste : undefined}
+          />
+          {divider}
           <LabeledBtn
             icon={<Trash2 className="h-5 w-5" />}
             label="Delete"
@@ -540,6 +562,28 @@ export function FloatingChordToolbar({
                 title="Duplicate"
               >
                 <Copy className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                disabled={!hasContext}
+                onClick={hasContext ? onCopy : undefined}
+                aria-label="Copy selected chord(s)"
+                title="Copy"
+              >
+                <Copy className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn("h-8 w-8", !canPaste && "opacity-40")}
+                disabled={!canPaste}
+                onClick={canPaste ? onPaste : undefined}
+                aria-label="Paste chord(s)"
+                title="Paste"
+              >
+                <ClipboardPaste className="h-5 w-5" />
               </Button>
             </div>
 
