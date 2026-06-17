@@ -156,6 +156,8 @@ interface LineRowProps {
   multiSelectedIds?: Set<string>;
   onMultiSelectTap?: (anchorId: string) => void;
   onShiftSelectTap?: (anchorId: string) => void;
+  pasteMode?: boolean;
+  onPasteAtSlot?: (slotIdx: number) => void;
   isFocused?: boolean;
   onTextFocus: () => void;
   onTextBlur: () => void;
@@ -177,6 +179,8 @@ function LineRow({
   multiSelectedIds,
   onMultiSelectTap,
   onShiftSelectTap,
+  pasteMode,
+  onPasteAtSlot,
   isFocused,
   onTextFocus,
   onTextBlur,
@@ -328,6 +332,7 @@ function LineRow({
             const t = e.target as HTMLElement;
             if (t.closest("[data-chip-anchor]")) return;
             if (t.closest("[data-slot-index]")) return;
+            if (pasteMode) { onPasteAtSlot?.(0); return; }
             setFocusedPattern(null);
             onChordFocus(line.id);
             onPickerOpen(line.id, 0);
@@ -335,6 +340,7 @@ function LineRow({
           className={cn(
             "group relative flex items-center flex-1 min-w-0 rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
+            pasteMode && "animate-paste-glow cursor-copy",
           )}
           style={{ minHeight: 22, paddingTop: 2, paddingBottom: 2, overflowX: "visible", paddingLeft: 8 }}
         >
@@ -377,6 +383,11 @@ function LineRow({
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
                     onClick={(e) => {
+                      if (pasteMode) {
+                        e.stopPropagation();
+                        onPasteAtSlot?.(slotIdx);
+                        return;
+                      }
                       if (occupied) return;
                       e.stopPropagation();
                       onChordFocus(line.id);
@@ -412,6 +423,10 @@ function LineRow({
                           keyChangeOffset={effectiveOffset}
                           selected={activeChordId === anchor!.id || !!multiSelectedIds?.has(anchor!.id)}
                           onClick={() => {
+                            if (pasteMode) {
+                              onPasteAtSlot?.(slotIdx);
+                              return;
+                            }
                             const { ctrl, shift } = lastClickModifiersRef.current;
                             if (ctrl || multiSelectModeRef.current) {
                               onMultiSelectTapRef.current?.(anchor!.id);
@@ -795,6 +810,8 @@ interface SectionCardProps {
   multiSelectedIds?: Set<string>;
   onMultiSelectTap?: (lineId: string, anchorId: string) => void;
   onShiftSelectTap?: (lineId: string, anchorId: string) => void;
+  pasteMode?: boolean;
+  onPasteAtSlot?: (lineId: string, slotIdx: number) => void;
   focusedLineId?: string;
   onLineTextFocus: (lineId: string) => void;
   onLineTextBlur: () => void;
@@ -817,6 +834,8 @@ function SectionCard({
   multiSelectedIds,
   onMultiSelectTap,
   onShiftSelectTap,
+  pasteMode,
+  onPasteAtSlot,
   focusedLineId,
   onLineTextFocus,
   onLineTextBlur,
@@ -1255,6 +1274,8 @@ function SectionCard({
                 multiSelectedIds={multiSelectedIds}
                 onMultiSelectTap={(anchorId) => onMultiSelectTap?.(line.id, anchorId)}
                 onShiftSelectTap={(anchorId) => onShiftSelectTap?.(line.id, anchorId)}
+                pasteMode={pasteMode}
+                onPasteAtSlot={(slotIdx) => onPasteAtSlot?.(line.id, slotIdx)}
                 isFocused={focusedLineId === line.id}
                 onTextFocus={() => onLineTextFocus(line.id)}
                 onTextBlur={onLineTextBlur}
@@ -1432,7 +1453,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     moveChordToSlot,
     setLineText,
     placeChordInSlot,
-    pasteChordsAt,
     autoLayoutSection,
     updatePattern,
     setSectionChordsLength,
@@ -1560,10 +1580,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   );
   const chordClipboard = useUIStore((s) => s.chordClipboard);
   const setChordClipboard = useUIStore((s) => s.setChordClipboard);
-  const [pastePending, setPastePending] = useState<{
-    chords: ClipboardChord[];
-    target: { sectionId: string; lineId: string; atCol: number } | null;
-  } | null>(null);
+  // Paste mode: after pressing Paste, chord rows glow and the next slot click
+  // drops the clipboard chords there (non-destructively).
+  const [pasteMode, setPasteMode] = useState(false);
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
   const [rhymeTarget, setRhymeTarget] = useState<{
@@ -1607,27 +1626,83 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const handlePasteRequest = useCallback(() => {
     if (chordClipboard.length === 0) return;
-    // Default target: after active chord, or slot 0 of active section's first line
-    let target: { sectionId: string; lineId: string; atCol: number } | null = null;
-    if (activeChordId) {
-      for (const section of sections) {
-        for (const line of section.lines) {
-          const anchor = line.chords.find((c) => c.id === activeChordId);
-          if (anchor) {
-            target = { sectionId: section.id, lineId: line.id, atCol: (anchor.slotIndex ?? 0) + 1 };
-            break;
+    setPasteMode(true);
+  }, [chordClipboard]);
+
+  const handleCutChords = useCallback(() => {
+    handleCopyChords();
+    const store = useSongStore.getState();
+    const targets: { sectionId: string; lineId: string; id: string }[] = [];
+    if (lyricMultiSelected.size > 0) {
+      lyricMultiSelected.forEach((ctx, id) =>
+        targets.push({ sectionId: ctx.sectionId, lineId: ctx.lineId, id }),
+      );
+    } else if (activeChordId) {
+      for (const sec of store.sections) {
+        for (const line of sec.lines) {
+          if (line.chords.find((c) => c.id === activeChordId)) {
+            targets.push({ sectionId: sec.id, lineId: line.id, id: activeChordId });
           }
         }
-        if (target) break;
       }
     }
-    if (!target && sections.length > 0) {
-      const sec = sections[0];
-      const line = sec.lines[0];
-      if (line) target = { sectionId: sec.id, lineId: line.id, atCol: 0 };
+    if (targets.length === 0) return;
+    const byLine = new Map<string, { sectionId: string; lineId: string; ids: string[] }>();
+    for (const t of targets) {
+      const key = `${t.sectionId}:${t.lineId}`;
+      const entry = byLine.get(key) ?? { sectionId: t.sectionId, lineId: t.lineId, ids: [] };
+      entry.ids.push(t.id);
+      byLine.set(key, entry);
     }
-    setPastePending({ chords: chordClipboard, target });
-  }, [chordClipboard, sections, activeChordId]);
+    for (const { sectionId, lineId, ids } of byLine.values()) {
+      store.removeChordAnchorsBatch(sectionId, lineId, ids);
+    }
+    setActiveChordId(null);
+    setLyricMultiSelected(new Map());
+  }, [handleCopyChords, lyricMultiSelected, activeChordId]);
+
+  // Drop the clipboard chords starting at the clicked slot, non-destructively:
+  // existing chords shift over, then autoLayout repacks to the 1-space rule and
+  // spills overflow onto continuation rows.
+  const handlePasteAtSlot = useCallback(
+    (sectionId: string, lineId: string, slotIdx: number) => {
+      if (chordClipboard.length === 0) {
+        setPasteMode(false);
+        return;
+      }
+      const store = useSongStore.getState();
+      const beforeIds = new Set(
+        store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
+      );
+      store.pasteChordsAt(
+        sectionId,
+        lineId,
+        slotIdx,
+        chordClipboard.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
+      );
+      // Restore copied beat lengths on the newly inserted chords (they land on
+      // this line with increasing slotIndex, matching clipboard order).
+      const fresh = useSongStore.getState();
+      const after = fresh.sections.find((s) => s.id === sectionId);
+      const newChords = (after?.chords ?? [])
+        .filter(
+          (c) =>
+            !beforeIds.has(c.id) && c.lyricsPlacement?.lineId === lineId && c.progressionPlacement,
+        )
+        .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex);
+      newChords.forEach((nc, i) => {
+        const want = chordClipboard[i]?.lengthBeats;
+        if (want != null && nc.progressionPlacement) {
+          fresh.setPatternChordLength(nc.progressionPlacement.patternId, nc.id, want);
+        }
+      });
+      fresh.autoLayoutSection(sectionId, window.innerWidth, 28);
+      setPasteMode(false);
+      setActiveChordId(null);
+      setLyricMultiSelected(new Map());
+    },
+    [chordClipboard],
+  );
 
   const handleLineTextFocus = (sectionId: string, lineId: string) => {
     setFocusedLineInfo({ sectionId, lineId });
@@ -2139,9 +2214,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     return () => setLyricsOnDragEnd(null);
   }, [setLyricsOnDragEnd]);
 
-  // Ctrl+C / Ctrl+V keyboard shortcuts for chord copy/paste.
+  // Ctrl+C / Ctrl+X / Ctrl+V keyboard shortcuts for chord copy/cut/paste, and
+  // Escape to cancel an in-progress paste.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && pasteMode) {
+        setPasteMode(false);
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey)) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -2149,6 +2229,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         if (activeChordId || lyricMultiSelected.size > 0) {
           e.preventDefault();
           handleCopyChords();
+        }
+      } else if (e.key === "x" || e.key === "X") {
+        if (activeChordId || lyricMultiSelected.size > 0) {
+          e.preventDefault();
+          handleCutChords();
         }
       } else if (e.key === "v" || e.key === "V") {
         if (chordClipboard.length > 0) {
@@ -2159,7 +2244,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [activeChordId, lyricMultiSelected, chordClipboard, handleCopyChords, handlePasteRequest]);
+  }, [activeChordId, lyricMultiSelected, chordClipboard, pasteMode, handleCopyChords, handleCutChords, handlePasteRequest]);
 
   // Tapping anywhere outside a chord, its overlay icons, the chord-editing
   // toolbar/menu, or any open menu/sheet clears the active-chord selection.
@@ -2209,6 +2294,8 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             onShiftSelectTap={(lineId, anchorId) =>
               rangeSelectLyricChords(sec.id, lineId, anchorId)
             }
+            pasteMode={pasteMode}
+            onPasteAtSlot={(lineId, slot) => handlePasteAtSlot(sec.id, lineId, slot)}
             sortMode={sortMode}
             onMoveSection={(id, direction) => moveSection(id, direction)}
             focusedLineId={focusedLineInfo?.sectionId === sec.id ? focusedLineInfo.lineId : undefined}
@@ -2673,8 +2760,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
               setLyricMultiSelected(new Map());
             }}
             onCopy={handleCopyChords}
+            onCut={handleCutChords}
+            canCut={targets.length > 0}
             canPaste={chordClipboard.length > 0}
             onPaste={handlePasteRequest}
+            pasteMode={pasteMode}
+            onCancelPaste={() => setPasteMode(false)}
             onExitEdit={() => {
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
@@ -2764,87 +2855,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
         </Sheet>
       );
     })()}
-    {/* ── Paste confirmation ──────────────────────────────────────────────── */}
-    {pastePending && (
-      <Sheet open onOpenChange={(o) => { if (!o) setPastePending(null); }}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl flex flex-col p-0 [&>button[type=button]]:hidden"
-          style={{ background: "var(--paper)", maxHeight: "80vh" }}
-        >
-          <SheetHeader className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-            <SheetTitle className="font-display text-lg" style={{ color: "var(--ink)" }}>
-              Paste {pastePending.chords.length} chord{pastePending.chords.length !== 1 ? "s" : ""}
-            </SheetTitle>
-            <div className="flex gap-1.5 flex-wrap mt-1">
-              {pastePending.chords.map((c, i) => (
-                <ChordChip key={i} chord={c.chord} size="sm" variant="ink" audition={false} />
-              ))}
-            </div>
-          </SheetHeader>
-          <div className="flex flex-col gap-2 px-4 py-4 overflow-y-auto">
-            <p className="text-xs" style={{ color: "var(--ink-soft)" }}>Choose where to paste:</p>
-            {sections.flatMap((sec) =>
-              sec.lines.filter((l) => !l._isChordOverflow).map((line, li) => {
-                const isActive = pastePending.target?.sectionId === sec.id && pastePending.target?.lineId === line.id;
-                return (
-                  <button
-                    key={line.id}
-                    type="button"
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm transition-colors",
-                      isActive ? "btn-sculpt-amber" : "btn-sculpt-cream",
-                    )}
-                    onClick={() => setPastePending((p) => p ? { ...p, target: { sectionId: sec.id, lineId: line.id, atCol: 0 } } : p)}
-                  >
-                    <span className="font-semibold truncate">{getSectionDisplayName(sections, sec.id)}</span>
-                    {sec.lines.filter((l) => !l._isChordOverflow).length > 1 && (
-                      <span className="text-xs opacity-70">line {li + 1}</span>
-                    )}
-                    <span className="ml-auto text-xs opacity-60 font-mono-chord">{line.text.slice(0, 20) || "(empty)"}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-          <div className="flex gap-2 px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
-            <Button
-              className="flex-1 btn-sculpt-amber"
-              disabled={!pastePending.target}
-              onClick={() => {
-                if (!pastePending.target) return;
-                const { sectionId, lineId, atCol } = pastePending.target;
-                const beforeIds = new Set(
-                  useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
-                );
-                pasteChordsAt(
-                  sectionId, lineId, atCol,
-                  pastePending.chords.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
-                );
-                // pasteChordsAt places chords at the default length; restore the
-                // copied beat lengths. New chords land on this line with
-                // increasing slotIndex, matching the clipboard order.
-                const store = useSongStore.getState();
-                const after = store.sections.find((s) => s.id === sectionId);
-                const newChords = (after?.chords ?? [])
-                  .filter((c) => !beforeIds.has(c.id) && c.lyricsPlacement?.lineId === lineId && c.progressionPlacement)
-                  .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex);
-                newChords.forEach((nc, i) => {
-                  const want = pastePending.chords[i]?.lengthBeats;
-                  if (want != null && nc.progressionPlacement) {
-                    store.setPatternChordLength(nc.progressionPlacement.patternId, nc.id, want);
-                  }
-                });
-                setPastePending(null);
-              }}
-            >
-              Paste here
-            </Button>
-            <Button variant="ghost" onClick={() => setPastePending(null)}>Cancel</Button>
-          </div>
-        </SheetContent>
-      </Sheet>
-    )}
     </>
   );
 }
