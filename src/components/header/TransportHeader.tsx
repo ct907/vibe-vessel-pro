@@ -180,22 +180,30 @@ function buildPlayback(
   }
   if (!events.length) return null;
 
-  let outEvents = events;
-  let outMeta = meta;
+  // sec.chords is ordered by lyrics position (line → slot), which can place a chord
+  // from a later block before the last chord of an earlier block when lyric lines
+  // straddle block boundaries. Sort by startBeat so the lookahead scheduler always
+  // sees monotonically increasing beat times.
+  const sortOrder = events.map((_, i) => i).sort((a, b) => events[a].startBeat - events[b].startBeat);
+  const sortedEvents = sortOrder.map((i) => events[i]);
+  const sortedMeta = sortOrder.map((i) => meta[i]);
+
+  let outEvents = sortedEvents;
+  let outMeta = sortedMeta;
   let startAnchorStale = false;
   if (startFromChordId) {
-    const i = meta.findIndex((m) => m.patternChordId === startFromChordId);
+    const i = sortedMeta.findIndex((m) => m.patternChordId === startFromChordId);
     if (i < 0) {
       startAnchorStale = true;
     } else if (i > 0) {
-      const offset = events[i].startBeat;
-      outEvents = events.map((_, k) => {
-        const src = events[(i + k) % events.length];
+      const offset = sortedEvents[i].startBeat;
+      outEvents = sortedEvents.map((_, k) => {
+        const src = sortedEvents[(i + k) % sortedEvents.length];
         const rawStart = src.startBeat - offset;
         const wrapped = rawStart < 0 ? rawStart + cursorBeat : rawStart;
         return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats, sectionId: src.sectionId };
       });
-      outMeta = outEvents.map((_, k) => meta[(i + k) % meta.length]);
+      outMeta = outEvents.map((_, k) => sortedMeta[(i + k) % sortedMeta.length]);
     }
   }
   return { events: outEvents, meta: outMeta, loopBeats: cursorBeat, startAnchorStale };
