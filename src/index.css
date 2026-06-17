@@ -587,7 +587,18 @@
   animation: play-pulse 1.4s ease infinite;
 }
 
+/* Paste glow — chord rows / blocks while choosing a paste target. */
+@keyframes paste-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--primary), 0 0 6px color-mix(in oklch, var(--primary) 35%, transparent); }
+  50%      { box-shadow: 0 0 0 2px var(--primary-strong), 0 0 14px color-mix(in oklch, var(--primary) 65%, transparent); }
+}
+.animate-paste-glow {
+  animation: paste-glow 1.3s ease infinite;
+  border-color: var(--primary) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rec-pulse { animation: none; }
   .animate-play-pulse { animation: none; }
+  .animate-paste-glow { animation: none; }
 }

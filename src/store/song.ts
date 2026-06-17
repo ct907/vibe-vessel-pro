@@ -2181,21 +2181,28 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     set((s) => {
       const sec = s.sections.find((x) => x.id === sectionId);
       if (!sec) return {};
-      // Compute target slots from atCol+relCol, clamped to row.
+      // Compute target slots from atCol+relCol, clamped to row. These are only
+      // ordering hints — the caller runs autoLayoutSection afterwards to repack
+      // the line to the 1-space rule and spill overflow onto continuation rows.
       const targetByItem = items.map((it) => ({
         chord: it.chord,
         slot: Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, atCol + Math.max(0, it.relCol))),
       }));
-      const replaceSlots = new Set(targetByItem.map((t) => t.slot));
-      // Drop any existing SectionChord on this line whose slot collides.
-      const trimmedSectionChords = sec.chords.filter(
-        (sc) => !(sc.lyricsPlacement?.lineId === lineId && replaceSlots.has(sc.lyricsPlacement.slotIndex)),
-      );
-      // Build new SectionChords + their progression placements one at a time
-      // (using placeSectionChordInProgression for continuation-block behavior).
+      // Non-destructive: never drop existing chords. Find where to splice the
+      // pasted chords into the target line — immediately before the first
+      // existing chord at/after atCol (so a paste at the end yields
+      // [existing…, pasted…], and a mid-line paste inserts in place).
+      const insertBeforeId = sec.chords
+        .filter((sc) => sc.lyricsPlacement?.lineId === lineId)
+        .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex)
+        .find((sc) => sc.lyricsPlacement!.slotIndex >= atCol)?.id;
+      // Build the pasted SectionChords + their progression placements one at a
+      // time (placeSectionChordInProgression gives continuation-block overflow).
+      // workingChords seeds the per-pattern beat accounting with the existing
+      // chords so pasted chords append after them in the progression.
       let workingProgression = s.progression;
-      let workingChords = trimmedSectionChords;
-      const created: SectionChord[] = [];
+      let workingChords = sec.chords;
+      const pasted: SectionChord[] = [];
       for (const t of targetByItem) {
         const newId = nanoid();
         const placement = placeSectionChordInProgression(
@@ -2208,12 +2215,24 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         );
         workingProgression = placement.progression;
         workingChords = [...workingChords, placement.sectionChord];
-        created.push(placement.sectionChord);
+        pasted.push(placement.sectionChord);
       }
+      // Splice the pasted chords into the section's chord array at the insertion
+      // point. Array order is what autoLayout packs by, so this fixes the
+      // left-to-right order on the target line.
+      const nextChords: SectionChord[] = [];
+      let inserted = false;
+      for (const sc of sec.chords) {
+        if (!inserted && sc.id === insertBeforeId) {
+          nextChords.push(...pasted);
+          inserted = true;
+        }
+        nextChords.push(sc);
+      }
+      if (!inserted) nextChords.push(...pasted);
       const nextSections = s.sections.map((x) =>
-        x.id !== sectionId ? x : { ...x, chords: workingChords },
+        x.id !== sectionId ? x : { ...x, chords: nextChords },
       );
-      void created;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ({
         sections: nextSections,

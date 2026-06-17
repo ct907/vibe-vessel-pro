@@ -8,7 +8,6 @@ import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
-import { ChordChip } from "@/components/chord/ChordChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -158,6 +157,8 @@ interface PatternProps {
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
+  pasteMode?: boolean;
+  onPasteIntoBlock?: (patternId: string, afterChordId?: string) => void;
   /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
   effectiveOffset: number;
   /** When true, the card background spans the full row width while content stays in the left ~85% (mobile non-last blocks). */
@@ -188,6 +189,8 @@ function PatternBlock({
   onToggleMultiSelected,
   onShiftSelectChord,
   onClearMultiSelected,
+  pasteMode,
+  onPasteIntoBlock,
   effectiveOffset,
   extendBackground = false,
   blockRef: blockRefProp,
@@ -508,8 +511,9 @@ function PatternBlock({
           return (
             <div
               data-pattern-grid
-              className="relative rounded-md flex items-stretch"
+              className={cn("relative rounded-md flex items-stretch", pasteMode && "animate-paste-glow cursor-copy")}
               style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-recess)", minHeight: 80, paddingTop: 8, paddingBottom: 8, paddingLeft: 4, paddingRight: 4, gap: 3, width: `${(gridBeats / totalBeats) * 100}%` }}
+              onClick={pasteMode ? () => onPasteIntoBlock?.(pattern.id) : undefined}
             >
               {/* Bar separators (over the cropped/effective length) */}
               {Array.from({ length: Math.floor(gridBeats / beatsPerBar) + 1 }).map((_, i) => {
@@ -557,6 +561,11 @@ function PatternBlock({
                         )}
                         style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
+                          if (pasteMode) {
+                            e.stopPropagation();
+                            onPasteIntoBlock?.(pattern.id);
+                            return;
+                          }
                           if (occupied) return;
                           e.stopPropagation();
                           onPickerOpen(pattern.id, slotIdx);
@@ -626,6 +635,10 @@ function PatternBlock({
                                   if (Date.now() - justDraggedAtRef.current < 350) return;
                                   if (longPressDidFireRef.current) { longPressDidFireRef.current = false; return; }
                                   e.stopPropagation();
+                                  if (pasteMode) {
+                                    onPasteIntoBlock?.(pattern.id, c.id);
+                                    return;
+                                  }
                                   if (e.ctrlKey || e.metaKey || multiSelectModeRef.current) {
                                     onToggleMultiSelected(c.id, pattern.id);
                                     return;
@@ -874,6 +887,8 @@ interface SectionGroupProps {
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
   onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
+  pasteMode?: boolean;
+  onPasteIntoBlock?: (patternId: string, afterChordId?: string) => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
   onChordClick: (patternId: string, chordId: string) => void;
   addChordsRef?: React.RefObject<HTMLButtonElement | null>;
@@ -903,6 +918,8 @@ function SectionGroup({
   onToggleMultiSelected,
   onShiftSelectChord,
   onClearMultiSelected,
+  pasteMode,
+  onPasteIntoBlock,
   onAddNewBlockRequest,
   onChordClick,
   addChordsRef,
@@ -1238,6 +1255,8 @@ function SectionGroup({
                     onToggleMultiSelected={onToggleMultiSelected}
                     onShiftSelectChord={onShiftSelectChord}
                     onClearMultiSelected={onClearMultiSelected}
+                    pasteMode={pasteMode}
+                    onPasteIntoBlock={onPasteIntoBlock}
                     effectiveOffset={effectiveOffset}
                     blockRef={i === 0 ? firstBlockRef : undefined}
                     spiceButtonRef={i === 0 ? firstSpiceButtonRef : undefined}
@@ -1465,7 +1484,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const chordClipboard = useUIStore((s) => s.chordClipboard);
   const setChordClipboard = useUIStore((s) => s.setChordClipboard);
-  const [pastePending, setPastePending] = useState<{ chords: ClipboardChord[] } | null>(null);
+  // Paste mode: after pressing Paste, blocks glow and the next chord/block click
+  // drops the clipboard chords there (non-destructively).
+  const [pasteMode, setPasteMode] = useState(false);
 
   const handleCopyChords = useCallback(() => {
     let copied: ClipboardChord[] = [];
@@ -1492,8 +1513,82 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const handlePasteRequest = useCallback(() => {
     if (chordClipboard.length === 0) return;
-    setPastePending({ chords: chordClipboard });
+    setPasteMode(true);
   }, [chordClipboard]);
+
+  const handleCutChords = useCallback(() => {
+    handleCopyChords();
+    const store = useSongStore.getState();
+    if (multiSelected.size > 0) {
+      const byPattern = new Map<string, string[]>();
+      for (const [cid, pid] of multiSelected) {
+        const arr = byPattern.get(pid) ?? [];
+        arr.push(cid);
+        byPattern.set(pid, arr);
+      }
+      for (const [pid, cids] of byPattern) store.removePatternChordsBatch(pid, cids);
+      setMultiSelected(new Map());
+      setActiveChordId(null);
+      return;
+    }
+    if (activeChordId) {
+      for (const p of store.progression) {
+        const sec = store.sections.find((s) => s.id === (p.sectionId ?? p.id));
+        const chords = sec ? getPatternChordsViaSSOT(sec, p) : p.chords;
+        if (chords.some((c) => c.id === activeChordId)) {
+          store.removePatternChordsBatch(p.id, [activeChordId]);
+          break;
+        }
+      }
+      setActiveChordId(null);
+    }
+  }, [handleCopyChords, multiSelected, activeChordId]);
+
+  // Drop the clipboard chords into a block, non-destructively. Clicking a chord
+  // inserts after it; clicking empty block area appends. addChordToPatternSlot
+  // handles overflow into continuation blocks; lengths are then forced exact.
+  const handlePasteIntoBlock = useCallback(
+    (patternId: string, afterChordId?: string) => {
+      if (chordClipboard.length === 0) {
+        setPasteMode(false);
+        return;
+      }
+      const store = useSongStore.getState();
+      const pat = store.progression.find((p) => p.id === patternId);
+      if (!pat) {
+        setPasteMode(false);
+        return;
+      }
+      const sectionId = pat.sectionId ?? pat.id;
+      const sec = store.sections.find((s) => s.id === sectionId);
+      const ordered = (sec ? getPatternChordsViaSSOT(sec, pat) : pat.chords)
+        .slice()
+        .sort((a, b) => a.startBeat - b.startBeat);
+      let insertIdx = ordered.length;
+      if (afterChordId) {
+        const idx = ordered.findIndex((c) => c.id === afterChordId);
+        if (idx >= 0) insertIdx = idx + 1;
+      }
+      let knownIds = new Set(
+        store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
+      );
+      chordClipboard.forEach((c, i) => {
+        store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats);
+        const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+        const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
+        if (added?.progressionPlacement && c.lengthBeats != null) {
+          store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
+        }
+        knownIds = new Set(
+          useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
+        );
+      });
+      setPasteMode(false);
+      setActiveChordId(null);
+      setMultiSelected(new Map());
+    },
+    [chordClipboard],
+  );
 
   const sortAnimatingRef = useRef(false);
   // Moves requested while an animation is in flight are queued and applied
@@ -1597,6 +1692,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [multiSelected.size]);
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && pasteMode) {
+        setPasteMode(false);
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey)) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -1604,6 +1703,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         if (activeChordId || multiSelected.size > 0) {
           e.preventDefault();
           handleCopyChords();
+        }
+      } else if (e.key === "x" || e.key === "X") {
+        if (activeChordId || multiSelected.size > 0) {
+          e.preventDefault();
+          handleCutChords();
         }
       } else if (e.key === "v" || e.key === "V") {
         if (chordClipboard.length > 0) {
@@ -1614,7 +1718,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [activeChordId, multiSelected, chordClipboard, handleCopyChords, handlePasteRequest]);
+  }, [activeChordId, multiSelected, chordClipboard, pasteMode, handleCopyChords, handleCutChords, handlePasteRequest]);
 
   const [picker, setPicker] = useState<{ patternId: string; atBeat: number; replaceChordId?: string } | null>(null);
   const [chordEditor, setChordEditor] = useState<{ patternId: string; chordId: string; sectionId: string } | null>(null);
@@ -1961,6 +2065,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onToggleMultiSelected={toggleMultiSelected}
           onShiftSelectChord={rangeSelectProgChords}
           onClearMultiSelected={() => setMultiSelected(new Map())}
+          pasteMode={pasteMode}
+          onPasteIntoBlock={handlePasteIntoBlock}
           addChordsRef={i === 0 ? addChordsRef : undefined}
           firstBlockRef={i === 0 ? firstBlockRef : undefined}
           firstSpiceButtonRef={i === 0 ? spiceButtonRef : undefined}
@@ -2243,7 +2349,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         />
       )}
 
-      {(activeChordId !== null || multiSelected.size > 0) && (
+      {(activeChordId !== null || multiSelected.size > 0 || pasteMode) && (
         <FloatingChordToolbar
           mode="progression"
           hideTrigger
@@ -2377,87 +2483,15 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             setActiveChordId(null);
           }}
           onCopy={handleCopyChords}
+          onCut={handleCutChords}
+          canCut={activeChordId !== null || multiSelected.size > 0}
           canPaste={chordClipboard.length > 0}
           onPaste={handlePasteRequest}
+          pasteMode={pasteMode}
+          onCancelPaste={() => setPasteMode(false)}
           onExitEdit={() => { setActiveChordId(null); setMultiSelected(new Map()); }}
         />
       )}
-
-      {/* ── Paste confirmation for progressions ─────────────────────────── */}
-      {pastePending && (() => {
-        const pasteTargets = progression.map((p) => {
-          const sec = sections.find((s) => s.id === (p.sectionId ?? p.id));
-          return { pat: p, sec };
-        });
-        return (
-          <div
-            className="fixed inset-0 z-[60] flex items-end justify-center"
-            style={{ background: "rgba(0,0,0,0.4)" }}
-            onClick={() => setPastePending(null)}
-          >
-            <div
-              className="w-full max-w-lg rounded-t-2xl p-0 overflow-hidden"
-              style={{ background: "var(--paper)", maxHeight: "80vh" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-                <p className="font-display text-lg font-semibold" style={{ color: "var(--ink)" }}>
-                  Paste {pastePending.chords.length} chord{pastePending.chords.length !== 1 ? "s" : ""}
-                </p>
-                <div className="flex gap-1.5 flex-wrap mt-1">
-                  {pastePending.chords.map((c, i) => (
-                    <ChordChip key={i} chord={c.chord} size="sm" variant="ink" audition={false} />
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 px-4 py-4 overflow-y-auto" style={{ maxHeight: "40vh" }}>
-                <p className="text-xs" style={{ color: "var(--ink-soft)" }}>Choose block to paste into:</p>
-                {pasteTargets.map(({ pat, sec }) => {
-                  const chords = sec ? getPatternChordsViaSSOT(sec, pat) : pat.chords;
-                  const usedBeats = chords.reduce((s, c) => s + c.lengthBeats, 0);
-                  return (
-                    <button
-                      key={pat.id}
-                      type="button"
-                      className="btn-sculpt-cream flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm"
-                      onClick={() => {
-                        if (!sec) return;
-                        const store = useSongStore.getState();
-                        // addChordToPattern clamps the new chord's length to the
-                        // block's free space (and resets it on overflow), so
-                        // after each insert force the exact copied length — the
-                        // SSOT derive then overflows it into continuation blocks
-                        // while preserving the beat length.
-                        let knownIds = new Set(
-                          store.sections.find((s) => s.id === sec.id)?.chords.map((c) => c.id) ?? [],
-                        );
-                        for (const c of pastePending.chords) {
-                          store.addChordToPattern(pat.id, c.chord, usedBeats, c.lengthBeats);
-                          const fresh = useSongStore.getState().sections.find((s) => s.id === sec.id);
-                          const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
-                          if (added?.progressionPlacement && c.lengthBeats != null) {
-                            store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
-                          }
-                          knownIds = new Set(
-                            useSongStore.getState().sections.find((s) => s.id === sec.id)?.chords.map((x) => x.id) ?? [],
-                          );
-                        }
-                        setPastePending(null);
-                      }}
-                    >
-                      <span className="font-semibold truncate">{pat.label}</span>
-                      <span className="text-xs opacity-60 ml-auto">{usedBeats}/{pat.bars * pat.beatsPerBar} beats</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
-                <Button variant="ghost" className="w-full" onClick={() => setPastePending(null)}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       <WhyThisChordSheet />
     </div>

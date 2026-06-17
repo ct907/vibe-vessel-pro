@@ -16,6 +16,7 @@ import {
   ListChecks,
   Copy,
   ClipboardPaste,
+  Scissors,
   Trash2,
   X,
 } from "lucide-react";
@@ -52,9 +53,17 @@ export interface FloatingChordToolbarProps {
   onDuplicate?: () => void;
   onDelete?: () => void;
   onCopy?: () => void;
+  /** Cut: copy the active chord / selection to the clipboard, then delete it. */
+  onCut?: () => void;
+  /** True when there is an active chord / selection to copy or cut. */
+  canCut?: boolean;
   /** True when there are chords in the clipboard ready to paste. */
   canPaste?: boolean;
   onPaste?: () => void;
+  /** When true, the toolbar shows the "select the area to paste" hint instead
+   *  of the normal controls — the user is mid-paste, picking a target slot. */
+  pasteMode?: boolean;
+  onCancelPaste?: () => void;
   onExitEdit: () => void;
 }
 
@@ -220,8 +229,12 @@ export function FloatingChordToolbar({
   onDuplicate,
   onDelete,
   onCopy,
+  onCut,
+  canCut = false,
   canPaste = false,
   onPaste,
+  pasteMode = false,
+  onCancelPaste,
   onExitEdit,
 }: FloatingChordToolbarProps) {
   const isDesktop = useIsDesktop();
@@ -240,7 +253,7 @@ export function FloatingChordToolbar({
   // toggles the menu. Desktop keeps the explicit open/close via the trigger
   // button and the chordToolbarOpen signal.
   const effectiveExpanded =
-    visible && (expanded || (autoExpandOnContext && hasContext));
+    visible && (expanded || pasteMode || (autoExpandOnContext && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {
@@ -303,6 +316,24 @@ export function FloatingChordToolbar({
       </span>
     ) : null;
   const divider = <div className="w-px h-6 bg-border mx-0.5" />;
+  const pasteHint = (
+    <div className="flex items-center gap-2 px-2 py-1">
+      <ClipboardPaste className="h-4 w-4 shrink-0 text-primary" />
+      <span className="text-sm font-medium text-foreground select-none">
+        Select the area to paste the chords
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 shrink-0"
+        onClick={onCancelPaste}
+        aria-label="Cancel paste"
+        title="Cancel"
+      >
+        <X className="h-5 w-5" />
+      </Button>
+    </div>
+  );
   const octaveSelect = (
     <div className="flex items-center gap-1 shrink-0">
       <span className="text-xs text-muted-foreground select-none">Oct</span>
@@ -337,9 +368,11 @@ export function FloatingChordToolbar({
           className={cn(
             "pointer-events-auto origin-bottom rounded-2xl border bg-popover shadow-lg px-3 py-2",
             "flex flex-row items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto",
-            expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
+            expanded || pasteMode ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
           )}
         >
+          {pasteMode ? pasteHint : (
+          <>
           <MoveDPad
             mode={mode}
             onShift={onShift}
@@ -410,6 +443,12 @@ export function FloatingChordToolbar({
             onClick={hasContext ? onCopy : undefined}
           />
           <LabeledBtn
+            icon={<Scissors className="h-5 w-5" />}
+            label="Cut"
+            disabled={!canCut}
+            onClick={canCut ? onCut : undefined}
+          />
+          <LabeledBtn
             icon={<ClipboardPaste className="h-5 w-5" />}
             label="Paste"
             disabled={!canPaste}
@@ -424,6 +463,8 @@ export function FloatingChordToolbar({
             className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-60"
           />
           <LabeledBtn icon={<X className="h-5 w-5" />} label="Close" onClick={close} />
+          </>
+          )}
         </div>
       </div>
     );
@@ -455,9 +496,11 @@ export function FloatingChordToolbar({
           "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
           "rounded-2xl border bg-[var(--paper-card)] shadow-lg overflow-hidden",
           "w-[22rem] max-w-[calc(100vw-2rem)]",
-          expanded ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
+          expanded || pasteMode ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
         )}
       >
+        {pasteMode ? pasteHint : (
+        <>
         {/* Header: chord name / status + close */}
         <div className="flex items-center gap-1 border-b px-3 py-1.5">
           <span
@@ -577,6 +620,17 @@ export function FloatingChordToolbar({
               <Button
                 size="icon"
                 variant="ghost"
+                className={cn("h-8 w-8", !canCut && "opacity-40")}
+                disabled={!canCut}
+                onClick={canCut ? onCut : undefined}
+                aria-label="Cut selected chord(s)"
+                title="Cut"
+              >
+                <Scissors className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
                 className={cn("h-8 w-8", !canPaste && "opacity-40")}
                 disabled={!canPaste}
                 onClick={canPaste ? onPaste : undefined}
@@ -665,6 +719,8 @@ export function FloatingChordToolbar({
             </Button>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
