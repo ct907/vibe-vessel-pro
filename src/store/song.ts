@@ -561,6 +561,22 @@ function ensureSlotsForLine(line: LyricLine): LyricLine {
   return { ...line, chords: next };
 }
 
+/**
+ * Re-lay chord anchors starting at `startSlot`, preserving the relative gaps
+ * between them. Used by line split/merge so the "1 space between" visual rule
+ * survives — the legacy reindex collapsed chords into consecutive slots,
+ * bunching them up. Word bindings are cleared; snapLineToWords +
+ * ensureSlotsForLine re-derive them from the (preserved) slotIndex.
+ */
+function respaceAnchors(chords: ChordAnchor[], startSlot: number): ChordAnchor[] {
+  const sorted = [...chords].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+  const base = sorted.length ? (sorted[0].slotIndex ?? 0) : 0;
+  return sorted.map((c) => {
+    const slot = Math.min(CHORD_ROW_SLOTS - 1, startSlot + Math.max(0, (c.slotIndex ?? 0) - base));
+    return { ...c, wordIndex: undefined, chordCol: slot, offset: slot, slotIndex: slot };
+  });
+}
+
 // ---------- Sync helpers ----------
 // Find the next free start beat in a pattern (after the last chord's end).
 function nextFreeBeat(pattern: PatternBlock): number {
@@ -1737,9 +1753,6 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     let newLineId: string | null = null;
     // A split is its own atomic undo step (also ends any typing-coalesce run).
     pushHistory(get);
-    // Re-anchor moved/kept chords in their existing left-to-right order.
-    const reindex = (arr: ChordAnchor[]): ChordAnchor[] =>
-      arr.map((c, i) => ({ ...c, wordIndex: undefined, chordCol: i, offset: i, slotIndex: undefined }));
     set((s) => ({
       sections: s.sections.map((sec) => {
         if (sec.id !== sectionId) return sec;
@@ -1757,11 +1770,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         const keep: ChordAnchor[] = [];
         const move: ChordAnchor[] = [];
         snapped.chords.forEach((c) => (charPosOf(c) < caret ? keep : move).push(c));
+        // Kept chords stay where they are (preserve absolute slots); moved
+        // chords left-align onto the new line. Both retain their relative gaps.
+        const keepStart = keep.length ? Math.min(...keep.map((c) => c.slotIndex ?? 0)) : 0;
         const original = ensureSlotsForLine(
-          snapLineToWords({ ...line, text: before, chords: reindex(keep) }),
+          snapLineToWords({ ...line, text: before, chords: respaceAnchors(keep, keepStart) }),
         );
         const newLine = ensureSlotsForLine(
-          snapLineToWords({ ...initialLine(), text: after, chords: reindex(move) }),
+          snapLineToWords({ ...initialLine(), text: after, chords: respaceAnchors(move, 0) }),
         );
         newLineId = newLine.id;
         const lines = [...sec.lines];
@@ -1780,8 +1796,6 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     const prev0 = sec0.lines[idx0 - 1];
     const result = { prevLineId: prev0.id, caretIndex: prev0.text.length };
     pushHistory(get);
-    const reindex = (arr: ChordAnchor[]): ChordAnchor[] =>
-      arr.map((c, i) => ({ ...c, wordIndex: undefined, chordCol: i, offset: i, slotIndex: undefined }));
     set((s) => ({
       sections: s.sections.map((sec) => {
         if (sec.id !== sectionId) return sec;
@@ -1790,11 +1804,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         const prev = sec.lines[idx - 1];
         const cur = sec.lines[idx];
         const prevSnapped = snapLineToWords(prev);
+        // Append the merged-in chords after the previous line's last chord,
+        // leaving a one-slot gap so the spacing rule holds.
+        const prevMax = prevSnapped.chords.reduce((m, c) => Math.max(m, c.slotIndex ?? 0), -1);
         const merged = ensureSlotsForLine(
           snapLineToWords({
             ...prev,
             text: prev.text + cur.text,
-            chords: [...prevSnapped.chords, ...reindex(cur.chords)],
+            chords: [...prevSnapped.chords, ...respaceAnchors(cur.chords, prevMax + 2)],
           }),
         );
         const lines = [...sec.lines];
