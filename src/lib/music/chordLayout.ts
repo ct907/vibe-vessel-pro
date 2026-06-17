@@ -109,7 +109,7 @@ function autoLayoutChordsPerLine(
     let cursor = 0;
     for (const sc of lineChords) {
       const w = chordSlotWidth(sc.chord.display);
-      if (cursor + w > cap && cursor !== 0) {
+      if (cursor >= cap && cursor !== 0) {
         // Wrap (shouldn't happen often after line-splitting); reset to 0.
         cursor = 0;
       }
@@ -251,13 +251,14 @@ export function formatChordsAndLyrics(
   splitLines.forEach((line) => {
     finalLines.push(line);
     const lineChords = byLine.get(line.id) ?? [];
-    // Walk chords; once a chord won't fit on the current row (with spacing),
-    // start a new overflow row.
+    // Walk chords; once a chord's start position reaches cap, spill to a new row.
+    // We check cursor >= cap (not cursor + w > cap) so wide chords (chordSlotWidth=2)
+    // are not penalised for starting at cap-1 — they can extend 1 slot past cap.
     let cursor = 0;
     let currentTargetId = line.id;
     for (const sc of lineChords) {
       const w = chordSlotWidth(sc.chord.display);
-      if (cursor + w > cap && cursor !== 0) {
+      if (cursor >= cap && cursor !== 0) {
         // Spawn a new overflow row.
         const newId = nanoid();
         finalLines.push({
