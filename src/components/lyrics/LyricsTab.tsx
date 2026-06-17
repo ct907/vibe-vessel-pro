@@ -87,6 +87,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { createPortal } from "react-dom";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useDefaultsStore } from "@/store/defaults";
 
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
@@ -1413,7 +1415,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     setLineText,
     placeChordInSlot,
     autoLayoutSection,
+    updatePattern,
+    setSectionChordsLength,
+    setPatternChordLength,
   } = useSongStore();
+  const progression = useSongStore((s) => s.progression);
+  const defaultChordLen = useDefaultsStore((s) => s.defaultChordLengthBeats);
 
   const [picker, setPicker] = useState<{
     sectionId: string;
@@ -1818,6 +1825,100 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picker?.sectionId, picker?.lineId, picker?.anchorId]);
 
+  // ── Overflow detection ───────────────────────────────────────────────────
+  // Captures a pending chord when adding it would spill into a new continuation
+  // block. The resolver sheet lets the user choose how to handle it instead of
+  // silently spawning extra blocks.
+  const [overflowPending, setOverflowPending] = useState<{
+    chords: ChordSymbol[];
+    sectionId: string;
+    lineId: string;
+    startSlot: number;
+    totalCap: number;
+    totalUsed: number;
+    existingPlacedCount: number;
+    lastBlock: PatternBlock;
+  } | null>(null);
+
+  const checkOverflow = (sectionId: string, newChordCount = 1) => {
+    const sec = sections.find((s) => s.id === sectionId);
+    const sectionBlocks = progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+    if (!sec || !sectionBlocks.length) return null;
+    const totalCap = sectionBlocks.reduce((s, p) => s + p.bars * p.beatsPerBar, 0);
+    const placedChords = sec.chords.filter((sc) => sc.progressionPlacement);
+    const totalUsed = placedChords.reduce((s, sc) => s + sc.progressionPlacement!.lengthBeats, 0);
+    const wouldOverflow = totalUsed + newChordCount * defaultChordLen > totalCap + 1e-9;
+    if (!wouldOverflow) return null;
+    return {
+      totalCap,
+      totalUsed,
+      existingPlacedCount: placedChords.length,
+      lastBlock: sectionBlocks[sectionBlocks.length - 1],
+    };
+  };
+
+  // Resolve overflow: resize all chords in the section to `newLength` then
+  // place the pending chord(s). Zustand set is synchronous so the second
+  // placeChordInSlot call sees the updated (smaller) usage.
+  const resolveOverflowCompress = (newLength: number) => {
+    if (!overflowPending) return;
+    const { chords, sectionId, lineId, startSlot } = overflowPending;
+    setSectionChordsLength(sectionId, newLength);
+    let nextSlot = startSlot;
+    for (const chord of chords) {
+      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+      if (result) {
+        const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+        const sc = fresh?.chords.find((c) => c.id === result.id);
+        if (sc?.progressionPlacement) {
+          setPatternChordLength(sc.progressionPlacement.patternId, result.id, newLength);
+        }
+      }
+      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+    }
+    advancePickerAfterBatch(startSlot, nextSlot);
+    setOverflowPending(null);
+  };
+
+  // Resolve overflow: expand the last block then place pending chord(s).
+  const resolveOverflowExpand = () => {
+    if (!overflowPending) return;
+    const { chords, sectionId, lineId, startSlot, totalUsed, totalCap, existingPlacedCount, lastBlock } = overflowPending;
+    const incoming = chords.length * defaultChordLen;
+    const deficit = totalUsed + incoming - totalCap;
+    const extraBars = Math.ceil(deficit / lastBlock.beatsPerBar);
+    updatePattern(lastBlock.id, { bars: lastBlock.bars + extraBars });
+    let nextSlot = startSlot;
+    for (const chord of chords) {
+      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+    }
+    advancePickerAfterBatch(startSlot, nextSlot);
+    setOverflowPending(null);
+    void existingPlacedCount; // used for display only
+  };
+
+  // Resolve overflow: proceed normally (spawn continuation block).
+  const resolveOverflowContinue = () => {
+    if (!overflowPending) return;
+    const { chords, sectionId, lineId, startSlot } = overflowPending;
+    let nextSlot = startSlot;
+    for (const chord of chords) {
+      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+    }
+    advancePickerAfterBatch(startSlot, nextSlot);
+    setOverflowPending(null);
+  };
+
+  const advancePickerAfterBatch = (startSlot: number, nextSlot: number) => {
+    void startSlot;
+    setPickerQuery("");
+    setPicker((prev) =>
+      prev ? { ...prev, anchorId: undefined, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, nextSlot) } : prev,
+    );
+  };
+
   const handlePick = (chord: ChordSymbol) => {
     if (!picker) return;
     // Door B: editing an unplaced progression-only chord — swap the symbol on
@@ -1839,7 +1940,19 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       setPicker(null);
       return;
     }
-    // Placing new chord into the requested slot.
+    // Placing new chord into the requested slot — check for block overflow first.
+    const overflow = checkOverflow(picker.sectionId, 1);
+    if (overflow) {
+      setOverflowPending({
+        chords: [chord],
+        sectionId: picker.sectionId,
+        lineId: picker.lineId,
+        startSlot: picker.slotIndex,
+        ...overflow,
+      });
+      setPickerQuery("");
+      return;
+    }
     placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
     setPickerQuery("");
     setPicker((prev) =>
@@ -1859,6 +1972,18 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   // synchronous, so each call sees state from the previous one).
   const handlePickBatch = (chords: ChordSymbol[]) => {
     if (!picker || picker.prog || picker.anchorId) return;
+    const overflow = checkOverflow(picker.sectionId, chords.length);
+    if (overflow) {
+      setOverflowPending({
+        chords,
+        sectionId: picker.sectionId,
+        lineId: picker.lineId,
+        startSlot: picker.slotIndex,
+        ...overflow,
+      });
+      setPickerQuery("");
+      return;
+    }
     let nextSlot = picker.slotIndex;
     for (const chord of chords) {
       const result = placeChordInSlot(picker.sectionId, picker.lineId, nextSlot, chord);
@@ -1921,6 +2046,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   }, [activeChordId]);
 
   return (
+    <>
     <div className="relative space-y-4" ref={lyricsRootRef}>
       {sections.map((sec, i) => (
         <div key={sec.id} className="space-y-2">
@@ -2403,5 +2529,86 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       })()}
 
     </div>
+
+    {/* ── Block overflow resolver ───────────────────────────────────────── */}
+    {overflowPending && (() => {
+      const { totalCap, totalUsed, existingPlacedCount, lastBlock, chords } = overflowPending;
+      const incoming = chords.length * defaultChordLen;
+      const newCount = existingPlacedCount + chords.length;
+      const compressedLen = Math.max(0.5, Math.floor((totalCap / newCount) * 2) / 2);
+      const extraBars = Math.ceil(Math.max(0, totalUsed + incoming - totalCap) / lastBlock.beatsPerBar);
+      const newBars = lastBlock.bars + extraBars;
+      const chordLabel = chords.length === 1
+        ? chords[0].display
+        : chords.map((c) => c.display).join(", ");
+      return (
+        <Sheet open onOpenChange={(o) => { if (!o) setOverflowPending(null); }}>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-2xl flex flex-col p-0 [&>button[type=button]]:hidden"
+            style={{ background: "var(--paper)", maxHeight: "80vh" }}
+          >
+            <SheetHeader className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+              <SheetTitle className="font-display text-lg" style={{ color: "var(--ink)" }}>
+                Block is full
+              </SheetTitle>
+              <p className="text-sm mt-1" style={{ color: "var(--ink-soft)" }}>
+                Adding{" "}
+                <span className="font-mono-chord font-semibold" style={{ color: "var(--ink)" }}>
+                  {chordLabel}
+                </span>{" "}
+                would overflow the current block ({Math.round(totalUsed)}/{totalCap} beats used).
+                How would you like to handle it?
+              </p>
+            </SheetHeader>
+
+            <div className="flex flex-col gap-3 px-4 py-4">
+              <button
+                type="button"
+                className="btn-sculpt-amber flex flex-col items-start rounded-xl px-4 py-3 text-left"
+                onClick={resolveOverflowExpand}
+              >
+                <span className="text-sm font-semibold">Expand block</span>
+                <span className="text-xs mt-0.5 opacity-80">
+                  Grow the last block from {lastBlock.bars} → {newBars} bars to fit all chords
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-sculpt-cream flex flex-col items-start rounded-xl px-4 py-3 text-left"
+                onClick={resolveOverflowContinue}
+              >
+                <span className="text-sm font-semibold">Add a continuation block</span>
+                <span className="text-xs mt-0.5 opacity-80">
+                  Overflow the extra chord{chords.length > 1 ? "s" : ""} into a new block after this one
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-sculpt-cocoa flex flex-col items-start rounded-xl px-4 py-3 text-left"
+                onClick={() => resolveOverflowCompress(compressedLen)}
+              >
+                <span className="text-sm font-semibold">Shorten chord beats</span>
+                <span className="text-xs mt-0.5 opacity-80">
+                  Compress all {newCount} chords to {compressedLen}b each so they fit in the existing block
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="text-xs py-2"
+                style={{ color: "var(--ink-soft)" }}
+                onClick={() => setOverflowPending(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      );
+    })()}
+    </>
   );
 }

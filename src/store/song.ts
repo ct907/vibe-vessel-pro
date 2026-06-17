@@ -292,6 +292,8 @@ export interface SongState {
   shiftPatternChords: (patternId: string, chordIds: string[], deltaBeats: number) => void;
   movePatternChordsTo: (fromPatternId: string, toPatternId: string, chordIds: string[]) => void;
   setPatternChordLength: (patternId: string, chordId: string, lengthBeats: number) => void;
+  /** Set every progression-placed SectionChord in a section to the same lengthBeats. Used to compress beats so all chords fit in the existing blocks. */
+  setSectionChordsLength: (sectionId: string, lengthBeats: number) => void;
   /**
    * Grow or shrink one or more chords' lengths by `deltaBeats` each. If the new
    * total exceeds the pattern's capacity, the rightmost chords overflow into the
@@ -2969,6 +2971,23 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         ...sec,
         chords: sec.chords.map((sc) =>
           sc.id !== chordId || !sc.progressionPlacement
+            ? sc
+            : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: newLen } },
+        ),
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ({ sections, [SSOT_MODE]: true } as any);
+  }),
+
+  setSectionChordsLength: (sectionId, lengthBeats) => set((s) => {
+    const newLen = Math.max(0.5, lengthBeats);
+    const sections = s.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      return {
+        ...sec,
+        chords: sec.chords.map((sc) =>
+          !sc.progressionPlacement
             ? sc
             : { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: newLen } },
         ),
