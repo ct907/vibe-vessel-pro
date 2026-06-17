@@ -2842,19 +2842,22 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
     const newId = nanoid();
     // B1: assign a default lyricsPlacement so the chord shows up in the
-    // Lyrics view immediately. Auto-layout will reflow positions later;
-    // for now, drop on the section's first line at the next free slot.
-    const firstLine = sec.lines[0];
-    const lyricsPlacement: LyricsPlacement | undefined = firstLine
+    // Lyrics view immediately. Use the line that matches this block's position
+    // within the section (1 block = 1 line rule).
+    const sectionBlocksForLine = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+    const blockPosIdx = sectionBlocksForLine.findIndex((p) => p.id === patternId);
+    const nonOverflowLines = sec.lines.filter((l) => !l._isChordOverflow);
+    const targetLine = nonOverflowLines[blockPosIdx >= 0 ? blockPosIdx : 0] ?? nonOverflowLines[0];
+    const lyricsPlacement: LyricsPlacement | undefined = targetLine
       ? (() => {
           const occupied = new Set<number>();
           sec.chords.forEach((c) => {
-            if (c.lyricsPlacement?.lineId === firstLine.id) {
+            if (c.lyricsPlacement?.lineId === targetLine.id) {
               occupied.add(c.lyricsPlacement.slotIndex);
             }
           });
           const slot = nearestFreeSlot(occupied, 0);
-          return slot >= 0 ? { lineId: firstLine.id, slotIndex: slot } : undefined;
+          return slot >= 0 ? { lineId: targetLine.id, slotIndex: slot } : undefined;
         })()
       : undefined;
     let nextProgression = s.progression;
@@ -3352,17 +3355,21 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       const freeInTarget = totalBeats - usedInTarget;
 
       // B1: default lyricsPlacement so the chord appears in the Lyrics view.
-      const firstLine = sec.lines.find((l) => !l._isChordOverflow);
-      const lyricsPlacement: LyricsPlacement | undefined = firstLine
+      // Use the line that matches this block's position (1 block = 1 line rule).
+      const sectionBlocksForLine2 = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+      const blockPosIdx2 = sectionBlocksForLine2.findIndex((p) => p.id === patternId);
+      const nonOverflowLines2 = sec.lines.filter((l) => !l._isChordOverflow);
+      const targetLine2 = nonOverflowLines2[blockPosIdx2 >= 0 ? blockPosIdx2 : 0] ?? nonOverflowLines2[0];
+      const lyricsPlacement: LyricsPlacement | undefined = targetLine2
         ? (() => {
             const occupied = new Set<number>();
             sec.chords.forEach((c) => {
-              if (c.lyricsPlacement?.lineId === firstLine.id) {
+              if (c.lyricsPlacement?.lineId === targetLine2.id) {
                 occupied.add(c.lyricsPlacement.slotIndex);
               }
             });
             const slot = nearestFreeSlot(occupied, 0);
-            return slot >= 0 ? { lineId: firstLine.id, slotIndex: slot } : undefined;
+            return slot >= 0 ? { lineId: targetLine2.id, slotIndex: slot } : undefined;
           })()
         : undefined;
 

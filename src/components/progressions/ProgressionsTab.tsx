@@ -156,6 +156,7 @@ interface PatternProps {
   /** Cross-block multi-selection: chordId → patternId. */
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
   /** Semitone offset for the section this block belongs to. Non-zero transposes display + audition. */
   effectiveOffset: number;
@@ -185,6 +186,7 @@ function PatternBlock({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onShiftSelectChord,
   onClearMultiSelected,
   effectiveOffset,
   extendBackground = false,
@@ -624,8 +626,12 @@ function PatternBlock({
                                   if (Date.now() - justDraggedAtRef.current < 350) return;
                                   if (longPressDidFireRef.current) { longPressDidFireRef.current = false; return; }
                                   e.stopPropagation();
-                                  if (multiSelectModeRef.current || e.shiftKey || isShiftDownRef.current) {
+                                  if (e.ctrlKey || e.metaKey || multiSelectModeRef.current) {
                                     onToggleMultiSelected(c.id, pattern.id);
+                                    return;
+                                  }
+                                  if (e.shiftKey || isShiftDownRef.current) {
+                                    onShiftSelectChord?.(pattern.id, c.id);
                                     return;
                                   }
                                   setFocusedPattern(pattern.id);
@@ -866,6 +872,7 @@ interface SectionGroupProps {
   onSetActiveChordId: (id: string | null) => void;
   multiSelected: Map<string, string>;
   onToggleMultiSelected: (chordId: string, patternId: string) => void;
+  onShiftSelectChord?: (patternId: string, chordId: string) => void;
   onClearMultiSelected: () => void;
   onAddNewBlockRequest?: (sectionId: string, patternId: string) => void;
   onChordClick: (patternId: string, chordId: string) => void;
@@ -894,6 +901,7 @@ function SectionGroup({
   onSetActiveChordId,
   multiSelected,
   onToggleMultiSelected,
+  onShiftSelectChord,
   onClearMultiSelected,
   onAddNewBlockRequest,
   onChordClick,
@@ -1228,6 +1236,7 @@ function SectionGroup({
                     onSetActiveChordId={onSetActiveChordId}
                     multiSelected={multiSelected}
                     onToggleMultiSelected={onToggleMultiSelected}
+                    onShiftSelectChord={onShiftSelectChord}
                     onClearMultiSelected={onClearMultiSelected}
                     effectiveOffset={effectiveOffset}
                     blockRef={i === 0 ? firstBlockRef : undefined}
@@ -1410,7 +1419,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const multiSelectedRef = useRef(multiSelected);
   multiSelectedRef.current = multiSelected;
 
+  const rangeAnchorRef = useRef<{ patternId: string; chordId: string } | null>(null);
+
   const toggleMultiSelected = useCallback((chordId: string, patternId: string) => {
+    rangeAnchorRef.current = { patternId, chordId };
     setMultiSelected((prev) => {
       const next = new Map(prev);
       if (next.has(chordId)) next.delete(chordId);
@@ -1418,6 +1430,38 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       return next;
     });
   }, []);
+
+  const rangeSelectProgChords = useCallback((patternId: string, chordId: string) => {
+    const pat = progression.find((p) => p.id === patternId);
+    if (!pat) return;
+    const sectionId = pat.sectionId ?? pat.id;
+    const sectionBlocks = progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
+    const sec = sections.find((s) => s.id === sectionId);
+    const ordered = sectionBlocks.flatMap((b) => {
+      const chords = sec ? getPatternChordsViaSSOT(sec, b) : b.chords;
+      return [...chords].sort((a, b) => a.startBeat - b.startBeat).map((c) => ({ chordId: c.id, patternId: b.id }));
+    });
+    const fromId = rangeAnchorRef.current?.chordId ?? activeChordId;
+    if (!fromId) {
+      toggleMultiSelected(chordId, patternId);
+      return;
+    }
+    const fromIdx = ordered.findIndex((x) => x.chordId === fromId);
+    const toIdx = ordered.findIndex((x) => x.chordId === chordId);
+    if (fromIdx < 0 || toIdx < 0) {
+      toggleMultiSelected(chordId, patternId);
+      return;
+    }
+    const lo = Math.min(fromIdx, toIdx);
+    const hi = Math.max(fromIdx, toIdx);
+    setMultiSelected((prev) => {
+      const next = new Map(prev);
+      for (let i = lo; i <= hi; i++) {
+        next.set(ordered[i].chordId, ordered[i].patternId);
+      }
+      return next;
+    });
+  }, [progression, sections, activeChordId, toggleMultiSelected]);
 
   const sortAnimatingRef = useRef(false);
   // Moves requested while an animation is in flight are queued and applied
@@ -1857,6 +1901,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onSetActiveChordId={setActiveChordId}
           multiSelected={multiSelected}
           onToggleMultiSelected={toggleMultiSelected}
+          onShiftSelectChord={rangeSelectProgChords}
           onClearMultiSelected={() => setMultiSelected(new Map())}
           addChordsRef={i === 0 ? addChordsRef : undefined}
           firstBlockRef={i === 0 ? firstBlockRef : undefined}

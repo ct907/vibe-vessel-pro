@@ -232,7 +232,7 @@ export function FloatingChordToolbar({
   // toggles the menu. Desktop keeps the explicit open/close via the trigger
   // button and the chordToolbarOpen signal.
   const effectiveExpanded =
-    visible && (expanded || (autoExpandOnContext && !isDesktop && hasContext));
+    visible && (expanded || (autoExpandOnContext && hasContext));
 
   useEffect(() => {
     if (chordToolbarOpen && visible) {

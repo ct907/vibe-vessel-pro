@@ -155,6 +155,7 @@ interface LineRowProps {
   onSetActiveChordId: (id: string | null) => void;
   multiSelectedIds?: Set<string>;
   onMultiSelectTap?: (anchorId: string) => void;
+  onShiftSelectTap?: (anchorId: string) => void;
   isFocused?: boolean;
   onTextFocus: () => void;
   onTextBlur: () => void;
@@ -175,6 +176,7 @@ function LineRow({
   onSetActiveChordId,
   multiSelectedIds,
   onMultiSelectTap,
+  onShiftSelectTap,
   isFocused,
   onTextFocus,
   onTextBlur,
@@ -232,6 +234,9 @@ function LineRow({
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const onMultiSelectTapRef = useRef(onMultiSelectTap);
   onMultiSelectTapRef.current = onMultiSelectTap;
+  const onShiftSelectTapRef = useRef(onShiftSelectTap);
+  onShiftSelectTapRef.current = onShiftSelectTap;
+  const lastClickModifiersRef = useRef({ ctrl: false, shift: false });
 
   // Task 1: while the chord context menu is showing, arrow keys reorder the chord
   // and Delete removes it.
@@ -393,6 +398,9 @@ function LineRow({
                           onSetActiveChordId(null);
                           onPickerOpen(line.id, slotIdx, anchor!.id);
                         }}
+                        onPointerDown={(e) => {
+                          lastClickModifiersRef.current = { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
+                        }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ChordChip
@@ -404,8 +412,13 @@ function LineRow({
                           keyChangeOffset={effectiveOffset}
                           selected={activeChordId === anchor!.id || !!multiSelectedIds?.has(anchor!.id)}
                           onClick={() => {
-                            if (multiSelectModeRef.current) {
+                            const { ctrl, shift } = lastClickModifiersRef.current;
+                            if (ctrl || multiSelectModeRef.current) {
                               onMultiSelectTapRef.current?.(anchor!.id);
+                              return;
+                            }
+                            if (shift) {
+                              onShiftSelectTapRef.current?.(anchor!.id);
                               return;
                             }
                             onSetActiveChordId(activeChordId === anchor!.id ? null : anchor!.id);
@@ -779,6 +792,7 @@ interface SectionCardProps {
   onSetActiveChordId: (id: string | null) => void;
   multiSelectedIds?: Set<string>;
   onMultiSelectTap?: (lineId: string, anchorId: string) => void;
+  onShiftSelectTap?: (lineId: string, anchorId: string) => void;
   focusedLineId?: string;
   onLineTextFocus: (lineId: string) => void;
   onLineTextBlur: () => void;
@@ -800,6 +814,7 @@ function SectionCard({
   onSetActiveChordId,
   multiSelectedIds,
   onMultiSelectTap,
+  onShiftSelectTap,
   focusedLineId,
   onLineTextFocus,
   onLineTextBlur,
@@ -1237,6 +1252,7 @@ function SectionCard({
                 onSetActiveChordId={onSetActiveChordId}
                 multiSelectedIds={multiSelectedIds}
                 onMultiSelectTap={(anchorId) => onMultiSelectTap?.(line.id, anchorId)}
+                onShiftSelectTap={(anchorId) => onShiftSelectTap?.(line.id, anchorId)}
                 isFocused={focusedLineId === line.id}
                 onTextFocus={() => onLineTextFocus(line.id)}
                 onTextBlur={onLineTextBlur}
@@ -1493,8 +1509,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
+  const rangeAnchorRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
   const toggleLyricMultiSelected = useCallback(
     (anchorId: string, ctx: { sectionId: string; lineId: string }) => {
+      rangeAnchorRef.current = { ...ctx, anchorId };
       setLyricMultiSelected((prev) => {
         const next = new Map(prev);
         if (next.has(anchorId)) next.delete(anchorId);
@@ -1503,6 +1521,39 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       });
     },
     [],
+  );
+  const rangeSelectLyricChords = useCallback(
+    (sectionId: string, lineId: string, anchorId: string) => {
+      const sec = sections.find((s) => s.id === sectionId);
+      if (!sec) return;
+      const ordered = sec.lines.flatMap((l) =>
+        getLineChordsViaSSOT(sec, l.id)
+          .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+          .map((c) => ({ anchorId: c.id, sectionId, lineId: l.id }))
+      );
+      const fromId = rangeAnchorRef.current?.anchorId ?? activeChordId;
+      if (!fromId) {
+        toggleLyricMultiSelected(anchorId, { sectionId, lineId });
+        return;
+      }
+      const fromIdx = ordered.findIndex((x) => x.anchorId === fromId);
+      const toIdx = ordered.findIndex((x) => x.anchorId === anchorId);
+      if (fromIdx < 0 || toIdx < 0) {
+        toggleLyricMultiSelected(anchorId, { sectionId, lineId });
+        return;
+      }
+      const lo = Math.min(fromIdx, toIdx);
+      const hi = Math.max(fromIdx, toIdx);
+      setLyricMultiSelected((prev) => {
+        const next = new Map(prev);
+        for (let i = lo; i <= hi; i++) {
+          const item = ordered[i];
+          next.set(item.anchorId, { sectionId: item.sectionId, lineId: item.lineId });
+        }
+        return next;
+      });
+    },
+    [sections, activeChordId, toggleLyricMultiSelected],
   );
   const [focusedLineInfo, setFocusedLineInfo] = useState<{ sectionId: string; lineId: string } | null>(null);
   const [rhymeOpen, setRhymeOpen] = useState(false);
@@ -2065,6 +2116,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             onMultiSelectTap={(lineId, anchorId) =>
               toggleLyricMultiSelected(anchorId, { sectionId: sec.id, lineId })
             }
+            onShiftSelectTap={(lineId, anchorId) =>
+              rangeSelectLyricChords(sec.id, lineId, anchorId)
+            }
             sortMode={sortMode}
             onMoveSection={(id, direction) => moveSection(id, direction)}
             focusedLineId={focusedLineInfo?.sectionId === sec.id ? focusedLineInfo.lineId : undefined}
@@ -2482,13 +2536,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             }}
             onDuplicate={() => {
               if (targets.length === 0) return;
-              const place = useSongStore.getState().upsertChordAt;
               for (const t of targets) {
                 const found = lookupAnchor(t.id);
                 if (!found) continue;
-                const sec = useSongStore.getState().sections.find((x) => x.id === t.sectionId);
+                const store = useSongStore.getState();
+                const sec = store.sections.find((x) => x.id === t.sectionId);
                 const line = sec?.lines.find((l) => l.id === t.lineId);
                 if (!line) continue;
+                const srcLen = sec?.chords.find((sc) => sc.id === t.id)?.progressionPlacement?.lengthBeats;
                 const occupied = new Set(line.chords.map((c) => c.slotIndex ?? 0));
                 const start = (found.anchor.slotIndex ?? 0) + 1;
                 let slot = -1;
@@ -2501,7 +2556,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                   }
                 }
                 if (slot < 0) continue;
-                place(t.sectionId, t.lineId, slot, found.anchor.chord);
+                const result = store.placeChordInSlot(t.sectionId, t.lineId, slot, found.anchor.chord);
+                if (result && srcLen !== undefined) {
+                  const fresh = useSongStore.getState();
+                  const newSC = fresh.sections.find((x) => x.id === t.sectionId)?.chords.find((sc) => sc.id === result.id);
+                  if (newSC?.progressionPlacement) {
+                    fresh.setPatternChordLength(newSC.progressionPlacement.patternId, result.id, srcLen);
+                  }
+                }
               }
             }}
             onDelete={() => {
