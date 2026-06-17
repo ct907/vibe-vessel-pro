@@ -1092,7 +1092,7 @@ function deriveMirrorsFromSectionChords(
           mirrorId: sc.lyricsPlacement ? sc.id : undefined,
         });
         usage[i] = start + len;
-        if (blocks[i].id !== pp.patternId || start !== pp.startBeat) {
+        if (blocks[i].id !== pp.patternId || start !== pp.startBeat || len !== pp.lengthBeats) {
           remappedPlacement.set(sc.id, { patternId: blocks[i].id, startBeat: start, lengthBeats: len });
         }
         placed = true;
@@ -3390,10 +3390,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       // pre-check capacity here.
       const defaultLen = lengthBeatsOverride ?? getDefaults().defaultChordLengthBeats;
       const totalBeats = target.bars * target.beatsPerBar;
-      const usedInTarget = sec.chords.reduce((sum, sc) => {
-        const pp = sc.progressionPlacement;
-        return pp && pp.patternId === patternId ? sum + pp.lengthBeats : sum;
-      }, 0);
+      const usedInTarget = target.chords.reduce((sum, pc) => sum + pc.lengthBeats, 0);
       const freeInTarget = totalBeats - usedInTarget;
 
       // B1: default lyricsPlacement so the chord appears in the Lyrics view.
