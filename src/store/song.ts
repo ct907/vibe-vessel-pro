@@ -124,9 +124,22 @@ export interface PatternBlock {
   id: string;
   /** Owning section's id. Optional for legacy data — defaults to `id`. */
   sectionId?: string;
+  /**
+   * The lyric row this block is a projection of (1 block ⇔ 1 non-overflow
+   * line). Optional for legacy data — assigned on load via the positional
+   * mapping. The block's chords, order and length all derive from this line.
+   */
+  lineId?: string;
   label: string;
   bars: number;
   beatsPerBar: number;
+  /**
+   * Locked length in beats. When set, the block has a FIXED capacity and does
+   * NOT flex to its chord content — `bars` is pinned to this length and adding
+   * chords past it is rejected (no overflow). Absent = flexible: the block
+   * grows/shrinks to fit its chords (capacity = sum of chord lengths).
+   */
+  lockedBeats?: number;
   /**
    * Crop-to-fit override: the block's *effective* played length in beats,
    * independent of its `bars × beatsPerBar` capacity. When set, playback uses
@@ -137,14 +150,35 @@ export interface PatternBlock {
   chords: PatternChord[];
 }
 
+/** Sum of a block's chord lengths in beats (its flexible content size). */
+export function patternUsedBeats(p: PatternBlock): number {
+  return p.chords.reduce((a, c) => a + c.lengthBeats, 0);
+}
+
+/**
+ * A block's capacity in beats. Locked blocks use their fixed `lockedBeats`;
+ * flexible blocks use their content (sum of chord lengths), with a 1-bar floor.
+ */
+export function patternCapacityBeats(p: PatternBlock): number {
+  if (p.lockedBeats != null) return Math.max(p.beatsPerBar, p.lockedBeats);
+  return Math.max(p.beatsPerBar, patternUsedBeats(p));
+}
+
+/**
+ * Whole-bar count a block renders/plays as: capacity rounded UP to whole bars,
+ * minimum 1. (The header label may show the exact fractional value separately.)
+ */
+export function patternBars(p: PatternBlock): number {
+  return Math.max(1, Math.ceil(patternCapacityBeats(p) / p.beatsPerBar - 1e-9));
+}
+
 /**
  * A block's effective played length in beats. Honors the crop-to-fit
- * `playBeats` override (clamped to capacity); otherwise the full
- * `bars × beatsPerBar`. Use for timeline/offset math — NOT for chord-capacity
- * checks, which always use the full capacity.
+ * `playBeats` override (clamped to capacity); otherwise the full whole-bar
+ * length. Use for timeline/offset math — NOT for chord-capacity checks.
  */
 export function patternPlayBeats(p: PatternBlock): number {
-  const cap = p.bars * p.beatsPerBar;
+  const cap = patternBars(p) * p.beatsPerBar;
   return p.playBeats != null ? Math.min(Math.max(0, p.playBeats), cap) : cap;
 }
 
@@ -1026,112 +1060,145 @@ function deriveMirrorsFromSectionChords(
   // shuffle the SSOT but leave stale slot indices behind, so the lyric
   // row would render in the old order.
   const section = resolveLyricSlotCollisions(recomputeLyricsSlotsForSection(rawSection));
-  // 1) Rebuild line.chords from SectionChords whose lyricsPlacement matches.
-  const anchorsByLine = new Map<string, ChordAnchor[]>();
-  section.lines.forEach((l) => anchorsByLine.set(l.id, []));
-  // Pointer self-heal: a lyricsPlacement aimed at a line that no longer exists
-  // is a phantom-in-waiting — invisible in Write yet kept alive by its
-  // progressionPlacement and re-rendered in Arrange. Repair it at this single
-  // chokepoint (every SSOT mutation flows through here) by demoting the chord
-  // to progression-only, rather than silently skipping the anchor while
-  // leaving the dangling pointer in the SSOT.
-  const danglingLyricIds = new Set<string>();
+  const defaultLen = getDefaults().defaultChordLengthBeats;
+
+  // The lyric chord rows are the single source of truth. Each non-overflow
+  // lyric line owns exactly ONE pattern block, which FLEXES to fit that line's
+  // chords (capacity = sum of chord lengths). progressionPlacement is therefore
+  // a pure projection of (line → block, chord order, chord lengths) and can no
+  // longer disagree with the Write tab. No overflow, no continuation blocks.
+  const nonOverflowLines = section.lines.filter((l) => !l._isChordOverflow);
+  // Map every line (incl. wrapped overflow rows) to its owning non-overflow
+  // parent, in render order, so chords on a wrapped row group with their parent.
+  const parentByLine = new Map<string, string>();
+  let lastParent: string | null = null;
+  for (const l of section.lines) {
+    if (l._isChordOverflow) {
+      if (lastParent) parentByLine.set(l.id, lastParent);
+    } else {
+      lastParent = l.id;
+      parentByLine.set(l.id, l.id);
+    }
+  }
+  const lineOrder = new Map<string, number>();
+  section.lines.forEach((l, i) => lineOrder.set(l.id, i));
+  const blockPosOfId = new Map<string, number>();
+  sectionPatterns.forEach((p, i) => blockPosOfId.set(p.id, i));
+
+  // Effective lyric placement per chord. Keep valid placements; re-home any
+  // "homeless" chord (no lyricsPlacement, or pointing at a vanished line) onto a
+  // real line so every chord is lyric-anchored. A progression-only chord lands
+  // on the line that positionally matches its old block; otherwise the last line.
+  const effectiveLyrics = new Map<string, LyricsPlacement>();
   for (const sc of section.chords) {
     const lp = sc.lyricsPlacement;
+    if (lp && parentByLine.has(lp.lineId)) effectiveLyrics.set(sc.id, lp);
+  }
+  const slotCursor = new Map<string, number>();
+  for (const l of nonOverflowLines) slotCursor.set(l.id, 0);
+  for (const [, lp] of effectiveLyrics) {
+    const parent = parentByLine.get(lp.lineId)!;
+    slotCursor.set(parent, Math.max(slotCursor.get(parent) ?? 0, lp.slotIndex + 1));
+  }
+  for (const sc of section.chords) {
+    if (effectiveLyrics.has(sc.id) || !nonOverflowLines.length) continue;
+    const pos = sc.progressionPlacement ? blockPosOfId.get(sc.progressionPlacement.patternId) : undefined;
+    const target = nonOverflowLines[pos != null && pos >= 0 && pos < nonOverflowLines.length ? pos : nonOverflowLines.length - 1];
+    const slot = slotCursor.get(target.id) ?? 0;
+    slotCursor.set(target.id, slot + 1);
+    effectiveLyrics.set(sc.id, { lineId: target.id, slotIndex: slot });
+  }
+
+  // Group chords by their parent line and order them (line render order, then slot).
+  const scsByParent = new Map<string, SectionChord[]>();
+  for (const l of nonOverflowLines) scsByParent.set(l.id, []);
+  for (const sc of section.chords) {
+    const lp = effectiveLyrics.get(sc.id);
     if (!lp) continue;
-    const bucket = anchorsByLine.get(lp.lineId);
-    if (!bucket) { danglingLyricIds.add(sc.id); continue; }
-    bucket.push({
+    scsByParent.get(parentByLine.get(lp.lineId)!)?.push(sc);
+  }
+  for (const [, arr] of scsByParent) {
+    arr.sort((a, b) => {
+      const la = effectiveLyrics.get(a.id)!, lb = effectiveLyrics.get(b.id)!;
+      const oa = lineOrder.get(la.lineId) ?? 0, ob = lineOrder.get(lb.lineId) ?? 0;
+      return oa !== ob ? oa - ob : la.slotIndex - lb.slotIndex;
+    });
+  }
+
+  // Match existing blocks to lines (by lineId, then by position) so block
+  // identity — and per-block settings like beatsPerBar/lockedBeats/playBeats —
+  // survive. Surplus blocks (more than lines) are dropped; their chords were
+  // already re-homed above.
+  const usedTmpl = new Set<PatternBlock>();
+  const byLineId = new Map<string, PatternBlock>();
+  for (const p of sectionPatterns) if (p.lineId && !byLineId.has(p.lineId)) byLineId.set(p.lineId, p);
+  const fallbackPool = sectionPatterns.filter(
+    (p) => !(p.lineId && nonOverflowLines.some((l) => l.id === p.lineId)),
+  );
+  let fallbackIdx = 0;
+  const tmplForLine = (lineId: string): PatternBlock | undefined => {
+    const m = byLineId.get(lineId);
+    if (m && !usedTmpl.has(m)) { usedTmpl.add(m); return m; }
+    while (fallbackIdx < fallbackPool.length) {
+      const c = fallbackPool[fallbackIdx++];
+      if (!usedTmpl.has(c)) { usedTmpl.add(c); return c; }
+    }
+    return undefined;
+  };
+  const fallbackBpb = sectionPatterns[0]?.beatsPerBar ?? 4;
+
+  const remapped = new Map<string, ProgressionPlacement>();
+  const blocks: PatternBlock[] = nonOverflowLines.map((line) => {
+    const tmpl = tmplForLine(line.id);
+    const id = tmpl?.id ?? nanoid();
+    const beatsPerBar = tmpl?.beatsPerBar ?? fallbackBpb;
+    let cursor = 0;
+    const pcs: PatternChord[] = [];
+    for (const sc of scsByParent.get(line.id) ?? []) {
+      const want = sc.progressionPlacement && sc.progressionPlacement.lengthBeats > 0
+        ? sc.progressionPlacement.lengthBeats
+        : defaultLen;
+      const len = Math.max(0.5, want);
+      pcs.push({ id: sc.id, chord: sc.chord, startBeat: cursor, lengthBeats: len, mirrorId: sc.id });
+      remapped.set(sc.id, { patternId: id, startBeat: cursor, lengthBeats: len });
+      cursor += len;
+    }
+    const block: PatternBlock = {
+      id,
+      sectionId: section.id,
+      lineId: line.id,
+      label: tmpl?.label ?? section.label,
+      bars: 1,
+      beatsPerBar,
+      lockedBeats: tmpl?.lockedBeats,
+      playBeats: tmpl?.playBeats,
+      chords: pcs,
+    };
+    block.bars = patternBars(block);
+    return block;
+  });
+
+  // Rebuild line.chords (anchors) from the effective lyric placements.
+  const anchorsByLine = new Map<string, ChordAnchor[]>();
+  section.lines.forEach((l) => anchorsByLine.set(l.id, []));
+  for (const sc of section.chords) {
+    const lp = effectiveLyrics.get(sc.id);
+    if (!lp) continue;
+    anchorsByLine.get(lp.lineId)?.push({
       id: sc.id,
       offset: lp.slotIndex,
       slotIndex: lp.slotIndex,
       chord: sc.chord,
-      mirrorId: sc.progressionPlacement ? sc.id : undefined,
+      mirrorId: sc.id,
     });
   }
 
-  // 2) Rebuild each pattern's chords from SectionChords whose
-  //    progressionPlacement matches that pattern. Walk SectionChords in
-  //    array order (== SSOT order). Pack left-to-right within each block;
-  //    when a chord doesn't fit, cascade into the next block (preserving
-  //    relative order). If no remaining block has room, spawn continuation
-  //    blocks at the end of the section. Reassigns SectionChord patternIds
-  //    on overflow so SSOT stays in sync with mirrors.
-  const defaultLen = getDefaults().defaultChordLengthBeats;
-  // Mutable copy of blocks; may grow with continuation blocks on overflow.
-  const blocks: PatternBlock[] = sectionPatterns.map((p) => ({ ...p, chords: [] as PatternChord[] }));
-  const usage: number[] = blocks.map(() => 0);
-  const indexById = new Map<string, number>(blocks.map((b, i) => [b.id, i]));
-  // Track patternId reassignment for SCs that overflowed.
-  const remappedPlacement = new Map<string, { patternId: string; startBeat: number; lengthBeats: number }>();
-
-  for (const sc of section.chords) {
-    const pp = sc.progressionPlacement;
-    if (!pp) continue;
-    const origIdx = indexById.get(pp.patternId);
-    if (origIdx == null) continue; // placement points to a foreign block — ignore here
-    const want = pp.lengthBeats > 0 ? pp.lengthBeats : defaultLen;
-    const len = Math.max(0.5, want);
-    // Find first block at or after origIdx with room.
-    let placed = false;
-    for (let i = origIdx; i < blocks.length; i++) {
-      const cap = blocks[i].bars * blocks[i].beatsPerBar;
-      if (usage[i] + len <= cap + 1e-9) {
-        const start = usage[i];
-        blocks[i].chords.push({
-          id: sc.id,
-          chord: sc.chord,
-          startBeat: start,
-          lengthBeats: len,
-          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-        });
-        usage[i] = start + len;
-        if (blocks[i].id !== pp.patternId || start !== pp.startBeat || len !== pp.lengthBeats) {
-          remappedPlacement.set(sc.id, { patternId: blocks[i].id, startBeat: start, lengthBeats: len });
-        }
-        placed = true;
-        break;
-      }
-    }
-    if (placed) continue;
-    // Spawn a new continuation block at the end of this section's blocks.
-    const ref = blocks[blocks.length - 1] ?? sectionPatterns[sectionPatterns.length - 1];
-    if (!ref) continue; // no template — section has no blocks; drop placement
-    const newId = nanoid();
-    const newBlock: PatternBlock = {
-      id: newId,
-      sectionId: section.id,
-      label: `${ref.label} (cont.)`,
-      bars: ref.bars,
-      beatsPerBar: ref.beatsPerBar,
-      chords: [],
-    };
-    const cap = newBlock.bars * newBlock.beatsPerBar;
-    const placedLen = Math.min(len, cap);
-    newBlock.chords.push({
-      id: sc.id,
-      chord: sc.chord,
-      startBeat: 0,
-      lengthBeats: placedLen,
-      mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-    });
-    blocks.push(newBlock);
-    usage.push(placedLen);
-    indexById.set(newId, blocks.length - 1);
-    remappedPlacement.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: placedLen });
-  }
-
-  // Build updated section with possibly-remapped SC placements.
   const nextSectionChords = section.chords
-    .map((sc) => {
-      const cleaned = danglingLyricIds.has(sc.id)
-        ? { ...sc, lyricsPlacement: undefined }
-        : sc;
-      const np = remappedPlacement.get(sc.id);
-      return np ? { ...cleaned, progressionPlacement: np } : cleaned;
-    })
-    // Drop chords left with no placement on either side — neither view can
-    // show them, so keeping them only re-seeds the phantom problem.
+    .map((sc) => ({
+      ...sc,
+      lyricsPlacement: effectiveLyrics.get(sc.id),
+      progressionPlacement: remapped.get(sc.id),
+    }))
     .filter((sc) => sc.lyricsPlacement || sc.progressionPlacement);
   const nextSection: Section = {
     ...section,
@@ -3242,7 +3309,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // SSOT-first: add a SectionChord assigned to this pattern (or a sibling
   // pattern with room / a fresh continuation block), placed at slotIndex
   // within the pattern's chord order.
-  addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride, lyricless) => {
+  addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride, _lyricless) => {
     pushHistory(get);
     set((s) => {
       const target = s.progression.find((p) => p.id === patternId);
@@ -3252,63 +3319,37 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       if (!sec) return {};
 
       const newId = nanoid();
-      // placeSectionChordInProgression handles "no room → walk to next block
-      // → spawn continuation". It picks the first pattern in section order
-      // with room. To honor the requested patternId when it has room, we
-      // pre-check capacity here.
       const defaultLen = lengthBeatsOverride ?? getDefaults().defaultChordLengthBeats;
-      const totalBeats = target.bars * target.beatsPerBar;
-      const usedInTarget = target.chords.reduce((sum, pc) => sum + pc.lengthBeats, 0);
-      const freeInTarget = totalBeats - usedInTarget;
 
-      // B1: default lyricsPlacement so the chord appears in the Lyrics view.
-      // Use the line that matches this block's position (1 block = 1 line rule).
-      // `lyricless` preserves a progression-only chord's lack of a lyric anchor
-      // through copy/paste/duplicate (it respects the user's choice to add lyrics
-      // later) — so we skip the mirror entirely in that case.
+      // Flex model: the block grows to fit, so the chord always lands in the
+      // requested block. Give it a lyricsPlacement on the matching line (1 block
+      // ⇔ 1 line) so it appears in the Write row. deriveMirrors recomputes the
+      // exact slot from SSOT order and the startBeat from cumulative lengths, so
+      // the rough slot here only needs to be free (avoid a same-slot collision).
       const sectionBlocksForLine2 = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
       const blockPosIdx2 = sectionBlocksForLine2.findIndex((p) => p.id === patternId);
       const nonOverflowLines2 = sec.lines.filter((l) => !l._isChordOverflow);
       const targetLine2 = nonOverflowLines2[blockPosIdx2 >= 0 ? blockPosIdx2 : 0] ?? nonOverflowLines2[0];
-      const lyricsPlacement: LyricsPlacement | undefined = targetLine2 && !lyricless
+      const lyricsPlacement: LyricsPlacement | undefined = targetLine2
         ? (() => {
             const occupied = new Set<number>();
             sec.chords.forEach((c) => {
-              if (c.lyricsPlacement?.lineId === targetLine2.id) {
-                occupied.add(c.lyricsPlacement.slotIndex);
-              }
+              if (c.lyricsPlacement?.lineId === targetLine2.id) occupied.add(c.lyricsPlacement.slotIndex);
             });
             const slot = nearestFreeSlot(occupied, 0);
-            // Never silently drop the lyric mirror when all 80 SSOT slots on the
-            // line are taken — attach at the last slot and let autoLayoutSection
-            // repack/spill it onto a continuation row. Returning undefined here
-            // would demote the chord to progression-only, vanishing it from Write.
             return { lineId: targetLine2.id, slotIndex: slot >= 0 ? slot : CHORD_ROW_SLOTS - 1 };
           })()
         : undefined;
 
-      let placement: { progression: PatternBlock[]; sectionChord: SectionChord };
-      if (freeInTarget + 1e-9 >= 0.5) {
-        const placedLen = Math.min(defaultLen, freeInTarget);
-        placement = {
-          progression: s.progression,
-          sectionChord: {
-            id: newId,
-            chord,
-            lyricsPlacement,
-            progressionPlacement: { patternId, startBeat: usedInTarget, lengthBeats: placedLen },
-          },
-        };
-      } else {
-        placement = placeSectionChordInProgression(
-          s.progression,
-          sectionId,
-          sec.chords,
+      const placement: { progression: PatternBlock[]; sectionChord: SectionChord } = {
+        progression: s.progression,
+        sectionChord: {
+          id: newId,
           chord,
-          newId,
           lyricsPlacement,
-        );
-      }
+          progressionPlacement: { patternId, startBeat: 0, lengthBeats: defaultLen },
+        },
+      };
 
       // Insert the new SectionChord such that, among same-pattern chords,
       // it sits at slotIndex. Other-pattern chords keep their relative order.

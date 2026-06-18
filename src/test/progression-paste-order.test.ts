@@ -124,38 +124,36 @@ describe("progression paste/duplicate keeps the Write row in order", () => {
 });
 
 /**
- * Review finding F3: a progression-only ("lyricless") chord must keep its lack
- * of a lyric anchor through copy/paste/duplicate in the Progressions tab, so the
- * user's choice to add lyrics later is respected.
+ * Lyrics-as-SSOT model: the Write chord rows are authoritative, so EVERY chord
+ * is lyric-anchored — there are no "lyricless" / progression-only chords. A
+ * chord added in the Progressions tab therefore also gains a lyric anchor on the
+ * block's line (1 block ⇔ 1 line), and that anchor survives paste/duplicate.
  */
-describe("progression lyricless chords stay lyricless through paste/duplicate", () => {
+describe("progression-tab chords are always lyric-anchored", () => {
   beforeEach(() => {
     useSongStore.getState().resetSong();
   });
 
-  it("duplicating a lyricless chord keeps the copy lyricless", () => {
+  it("duplicating a chord keeps both copies lyric-anchored", () => {
     const store = useSongStore.getState();
     const section = store.sections[0];
     const pattern = store.progression[0];
 
-    // A progression-only chord — the user hasn't added lyrics yet.
-    store.addChordToPatternSlot(pattern.id, chord("A"), 0, undefined, true);
+    store.addChordToPatternSlot(pattern.id, chord("A"), 0);
     {
       const sec = useSongStore.getState().sections.find((x) => x.id === section.id)!;
       expect(sec.chords).toHaveLength(1);
       expect(sec.chords[0].progressionPlacement).toBeTruthy();
-      expect(sec.chords[0].lyricsPlacement).toBeUndefined();
+      expect(sec.chords[0].lyricsPlacement).toBeTruthy();
     }
 
-    // Duplicate it as ProgressionsTab.onDuplicate does for a lyricless source:
-    // carry the lyricless flag through, then repack.
+    // Duplicate it as ProgressionsTab.onDuplicate does, then repack.
     {
       const s = useSongStore.getState();
       const sec = s.sections.find((x) => x.id === section.id)!;
       const pat = s.progression.find((p) => p.id === pattern.id)!;
       const chords = getPatternChordsViaSSOT(sec, pat);
-      const srcLyricless = !sec.chords.find((x) => x.id === chords[0].id)?.lyricsPlacement;
-      s.addChordToPatternSlot(pattern.id, chords[0].chord, 1, chords[0].lengthBeats, srcLyricless);
+      s.addChordToPatternSlot(pattern.id, chords[0].chord, 1, chords[0].lengthBeats);
       s.autoLayoutSection(section.id, SCREEN_W, SLOT_W);
     }
 
@@ -163,23 +161,21 @@ describe("progression lyricless chords stay lyricless through paste/duplicate", 
     expect(sec.chords).toHaveLength(2);
     for (const c of sec.chords) {
       expect(c.progressionPlacement, "lost progression placement").toBeTruthy();
-      expect(c.lyricsPlacement, `chord ${c.chord.display} should stay lyricless`).toBeUndefined();
+      expect(c.lyricsPlacement, `chord ${c.chord.display} should be lyric-anchored`).toBeTruthy();
     }
   });
 
-  it("pasting a lyricless chord into a block keeps it lyricless", () => {
+  it("pasting a chord into a block anchors it to the block's line", () => {
     const store = useSongStore.getState();
     const section = store.sections[0];
     const pattern = store.progression[0];
 
-    // Simulate handlePasteIntoBlock for a clipboard chord copied from a
-    // progression-only source ({ lyricless: true }).
-    store.addChordToPatternSlot(pattern.id, chord("G"), 0, 4, true);
+    store.addChordToPatternSlot(pattern.id, chord("G"), 0, 4);
     store.autoLayoutSection(section.id, SCREEN_W, SLOT_W);
 
     const sec = useSongStore.getState().sections.find((x) => x.id === section.id)!;
     expect(sec.chords).toHaveLength(1);
     expect(sec.chords[0].progressionPlacement).toBeTruthy();
-    expect(sec.chords[0].lyricsPlacement).toBeUndefined();
+    expect(sec.chords[0].lyricsPlacement).toBeTruthy();
   });
 });
