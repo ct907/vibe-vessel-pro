@@ -53,6 +53,8 @@ import {
   Play,
   Scissors,
   Maximize2,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -71,7 +73,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
-const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
+const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "instrumental", "custom"];
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -175,6 +177,14 @@ function formatBeats(n: number) {
   return Number.isInteger(n) ? `${n}` : n.toFixed(1).replace(/\.0$/, "");
 }
 
+/**
+ * Arrange-view block width scale: a block's rendered width is its length in
+ * beats × this, so a 2-bar block is visibly twice a 1-bar block. Blocks flow
+ * left-to-right and wrap to the next line; a block wider than its column is
+ * capped at 100% (its chord chips, which flex by lengthBeats, compress to fit).
+ */
+const PX_PER_BEAT = 40;
+
 function PatternBlock({
   pattern,
   blockIndex,
@@ -201,7 +211,7 @@ function PatternBlock({
   onChordClick,
 }: PatternProps) {
   const {
-    updatePattern,
+    setPatternLock,
     setPatternPlayBeats,
     movePatternChord,
     removePatternChordsBatch,
@@ -271,6 +281,13 @@ function PatternBlock({
   const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
+  const isLocked = pattern.lockedBeats != null;
+  // Smallest lock that still fits current content (whole bars, ≥ 1 bar). The
+  // store clamps to this too — shown here so the stepper can't go lower.
+  const minLockBeats = Math.max(
+    pattern.beatsPerBar,
+    Math.ceil(usedBeats / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar,
+  );
   const canDeleteThisBlock = totalBlocksInSong > 1;
   // Crop-to-fit: effective played length (capped at capacity). When cropped,
   // the grid is drawn shrunk to this many beats while the card keeps its width.
@@ -369,49 +386,61 @@ function PatternBlock({
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1 px-3 py-0.5 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full"
               style={{ background: "var(--paper-shade)" }}
-              aria-label="Edit beats"
+              aria-label="Block length"
             >
+              {isLocked && <Lock className="h-3 w-3 opacity-70" style={{ color: "var(--primary)" }} />}
               <span className="font-mono-chord">{formatBeats(usedBeats)}/{totalBeats}</span>
               <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
               <ChevronDown className="h-3 w-3 opacity-70" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto p-2">
-            <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
-                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                  setPatternLock(pattern.id, isLocked ? null : totalBeats);
                 }}
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
-                disabled={pattern.bars <= 1}
-                aria-label="Decrease beats"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] rounded hover:bg-accent"
+                style={{ color: isLocked ? "var(--primary-strong)" : "var(--ink-soft)" }}
               >
-                <Minus className="h-3.5 w-3.5" />
+                {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                <span>{isLocked ? "Locked length" : "Auto (grows to fit)"}</span>
               </button>
-              <BeatsInput
-                value={totalBeats}
-                beatsPerBar={pattern.beatsPerBar}
-                onCommit={(beats) => {
-                  const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-                  updatePattern(pattern.id, { bars });
-                }}
-              />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const next = totalBeats + pattern.beatsPerBar;
-                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-                }}
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                aria-label="Increase beats"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+              {isLocked && (
+                <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPatternLock(pattern.id, Math.max(minLockBeats, totalBeats - pattern.beatsPerBar));
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+                    disabled={totalBeats <= minLockBeats}
+                    aria-label="Decrease beats"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <BeatsInput
+                    value={totalBeats}
+                    beatsPerBar={pattern.beatsPerBar}
+                    onCommit={(beats) => setPatternLock(pattern.id, Math.max(minLockBeats, beats))}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPatternLock(pattern.id, totalBeats + pattern.beatsPerBar);
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="Increase beats"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+                </div>
+              )}
             </div>
           </PopoverContent>
         </Popover>
@@ -1219,7 +1248,6 @@ function SectionGroup({
 
         {(() => {
           const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
-          const maxBars = Math.max(1, ...blocks.map((b) => b.bars));
           const renderBlock = (p: PatternBlockType, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
@@ -1235,10 +1263,10 @@ function SectionGroup({
                   label: `${sectionName}: Block ${blockNum}`,
                 };
               });
-            const widthPct = (p.bars / maxBars) * 100;
+            const blockWidth = p.bars * p.beatsPerBar * PX_PER_BEAT;
             const blockHasChords = section ? getPatternChordsViaSSOT(section, p).length > 0 : false;
             return (
-              <div key={p.id} className="min-w-0" style={{ width: `${widthPct}%` }}>
+              <div key={p.id} className="min-w-0 shrink-0 max-w-full" style={{ width: blockWidth }}>
                 {blockHasChords ? (
                   <PatternBlock
                     pattern={p}
@@ -1340,15 +1368,9 @@ function SectionGroup({
           }
           return (
             <div>
-              {isMobile ? (
-                <div className="flex flex-col gap-3">
-                  {blocks.map((p, i) => renderBlock(p, i))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {blocks.map((p, i) => renderBlock(p, i))}
-                </div>
-              )}
+              <div className="flex flex-wrap items-start gap-3">
+                {blocks.map((p, i) => renderBlock(p, i))}
+              </div>
               {addBlockRow}
             </div>
           );

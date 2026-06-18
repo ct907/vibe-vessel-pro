@@ -17,7 +17,7 @@ interface Props {
   onEditorAction?: () => void;
 }
 
-const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge", "intro"];
+const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge", "intro", "instrumental"];
 
 const START_RECORDING_EVENT = "write:start-recording";
 
