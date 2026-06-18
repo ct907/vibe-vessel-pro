@@ -1583,6 +1583,12 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
         );
       });
+      // Repack the lyric mirror so the Write row reflects SSOT (= progression)
+      // order. addChordToPatternSlot lands each lyric anchor on the leftmost free
+      // slot regardless of beat position; without this the Write view shows the
+      // pasted chords out of order (and doesn't spill overflow onto continuation
+      // rows the way the lyrics-tab paste path does).
+      store.autoLayoutSection(sectionId, window.innerWidth, 28);
       setPasteMode(false);
       setActiveChordId(null);
       setMultiSelected(new Map());
@@ -2431,6 +2437,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           }}
           onDuplicate={() => {
             const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
+            const affectedSections = new Set<string>();
             const dupOne = (patternId: string, chordId: string) => {
               const pat = prog.find((p) => p.id === patternId);
               const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
@@ -2440,6 +2447,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               if (idx < 0) return;
               const c = chords[idx];
               addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats);
+              affectedSections.add(sec.id);
             };
             if (multiSelected.size > 0) {
               const byPattern = new Map<string, string[]>();
@@ -2459,10 +2467,17 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                   .sort((a, b) => order.indexOf(b) - order.indexOf(a))
                   .forEach((cid) => dupOne(pid, cid));
               }
-              return;
+            } else if (activeChordId && toolbarContext.activePatternId) {
+              dupOne(toolbarContext.activePatternId, activeChordId);
             }
-            if (!activeChordId || !toolbarContext.activePatternId) return;
-            dupOne(toolbarContext.activePatternId, activeChordId);
+            // Repack the lyric mirror(s) so the Write row follows SSOT order, the
+            // same as the paste path. addChordToPatternSlot lands the lyric anchor
+            // on the leftmost free slot, which otherwise leaves the duplicate out
+            // of order in the Write view.
+            const { autoLayoutSection } = useSongStore.getState();
+            for (const secId of affectedSections) {
+              autoLayoutSection(secId, window.innerWidth, 28);
+            }
           }}
           onDelete={() => {
             if (multiSelected.size > 0) {

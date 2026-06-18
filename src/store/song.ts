@@ -3411,7 +3411,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
               }
             });
             const slot = nearestFreeSlot(occupied, 0);
-            return slot >= 0 ? { lineId: targetLine2.id, slotIndex: slot } : undefined;
+            // Never silently drop the lyric mirror when all 80 SSOT slots on the
+            // line are taken — attach at the last slot and let autoLayoutSection
+            // repack/spill it onto a continuation row. Returning undefined here
+            // would demote the chord to progression-only, vanishing it from Write.
+            return { lineId: targetLine2.id, slotIndex: slot >= 0 ? slot : CHORD_ROW_SLOTS - 1 };
           })()
         : undefined;
 
