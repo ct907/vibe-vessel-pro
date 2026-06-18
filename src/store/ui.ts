@@ -27,6 +27,10 @@ export type ArrangeView = "track" | "chords";
 export interface ClipboardChord {
   chord: ChordSymbol;
   lengthBeats?: number;
+  /** Source chord was progression-only (no lyric anchor). Paste/duplicate in
+   *  the Progression tab reproduces it as lyricless rather than materializing a
+   *  lyric placement, respecting the user's choice to add lyrics later. */
+  lyricless?: boolean;
 }
 
 interface UIState {

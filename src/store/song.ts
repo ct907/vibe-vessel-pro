@@ -308,7 +308,7 @@ export interface SongState {
   movePatternChordToSlot: (patternId: string, chordId: string, slotIndex: number) => void;
   movePatternChordsToSlot: (patternId: string, chordIds: string[], slotIndex: number) => void;
   /** Slot-based: insert a brand-new chord into a specific slot (left-packed). */
-  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number, lengthBeatsOverride?: number) => void;
+  addChordToPatternSlot: (patternId: string, chord: ChordSymbol, slotIndex: number, lengthBeatsOverride?: number, lyricless?: boolean) => void;
   /** Append a fresh empty pattern block to a section. Returns its id. */
   addPatternToSection: (sectionId: string) => string;
   /** Reorder a pattern block within its section (Phase 3 / Item 3). */
@@ -3374,7 +3374,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // SSOT-first: add a SectionChord assigned to this pattern (or a sibling
   // pattern with room / a fresh continuation block), placed at slotIndex
   // within the pattern's chord order.
-  addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride) => {
+  addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride, lyricless) => {
     pushHistory(get);
     set((s) => {
       const target = s.progression.find((p) => p.id === patternId);
@@ -3398,11 +3398,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
       // B1: default lyricsPlacement so the chord appears in the Lyrics view.
       // Use the line that matches this block's position (1 block = 1 line rule).
+      // `lyricless` preserves a progression-only chord's lack of a lyric anchor
+      // through copy/paste/duplicate (it respects the user's choice to add lyrics
+      // later) — so we skip the mirror entirely in that case.
       const sectionBlocksForLine2 = s.progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
       const blockPosIdx2 = sectionBlocksForLine2.findIndex((p) => p.id === patternId);
       const nonOverflowLines2 = sec.lines.filter((l) => !l._isChordOverflow);
       const targetLine2 = nonOverflowLines2[blockPosIdx2 >= 0 ? blockPosIdx2 : 0] ?? nonOverflowLines2[0];
-      const lyricsPlacement: LyricsPlacement | undefined = targetLine2
+      const lyricsPlacement: LyricsPlacement | undefined = targetLine2 && !lyricless
         ? (() => {
             const occupied = new Set<number>();
             sec.chords.forEach((c) => {

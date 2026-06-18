@@ -1497,7 +1497,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
         const chords = sec && pat ? getPatternChordsViaSSOT(sec, pat) : (pat?.chords ?? []);
         const c = chords.find((x) => x.id === cid);
-        if (c) items.push({ chord: { chord: c.chord, lengthBeats: c.lengthBeats }, startBeat: c.startBeat });
+        if (c) {
+          const lyricless = !sec?.chords.find((x) => x.id === cid)?.lyricsPlacement;
+          items.push({ chord: { chord: c.chord, lengthBeats: c.lengthBeats, lyricless }, startBeat: c.startBeat });
+        }
       }
       copied = items.sort((a, b) => a.startBeat - b.startBeat).map((x) => x.chord);
     } else if (activeChordId) {
@@ -1505,7 +1508,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         const sec = sections.find((s) => s.id === (p.sectionId ?? p.id));
         const chords = sec ? getPatternChordsViaSSOT(sec, p) : p.chords;
         const c = chords.find((x) => x.id === activeChordId);
-        if (c) { copied = [{ chord: c.chord, lengthBeats: c.lengthBeats }]; break; }
+        if (c) {
+          const lyricless = !sec?.chords.find((x) => x.id === activeChordId)?.lyricsPlacement;
+          copied = [{ chord: c.chord, lengthBeats: c.lengthBeats, lyricless }];
+          break;
+        }
       }
     }
     if (copied.length > 0) setChordClipboard(copied);
@@ -1573,7 +1580,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
       );
       chordClipboard.forEach((c, i) => {
-        store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats);
+        store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats, c.lyricless);
         const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
         const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
         if (added?.progressionPlacement && c.lengthBeats != null) {
@@ -2446,7 +2453,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               const idx = chords.findIndex((c) => c.id === chordId);
               if (idx < 0) return;
               const c = chords[idx];
-              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats);
+              // Preserve a progression-only chord's lyricless state in its copy.
+              const lyricless = !sec.chords.find((x) => x.id === chordId)?.lyricsPlacement;
+              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
               affectedSections.add(sec.id);
             };
             if (multiSelected.size > 0) {
