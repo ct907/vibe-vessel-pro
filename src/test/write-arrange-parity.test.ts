@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { useSongStore, getLineChordsViaSSOT, type PatternBlock } from "@/store/song";
 import tester from "./tester-jun26-song.json";
+import dreamon from "./dreamon-song.json";
 
 /**
  * Regression for the reported "Write and Arrange show the same chord in
@@ -18,9 +19,9 @@ import tester from "./tester-jun26-song.json";
 const sectionBlocks = (sectionId: string): PatternBlock[] =>
   useSongStore.getState().progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
 
-describe("Write/Arrange parity on load", () => {
-  it("the Tester Jun 26 song reads identically across both tabs", () => {
-    useSongStore.getState().loadFromJSON(JSON.parse(JSON.stringify(tester)));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const assertParity = (song: any) => {
+    useSongStore.getState().loadFromJSON(JSON.parse(JSON.stringify(song)));
 
     const { sections } = useSongStore.getState();
     expect(sections.length).toBeGreaterThan(0);
@@ -65,5 +66,14 @@ describe("Write/Arrange parity on load", () => {
 
     // The song is non-trivial — the assertions above actually exercised chords.
     expect(totalChords).toBeGreaterThan(0);
+};
+
+describe("Write/Arrange parity on load", () => {
+  it("the Tester Jun 26 song reads identically across both tabs", () => {
+    assertParity(tester);
+  });
+
+  it("the Dream On song reads identically across both tabs", () => {
+    assertParity(dreamon);
   });
 });
