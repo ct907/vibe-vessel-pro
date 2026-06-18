@@ -91,7 +91,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useDefaultsStore } from "@/store/defaults";
 
 
-const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
+const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "instrumental", "custom"];
 
 
 /**
@@ -551,7 +551,8 @@ function LineRow({
         );
       })()}
 
-      {/* LYRIC INPUT */}
+      {/* LYRIC INPUT — hidden for instrumental sections (chord rows only). */}
+      {section.type !== "instrumental" && (<>
       <div className="relative flex items-center rounded-sm">
         {isFocused && (
           <button
@@ -720,6 +721,7 @@ function LineRow({
         />
       </div>
       <div aria-hidden="true" style={{ height: 1, background: "var(--cocoa)" }} />
+      </>)}
 
       {/* "/" on an empty line → new section dialog */}
       <Dialog
@@ -1284,6 +1286,19 @@ function SectionCard({
               />
             ))}
           </div>
+
+          {/* Instrumental sections have no lyric text, so rows can't be added by
+              pressing Enter — give them an explicit "add chord row" affordance. */}
+          {section.type === "instrumental" && (
+            <button
+              type="button"
+              onClick={() => addLine(section.id, section.lines[section.lines.length - 1]?.id)}
+              className="mt-1 inline-flex items-center gap-1.5 px-2 py-1 text-xs font-display uppercase tracking-wide rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add chord row
+            </button>
+          )}
 
           {/* Basket chords are now drag-and-dropped directly into chord-row slots. */}
 

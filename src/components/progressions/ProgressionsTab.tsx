@@ -73,7 +73,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
-const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "custom"];
+const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "instrumental", "custom"];
 
 const LENGTH_STEP = 0.5;
 const MIN_LEN = 0.5;
@@ -176,6 +176,14 @@ interface PatternProps {
 function formatBeats(n: number) {
   return Number.isInteger(n) ? `${n}` : n.toFixed(1).replace(/\.0$/, "");
 }
+
+/**
+ * Arrange-view block width scale: a block's rendered width is its length in
+ * beats × this, so a 2-bar block is visibly twice a 1-bar block. Blocks flow
+ * left-to-right and wrap to the next line; a block wider than its column is
+ * capped at 100% (its chord chips, which flex by lengthBeats, compress to fit).
+ */
+const PX_PER_BEAT = 40;
 
 function PatternBlock({
   pattern,
@@ -1240,7 +1248,6 @@ function SectionGroup({
 
         {(() => {
           const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
-          const maxBars = Math.max(1, ...blocks.map((b) => b.bars));
           const renderBlock = (p: PatternBlockType, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
@@ -1256,10 +1263,10 @@ function SectionGroup({
                   label: `${sectionName}: Block ${blockNum}`,
                 };
               });
-            const widthPct = (p.bars / maxBars) * 100;
+            const blockWidth = p.bars * p.beatsPerBar * PX_PER_BEAT;
             const blockHasChords = section ? getPatternChordsViaSSOT(section, p).length > 0 : false;
             return (
-              <div key={p.id} className="min-w-0" style={{ width: `${widthPct}%` }}>
+              <div key={p.id} className="min-w-0 shrink-0 max-w-full" style={{ width: blockWidth }}>
                 {blockHasChords ? (
                   <PatternBlock
                     pattern={p}
@@ -1361,15 +1368,9 @@ function SectionGroup({
           }
           return (
             <div>
-              {isMobile ? (
-                <div className="flex flex-col gap-3">
-                  {blocks.map((p, i) => renderBlock(p, i))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {blocks.map((p, i) => renderBlock(p, i))}
-                </div>
-              )}
+              <div className="flex flex-wrap items-start gap-3">
+                {blocks.map((p, i) => renderBlock(p, i))}
+              </div>
               {addBlockRow}
             </div>
           );

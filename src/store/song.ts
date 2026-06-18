@@ -46,7 +46,7 @@ export interface LyricLine {
   _isChordOverflow?: boolean;
 }
 
-export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "custom";
+export type SectionType = "verse" | "chorus" | "bridge" | "intro" | "outro" | "pre-chorus" | "instrumental" | "custom";
 
 /**
  * Per-view placement metadata for a {@link SectionChord}. Free-form: NO
@@ -416,6 +416,7 @@ const SECTION_DEFAULT_LABEL: Record<SectionType, string> = {
   intro: "Intro",
   outro: "Outro",
   "pre-chorus": "Pre-Chorus",
+  instrumental: "Instrumental",
   custom: "Section",
 };
 
