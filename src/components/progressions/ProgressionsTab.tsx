@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDndStore } from "@/store/dnd";
-import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
+import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHistoryGroup, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -1533,7 +1533,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         arr.push(cid);
         byPattern.set(pid, arr);
       }
-      for (const [pid, cids] of byPattern) store.removePatternChordsBatch(pid, cids);
+      withHistoryGroup(() => {
+        for (const [pid, cids] of byPattern) store.removePatternChordsBatch(pid, cids);
+      });
       setMultiSelected(new Map());
       setActiveChordId(null);
       return;
@@ -1579,23 +1581,26 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       let knownIds = new Set(
         store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
       );
-      chordClipboard.forEach((c, i) => {
-        store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats, c.lyricless);
-        const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
-        const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
-        if (added?.progressionPlacement && c.lengthBeats != null) {
-          store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
-        }
-        knownIds = new Set(
-          useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
-        );
+      // One grouped undo step for the whole paste (all inserts + length restore + reflow).
+      withHistoryGroup(() => {
+        chordClipboard.forEach((c, i) => {
+          store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats, c.lyricless);
+          const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+          const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
+          if (added?.progressionPlacement && c.lengthBeats != null) {
+            store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
+          }
+          knownIds = new Set(
+            useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
+          );
+        });
+        // Repack the lyric mirror so the Write row reflects SSOT (= progression)
+        // order. addChordToPatternSlot lands each lyric anchor on the leftmost free
+        // slot regardless of beat position; without this the Write view shows the
+        // pasted chords out of order (and doesn't spill overflow onto continuation
+        // rows the way the lyrics-tab paste path does).
+        store.autoLayoutSection(sectionId, window.innerWidth, 28);
       });
-      // Repack the lyric mirror so the Write row reflects SSOT (= progression)
-      // order. addChordToPatternSlot lands each lyric anchor on the leftmost free
-      // slot regardless of beat position; without this the Write view shows the
-      // pasted chords out of order (and doesn't spill overflow onto continuation
-      // rows the way the lyrics-tab paste path does).
-      store.autoLayoutSection(sectionId, window.innerWidth, 28);
       setPasteMode(false);
       setActiveChordId(null);
       setMultiSelected(new Map());
@@ -1653,8 +1658,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       arr.push(chordId);
       byPattern.set(patternId, arr);
     });
-    byPattern.forEach((chordIds, patternId) => {
-      resizePatternChordsWithOverflow(patternId, chordIds, delta);
+    withHistoryGroup(() => {
+      byPattern.forEach((chordIds, patternId) => {
+        resizePatternChordsWithOverflow(patternId, chordIds, delta);
+      });
     });
   }, [resizePatternChordsWithOverflow]);
 
@@ -1665,8 +1672,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       arr.push(chordId);
       byPattern.set(patternId, arr);
     });
-    byPattern.forEach((chordIds, patternId) => {
-      shiftPatternChords(patternId, chordIds, direction);
+    withHistoryGroup(() => {
+      byPattern.forEach((chordIds, patternId) => {
+        shiftPatternChords(patternId, chordIds, direction);
+      });
     });
   }, [shiftPatternChords]);
 
@@ -1694,9 +1703,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           byPattern.set(patternId, arr);
         }
         const removeBatch = useSongStore.getState().removePatternChordsBatch;
-        for (const [patId, ids] of byPattern) {
-          removeBatch(patId, ids);
-        }
+        withHistoryGroup(() => {
+          for (const [patId, ids] of byPattern) {
+            removeBatch(patId, ids);
+          }
+        });
         setMultiSelected(new Map());
       }
     };
@@ -2458,6 +2469,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
               affectedSections.add(sec.id);
             };
+            // One grouped undo step for the whole duplicate (all inserts + reflow).
+            withHistoryGroup(() => {
             if (multiSelected.size > 0) {
               const byPattern = new Map<string, string[]>();
               for (const [cid, pid] of multiSelected) {
@@ -2487,6 +2500,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             for (const secId of affectedSections) {
               autoLayoutSection(secId, window.innerWidth, 28);
             }
+            });
           }}
           onDelete={() => {
             if (multiSelected.size > 0) {
@@ -2497,7 +2511,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                 byPattern.set(pid, arr);
               }
               const removeBatch = useSongStore.getState().removePatternChordsBatch;
-              for (const [pid, cids] of byPattern) removeBatch(pid, cids);
+              withHistoryGroup(() => {
+                for (const [pid, cids] of byPattern) removeBatch(pid, cids);
+              });
               setMultiSelected(new Map());
               setActiveChordId(null);
               return;

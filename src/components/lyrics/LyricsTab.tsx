@@ -1654,9 +1654,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       entry.ids.push(t.id);
       byLine.set(key, entry);
     }
-    for (const { sectionId, lineId, ids } of byLine.values()) {
-      store.removeChordAnchorsBatch(sectionId, lineId, ids);
-    }
+    withHistoryGroup(() => {
+      for (const { sectionId, lineId, ids } of byLine.values()) {
+        store.removeChordAnchorsBatch(sectionId, lineId, ids);
+      }
+    });
     setActiveChordId(null);
     setLyricMultiSelected(new Map());
   }, [handleCopyChords, lyricMultiSelected, activeChordId]);
@@ -1674,29 +1676,32 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       const beforeIds = new Set(
         store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
       );
-      store.pasteChordsAt(
-        sectionId,
-        lineId,
-        slotIdx,
-        chordClipboard.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
-      );
-      // Restore copied beat lengths on the newly inserted chords (they land on
-      // this line with increasing slotIndex, matching clipboard order).
-      const fresh = useSongStore.getState();
-      const after = fresh.sections.find((s) => s.id === sectionId);
-      const newChords = (after?.chords ?? [])
-        .filter(
-          (c) =>
-            !beforeIds.has(c.id) && c.lyricsPlacement?.lineId === lineId && c.progressionPlacement,
-        )
-        .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex);
-      newChords.forEach((nc, i) => {
-        const want = chordClipboard[i]?.lengthBeats;
-        if (want != null && nc.progressionPlacement) {
-          fresh.setPatternChordLength(nc.progressionPlacement.patternId, nc.id, want);
-        }
+      // One grouped undo step for the whole paste (insert + length restore + reflow).
+      withHistoryGroup(() => {
+        store.pasteChordsAt(
+          sectionId,
+          lineId,
+          slotIdx,
+          chordClipboard.map((c, i) => ({ chord: c.chord, relCol: i * 2, widthCh: 1 })),
+        );
+        // Restore copied beat lengths on the newly inserted chords (they land on
+        // this line with increasing slotIndex, matching clipboard order).
+        const fresh = useSongStore.getState();
+        const after = fresh.sections.find((s) => s.id === sectionId);
+        const newChords = (after?.chords ?? [])
+          .filter(
+            (c) =>
+              !beforeIds.has(c.id) && c.lyricsPlacement?.lineId === lineId && c.progressionPlacement,
+          )
+          .sort((a, b) => a.lyricsPlacement!.slotIndex - b.lyricsPlacement!.slotIndex);
+        newChords.forEach((nc, i) => {
+          const want = chordClipboard[i]?.lengthBeats;
+          if (want != null && nc.progressionPlacement) {
+            fresh.setPatternChordLength(nc.progressionPlacement.patternId, nc.id, want);
+          }
+        });
+        fresh.autoLayoutSection(sectionId, window.innerWidth, 28);
       });
-      fresh.autoLayoutSection(sectionId, window.innerWidth, 28);
       setPasteMode(false);
       setActiveChordId(null);
       setLyricMultiSelected(new Map());
@@ -2053,19 +2058,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const resolveOverflowCompress = (newLength: number) => {
     if (!overflowPending) return;
     const { chords, sectionId, lineId, startSlot } = overflowPending;
-    setSectionChordsLength(sectionId, newLength);
     let nextSlot = startSlot;
-    for (const chord of chords) {
-      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
-      if (result) {
-        const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
-        const sc = fresh?.chords.find((c) => c.id === result.id);
-        if (sc?.progressionPlacement) {
-          setPatternChordLength(sc.progressionPlacement.patternId, result.id, newLength);
+    withHistoryGroup(() => {
+      setSectionChordsLength(sectionId, newLength);
+      for (const chord of chords) {
+        const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+        if (result) {
+          const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+          const sc = fresh?.chords.find((c) => c.id === result.id);
+          if (sc?.progressionPlacement) {
+            setPatternChordLength(sc.progressionPlacement.patternId, result.id, newLength);
+          }
         }
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
       }
-      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
-    }
+    });
     advancePickerAfterBatch(startSlot, nextSlot);
     setOverflowPending(null);
   };
@@ -2077,12 +2084,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     const incoming = chords.length * defaultChordLen;
     const deficit = totalUsed + incoming - totalCap;
     const extraBars = Math.ceil(deficit / lastBlock.beatsPerBar);
-    updatePattern(lastBlock.id, { bars: lastBlock.bars + extraBars });
     let nextSlot = startSlot;
-    for (const chord of chords) {
-      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
-      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
-    }
+    withHistoryGroup(() => {
+      updatePattern(lastBlock.id, { bars: lastBlock.bars + extraBars });
+      for (const chord of chords) {
+        const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+      }
+    });
     advancePickerAfterBatch(startSlot, nextSlot);
     setOverflowPending(null);
     void existingPlacedCount; // used for display only
@@ -2093,10 +2102,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     if (!overflowPending) return;
     const { chords, sectionId, lineId, startSlot } = overflowPending;
     let nextSlot = startSlot;
-    for (const chord of chords) {
-      const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
-      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
-    }
+    withHistoryGroup(() => {
+      for (const chord of chords) {
+        const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+      }
+    });
     advancePickerAfterBatch(startSlot, nextSlot);
     setOverflowPending(null);
   };
@@ -2175,10 +2186,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       return;
     }
     let nextSlot = picker.slotIndex;
-    for (const chord of chords) {
-      const result = placeChordInSlot(picker.sectionId, picker.lineId, nextSlot, chord);
-      nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
-    }
+    withHistoryGroup(() => {
+      for (const chord of chords) {
+        const result = placeChordInSlot(picker.sectionId, picker.lineId, nextSlot, chord);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+      }
+    });
     setPickerQuery("");
     setPicker((prev) => (prev ? { ...prev, anchorId: undefined, slotIndex: nextSlot } : prev));
   };
@@ -2668,21 +2681,25 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                 moveChordToSlot(singleTarget.sectionId, singleTarget.lineId, singleTarget.id, slot + dir);
                 return;
               }
-              for (const t of targets) {
-                const found = lookupAnchor(t.id);
-                if (!found) continue;
-                const slot = found.anchor.slotIndex ?? 0;
-                const next = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slot + dir));
-                if (next !== slot) moveChordToSlot(t.sectionId, t.lineId, t.id, next);
-              }
+              withHistoryGroup(() => {
+                for (const t of targets) {
+                  const found = lookupAnchor(t.id);
+                  if (!found) continue;
+                  const slot = found.anchor.slotIndex ?? 0;
+                  const next = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slot + dir));
+                  if (next !== slot) moveChordToSlot(t.sectionId, t.lineId, t.id, next);
+                }
+              });
             }}
             onOctaveChange={(oct) => {
-              for (const t of targets) {
-                const found = lookupAnchor(t.id);
-                if (!found) continue;
-                const slot = found.anchor.slotIndex ?? 0;
-                upsertChordAt(t.sectionId, t.lineId, slot, { ...found.anchor.chord, octave: oct }, t.id);
-              }
+              withHistoryGroup(() => {
+                for (const t of targets) {
+                  const found = lookupAnchor(t.id);
+                  if (!found) continue;
+                  const slot = found.anchor.slotIndex ?? 0;
+                  upsertChordAt(t.sectionId, t.lineId, slot, { ...found.anchor.chord, octave: oct }, t.id);
+                }
+              });
               const auditionTarget = activeCtx ?? (targets[0] ? lookupAnchor(targets[0].id) : null);
               if (auditionTarget) {
                 void playChord(auditionTarget.anchor.chord, undefined, oct);
@@ -2713,6 +2730,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             }}
             onDuplicate={() => {
               if (targets.length === 0) return;
+              withHistoryGroup(() => {
               for (const t of targets) {
                 const found = lookupAnchor(t.id);
                 if (!found) continue;
@@ -2742,6 +2760,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                   }
                 }
               }
+              });
             }}
             onDelete={() => {
               if (targets.length === 0) return;
@@ -2753,9 +2772,11 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                 byLine.set(key, entry);
               }
               const removeBatch = useSongStore.getState().removeChordAnchorsBatch;
-              for (const { sectionId, lineId, ids } of byLine.values()) {
-                removeBatch(sectionId, lineId, ids);
-              }
+              withHistoryGroup(() => {
+                for (const { sectionId, lineId, ids } of byLine.values()) {
+                  removeBatch(sectionId, lineId, ids);
+                }
+              });
               setActiveChordId(null);
               setLyricMultiSelected(new Map());
             }}
