@@ -50,8 +50,10 @@ describe("lyric slot collision repair", () => {
     }
   });
 
-  it("attachChordToLyrics re-anchors a progression-only chord without collision", () => {
-    // A section with one word-anchored chord and one progression-only chord.
+  it("auto-anchors a progression-only chord on load without collision", () => {
+    // A section whose JSON has one word-anchored chord (C) and one
+    // progression-only chord (G). Under lyrics-as-SSOT the loader re-homes G
+    // onto the block's line so every chord is lyric-anchored.
     useSongStore.getState().loadFromJSON({
       version: 3,
       meta: { beatsPerBar: 4, beatUnit: 4, title: "T", keyRoot: "C", keyMode: "maj", bpm: 100 },
@@ -68,21 +70,18 @@ describe("lyric slot collision repair", () => {
         { id: "a1", chord: { root: "G", quality: "maj", display: "G", octave: 3 }, startBeat: 4, lengthBeats: 4 },
       ] }],
     });
-    const secId = "S1";
-    const target = useSongStore.getState().sections.find((s) => s.id === secId)!
-      .chords.find((c) => c.progressionPlacement && !c.lyricsPlacement)!;
 
-    useSongStore.getState().attachChordToLyrics(secId, target.id);
-
-    const sec = useSongStore.getState().sections.find((s) => s.id === secId)!;
-    const moved = sec.chords.find((c) => c.id === target.id)!;
-    // It now sits on a lyric line, still has its block placement, and shares no
-    // (line, slot) with any other chord.
-    expect(moved.lyricsPlacement).toBeTruthy();
-    expect(moved.progressionPlacement).toBeTruthy();
-    const lp = moved.lyricsPlacement!;
+    const sec = useSongStore.getState().sections.find((s) => s.id === "S1")!;
+    // Every chord is lyric-anchored — no progression-only leftovers.
+    for (const c of sec.chords) {
+      expect(c.lyricsPlacement, `chord ${c.chord.display} should be lyric-anchored`).toBeTruthy();
+      expect(c.progressionPlacement, `chord ${c.chord.display} should keep its block placement`).toBeTruthy();
+    }
+    // The formerly progression-only G is anchored without colliding with C.
+    const g = sec.chords.find((c) => c.chord.display === "G")!;
+    const lp = g.lyricsPlacement!;
     const sameSlot = sec.chords.filter(
-      (c) => c.id !== moved.id && c.lyricsPlacement?.lineId === lp.lineId && c.lyricsPlacement?.slotIndex === lp.slotIndex,
+      (c) => c.id !== g.id && c.lyricsPlacement?.lineId === lp.lineId && c.lyricsPlacement?.slotIndex === lp.slotIndex,
     );
     expect(sameSlot).toEqual([]);
   });
