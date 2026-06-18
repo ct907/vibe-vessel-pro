@@ -1831,7 +1831,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
             }
             return c; // remains floating if no free word
           });
-          return { ...l, text, chords: sortAnchors(final) };
+          // The word reflow above updates each chord's word binding but not its
+          // chord-row slot; re-resolve slots so a chord that just snapped to a
+          // new word always has a valid, unique slotIndex (no stale/duplicate).
+          return ensureSlotsForLine({ ...l, text, chords: sortAnchors(final) });
         }),
       };
     }),
