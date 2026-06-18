@@ -117,8 +117,7 @@ card a one-tap action with helper text telegraphing it.
   `visibilitychange` and call their respective stop/finalize path when the document
   is hidden, saving the in-progress take instead of letting the browser kill it.
   (`components/write/WriteStickyBar.tsx`,
-  `components/arrange/TrackTimeline.tsx`,
-  `components/recordings/RecordingsTab.tsx`)
+  `components/arrange/TrackTimeline.tsx`)
 - ✅ **Cross-tab edit protection.** `startCrossTabWarning()` listens for
   `storage` events on the song key; fires a persistent toast the first time
   another tab writes to the slot, warning that last-writer-wins. Wired in App.tsx.
