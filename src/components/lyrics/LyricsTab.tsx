@@ -1599,7 +1599,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       const section = sec.find((s) => s.id === sectionId);
       const sc = section?.chords.find((c) => c.id === anchorId);
       if (!sc) return null;
-      return { chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats };
+      return { chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats, lyricless: !sc.lyricsPlacement };
     };
     let copied: ClipboardChord[] = [];
     if (lyricMultiSelected.size > 0) {
@@ -1616,7 +1616,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       for (const section of sec) {
         const sc = section.chords.find((c) => c.id === activeChordId);
         if (sc) {
-          copied = [{ chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats }];
+          copied = [{ chord: sc.chord, lengthBeats: sc.progressionPlacement?.lengthBeats, lyricless: !sc.lyricsPlacement }];
           break;
         }
       }
