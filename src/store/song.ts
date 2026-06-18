@@ -182,6 +182,17 @@ export function patternPlayBeats(p: PatternBlock): number {
   return p.playBeats != null ? Math.min(Math.max(0, p.playBeats), cap) : cap;
 }
 
+/**
+ * Whether adding `addLen` beats would overflow a LOCKED block's fixed capacity.
+ * Flexible blocks (no `lockedBeats`) grow to fit and never reject.
+ */
+export function patternRejectsAdd(p: PatternBlock | undefined, addLen: number): boolean {
+  if (!p || p.lockedBeats == null) return false;
+  return patternUsedBeats(p) + addLen > patternCapacityBeats(p) + 1e-9;
+}
+
+const LOCKED_BLOCK_FULL_MSG = "Block is locked — unlock it or shorten chords to add more.";
+
 export interface BasketItem {
   id: string;
   chord: ChordSymbol;
@@ -310,6 +321,12 @@ export interface SongState {
 
   // ---- progression (binding-aware) ----
   updatePattern: (id: string, patch: Partial<Pick<PatternBlock, "bars" | "beatsPerBar">>) => void;
+  /**
+   * Lock a block to a fixed length in beats (overrides flex; allows intentional
+   * empty space and blocks adds past capacity), or pass null to make it flexible
+   * again (grows/shrinks to fit its chords).
+   */
+  setPatternLock: (id: string, lockedBeats: number | null) => void;
   /** Crop a block to a played length (beats), or pass null to restore full length. */
   setPatternPlayBeats: (id: string, playBeats: number | null) => void;
   addChordToPattern: (patternId: string, chord: ChordSymbol, atBeat: number, lengthBeats?: number) => void;
@@ -1163,6 +1180,13 @@ function deriveMirrorsFromSectionChords(
       remapped.set(sc.id, { patternId: id, startBeat: cursor, lengthBeats: len });
       cursor += len;
     }
+    // Self-heal: a locked block whose chords already exceed its locked length
+    // (legacy data, hand-edited JSON, or per-chord length growth) auto-unlocks
+    // so nothing is dropped or clipped.
+    const lockedBeats =
+      tmpl?.lockedBeats != null && cursor > Math.max(beatsPerBar, tmpl.lockedBeats) + 1e-9
+        ? undefined
+        : tmpl?.lockedBeats;
     const block: PatternBlock = {
       id,
       sectionId: section.id,
@@ -1170,7 +1194,7 @@ function deriveMirrorsFromSectionChords(
       label: tmpl?.label ?? section.label,
       bars: 1,
       beatsPerBar,
-      lockedBeats: tmpl?.lockedBeats,
+      lockedBeats,
       playBeats: tmpl?.playBeats,
       chords: pcs,
     };
@@ -2426,6 +2450,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         return typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1";
       } catch { return false; }
     })();
+    // The line's block is locked and full — reject before mutating.
+    const lockTarget = get().progression.find(
+      (p) => (p.sectionId ?? p.id) === sectionId && p.lineId === lineId,
+    );
+    if (patternRejectsAdd(lockTarget, getDefaults().defaultChordLengthBeats)) {
+      toast.warning(LOCKED_BLOCK_FULL_MSG);
+      return null;
+    }
     pushHistory(get);
     let result: { id: string; lineId: string; slotIndex: number } | null = null;
     set((s) => {
@@ -2777,9 +2809,30 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }),
   })); },
 
+  setPatternLock: (id, lockedBeats) => { pushHistory(get); return set((s) => ({
+    progression: s.progression.map((p) => {
+      if (p.id !== id) return p;
+      if (lockedBeats == null) {
+        const { lockedBeats: _drop, ...rest } = p;
+        return rest;
+      }
+      // Never lock below existing content — that would auto-unlock on derive.
+      const floor = Math.max(p.beatsPerBar, Math.ceil(patternUsedBeats(p) / p.beatsPerBar - 1e-9) * p.beatsPerBar);
+      return { ...p, lockedBeats: Math.max(floor, lockedBeats) };
+    }),
+    [SSOT_MODE]: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any)); },
+
   // Add chord into pattern (SSOT-first). Creates a SectionChord targeting the
   // specific pattern; mirrors derive `line.chords` + `pattern.chords`.
-  addChordToPattern: (patternId, chord, atBeat, lengthBeats) => set((s) => {
+  addChordToPattern: (patternId, chord, atBeat, lengthBeats) => {
+    const lockTarget = get().progression.find((p) => p.id === patternId);
+    if (patternRejectsAdd(lockTarget, lengthBeats ?? getDefaults().defaultChordLengthBeats)) {
+      toast.warning(LOCKED_BLOCK_FULL_MSG);
+      return;
+    }
+    set((s) => {
     const pattern = s.progression.find((p) => p.id === patternId);
     if (!pattern) return {};
     const sectionId = pattern.sectionId ?? pattern.id;
@@ -2860,7 +2913,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ({ sections: nextSections, progression: nextProgression, [SSOT_MODE]: true } as any);
-  }),
+    });
+  },
 
   updatePatternChord: (patternId, chordId, patch) => set((s) => {
     // SSOT-first: chordId === SectionChord.id. Apply patch to the
@@ -3111,7 +3165,22 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     return ({ sections: nextSections, [SSOT_MODE]: true } as any);
   }),
 
-  movePatternChordToPatternAt: (fromPatternId, toPatternId, chordId, toIndex) => set((s) => {
+  movePatternChordToPatternAt: (fromPatternId, toPatternId, chordId, toIndex) => {
+    if (fromPatternId !== toPatternId) {
+      const st = get();
+      const toPattern = st.progression.find((p) => p.id === toPatternId);
+      if (toPattern?.lockedBeats != null) {
+        const fromPattern = st.progression.find((p) => p.id === fromPatternId);
+        const fromSectionId = fromPattern ? (fromPattern.sectionId ?? fromPattern.id) : undefined;
+        const moving = st.sections.find((x) => x.id === fromSectionId)?.chords.find((c) => c.id === chordId);
+        const addLen = moving?.progressionPlacement?.lengthBeats ?? getDefaults().defaultChordLengthBeats;
+        if (patternRejectsAdd(toPattern, addLen)) {
+          toast.warning(LOCKED_BLOCK_FULL_MSG);
+          return;
+        }
+      }
+    }
+    return set((s) => {
     // SSOT-first: move a SectionChord from one pattern's group to another's
     // (or reorder within the same pattern). Reposition entry in section.chords
     // and reassign its progressionPlacement.patternId.
@@ -3264,7 +3333,8 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ({ sections: nextSections, [SSOT_MODE]: true } as any);
-  }),
+    });
+  },
 
   movePatternChordToSlot: (patternId, chordId, slotIndex) => {
     get().reorderPatternChord(patternId, chordId, Math.max(0, slotIndex));
@@ -3310,6 +3380,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   // pattern with room / a fresh continuation block), placed at slotIndex
   // within the pattern's chord order.
   addChordToPatternSlot: (patternId, chord, slotIndex, lengthBeatsOverride, _lyricless) => {
+    const lockTarget = get().progression.find((p) => p.id === patternId);
+    if (patternRejectsAdd(lockTarget, lengthBeatsOverride ?? getDefaults().defaultChordLengthBeats)) {
+      toast.warning(LOCKED_BLOCK_FULL_MSG);
+      return;
+    }
     pushHistory(get);
     set((s) => {
       const target = s.progression.find((p) => p.id === patternId);

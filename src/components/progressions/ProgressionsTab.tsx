@@ -53,6 +53,8 @@ import {
   Play,
   Scissors,
   Maximize2,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -201,7 +203,7 @@ function PatternBlock({
   onChordClick,
 }: PatternProps) {
   const {
-    updatePattern,
+    setPatternLock,
     setPatternPlayBeats,
     movePatternChord,
     removePatternChordsBatch,
@@ -271,6 +273,13 @@ function PatternBlock({
   const resizePatternChordsWithOverflowRef = useRef(resizePatternChordsWithOverflow);
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
+  const isLocked = pattern.lockedBeats != null;
+  // Smallest lock that still fits current content (whole bars, ≥ 1 bar). The
+  // store clamps to this too — shown here so the stepper can't go lower.
+  const minLockBeats = Math.max(
+    pattern.beatsPerBar,
+    Math.ceil(usedBeats / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar,
+  );
   const canDeleteThisBlock = totalBlocksInSong > 1;
   // Crop-to-fit: effective played length (capped at capacity). When cropped,
   // the grid is drawn shrunk to this many beats while the card keeps its width.
@@ -369,49 +378,61 @@ function PatternBlock({
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1 px-3 py-0.5 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full"
               style={{ background: "var(--paper-shade)" }}
-              aria-label="Edit beats"
+              aria-label="Block length"
             >
+              {isLocked && <Lock className="h-3 w-3 opacity-70" style={{ color: "var(--primary)" }} />}
               <span className="font-mono-chord">{formatBeats(usedBeats)}/{totalBeats}</span>
               <span>beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
               <ChevronDown className="h-3 w-3 opacity-70" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto p-2">
-            <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const next = Math.max(pattern.beatsPerBar, totalBeats - pattern.beatsPerBar);
-                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
+                  setPatternLock(pattern.id, isLocked ? null : totalBeats);
                 }}
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
-                disabled={pattern.bars <= 1}
-                aria-label="Decrease beats"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] rounded hover:bg-accent"
+                style={{ color: isLocked ? "var(--primary-strong)" : "var(--ink-soft)" }}
               >
-                <Minus className="h-3.5 w-3.5" />
+                {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                <span>{isLocked ? "Locked length" : "Auto (grows to fit)"}</span>
               </button>
-              <BeatsInput
-                value={totalBeats}
-                beatsPerBar={pattern.beatsPerBar}
-                onCommit={(beats) => {
-                  const bars = Math.max(1, Math.round(beats / pattern.beatsPerBar));
-                  updatePattern(pattern.id, { bars });
-                }}
-              />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const next = totalBeats + pattern.beatsPerBar;
-                  updatePattern(pattern.id, { bars: Math.max(1, Math.round(next / pattern.beatsPerBar)) });
-                }}
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                aria-label="Increase beats"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+              {isLocked && (
+                <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPatternLock(pattern.id, Math.max(minLockBeats, totalBeats - pattern.beatsPerBar));
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent disabled:opacity-30"
+                    disabled={totalBeats <= minLockBeats}
+                    aria-label="Decrease beats"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <BeatsInput
+                    value={totalBeats}
+                    beatsPerBar={pattern.beatsPerBar}
+                    onCommit={(beats) => setPatternLock(pattern.id, Math.max(minLockBeats, beats))}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPatternLock(pattern.id, totalBeats + pattern.beatsPerBar);
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="Increase beats"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="ml-1 whitespace-nowrap">beats · {pattern.bars} bar{pattern.bars === 1 ? "" : "s"}</span>
+                </div>
+              )}
             </div>
           </PopoverContent>
         </Popover>
