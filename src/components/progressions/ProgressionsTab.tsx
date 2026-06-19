@@ -1271,10 +1271,10 @@ function SectionGroup({
             // empty "add chords" placeholder so a chordless line is identifiable.
             const blockLineText = section?.lines.find((l) => l.id === p.lineId)?.text?.trim() ?? "";
             // Filled blocks size proportionally to their beats; empty placeholders
-            // get a readable floor so the lyric they belong to stays legible.
-            const blockWidth = blockHasChords
+            // span the full column so they match the pattern-block width.
+            const blockWidth: number | string = blockHasChords
               ? p.bars * p.beatsPerBar * PX_PER_BEAT
-              : Math.max(p.bars * p.beatsPerBar * PX_PER_BEAT, 220);
+              : "100%";
             return (
               <div key={p.id} className="min-w-0 shrink-0 max-w-full" style={{ width: blockWidth }}>
                 {blockHasChords ? (
@@ -1306,8 +1306,11 @@ function SectionGroup({
                   <button
                     ref={addChordsRef}
                     type="button"
-                    onClick={() => onPickerOpen(p.id, 0)}
-                    className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+                    onClick={pasteMode ? () => onPasteIntoBlock?.(p.id) : () => onPickerOpen(p.id, 0)}
+                    className={cn(
+                      "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
+                      pasteMode && "animate-paste-glow cursor-copy",
+                    )}
                   >
                     {blockLineText && (
                       <span className="block w-full text-[12px] leading-tight text-[var(--ink-soft)] line-clamp-2">
@@ -1316,7 +1319,7 @@ function SectionGroup({
                     )}
                     <span className="flex-1 flex items-center justify-center gap-2">
                       <Plus className="h-4 w-4" />
-                      <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+                      <span className="text-sm font-display uppercase tracking-wide">{pasteMode ? "Paste chords" : "Add chords"}</span>
                     </span>
                   </button>
                 )}
