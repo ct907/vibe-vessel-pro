@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDndStore } from "@/store/dnd";
-import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
+import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHistoryGroup, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -1465,7 +1465,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     updatePatternChord,
     moveSection,
     removeSection,
-    removePatternBlock,
     setAllSectionsCollapsed,
     shiftPatternChords,
     resizePatternChordsWithOverflow,
@@ -2055,11 +2054,25 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   };
 
   const requestDeleteBlock = (patternId: string) => {
-    const undo = useSongStore.getState().undo;
-    removePatternBlock(patternId);
+    const store = useSongStore.getState();
+    const undo = store.undo;
+    const block = store.progression.find((p) => p.id === patternId);
+    const sectionId = block ? (block.sectionId ?? block.id) : undefined;
+    const lineId = block?.lineId;
+    // The Arrange block and its lyric line are one identity here (the documented
+    // exception): deleting the block also deletes its corresponding lyric line.
+    // Remove the line first, then the block, as one undo step — the 1:1
+    // derivation then lands on N-1 lines / N-1 blocks (without removing the line
+    // the block would simply re-derive).
+    withHistoryGroup(() => {
+      if (sectionId && lineId && store.sections.find((s) => s.id === sectionId)?.lines.some((l) => l.id === lineId)) {
+        store.removeLine(sectionId, lineId);
+      }
+      store.removePatternBlock(patternId);
+    });
     toast({
       title: "Block deleted",
-      description: "Removed this pattern block.",
+      description: "Removed this pattern block and its lyric line.",
       action: (
         <Button variant="outline" size="sm" onClick={() => undo()}>
           Undo
@@ -2482,52 +2495,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                 next.set(activeChordId, toolbarContext.activePatternId!);
                 return next;
               });
-            }
-          }}
-          onDuplicate={() => {
-            const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
-            const affectedSections = new Set<string>();
-            const dupOne = (patternId: string, chordId: string) => {
-              const pat = prog.find((p) => p.id === patternId);
-              const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
-              if (!sec || !pat) return;
-              const chords = getPatternChordsViaSSOT(sec, pat);
-              const idx = chords.findIndex((c) => c.id === chordId);
-              if (idx < 0) return;
-              const c = chords[idx];
-              // Preserve a progression-only chord's lyricless state in its copy.
-              const lyricless = !sec.chords.find((x) => x.id === chordId)?.lyricsPlacement;
-              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
-              affectedSections.add(sec.id);
-            };
-            if (multiSelected.size > 0) {
-              const byPattern = new Map<string, string[]>();
-              for (const [cid, pid] of multiSelected) {
-                const arr = byPattern.get(pid) ?? [];
-                arr.push(cid);
-                byPattern.set(pid, arr);
-              }
-              for (const [pid, cids] of byPattern) {
-                const pat = prog.find((p) => p.id === pid);
-                const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
-                if (!sec || !pat) continue;
-                const order = getPatternChordsViaSSOT(sec, pat).map((c) => c.id);
-                // Insert from the rightmost selection first so earlier indices
-                // stay valid as copies shift later chords rightward.
-                [...cids]
-                  .sort((a, b) => order.indexOf(b) - order.indexOf(a))
-                  .forEach((cid) => dupOne(pid, cid));
-              }
-            } else if (activeChordId && toolbarContext.activePatternId) {
-              dupOne(toolbarContext.activePatternId, activeChordId);
-            }
-            // Repack the lyric mirror(s) so the Write row follows SSOT order, the
-            // same as the paste path. addChordToPatternSlot lands the lyric anchor
-            // on the leftmost free slot, which otherwise leaves the duplicate out
-            // of order in the Write view.
-            const { autoLayoutSection } = useSongStore.getState();
-            for (const secId of affectedSections) {
-              autoLayoutSection(secId, window.innerWidth, 28);
             }
           }}
           onDelete={() => {

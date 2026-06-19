@@ -2730,38 +2730,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                 });
               }
             }}
-            onDuplicate={() => {
-              if (targets.length === 0) return;
-              for (const t of targets) {
-                const found = lookupAnchor(t.id);
-                if (!found) continue;
-                const store = useSongStore.getState();
-                const sec = store.sections.find((x) => x.id === t.sectionId);
-                const line = sec?.lines.find((l) => l.id === t.lineId);
-                if (!line) continue;
-                const srcLen = sec?.chords.find((sc) => sc.id === t.id)?.progressionPlacement?.lengthBeats;
-                const occupied = new Set(line.chords.map((c) => c.slotIndex ?? 0));
-                const start = (found.anchor.slotIndex ?? 0) + 1;
-                let slot = -1;
-                for (let cand = start; cand < CHORD_ROW_SLOTS; cand++) {
-                  if (!occupied.has(cand)) { slot = cand; break; }
-                }
-                if (slot < 0) {
-                  for (let cand = CHORD_ROW_SLOTS - 1; cand >= 0; cand--) {
-                    if (!occupied.has(cand)) { slot = cand; break; }
-                  }
-                }
-                if (slot < 0) continue;
-                const result = store.placeChordInSlot(t.sectionId, t.lineId, slot, found.anchor.chord);
-                if (result && srcLen !== undefined) {
-                  const fresh = useSongStore.getState();
-                  const newSC = fresh.sections.find((x) => x.id === t.sectionId)?.chords.find((sc) => sc.id === result.id);
-                  if (newSC?.progressionPlacement) {
-                    fresh.setPatternChordLength(newSC.progressionPlacement.patternId, result.id, srcLen);
-                  }
-                }
-              }
-            }}
             onDelete={() => {
               if (targets.length === 0) return;
               const byLine = new Map<string, { sectionId: string; lineId: string; ids: string[] }>();
