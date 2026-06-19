@@ -1271,10 +1271,10 @@ function SectionGroup({
             // empty "add chords" placeholder so a chordless line is identifiable.
             const blockLineText = section?.lines.find((l) => l.id === p.lineId)?.text?.trim() ?? "";
             // Filled blocks size proportionally to their beats; empty placeholders
-            // get a readable floor so the lyric they belong to stays legible.
-            const blockWidth = blockHasChords
+            // span the full column so they match the pattern-block width.
+            const blockWidth: number | string = blockHasChords
               ? p.bars * p.beatsPerBar * PX_PER_BEAT
-              : Math.max(p.bars * p.beatsPerBar * PX_PER_BEAT, 220);
+              : "100%";
             return (
               <div key={p.id} className="min-w-0 shrink-0 max-w-full" style={{ width: blockWidth }}>
                 {blockHasChords ? (
@@ -1306,8 +1306,11 @@ function SectionGroup({
                   <button
                     ref={addChordsRef}
                     type="button"
-                    onClick={() => onPickerOpen(p.id, 0)}
-                    className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+                    onClick={pasteMode ? () => onPasteIntoBlock?.(p.id) : () => onPickerOpen(p.id, 0)}
+                    className={cn(
+                      "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
+                      pasteMode && "animate-paste-glow cursor-copy",
+                    )}
                   >
                     {blockLineText && (
                       <span className="block w-full text-[12px] leading-tight text-[var(--ink-soft)] line-clamp-2">
@@ -1316,7 +1319,7 @@ function SectionGroup({
                     )}
                     <span className="flex-1 flex items-center justify-center gap-2">
                       <Plus className="h-4 w-4" />
-                      <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+                      <span className="text-sm font-display uppercase tracking-wide">{pasteMode ? "Paste chords" : "Add chords"}</span>
                     </span>
                   </button>
                 )}
@@ -1462,7 +1465,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     updatePatternChord,
     moveSection,
     removeSection,
-    removePatternBlock,
     setAllSectionsCollapsed,
     shiftPatternChords,
     resizePatternChordsWithOverflow,
@@ -2063,11 +2065,25 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   };
 
   const requestDeleteBlock = (patternId: string) => {
-    const undo = useSongStore.getState().undo;
-    removePatternBlock(patternId);
+    const store = useSongStore.getState();
+    const undo = store.undo;
+    const block = store.progression.find((p) => p.id === patternId);
+    const sectionId = block ? (block.sectionId ?? block.id) : undefined;
+    const lineId = block?.lineId;
+    // The Arrange block and its lyric line are one identity here (the documented
+    // exception): deleting the block also deletes its corresponding lyric line.
+    // Remove the line first, then the block, as one undo step — the 1:1
+    // derivation then lands on N-1 lines / N-1 blocks (without removing the line
+    // the block would simply re-derive).
+    withHistoryGroup(() => {
+      if (sectionId && lineId && store.sections.find((s) => s.id === sectionId)?.lines.some((l) => l.id === lineId)) {
+        store.removeLine(sectionId, lineId);
+      }
+      store.removePatternBlock(patternId);
+    });
     toast({
       title: "Block deleted",
-      description: "Removed this pattern block.",
+      description: "Removed this pattern block and its lyric line.",
       action: (
         <Button variant="outline" size="sm" onClick={() => undo()}>
           Undo

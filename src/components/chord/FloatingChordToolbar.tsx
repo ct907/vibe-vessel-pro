@@ -49,8 +49,6 @@ export interface FloatingChordToolbarProps {
   onClearAll: () => void;
   /** Entering multi-select seeds the selection with the active chord. */
   onEnterMultiSelect?: () => void;
-  /** Duplicate the active chord / current selection in place. */
-  onDuplicate?: () => void;
   onDelete?: () => void;
   onCopy?: () => void;
   /** Cut: copy the active chord / selection to the clipboard, then delete it. */
@@ -226,7 +224,6 @@ export function FloatingChordToolbar({
   onSelectAll,
   onClearAll,
   onEnterMultiSelect,
-  onDuplicate,
   onDelete,
   onCopy,
   onCut,
@@ -431,13 +428,6 @@ export function FloatingChordToolbar({
           {divider}
           <LabeledBtn
             icon={<Copy className="h-5 w-5" />}
-            label="Duplicate"
-            disabled={!hasContext}
-            onClick={hasContext ? onDuplicate : undefined}
-          />
-          {divider}
-          <LabeledBtn
-            icon={<Copy className="h-5 w-5" />}
             label="Copy"
             disabled={!hasContext}
             onClick={hasContext ? onCopy : undefined}
@@ -522,124 +512,122 @@ export function FloatingChordToolbar({
           </Button>
         </div>
 
-        {/* Body grid: a Move cross on the left, the Select / Length / Octave
-            rows stacked in the middle, and a full-height Delete on the right —
-            each region separated by hairline dividers. */}
-        <div className="flex items-stretch">
-          {/* Move cross — chevrons around a bold "Move" label. */}
-          <div
-            role="group"
-            aria-label="Move chord"
-            className="grid shrink-0 place-items-center border-r px-1 py-2"
-            style={{ gridTemplateColumns: "auto auto auto", gridTemplateRows: "auto auto auto" }}
-          >
-            <span />
-            <DPadButton
-              icon={<ChevronUp className="h-6 w-6" />}
-              label={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
-              disabled={!hasContext || !canMoveUp}
-              onClick={() => onMoveVertical?.(-1)}
-            />
-            <span />
-            <DPadButton
-              icon={<ChevronLeft className="h-6 w-6" />}
-              label="Move earlier"
-              disabled={!hasContext || !canShiftLeft}
-              onClick={() => onShift(-1)}
-            />
-            <span className="px-1 text-base font-semibold text-foreground select-none">Move</span>
-            <DPadButton
-              icon={<ChevronRight className="h-6 w-6" />}
-              label="Move later"
-              disabled={!hasContext || !canShiftRight}
-              onClick={() => onShift(1)}
-            />
-            <span />
-            <DPadButton
-              icon={<ChevronDown className="h-6 w-6" />}
-              label={mode === "lyrics" ? "Move to row below" : "Move to next block"}
-              disabled={!hasContext || !canMoveDown}
-              onClick={() => onMoveVertical?.(1)}
-            />
-            <span />
+        {/* Body: a full-width Select row on top; below it a compact 2-row Move
+            pad on the left, the Length / Octave rows beside it, and a
+            full-height Delete on the right. */}
+        <div className="flex flex-col divide-y">
+          {/* Select: multi-select · select-all · copy · cut · paste — full width
+              so the controls aren't crammed. */}
+          <div className="flex items-center gap-1 px-3 py-2">
+            <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+              Select
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-8 w-8",
+                multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
+              )}
+              onClick={toggleMode}
+              aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
+              title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
+            >
+              <CheckSquare className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              disabled={selectAllDisabled}
+              onClick={onSelectAll}
+              aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
+              title="Select all"
+            >
+              <ListChecks className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              disabled={!hasContext}
+              onClick={hasContext ? onCopy : undefined}
+              aria-label="Copy selected chord(s)"
+              title="Copy"
+            >
+              <Copy className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn("h-8 w-8", !canCut && "opacity-40")}
+              disabled={!canCut}
+              onClick={canCut ? onCut : undefined}
+              aria-label="Cut selected chord(s)"
+              title="Cut"
+            >
+              <Scissors className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn("h-8 w-8", !canPaste && "opacity-40")}
+              disabled={!canPaste}
+              onClick={canPaste ? onPaste : undefined}
+              aria-label="Paste chord(s)"
+              title="Paste"
+            >
+              <ClipboardPaste className="h-5 w-5" />
+            </Button>
           </div>
 
-          {/* Middle: stacked control rows. */}
-          <div className="flex min-w-0 flex-1 flex-col divide-y">
-            {/* Select: multi-select · select-all · duplicate */}
-            <div className="flex items-center gap-1 px-3 py-2">
-              <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
-                Select
+          {/* Lower: Move pad · (Length / Octave) · Delete */}
+          <div className="flex items-stretch">
+            {/* Move pad — compact 2-row d-pad: ↑/↓ jump block (row in Write),
+                ←/→ shift earlier/later. */}
+            <div
+              role="group"
+              aria-label="Move chord"
+              className="flex shrink-0 flex-col items-center justify-center gap-1 border-r px-2"
+            >
+              <div
+                className="grid place-items-center"
+                style={{ gridTemplateColumns: "repeat(3, 2rem)", gridTemplateRows: "repeat(2, 2rem)" }}
+              >
+                <span />
+                <DPadButton
+                  icon={<ChevronUp className="h-6 w-6" />}
+                  label={mode === "lyrics" ? "Move to row above" : "Move to previous block"}
+                  disabled={!hasContext || !canMoveUp}
+                  onClick={() => onMoveVertical?.(-1)}
+                />
+                <span />
+                <DPadButton
+                  icon={<ChevronLeft className="h-6 w-6" />}
+                  label="Move earlier"
+                  disabled={!hasContext || !canShiftLeft}
+                  onClick={() => onShift(-1)}
+                />
+                <DPadButton
+                  icon={<ChevronDown className="h-6 w-6" />}
+                  label={mode === "lyrics" ? "Move to row below" : "Move to next block"}
+                  disabled={!hasContext || !canMoveDown}
+                  onClick={() => onMoveVertical?.(1)}
+                />
+                <DPadButton
+                  icon={<ChevronRight className="h-6 w-6" />}
+                  label="Move later"
+                  disabled={!hasContext || !canShiftRight}
+                  onClick={() => onShift(1)}
+                />
+              </div>
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/70 select-none">
+                Move
               </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={cn(
-                  "h-8 w-8",
-                  multiSelectMode && "bg-[var(--ink-soft)] text-[var(--paper-card)] hover:bg-[var(--ink-soft)] hover:text-[var(--paper-card)]",
-                )}
-                onClick={toggleMode}
-                aria-label={multiSelectMode ? "Exit multi-select mode" : "Enter multi-select mode"}
-                title={multiSelectMode ? "Exit multi-select" : "Multi-select"}
-              >
-                <CheckSquare className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                disabled={selectAllDisabled}
-                onClick={onSelectAll}
-                aria-label={mode === "progression" ? "Select all chords in block" : "Select all chords in line"}
-                title="Select all"
-              >
-                <ListChecks className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                disabled={!hasContext}
-                onClick={onDuplicate}
-                aria-label="Duplicate selected chord(s)"
-                title="Duplicate"
-              >
-                <Copy className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                disabled={!hasContext}
-                onClick={hasContext ? onCopy : undefined}
-                aria-label="Copy selected chord(s)"
-                title="Copy"
-              >
-                <Copy className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={cn("h-8 w-8", !canCut && "opacity-40")}
-                disabled={!canCut}
-                onClick={canCut ? onCut : undefined}
-                aria-label="Cut selected chord(s)"
-                title="Cut"
-              >
-                <Scissors className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={cn("h-8 w-8", !canPaste && "opacity-40")}
-                disabled={!canPaste}
-                onClick={canPaste ? onPaste : undefined}
-                aria-label="Paste chord(s)"
-                title="Paste"
-              >
-                <ClipboardPaste className="h-5 w-5" />
-              </Button>
             </div>
+
+            {/* Middle: Length + Chord Octave. */}
+            <div className="flex min-w-0 flex-1 flex-col divide-y">
 
             {/* Length (progression only): −½ · beats · +½ */}
             {mode === "progression" && (
@@ -717,6 +705,7 @@ export function FloatingChordToolbar({
             >
               <Trash2 className="h-6 w-6" />
             </Button>
+          </div>
           </div>
         </div>
         </>
