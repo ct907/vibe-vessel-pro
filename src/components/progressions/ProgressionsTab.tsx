@@ -1574,7 +1574,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         arr.push(cid);
         byPattern.set(pid, arr);
       }
-      for (const [pid, cids] of byPattern) store.removePatternChordsBatch(pid, cids);
+      withHistoryGroup(() => {
+        for (const [pid, cids] of byPattern) store.removePatternChordsBatch(pid, cids);
+      });
       setMultiSelected(new Map());
       setActiveChordId(null);
       return;
@@ -1620,23 +1622,26 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       let knownIds = new Set(
         store.sections.find((s) => s.id === sectionId)?.chords.map((c) => c.id) ?? [],
       );
-      chordClipboard.forEach((c, i) => {
-        store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats, c.lyricless);
-        const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
-        const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
-        if (added?.progressionPlacement && c.lengthBeats != null) {
-          store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
-        }
-        knownIds = new Set(
-          useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
-        );
+      // One grouped undo step for the whole paste (all inserts + length restore + reflow).
+      withHistoryGroup(() => {
+        chordClipboard.forEach((c, i) => {
+          store.addChordToPatternSlot(patternId, c.chord, insertIdx + i, c.lengthBeats, c.lyricless);
+          const fresh = useSongStore.getState().sections.find((s) => s.id === sectionId);
+          const added = fresh?.chords.find((x) => !knownIds.has(x.id) && x.progressionPlacement);
+          if (added?.progressionPlacement && c.lengthBeats != null) {
+            store.setPatternChordLength(added.progressionPlacement.patternId, added.id, c.lengthBeats);
+          }
+          knownIds = new Set(
+            useSongStore.getState().sections.find((s) => s.id === sectionId)?.chords.map((x) => x.id) ?? [],
+          );
+        });
+        // Repack the lyric mirror so the Write row reflects SSOT (= progression)
+        // order. addChordToPatternSlot lands each lyric anchor on the leftmost free
+        // slot regardless of beat position; without this the Write view shows the
+        // pasted chords out of order (and doesn't spill overflow onto continuation
+        // rows the way the lyrics-tab paste path does).
+        store.autoLayoutSection(sectionId, window.innerWidth, 28);
       });
-      // Repack the lyric mirror so the Write row reflects SSOT (= progression)
-      // order. addChordToPatternSlot lands each lyric anchor on the leftmost free
-      // slot regardless of beat position; without this the Write view shows the
-      // pasted chords out of order (and doesn't spill overflow onto continuation
-      // rows the way the lyrics-tab paste path does).
-      store.autoLayoutSection(sectionId, window.innerWidth, 28);
       setPasteMode(false);
       setActiveChordId(null);
       setMultiSelected(new Map());
@@ -1694,8 +1699,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       arr.push(chordId);
       byPattern.set(patternId, arr);
     });
-    byPattern.forEach((chordIds, patternId) => {
-      resizePatternChordsWithOverflow(patternId, chordIds, delta);
+    withHistoryGroup(() => {
+      byPattern.forEach((chordIds, patternId) => {
+        resizePatternChordsWithOverflow(patternId, chordIds, delta);
+      });
     });
   }, [resizePatternChordsWithOverflow]);
 
@@ -1706,8 +1713,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       arr.push(chordId);
       byPattern.set(patternId, arr);
     });
-    byPattern.forEach((chordIds, patternId) => {
-      shiftPatternChords(patternId, chordIds, direction);
+    withHistoryGroup(() => {
+      byPattern.forEach((chordIds, patternId) => {
+        shiftPatternChords(patternId, chordIds, direction);
+      });
     });
   }, [shiftPatternChords]);
 
@@ -1735,9 +1744,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           byPattern.set(patternId, arr);
         }
         const removeBatch = useSongStore.getState().removePatternChordsBatch;
-        for (const [patId, ids] of byPattern) {
-          removeBatch(patId, ids);
-        }
+        withHistoryGroup(() => {
+          for (const [patId, ids] of byPattern) {
+            removeBatch(patId, ids);
+          }
+        });
         setMultiSelected(new Map());
       }
     };
@@ -2497,6 +2508,55 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               });
             }
           }}
+          onDuplicate={() => {
+            const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
+            const affectedSections = new Set<string>();
+            const dupOne = (patternId: string, chordId: string) => {
+              const pat = prog.find((p) => p.id === patternId);
+              const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
+              if (!sec || !pat) return;
+              const chords = getPatternChordsViaSSOT(sec, pat);
+              const idx = chords.findIndex((c) => c.id === chordId);
+              if (idx < 0) return;
+              const c = chords[idx];
+              // Preserve a progression-only chord's lyricless state in its copy.
+              const lyricless = !sec.chords.find((x) => x.id === chordId)?.lyricsPlacement;
+              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
+              affectedSections.add(sec.id);
+            };
+            // One grouped undo step for the whole duplicate (all inserts + reflow).
+            withHistoryGroup(() => {
+            if (multiSelected.size > 0) {
+              const byPattern = new Map<string, string[]>();
+              for (const [cid, pid] of multiSelected) {
+                const arr = byPattern.get(pid) ?? [];
+                arr.push(cid);
+                byPattern.set(pid, arr);
+              }
+              for (const [pid, cids] of byPattern) {
+                const pat = prog.find((p) => p.id === pid);
+                const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
+                if (!sec || !pat) continue;
+                const order = getPatternChordsViaSSOT(sec, pat).map((c) => c.id);
+                // Insert from the rightmost selection first so earlier indices
+                // stay valid as copies shift later chords rightward.
+                [...cids]
+                  .sort((a, b) => order.indexOf(b) - order.indexOf(a))
+                  .forEach((cid) => dupOne(pid, cid));
+              }
+            } else if (activeChordId && toolbarContext.activePatternId) {
+              dupOne(toolbarContext.activePatternId, activeChordId);
+            }
+            // Repack the lyric mirror(s) so the Write row follows SSOT order, the
+            // same as the paste path. addChordToPatternSlot lands the lyric anchor
+            // on the leftmost free slot, which otherwise leaves the duplicate out
+            // of order in the Write view.
+            const { autoLayoutSection } = useSongStore.getState();
+            for (const secId of affectedSections) {
+              autoLayoutSection(secId, window.innerWidth, 28);
+            }
+            });
+          }}
           onDelete={() => {
             if (multiSelected.size > 0) {
               const byPattern = new Map<string, string[]>();
@@ -2506,7 +2566,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
                 byPattern.set(pid, arr);
               }
               const removeBatch = useSongStore.getState().removePatternChordsBatch;
-              for (const [pid, cids] of byPattern) removeBatch(pid, cids);
+              withHistoryGroup(() => {
+                for (const [pid, cids] of byPattern) removeBatch(pid, cids);
+              });
               setMultiSelected(new Map());
               setActiveChordId(null);
               return;

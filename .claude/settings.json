@@ -3,18 +3,20 @@
     "allow": [
       "Edit(**)",
       "Write(**)",
-      "Bash(git add*)",
-      "Bash(git commit*)",
-      "Bash(git push*)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git fetch*)",
-      "Bash(git pull*)",
-      "Bash(git branch*)",
-      "Bash(git checkout*)",
-      "Bash(npx tsc*)",
-      "Bash(npm run*)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git rebase *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run typecheck)"
     ]
   }
 }
