@@ -1248,6 +1248,9 @@ function SectionGroup({
 
         {(() => {
           const sectionHasChords = !!section && blocks.some((b) => getPatternChordsViaSSOT(section, b).length > 0);
+          // A section with lyrics but no chords still shows its rows as empty
+          // blocks (each labelled with its lyric) rather than one bare prompt.
+          const sectionHasLyrics = !!section && section.lines.some((l) => !l._isChordOverflow && l.text.trim().length > 0);
           const renderBlock = (p: PatternBlockType, i: number) => {
             const otherAll = allPatterns
               .filter((q) => q.id !== p.id)
@@ -1263,8 +1266,15 @@ function SectionGroup({
                   label: `${sectionName}: Block ${blockNum}`,
                 };
               });
-            const blockWidth = p.bars * p.beatsPerBar * PX_PER_BEAT;
             const blockHasChords = section ? getPatternChordsViaSSOT(section, p).length > 0 : false;
+            // The lyric line this block projects (1 block ⇔ 1 line). Shown on the
+            // empty "add chords" placeholder so a chordless line is identifiable.
+            const blockLineText = section?.lines.find((l) => l.id === p.lineId)?.text?.trim() ?? "";
+            // Filled blocks size proportionally to their beats; empty placeholders
+            // get a readable floor so the lyric they belong to stays legible.
+            const blockWidth = blockHasChords
+              ? p.bars * p.beatsPerBar * PX_PER_BEAT
+              : Math.max(p.bars * p.beatsPerBar * PX_PER_BEAT, 220);
             return (
               <div key={p.id} className="min-w-0 shrink-0 max-w-full" style={{ width: blockWidth }}>
                 {blockHasChords ? (
@@ -1297,10 +1307,17 @@ function SectionGroup({
                     ref={addChordsRef}
                     type="button"
                     onClick={() => onPickerOpen(p.id, 0)}
-                    className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+                    className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
                   >
-                    <Plus className="h-4 w-4" />
-                    <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+                    {blockLineText && (
+                      <span className="block w-full text-[12px] leading-tight text-[var(--ink-soft)] line-clamp-2">
+                        {blockLineText}
+                      </span>
+                    )}
+                    <span className="flex-1 flex items-center justify-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+                    </span>
                   </button>
                 )}
               </div>
@@ -1359,7 +1376,7 @@ function SectionGroup({
               </button>
             </div>
           );
-          if (!sectionHasChords) {
+          if (!sectionHasChords && !sectionHasLyrics) {
             return (
               <div>
                 {addChordsPlaceholder}
