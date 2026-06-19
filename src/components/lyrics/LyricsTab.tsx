@@ -316,6 +316,10 @@ function LineRow({
         active && !isMobile
           ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
           : "relative",
+        // Chord-overflow continuation rows are a visual wrap of the line above,
+        // not (yet) their own line — mark them so the single-block view reads
+        // correctly. Typing a lyric promotes the row into a real line.
+        line._isChordOverflow && "border-l-2 border-[var(--cocoa)]/15 pl-2",
       )}
       data-line-id={line.id}
     >
@@ -713,7 +717,7 @@ function LineRow({
               return;
             }
           }}
-          placeholder="Write your lyric line…"
+          placeholder={line._isChordOverflow ? "…continued — type to make this its own line" : "Write your lyric line…"}
           className={cn(
             "w-full min-h-[1.875rem] bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
             isFocused && "pr-8",

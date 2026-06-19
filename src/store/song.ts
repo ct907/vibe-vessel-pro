@@ -1770,6 +1770,25 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     })(),
   })); },
   setLineText: (sectionId, id, text) => {
+    // Editing a transient chord-overflow continuation row promotes it into a
+    // real, persistent lyric line with its own pattern block. The wrapped chords
+    // already point at this line's id in the SSOT, so clearing the flag and
+    // re-deriving regroups them into a fresh block immediately (Arrange shows the
+    // new block at once; the typed text can no longer be discarded by a reflow).
+    const targetLine = get().sections.find((x) => x.id === sectionId)?.lines.find((l) => l.id === id);
+    if (targetLine?._isChordOverflow && text.length > 0) {
+      pushHistory(get);
+      lastLineTextEdit = null;
+      return set((s) => ({
+        sections: s.sections.map((sec) =>
+          sec.id !== sectionId
+            ? sec
+            : { ...sec, lines: sec.lines.map((l) => (l.id !== id ? l : { ...l, text, _isChordOverflow: false })) },
+        ),
+        [SSOT_MODE]: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any));
+    }
     const editKey = `${sectionId}:${id}`;
     const now = Date.now();
     const coalesce =
@@ -1864,8 +1883,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         // Kept chords stay where they are (preserve absolute slots); moved
         // chords left-align onto the new line. Both retain their relative gaps.
         const keepStart = keep.length ? Math.min(...keep.map((c) => c.slotIndex ?? 0)) : 0;
+        // Splitting also promotes a transient overflow row: both halves become
+        // real, persistent lines (initialLine() carries no flag; clear it here).
         const original = ensureSlotsForLine(
-          snapLineToWords({ ...line, text: before, chords: respaceAnchors(keep, keepStart) }),
+          snapLineToWords({ ...line, _isChordOverflow: false, text: before, chords: respaceAnchors(keep, keepStart) }),
         );
         const newLine = ensureSlotsForLine(
           snapLineToWords({ ...initialLine(), text: after, chords: respaceAnchors(move, 0) }),
