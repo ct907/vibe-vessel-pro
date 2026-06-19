@@ -21,7 +21,7 @@ let nextNoteTime = 0;
 let beatInBar = 0;
 let current: Opts | null = null;
 const LOOKAHEAD_MS = 25;
-const SCHEDULE_AHEAD_S = 0.1;
+const SCHEDULE_AHEAD_S = 3.0;
 const BASE_HZ = 880;
 const ACCENT_HZ = BASE_HZ * Math.pow(2, 2 / 12); // +2 semitones
 

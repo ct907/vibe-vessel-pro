@@ -24,7 +24,7 @@ export function getAudioContext(injected?: AudioContext): AudioContext {
   if (ctx) return ctx;
   const Ctor: typeof AudioContext =
     (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-  ctx = new Ctor({ latencyHint: "balanced" });
+  ctx = new Ctor({ latencyHint: "playback" });
   return ctx;
 }
 
