@@ -27,12 +27,10 @@ let started = false;
 
 export async function ensureAudio(): Promise<void> {
   if (!started) {
-    if (useSoundStore.getState().highLatencyMode) {
-      const Ctor: typeof AudioContext =
-        (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-      const preCtx = new Ctor({ latencyHint: "playback" });
-      Tone.setContext(new Tone.Context(preCtx));
-    }
+    const Ctor: typeof AudioContext =
+      (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+    const preCtx = new Ctor({ latencyHint: "playback" });
+    Tone.setContext(new Tone.Context(preCtx));
     await Tone.start(); // resumes the underlying AudioContext on user gesture
     // Adopt Tone's raw AudioContext so scheduled times line up with Tone.now().
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
@@ -416,7 +414,7 @@ export interface PlayProgressionOptions {
 }
 
 const LOOKAHEAD_MS = 25;
-const SCHEDULE_AHEAD_S = 0.1;
+const SCHEDULE_AHEAD_S = 3.0;
 
 function sectionArpArmed(sectionId: string): boolean {
   const sec = useSongStore.getState().sections.find((s) => s.id === sectionId);
