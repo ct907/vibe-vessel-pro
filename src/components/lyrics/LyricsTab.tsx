@@ -85,8 +85,7 @@ import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useUIStore, type ClipboardChord } from "@/store/ui";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
-import { createPortal } from "react-dom";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useDefaultsStore } from "@/store/defaults";
 
@@ -1513,7 +1512,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, progressionsStep, setProgressionsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
+  const { enabled: onboardingEnabled, lyricsStep, setLyricsStep, featureStep, setFeatureStep, featureDone, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -1544,6 +1543,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       setLyricsStep(3);
     }
   }, [picker, lyricsStep, onboardingEnabled, setLyricsStep]);
+
+  // After the last lyrics content step, hand off to the shared feature tour
+  // (sound → voice key → export) — but only the first time through.
+  useEffect(() => {
+    if (onboardingEnabled && lyricsStep === 5 && featureStep === 0 && !featureDone) setFeatureStep(1);
+  }, [onboardingEnabled, lyricsStep, featureStep, featureDone, setFeatureStep]);
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [lyricMultiSelected, setLyricMultiSelected] =
     useState<Map<string, { sectionId: string; lineId: string }>>(new Map());
@@ -2378,7 +2383,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           anchorRef={firstLyricRowRef}
           anchorEdge="bottom"
           gap={12}
-          step="3/7"
+          step="6/13"
           message="Write your lyrics here! Press enter to create a new line."
           arrowSide="top"
           onDismiss={() => dismissCoachMark("lyrics-1")}
@@ -2390,7 +2395,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
             anchorEdge="top"
             gap={8}
-            step="4/7"
+            step="7/13"
             message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("lyrics-2")}
@@ -2400,7 +2405,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             anchorRef={firstChordRowRef}
             anchorEdge="top"
             gap={12}
-            step="4/7"
+            step="7/13"
             message="Add your chords here. Try adding the Royal Road progression!"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("lyrics-2")}
@@ -2413,7 +2418,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
             anchorEdge="top"
             gap={8}
-            step="5/7"
+            step="8/13"
             message="Right click or tap & hold a chord chip to edit it."
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("lyrics-3")}
@@ -2423,7 +2428,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             anchorRef={firstChordRowRef}
             anchorEdge="top"
             gap={12}
-            step="5/7"
+            step="8/13"
             message="Right click or tap & hold a chord chip to edit it."
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("lyrics-3")}
@@ -2435,38 +2440,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           anchorRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
           anchorEdge="top"
           gap={8}
-          step="6/7"
+          step="9/13"
           message="Pick a chord from the list to replace it."
           arrowSide="bottom"
           onDismiss={() => dismissCoachMark("lyrics-4")}
         />
       )}
-      {canShowCoachMark && lyricsStep === 5 && dismissedKey !== "lyrics-5" && createPortal(
-        <div
-          className="pointer-events-auto"
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            zIndex: 9999,
-          }}
-        >
-          <OnboardingCoachMark
-            step="7/7"
-            message="This is the end of the tutorial! You can press the Chord Progressions here to learn the other side of this app."
-            actionLabel="Finish"
-            onAction={() => {
-              setLyricsStep(6);
-              if (progressionsStep === 0 || progressionsStep >= 6) setProgressionsStep(1);
-              dismissNewSongPrompt();
-            }}
-            onDismiss={() => dismissCoachMark("lyrics-5")}
-          />
-        </div>,
-        document.body,
-      )}
-
       {onboardingEnabled && showNewSongPrompt && (
         <div className="fixed bottom-16 left-0 right-0 z-50">
           <div

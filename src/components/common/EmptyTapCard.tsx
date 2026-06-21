@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Plus } from "lucide-react";
 
 interface Props {
@@ -7,11 +7,14 @@ interface Props {
   /** Telegraphs what tapping does, e.g. "Tap to start recording". */
   hint?: string;
   onClick: () => void;
+  /** Lets a coach mark anchor to the card while it stands in for the editor. */
+  anchorRef?: RefObject<HTMLButtonElement | null>;
 }
 
-export function EmptyTapCard({ icon, label, hint, onClick }: Props) {
+export function EmptyTapCard({ icon, label, hint, onClick, anchorRef }: Props) {
   return (
     <button
+      ref={anchorRef}
       type="button"
       onClick={onClick}
       className="w-full rounded-xl border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col items-center justify-center gap-3 py-7 px-4 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border transition-colors"

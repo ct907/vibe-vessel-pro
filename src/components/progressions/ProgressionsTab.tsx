@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useDndStore } from "@/store/dnd";
 import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHistoryGroup, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
@@ -71,7 +70,7 @@ import { useUIStore, type ClipboardChord } from "@/store/ui";
 import { WhyThisChordSheet } from "@/components/chords/WhyThisChordSheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useOnboardingStore } from "@/store/onboarding";
-import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "bridge", "intro", "outro", "pre-chorus", "instrumental", "custom"];
 
@@ -1841,7 +1840,13 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, lyricsStep, setLyricsStep, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
+  const { enabled: onboardingEnabled, progressionsStep, setProgressionsStep, featureStep, setFeatureStep, featureDone, showNewSongPrompt, dismissNewSongPrompt, disable: disableOnboarding, dismissedKey, dismissCoachMark } = useOnboardingStore();
+
+  // After the last progression content step, hand off to the shared feature tour
+  // (sound → voice key → export) — only the first time through.
+  useEffect(() => {
+    if (onboardingEnabled && progressionsStep === 5 && featureStep === 0 && !featureDone) setFeatureStep(1);
+  }, [onboardingEnabled, progressionsStep, featureStep, featureDone, setFeatureStep]);
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const progressionsRootRef = useRef<HTMLDivElement>(null);
   const addChordsRef = useRef<HTMLButtonElement | null>(null);
@@ -2192,8 +2197,8 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         <AnchoredCoachMark
           anchorRef={addChordsRef}
           gap={16}
-          step="3/7"
-          message="Tap Add Chords to begin!"
+          step="6/13"
+          message="Add a chord block to start your progression."
           arrowSide="top"
           onDismiss={() => dismissCoachMark("progressions-1")}
         />
@@ -2204,7 +2209,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={chordPickerHeaderRef}
             anchorEdge="top"
             gap={8}
-            step="4/7"
+            step="7/13"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-2")}
@@ -2214,7 +2219,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={focusedEditorHeaderRef}
             anchorEdge="top"
             gap={8}
-            step="4/7"
+            step="7/13"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-2")}
@@ -2223,7 +2228,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           <AnchoredCoachMark
             anchorRef={progressionsRootRef}
             viewportBottom={380}
-            step="4/7"
+            step="7/13"
             message="Pick a chord or add a progression. Try adding the Royal Road Progression."
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-2")}
@@ -2238,7 +2243,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={modalHeaderRef}
             anchorEdge="top"
             gap={8}
-            step="5/7"
+            step="8/13"
             message="Replace with one of these chords!"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-3")}
@@ -2248,7 +2253,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={firstBlockRef}
             gap={44}
             anchorEdge="top"
-            step="5/7"
+            step="8/13"
             message="Right click or tap & hold a chord chip to replace it"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-3")}
@@ -2261,7 +2266,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={spiceHeaderRef}
             gap={8}
             anchorEdge="top"
-            step="6/7"
+            step="9/13"
             message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-4")}
@@ -2271,31 +2276,12 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
             anchorRef={spiceButtonRef}
             gap={16}
             anchorEdge="top"
-            step="6/7"
+            step="9/13"
             message="Press the ✨Add Spice button to explore different chord variations! Try the Dramatic Variation"
             arrowSide="bottom"
             onDismiss={() => dismissCoachMark("progressions-4")}
           />
         )
-      )}
-      {canShowCoachMark && progressionsStep === 5 && dismissedKey !== "progressions-5" && createPortal(
-        <div
-          className="pointer-events-auto"
-          style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9999 }}
-        >
-          <OnboardingCoachMark
-            step="7/7"
-            message="That concludes the Progressions tutorial. Check out the Lyrics tutorial by pressing the Lyrics tab here!"
-            actionLabel="Finish"
-            onAction={() => {
-              setProgressionsStep(6);
-              if (lyricsStep === 0 || lyricsStep >= 6) setLyricsStep(1);
-              dismissNewSongPrompt();
-            }}
-            onDismiss={() => dismissCoachMark("progressions-5")}
-          />
-        </div>,
-        document.body,
       )}
 
       {onboardingEnabled && showNewSongPrompt && (

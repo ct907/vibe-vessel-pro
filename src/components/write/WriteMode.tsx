@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Mic, Pencil } from "lucide-react";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import type { TabName } from "@/store/ui";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore } from "@/store/song";
+import { useOnboardingStore } from "@/store/onboarding";
+import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { RecordingsStrip } from "./RecordingsStrip";
@@ -56,6 +58,27 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const showRecordings = !recordingsEmpty || recRevealed;
   const showLyrics = !lyricsEmpty || lyricsRevealed;
 
+  const onboarding = useOnboardingStore();
+  const canCoach = onboarding.enabled && showOnboarding && onboarding.globalPhase === 2;
+  const recCardRef = useRef<HTMLButtonElement | null>(null);
+  const recStripRef = useRef<HTMLDivElement | null>(null);
+  const lyricsCardRef = useRef<HTMLButtonElement | null>(null);
+
+  // Capture walkthrough: once recording is rolling, move from the record prompt
+  // to the "your take lives here" callout.
+  useEffect(() => {
+    if (canCoach && onboarding.captureStep === 1 && showRecordings) onboarding.setCaptureStep(2);
+  }, [canCoach, onboarding, showRecordings]);
+
+  // Revealing the lyrics editor (by tap or otherwise) ends the capture phase and
+  // hands the tour to the lyrics steps that live inside LyricsTab.
+  const revealLyricsForTour = () => {
+    if (canCoach && onboarding.captureStep !== 0) {
+      onboarding.setCaptureStep(0);
+      onboarding.setLyricsStep(1);
+    }
+  };
+
   // Carry the capture intent picked on the landing page straight into the
   // editor so tapping its empty-state card starts the same gesture here — no
   // second tap. The param is consumed once, then cleared.
@@ -84,11 +107,12 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   return (
     <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
       {/* Left column — recordings (2 of 5) */}
-      <div className="md:col-span-2">
+      <div className="md:col-span-2" ref={recStripRef}>
         {showRecordings ? (
           <RecordingsStrip />
         ) : (
           <EmptyTapCard
+            anchorRef={recCardRef}
             icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
             label="Add Recording"
             hint={`${tapVerb} to start recording`}
@@ -107,18 +131,50 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
           <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
         ) : (
           <EmptyTapCard
+            anchorRef={lyricsCardRef}
             icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
             label="Write Lyrics"
             hint={`${tapVerb} to start typing`}
             onClick={() => {
               setLyricsRevealed(true);
               focusFirstLyricLine();
+              revealLyricsForTour();
             }}
           />
         )}
       </div>
 
-      <WriteStickyBar onEditorAction={() => setLyricsRevealed(true)} />
+      <WriteStickyBar onEditorAction={() => { setLyricsRevealed(true); revealLyricsForTour(); }} />
+
+      {canCoach && onboarding.captureStep === 1 && !showRecordings && onboarding.dismissedKey !== "capture-1" && (
+        <AnchoredCoachMark
+          anchorRef={recCardRef}
+          step="3/13"
+          message={`${tapVerb} Add Recording to capture a vocal idea — your first take.`}
+          arrowSide="top"
+          onDismiss={() => onboarding.dismissCoachMark("capture-1")}
+        />
+      )}
+      {canCoach && onboarding.captureStep === 2 && onboarding.dismissedKey !== "capture-2" && (
+        <AnchoredCoachMark
+          anchorRef={recStripRef}
+          step="4/13"
+          message="Your takes live here — tap the ★ to mark your favourite."
+          arrowSide="top"
+          actionLabel="Next"
+          onAction={() => onboarding.setCaptureStep(3)}
+          onDismiss={() => onboarding.dismissCoachMark("capture-2")}
+        />
+      )}
+      {canCoach && onboarding.captureStep === 3 && !showLyrics && onboarding.dismissedKey !== "capture-3" && (
+        <AnchoredCoachMark
+          anchorRef={lyricsCardRef}
+          step="5/13"
+          message={`${tapVerb} Write Lyrics to open the editor.`}
+          arrowSide="top"
+          onDismiss={() => onboarding.dismissCoachMark("capture-3")}
+        />
+      )}
     </div>
   );
 }
