@@ -66,7 +66,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
 import { useOnboardingStore } from "@/store/onboarding";
-import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
+import { createPortal } from "react-dom";
 import { useRecordingsStore } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { downloadMidi } from "@/lib/export/midi";
@@ -490,6 +491,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [inspirationModalOpen, setInspirationModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
@@ -895,7 +897,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
                 <Sheet open={navOpen} onOpenChange={setNavOpen}>
             <SheetTrigger asChild>
-              <button className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
+              <button ref={menuBtnRef} className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9" aria-label="Open menu">
                 <Menu className="h-4 w-4" />
               </button>
             </SheetTrigger>
@@ -1215,7 +1217,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             {onboarding.enabled && onboarding.globalPhase === 0 && onboarding.dismissedKey !== "phase-0" && location.pathname !== '/' && (
               <AnchoredCoachMark
                 anchorRef={tabsBarRef}
-                step="1/7"
+                step="1/13"
                 message="Write lyrics or build progressions? Tap a tab to begin"
                 arrowSide="top"
                 onDismiss={() => onboarding.dismissCoachMark("phase-0")}
@@ -1242,6 +1244,79 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     </div>
     <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
+
+    {/* Shared feature tour — runs once after the first branch's content steps,
+        pointing at the menu where Sound, Voice Key and export/Drive all live. */}
+    {onboarding.enabled && onboarding.globalPhase === 2 && onboarding.featureStep > 0 && location.pathname !== "/" && (
+      <>
+        {onboarding.featureStep === 1 && onboarding.dismissedKey !== "feature-1" && (
+          <AnchoredCoachMark
+            anchorRef={menuBtnRef}
+            gap={12}
+            step="10/13"
+            message="Open the menu to shape your instrument in the Sound panel."
+            arrowSide="top"
+            actionLabel="Next"
+            onAction={() => onboarding.setFeatureStep(2)}
+            onDismiss={() => onboarding.dismissCoachMark("feature-1")}
+          />
+        )}
+        {onboarding.featureStep === 2 && onboarding.dismissedKey !== "feature-2" && (
+          <AnchoredCoachMark
+            anchorRef={menuBtnRef}
+            gap={12}
+            step="11/13"
+            message="Match your range with Voice Key — it's under Explore Chords."
+            arrowSide="top"
+            actionLabel="Next"
+            onAction={() => onboarding.setFeatureStep(3)}
+            onDismiss={() => onboarding.dismissCoachMark("feature-2")}
+          />
+        )}
+        {onboarding.featureStep === 3 && onboarding.dismissedKey !== "feature-3" && (
+          <AnchoredCoachMark
+            anchorRef={menuBtnRef}
+            gap={12}
+            step="12/13"
+            message="Save to Google Drive or export MIDI & stems from the menu."
+            arrowSide="top"
+            actionLabel="Next"
+            onAction={() => onboarding.setFeatureStep(4)}
+            onDismiss={() => onboarding.dismissCoachMark("feature-3")}
+          />
+        )}
+        {onboarding.featureStep === 4 && onboarding.dismissedKey !== "feature-4" && createPortal(
+          <div
+            className="pointer-events-auto"
+            style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9999 }}
+          >
+            <OnboardingCoachMark
+              step="13/13"
+              message={
+                mode === "write"
+                  ? "That's the tour! Tap Arrange to explore the other side."
+                  : "That's the tour! Tap Write and Record to explore the other side."
+              }
+              actionLabel="Finish"
+              onAction={() => {
+                onboarding.setFeatureStep(0);
+                onboarding.markFeatureDone();
+                if (mode === "write") {
+                  onboarding.setLyricsStep(6);
+                  onboarding.setProgressionsStep(1);
+                } else {
+                  onboarding.setProgressionsStep(6);
+                  onboarding.setLyricsStep(1);
+                }
+                onboarding.dismissNewSongPrompt();
+              }}
+              onDismiss={() => onboarding.dismissCoachMark("feature-4")}
+            />
+          </div>,
+          document.body,
+        )}
+      </>
+    )}
     <AlertDialog open={confirmNewSong} onOpenChange={setConfirmNewSong}>
       <AlertDialogContent>
         <AlertDialogHeader>

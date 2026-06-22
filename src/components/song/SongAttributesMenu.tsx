@@ -58,8 +58,7 @@ export function SongAttributesMenu() {
     setOpen(false);
     if (onboarding.enabled && onboarding.globalPhase === 1) {
       onboarding.setGlobalPhase(2);
-      onboarding.setLyricsStep(1);
-      onboarding.setProgressionsStep(1);
+      onboarding.setCaptureStep(1);
     }
   };
 
@@ -329,7 +328,7 @@ export function SongAttributesMenu() {
       <AnchoredCoachMark
         anchorRef={attrBtnRef}
         gap={24}
-        step="2/7"
+        step="2/13"
         message="Set the scene — choose key and timing, then tap Save Settings"
         arrowSide="top"
         onDismiss={() => onboarding.dismissCoachMark("phase-1")}
