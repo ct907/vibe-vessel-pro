@@ -160,6 +160,10 @@ interface RecordingsState {
   setClipStart: (id: RecTrackId, blobId: RecBlobId, startSec: number) => void;
   /** Set the looped fill length. Pass undefined / a value <= body to disable looping. */
   setClipLoop: (id: RecTrackId, blobId: RecBlobId, loopSec: number | undefined) => void;
+  /** Split a clip at splitSec into two clips. The right half uses newBlobId
+   *  (a copy of the same audio bytes), so each half is independently editable.
+   *  Single undo step; no-op if splitSec is not inside the clip body. */
+  splitClip: (id: RecTrackId, blobId: RecBlobId, splitSec: number, newBlobId: RecBlobId) => void;
   /** Move a clip within or across tracks, re-applying non-overlap at the destination. */
   moveClip: (from: RecTrackId, to: RecTrackId, blobId: RecBlobId, startSec: number) => void;
   /** Snapshot the current tracks for a single undo step (call once at the start of a drag). */
@@ -340,6 +344,35 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
         }),
       };
     }),
+
+  splitClip: (id, blobId, splitSec, newBlobId) => {
+    const track = get().tracks.find((t) => t.id === id);
+    const clip = track?.clips.find((c) => c.blobId === blobId);
+    if (!clip) return;
+    const leftLen = splitSec - clip.startSec;
+    const body = clip.trimEndSec - clip.trimStartSec;
+    if (leftLen <= 0.01 || leftLen >= body - 0.01) return;
+    pushHistory(get().tracks);
+    const left: RecClip = { ...clip, trimEndSec: clip.trimStartSec + leftLen, loopSec: undefined };
+    const right: RecClip = {
+      blobId: newBlobId,
+      mime: clip.mime,
+      durationSec: clip.durationSec,
+      startSec: splitSec,
+      trimStartSec: clip.trimStartSec + leftLen,
+      trimEndSec: clip.trimEndSec,
+    };
+    set((s) => ({
+      tracks: s.tracks.map((t) => {
+        if (t.id !== id) return t;
+        const clips = t.clips
+          .map((c) => (c.blobId === blobId ? left : c))
+          .concat(right)
+          .sort((a, b) => a.startSec - b.startSec);
+        return { ...t, clips };
+      }),
+    }));
+  },
 
   beginClipEdit: () => pushHistory(get().tracks),
 

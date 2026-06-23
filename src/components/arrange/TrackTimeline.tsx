@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X } from "lucide-react";
+import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
@@ -11,11 +11,21 @@ import {
   clipEndSec,
   clipBodySec,
   clipSpanSec,
+  TRACK_COLOR_PRESETS,
 } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { usePlaybackStore } from "@/store/playback";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob, deleteAudioBlob, getAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
@@ -242,6 +252,61 @@ function DelayPanel({ offsetMs, onNudge }: { offsetMs: number; onNudge: (d: numb
   );
 }
 
+/** Gain + pan mixer panel for a track. Wired to the live engine via the store. */
+function MixPanel({
+  gainDb,
+  pan,
+  onGain,
+  onPan,
+}: {
+  gainDb: number;
+  pan: number;
+  onGain: (db: number) => void;
+  onPan: (pan: number) => void;
+}) {
+  const panLabel =
+    Math.abs(pan) < 0.025 ? "C" : pan < 0 ? `L ${Math.round(-pan * 100)}` : `R ${Math.round(pan * 100)}`;
+  return (
+    <div
+      className="flex flex-col gap-2.5 border-t border-border p-3"
+      style={{ background: "var(--paper-shade-soft)" }}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 font-mono-chord text-[9.5px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
+          Gain
+        </span>
+        <Slider
+          min={-24}
+          max={6}
+          step={0.5}
+          value={[gainDb]}
+          onValueChange={(v) => onGain(v[0])}
+          aria-label="Track gain"
+          className="flex-1"
+        />
+        <span className="w-12 text-right font-mono-chord text-[10px] text-ink">
+          {(gainDb > 0 ? "+" : "") + gainDb.toFixed(1)} dB
+        </span>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 font-mono-chord text-[9.5px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
+          Pan
+        </span>
+        <Slider
+          min={-1}
+          max={1}
+          step={0.05}
+          value={[pan]}
+          onValueChange={(v) => onPan(v[0])}
+          aria-label="Track pan"
+          className="flex-1"
+        />
+        <span className="w-12 text-right font-mono-chord text-[10px] text-ink">{panLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The destructive-red playhead bar. Isolated from TrackTimeline so the per-frame
  * position updates during playback re-render only this thin overlay, not the
@@ -328,6 +393,7 @@ export function TrackTimeline() {
   const setClipStart = useRecordingsStore((s) => s.setClipStart);
   const setClipTrim = useRecordingsStore((s) => s.setClipTrim);
   const setClipLoop = useRecordingsStore((s) => s.setClipLoop);
+  const splitClip = useRecordingsStore((s) => s.splitClip);
   const setTrackOffsetMs = useRecordingsStore((s) => s.setTrackOffsetMs);
   const clearTrackClips = useRecordingsStore((s) => s.clearTrackClips);
   const recUndo = useRecordingsStore((s) => s.undo);
@@ -338,6 +404,12 @@ export function TrackTimeline() {
   const setPlayheadSec = useRecordingsStore((s) => s.setPlayheadSec);
   const pendingOverdub = useRecordingsStore((s) => s.pendingOverdub);
   const setPendingOverdub = useRecordingsStore((s) => s.setPendingOverdub);
+  const toggleMute = useRecordingsStore((s) => s.toggleMute);
+  const toggleSolo = useRecordingsStore((s) => s.toggleSolo);
+  const setGainDb = useRecordingsStore((s) => s.setGainDb);
+  const setPan = useRecordingsStore((s) => s.setPan);
+  const renameTrack = useRecordingsStore((s) => s.renameTrack);
+  const setTrackColor = useRecordingsStore((s) => s.setTrackColor);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -357,6 +429,21 @@ export function TrackTimeline() {
   }, [recordingTrackId]);
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
+  const [mixOpen, setMixOpen] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+
+  const startRename = (t: RecTrack) => {
+    setEditingNameId(t.id);
+    setNameDraft(t.name);
+  };
+  const commitRename = () => {
+    if (editingNameId) {
+      const v = nameDraft.trim();
+      if (v) renameTrack(editingNameId, v);
+    }
+    setEditingNameId(null);
+  };
 
   const [selected, setSelected] = useState<{ trackId: string; blobId: string } | null>(null);
   const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
@@ -419,6 +506,26 @@ export function TrackTimeline() {
     await putAudioBlob(newId, blob);
     const copy: RecClip = { ...clip, blobId: newId, startSec: clipEndSec(clip) };
     addClip(track.id, copy);
+    setSelected({ trackId: track.id, blobId: newId });
+  };
+
+  const splitSelectedAtPlayhead = async () => {
+    if (!selected) return;
+    const st = useRecordingsStore.getState();
+    const track = st.tracks.find((t) => t.id === selected.trackId);
+    const clip = track?.clips.find((c) => c.blobId === selected.blobId);
+    if (!track || !clip) return;
+    const p = st.playheadSec;
+    const body = clipBodySec(clip);
+    if (p <= clip.startSec + 0.01 || p >= clip.startSec + body - 0.01) {
+      toast("Move the playhead over the clip to split");
+      return;
+    }
+    const blob = await getAudioBlob(clip.blobId);
+    if (!blob) return;
+    const newId = nanoid();
+    await putAudioBlob(newId, blob);
+    splitClip(track.id, clip.blobId, p, newId);
     setSelected({ trackId: track.id, blobId: newId });
   };
 
@@ -541,6 +648,9 @@ export function TrackTimeline() {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         deleteClip(selected.trackId, selected.blobId);
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        void splitSelectedAtPlayhead();
       } else if (e.key === "Escape") {
         setSelected(null);
       }
@@ -553,6 +663,7 @@ export function TrackTimeline() {
   const LANE_H = isMobile ? 114 : 78;
   const LABEL_W = isMobile ? 138 : 156;
   const secPerBar = (60 / bpm) * beatsPerBar;
+  const anySolo = tracks.some((t) => t.soloed);
 
   // Default the timeline to 10 minutes, extending to fit the longest clip.
   const MIN_TIMELINE_SEC = 600;
@@ -775,6 +886,8 @@ export function TrackTimeline() {
             {tracks.map((track) => {
               const isRec = recordingTrackId === track.id;
               const showDelay = delayOpen === track.id;
+              const showMix = mixOpen === track.id;
+              const silent = track.muted || (anySolo && !track.soloed);
               const offBars = ((track.offsetMs || 0) / 1000 / secPerBar);
               return (
                 <div key={track.id}>
@@ -785,13 +898,60 @@ export function TrackTimeline() {
                       style={{ width: LABEL_W, background: isRec ? "#fbe9e9" : "var(--paper-shade-soft)" }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: track.color }}
-                        />
-                        <span className="truncate text-xs font-bold text-ink">{track.name}</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Track color"
+                              className="inline-flex shrink-0 items-center justify-center rounded-full p-0.5 hover:bg-paper-shade"
+                            >
+                              <span className="h-2.5 w-2.5 rounded-full" style={{ background: track.color }} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-auto p-2">
+                            <div className="flex gap-1.5">
+                              {TRACK_COLOR_PRESETS.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setTrackColor(track.id, c)}
+                                  aria-label={c === track.color ? "Current color" : "Set track color"}
+                                  className="h-6 w-6 rounded-full border-2"
+                                  style={{ background: c, borderColor: c === track.color ? "var(--ink)" : "transparent" }}
+                                />
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                        {editingNameId === track.id ? (
+                          <Input
+                            autoFocus
+                            value={nameDraft}
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                commitRename();
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                setEditingNameId(null);
+                              }
+                            }}
+                            className="h-6 min-w-0 flex-1 px-1.5 py-0 text-xs font-bold"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startRename(track)}
+                            aria-label={`Rename ${track.name}`}
+                            className="min-w-0 flex-1 truncate text-left text-xs font-bold text-ink"
+                          >
+                            {track.name}
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => void toggleRecord(track.id)}
@@ -815,28 +975,75 @@ export function TrackTimeline() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => clearTrack(track)}
-                          aria-label="Clear track"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-destructive"
+                          onClick={() => toggleMute(track.id)}
+                          aria-label={track.muted ? "Unmute track" : "Mute track"}
+                          aria-pressed={track.muted}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
+                          style={
+                            track.muted
+                              ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" }
+                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
+                          }
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          M
                         </button>
                         <button
                           type="button"
-                          onClick={() => triggerImport(track.id)}
-                          aria-label="Import audio"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                          onClick={() => toggleSolo(track.id)}
+                          aria-label={track.soloed ? "Unsolo track" : "Solo track"}
+                          aria-pressed={track.soloed}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
+                          style={
+                            track.soloed
+                              ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary-strong)" }
+                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
+                          }
                         >
-                          <Upload className="h-3.5 w-3.5" />
+                          S
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDelayOpen(showDelay ? null : track.id)}
-                          aria-label="Delay compensation"
+                          onClick={() => {
+                            setMixOpen(showMix ? null : track.id);
+                            setDelayOpen(null);
+                          }}
+                          aria-label="Volume and pan"
+                          aria-pressed={showMix}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                          style={showMix ? { background: "var(--primary-halo)", color: "var(--ink)" } : undefined}
                         >
-                          <Timer className="h-3.5 w-3.5" />
+                          <SlidersHorizontal className="h-3.5 w-3.5" />
                         </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="More track actions"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                            >
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[10rem]">
+                            <DropdownMenuItem onSelect={() => triggerImport(track.id)}>
+                              <Upload className="mr-2 h-3.5 w-3.5" /> Import audio
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                setDelayOpen(showDelay ? null : track.id);
+                                setMixOpen(null);
+                              }}
+                            >
+                              <Timer className="mr-2 h-3.5 w-3.5" /> Delay compensation
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => clearTrack(track)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Clear track
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         {track.offsetMs ? (
                           <span className="font-mono-chord text-[8.5px] text-ink-soft">
                             {(track.offsetMs > 0 ? "+" : "") + track.offsetMs}ms
@@ -859,6 +1066,7 @@ export function TrackTimeline() {
                               : isRec
                               ? "#fdf3f3"
                               : "var(--card)",
+                            opacity: silent && !isRec ? 0.4 : 1,
                           }}
                           onClick={handleLaneClick}
                         >
@@ -985,6 +1193,18 @@ export function TrackTimeline() {
                       )}
                     </Droppable>
                   </div>
+                  {showMix && (
+                    <div className="flex border-b border-border">
+                      <div className="sticky left-0 z-[5]" style={{ width: "min(92vw, 320px)" }}>
+                        <MixPanel
+                          gainDb={track.gainDb}
+                          pan={track.pan}
+                          onGain={(db) => setGainDb(track.id, db)}
+                          onPan={(p) => setPan(track.id, p)}
+                        />
+                      </div>
+                    </div>
+                  )}
                   {showDelay && (
                     <div className="flex border-b border-border">
                       <div className="sticky left-0 z-[5]" style={{ width: "min(92vw, 320px)" }}>
@@ -1034,6 +1254,13 @@ export function TrackTimeline() {
               className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
             >
               <Copy className="h-3.5 w-3.5" /> Duplicate
+            </button>
+            <button
+              type="button"
+              onClick={() => void splitSelectedAtPlayhead()}
+              className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+            >
+              <Scissors className="h-3.5 w-3.5" /> Split
             </button>
             {(selectedClip.loopSec ?? 0) > clipBodySec(selectedClip) + 0.001 && (
               <button
