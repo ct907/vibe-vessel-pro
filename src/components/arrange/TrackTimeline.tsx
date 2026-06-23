@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal } from "lucide-react";
+import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
@@ -393,6 +393,7 @@ export function TrackTimeline() {
   const setClipStart = useRecordingsStore((s) => s.setClipStart);
   const setClipTrim = useRecordingsStore((s) => s.setClipTrim);
   const setClipLoop = useRecordingsStore((s) => s.setClipLoop);
+  const splitClip = useRecordingsStore((s) => s.splitClip);
   const setTrackOffsetMs = useRecordingsStore((s) => s.setTrackOffsetMs);
   const clearTrackClips = useRecordingsStore((s) => s.clearTrackClips);
   const recUndo = useRecordingsStore((s) => s.undo);
@@ -505,6 +506,26 @@ export function TrackTimeline() {
     await putAudioBlob(newId, blob);
     const copy: RecClip = { ...clip, blobId: newId, startSec: clipEndSec(clip) };
     addClip(track.id, copy);
+    setSelected({ trackId: track.id, blobId: newId });
+  };
+
+  const splitSelectedAtPlayhead = async () => {
+    if (!selected) return;
+    const st = useRecordingsStore.getState();
+    const track = st.tracks.find((t) => t.id === selected.trackId);
+    const clip = track?.clips.find((c) => c.blobId === selected.blobId);
+    if (!track || !clip) return;
+    const p = st.playheadSec;
+    const body = clipBodySec(clip);
+    if (p <= clip.startSec + 0.01 || p >= clip.startSec + body - 0.01) {
+      toast("Move the playhead over the clip to split");
+      return;
+    }
+    const blob = await getAudioBlob(clip.blobId);
+    if (!blob) return;
+    const newId = nanoid();
+    await putAudioBlob(newId, blob);
+    splitClip(track.id, clip.blobId, p, newId);
     setSelected({ trackId: track.id, blobId: newId });
   };
 
@@ -627,6 +648,9 @@ export function TrackTimeline() {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         deleteClip(selected.trackId, selected.blobId);
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        void splitSelectedAtPlayhead();
       } else if (e.key === "Escape") {
         setSelected(null);
       }
@@ -1230,6 +1254,13 @@ export function TrackTimeline() {
               className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
             >
               <Copy className="h-3.5 w-3.5" /> Duplicate
+            </button>
+            <button
+              type="button"
+              onClick={() => void splitSelectedAtPlayhead()}
+              className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+            >
+              <Scissors className="h-3.5 w-3.5" /> Split
             </button>
             {(selectedClip.loopSec ?? 0) > clipBodySec(selectedClip) + 0.001 && (
               <button
