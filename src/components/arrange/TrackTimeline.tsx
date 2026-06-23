@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X } from "lucide-react";
+import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
@@ -16,6 +16,13 @@ import { useTakesStore } from "@/store/takes";
 import { usePlaybackStore } from "@/store/playback";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
+import { Slider } from "@/components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob, deleteAudioBlob, getAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
@@ -242,6 +249,61 @@ function DelayPanel({ offsetMs, onNudge }: { offsetMs: number; onNudge: (d: numb
   );
 }
 
+/** Gain + pan mixer panel for a track. Wired to the live engine via the store. */
+function MixPanel({
+  gainDb,
+  pan,
+  onGain,
+  onPan,
+}: {
+  gainDb: number;
+  pan: number;
+  onGain: (db: number) => void;
+  onPan: (pan: number) => void;
+}) {
+  const panLabel =
+    Math.abs(pan) < 0.025 ? "C" : pan < 0 ? `L ${Math.round(-pan * 100)}` : `R ${Math.round(pan * 100)}`;
+  return (
+    <div
+      className="flex flex-col gap-2.5 border-t border-border p-3"
+      style={{ background: "var(--paper-shade-soft)" }}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 font-mono-chord text-[9.5px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
+          Gain
+        </span>
+        <Slider
+          min={-24}
+          max={6}
+          step={0.5}
+          value={[gainDb]}
+          onValueChange={(v) => onGain(v[0])}
+          aria-label="Track gain"
+          className="flex-1"
+        />
+        <span className="w-12 text-right font-mono-chord text-[10px] text-ink">
+          {(gainDb > 0 ? "+" : "") + gainDb.toFixed(1)} dB
+        </span>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 font-mono-chord text-[9.5px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
+          Pan
+        </span>
+        <Slider
+          min={-1}
+          max={1}
+          step={0.05}
+          value={[pan]}
+          onValueChange={(v) => onPan(v[0])}
+          aria-label="Track pan"
+          className="flex-1"
+        />
+        <span className="w-12 text-right font-mono-chord text-[10px] text-ink">{panLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The destructive-red playhead bar. Isolated from TrackTimeline so the per-frame
  * position updates during playback re-render only this thin overlay, not the
@@ -338,6 +400,10 @@ export function TrackTimeline() {
   const setPlayheadSec = useRecordingsStore((s) => s.setPlayheadSec);
   const pendingOverdub = useRecordingsStore((s) => s.pendingOverdub);
   const setPendingOverdub = useRecordingsStore((s) => s.setPendingOverdub);
+  const toggleMute = useRecordingsStore((s) => s.toggleMute);
+  const toggleSolo = useRecordingsStore((s) => s.toggleSolo);
+  const setGainDb = useRecordingsStore((s) => s.setGainDb);
+  const setPan = useRecordingsStore((s) => s.setPan);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -357,6 +423,7 @@ export function TrackTimeline() {
   }, [recordingTrackId]);
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
+  const [mixOpen, setMixOpen] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<{ trackId: string; blobId: string } | null>(null);
   const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
@@ -553,6 +620,7 @@ export function TrackTimeline() {
   const LANE_H = isMobile ? 114 : 78;
   const LABEL_W = isMobile ? 138 : 156;
   const secPerBar = (60 / bpm) * beatsPerBar;
+  const anySolo = tracks.some((t) => t.soloed);
 
   // Default the timeline to 10 minutes, extending to fit the longest clip.
   const MIN_TIMELINE_SEC = 600;
@@ -775,6 +843,8 @@ export function TrackTimeline() {
             {tracks.map((track) => {
               const isRec = recordingTrackId === track.id;
               const showDelay = delayOpen === track.id;
+              const showMix = mixOpen === track.id;
+              const silent = track.muted || (anySolo && !track.soloed);
               const offBars = ((track.offsetMs || 0) / 1000 / secPerBar);
               return (
                 <div key={track.id}>
@@ -791,7 +861,7 @@ export function TrackTimeline() {
                         />
                         <span className="truncate text-xs font-bold text-ink">{track.name}</span>
                       </div>
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => void toggleRecord(track.id)}
@@ -815,28 +885,75 @@ export function TrackTimeline() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => clearTrack(track)}
-                          aria-label="Clear track"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-destructive"
+                          onClick={() => toggleMute(track.id)}
+                          aria-label={track.muted ? "Unmute track" : "Mute track"}
+                          aria-pressed={track.muted}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
+                          style={
+                            track.muted
+                              ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" }
+                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
+                          }
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          M
                         </button>
                         <button
                           type="button"
-                          onClick={() => triggerImport(track.id)}
-                          aria-label="Import audio"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                          onClick={() => toggleSolo(track.id)}
+                          aria-label={track.soloed ? "Unsolo track" : "Solo track"}
+                          aria-pressed={track.soloed}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
+                          style={
+                            track.soloed
+                              ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary-strong)" }
+                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
+                          }
                         >
-                          <Upload className="h-3.5 w-3.5" />
+                          S
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDelayOpen(showDelay ? null : track.id)}
-                          aria-label="Delay compensation"
+                          onClick={() => {
+                            setMixOpen(showMix ? null : track.id);
+                            setDelayOpen(null);
+                          }}
+                          aria-label="Volume and pan"
+                          aria-pressed={showMix}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                          style={showMix ? { background: "var(--primary-halo)", color: "var(--ink)" } : undefined}
                         >
-                          <Timer className="h-3.5 w-3.5" />
+                          <SlidersHorizontal className="h-3.5 w-3.5" />
                         </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="More track actions"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:text-ink"
+                            >
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[10rem]">
+                            <DropdownMenuItem onSelect={() => triggerImport(track.id)}>
+                              <Upload className="mr-2 h-3.5 w-3.5" /> Import audio
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                setDelayOpen(showDelay ? null : track.id);
+                                setMixOpen(null);
+                              }}
+                            >
+                              <Timer className="mr-2 h-3.5 w-3.5" /> Delay compensation
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => clearTrack(track)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Clear track
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         {track.offsetMs ? (
                           <span className="font-mono-chord text-[8.5px] text-ink-soft">
                             {(track.offsetMs > 0 ? "+" : "") + track.offsetMs}ms
@@ -859,6 +976,7 @@ export function TrackTimeline() {
                               : isRec
                               ? "#fdf3f3"
                               : "var(--card)",
+                            opacity: silent && !isRec ? 0.4 : 1,
                           }}
                           onClick={handleLaneClick}
                         >
@@ -985,6 +1103,18 @@ export function TrackTimeline() {
                       )}
                     </Droppable>
                   </div>
+                  {showMix && (
+                    <div className="flex border-b border-border">
+                      <div className="sticky left-0 z-[5]" style={{ width: "min(92vw, 320px)" }}>
+                        <MixPanel
+                          gainDb={track.gainDb}
+                          pan={track.pan}
+                          onGain={(db) => setGainDb(track.id, db)}
+                          onPan={(p) => setPan(track.id, p)}
+                        />
+                      </div>
+                    </div>
+                  )}
                   {showDelay && (
                     <div className="flex border-b border-border">
                       <div className="sticky left-0 z-[5]" style={{ width: "min(92vw, 320px)" }}>
