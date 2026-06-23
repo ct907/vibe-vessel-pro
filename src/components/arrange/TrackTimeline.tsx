@@ -11,12 +11,15 @@ import {
   clipEndSec,
   clipBodySec,
   clipSpanSec,
+  TRACK_COLOR_PRESETS,
 } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { usePlaybackStore } from "@/store/playback";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Waveform } from "@/components/common/Waveform";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -404,6 +407,8 @@ export function TrackTimeline() {
   const toggleSolo = useRecordingsStore((s) => s.toggleSolo);
   const setGainDb = useRecordingsStore((s) => s.setGainDb);
   const setPan = useRecordingsStore((s) => s.setPan);
+  const renameTrack = useRecordingsStore((s) => s.renameTrack);
+  const setTrackColor = useRecordingsStore((s) => s.setTrackColor);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -424,6 +429,20 @@ export function TrackTimeline() {
 
   const [delayOpen, setDelayOpen] = useState<string | null>(null);
   const [mixOpen, setMixOpen] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+
+  const startRename = (t: RecTrack) => {
+    setEditingNameId(t.id);
+    setNameDraft(t.name);
+  };
+  const commitRename = () => {
+    if (editingNameId) {
+      const v = nameDraft.trim();
+      if (v) renameTrack(editingNameId, v);
+    }
+    setEditingNameId(null);
+  };
 
   const [selected, setSelected] = useState<{ trackId: string; blobId: string } | null>(null);
   const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
@@ -855,11 +874,58 @@ export function TrackTimeline() {
                       style={{ width: LABEL_W, background: isRec ? "#fbe9e9" : "var(--paper-shade-soft)" }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: track.color }}
-                        />
-                        <span className="truncate text-xs font-bold text-ink">{track.name}</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Track color"
+                              className="inline-flex shrink-0 items-center justify-center rounded-full p-0.5 hover:bg-paper-shade"
+                            >
+                              <span className="h-2.5 w-2.5 rounded-full" style={{ background: track.color }} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-auto p-2">
+                            <div className="flex gap-1.5">
+                              {TRACK_COLOR_PRESETS.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setTrackColor(track.id, c)}
+                                  aria-label={c === track.color ? "Current color" : "Set track color"}
+                                  className="h-6 w-6 rounded-full border-2"
+                                  style={{ background: c, borderColor: c === track.color ? "var(--ink)" : "transparent" }}
+                                />
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                        {editingNameId === track.id ? (
+                          <Input
+                            autoFocus
+                            value={nameDraft}
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                commitRename();
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                setEditingNameId(null);
+                              }
+                            }}
+                            className="h-6 min-w-0 flex-1 px-1.5 py-0 text-xs font-bold"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startRename(track)}
+                            aria-label={`Rename ${track.name}`}
+                            className="min-w-0 flex-1 truncate text-left text-xs font-bold text-ink"
+                          >
+                            {track.name}
+                          </button>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <button
