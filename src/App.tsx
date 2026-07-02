@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { OnboardingFilters } from "@/components/onboarding/OnboardingFilters";
@@ -23,11 +23,34 @@ import { hydrateTakesFromStorage, startTakesAutosave, useTakesStore } from "@/st
 import { pruneOrphanBlobs } from "@/lib/audio/blob-store";
 import { pushRecent } from "@/lib/recent-projects";
 import { startOfflineCheckpoints } from "@/store/drive";
+import { isOverlayRoute } from "@/lib/routes";
 
 const queryClient = new QueryClient();
 
 function FullScreenOverlay({ children }: { children: React.ReactNode }) {
   return <div className="fixed inset-0 z-50 bg-background overflow-y-auto">{children}</div>;
+}
+
+/**
+ * The editor (`<Index />`) stays mounted under every overlay route so its state
+ * survives navigation. Without `inert` its buttons/inputs remain in the tab
+ * order and reachable by screen readers even while a Landing/Help/404 overlay
+ * is the only thing visibly on screen.
+ */
+function EditorLayer() {
+  const { pathname } = useLocation();
+  const ref = useRef<HTMLDivElement>(null);
+  const overlayActive = isOverlayRoute(pathname);
+
+  useEffect(() => {
+    if (ref.current) ref.current.inert = overlayActive;
+  }, [overlayActive]);
+
+  return (
+    <div ref={ref}>
+      <Index />
+    </div>
+  );
 }
 
 const App = () => {
@@ -133,7 +156,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "") || "/"}>
             <SkipTutorialButton />
-            <Index />
+            <EditorLayer />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/defaults" element={<FullScreenOverlay><Defaults /></FullScreenOverlay>} />

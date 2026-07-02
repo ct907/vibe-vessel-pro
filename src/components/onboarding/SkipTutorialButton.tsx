@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore } from "@/store/ui";
+import { isOverlayRoute } from "@/lib/routes";
 
 export function SkipTutorialButton() {
   const enabled = useOnboardingStore((s) => s.enabled);
@@ -22,7 +23,7 @@ export function SkipTutorialButton() {
       (activeTab === "lyrics" && lyricsStep >= 1 && lyricsStep <= 5) ||
       (activeTab === "progressions" && progressionsStep >= 1 && progressionsStep <= 5));
 
-  if (!inTutorial || pathname === "/") return null;
+  if (!inTutorial || isOverlayRoute(pathname)) return null;
 
   return createPortal(
     <button

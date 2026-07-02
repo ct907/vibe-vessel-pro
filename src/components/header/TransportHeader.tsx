@@ -336,94 +336,77 @@ function InspirationLightbox({
   const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
   const next = () => setIdx((i) => (i + 1) % photos.length);
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: "rgba(0,0,0,0.88)",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        gap: 16,
-      }}
-      onClick={onClose}
-    >
-      {/* Photo */}
-      <div
-        style={{ position: "relative", maxWidth: "min(90vw, 480px)", maxHeight: "60vh" }}
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        onKeyDown={(e) => {
+          if (photos.length <= 1) return;
+          if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+          else if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+        }}
+        className="left-0 top-0 z-[9999] flex h-full max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none border-0 bg-black/88 p-6 shadow-none [&>button]:text-white/70 [&>button]:hover:text-white [&>button]:hover:bg-white/10"
       >
-        <img
-          src={current.dataUrl}
-          alt={`Inspiration photo ${idx + 1}`}
-          draggable={false}
-          style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", display: "block" }}
-        />
-      </div>
-      {/* Inline nav: [‹] 1/3 [›] */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
-        {photos.length > 1 && (
+        <DialogTitle className="sr-only">
+          Inspiration photo {idx + 1} of {photos.length}
+        </DialogTitle>
+        {/* Photo */}
+        <div className="relative max-w-[min(90vw,480px)] max-h-[60vh]">
+          <img
+            src={current.dataUrl}
+            alt={`Inspiration photo ${idx + 1}`}
+            draggable={false}
+            className="block w-full max-h-[60vh] object-contain rounded-xl"
+            style={{ boxShadow: "0 8px 40px color-mix(in oklch, black 60%, transparent)" }}
+          />
+        </div>
+        {/* Inline nav: [‹] 1/3 [›] */}
+        <div className="flex items-center gap-2.5">
+          {photos.length > 1 && (
+            <button
+              type="button"
+              onClick={prev}
+              className="h-8 w-8 rounded-full flex items-center justify-center text-lg text-white"
+              style={{ background: "color-mix(in oklch, white 15%, transparent)", border: "1px solid color-mix(in oklch, white 30%, transparent)" }}
+              aria-label="Previous photo"
+            >‹</button>
+          )}
+          <span className="font-mono-chord text-[13px] min-w-9 text-center" style={{ color: "color-mix(in oklch, white 60%, transparent)" }}>
+            {idx + 1}/{photos.length}
+          </span>
+          {photos.length > 1 && (
+            <button
+              type="button"
+              onClick={next}
+              className="h-8 w-8 rounded-full flex items-center justify-center text-lg text-white"
+              style={{ background: "color-mix(in oklch, white 15%, transparent)", border: "1px solid color-mix(in oklch, white 30%, transparent)" }}
+              aria-label="Next photo"
+            >›</button>
+          )}
+        </div>
+        {/* Actions */}
+        <div className="flex gap-2.5 mt-4">
+          {photos.length < 3 && (
+            <button
+              type="button"
+              onClick={onAddPhotos}
+              className="px-4 py-2 rounded-lg text-[13px] text-white"
+              style={{ background: "color-mix(in oklch, white 18%, transparent)", border: "1px solid color-mix(in oklch, white 35%, transparent)" }}
+            >Add photos</button>
+          )}
           <button
             type="button"
-            onClick={prev}
-            style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: "rgba(255,255,255,0.15)", color: "white",
-              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-            }}
-            aria-label="Previous photo"
-          >‹</button>
-        )}
-        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "'JetBrains Mono', monospace", minWidth: 36, textAlign: "center" }}>
-          {idx + 1}/{photos.length}
-        </span>
-        {photos.length > 1 && (
+            onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
+            className="px-4 py-2 rounded-lg text-[13px] text-white"
+            style={{ background: "color-mix(in oklch, white 12%, transparent)", border: "1px solid color-mix(in oklch, white 25%, transparent)" }}
+          >Remove this photo</button>
           <button
             type="button"
-            onClick={next}
-            style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: "rgba(255,255,255,0.15)", color: "white",
-              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-            }}
-            aria-label="Next photo"
-          >›</button>
-        )}
-      </div>
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
-        {photos.length < 3 && (
-          <button
-            type="button"
-            onClick={onAddPhotos}
-            style={{
-              padding: "8px 16px", borderRadius: 8, cursor: "pointer",
-              background: "rgba(255,255,255,0.18)", color: "white",
-              border: "1px solid rgba(255,255,255,0.35)", fontSize: 13,
-            }}
-          >Add photos</button>
-        )}
-        <button
-          type="button"
-          onClick={() => { onRemove(current.id); if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2)); }}
-          style={{
-            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
-            background: "rgba(255,255,255,0.12)", color: "white",
-            border: "1px solid rgba(255,255,255,0.25)", fontSize: 13,
-          }}
-        >Remove this photo</button>
-        <button
-          type="button"
-          onClick={() => { onRemoveAll(); onClose(); }}
-          style={{
-            padding: "8px 16px", borderRadius: 8, cursor: "pointer",
-            background: "rgba(220,50,50,0.75)", color: "white",
-            border: "1px solid rgba(255,255,255,0.2)", fontSize: 13,
-          }}
-        >Remove all photos</button>
-      </div>
-      {/* Close hint */}
-      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, marginTop: 4 }}>Tap outside to close</span>
-    </div>
+            onClick={() => { onRemoveAll(); onClose(); }}
+            className="px-4 py-2 rounded-lg text-[13px] text-white"
+            style={{ background: "color-mix(in oklch, var(--destructive) 75%, transparent)", border: "1px solid color-mix(in oklch, white 20%, transparent)" }}
+          >Remove all photos</button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
