@@ -57,7 +57,9 @@ export function RecordFab({
         addTake({ blobId, durationSec, mime });
       }
     } catch {
-      // normalization or storage failed — discard silently
+      toast.error("Couldn't save that recording", {
+        description: "Something went wrong storing the audio. Please try recording again.",
+      });
     } finally {
       setPending(false);
     }

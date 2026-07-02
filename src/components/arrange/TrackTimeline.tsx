@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
+import { cn } from "@/lib/utils";
 import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
@@ -916,8 +917,11 @@ export function TrackTimeline() {
                                   type="button"
                                   onClick={() => setTrackColor(track.id, c)}
                                   aria-label={c === track.color ? "Current color" : "Set track color"}
-                                  className="h-6 w-6 rounded-full border-2"
-                                  style={{ background: c, borderColor: c === track.color ? "var(--ink)" : "transparent" }}
+                                  className={cn(
+                                    "h-6 w-6 rounded-full transition-transform",
+                                    c === track.color && "ring-2 ring-primary scale-110",
+                                  )}
+                                  style={{ background: c }}
                                 />
                               ))}
                             </div>
@@ -978,12 +982,10 @@ export function TrackTimeline() {
                           onClick={() => toggleMute(track.id)}
                           aria-label={track.muted ? "Unmute track" : "Mute track"}
                           aria-pressed={track.muted}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
-                          style={
-                            track.muted
-                              ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" }
-                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
-                          }
+                          className={cn(
+                            track.muted ? "btn-sculpt-cocoa" : "btn-sculpt-cream",
+                            "inline-flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-bold",
+                          )}
                         >
                           M
                         </button>
@@ -992,12 +994,10 @@ export function TrackTimeline() {
                           onClick={() => toggleSolo(track.id)}
                           aria-label={track.soloed ? "Unsolo track" : "Solo track"}
                           aria-pressed={track.soloed}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold"
-                          style={
-                            track.soloed
-                              ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary-strong)" }
-                              : { borderColor: "var(--border)", color: "var(--ink-soft)" }
-                          }
+                          className={cn(
+                            track.soloed ? "btn-sculpt-amber" : "btn-sculpt-cream",
+                            "inline-flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-bold",
+                          )}
                         >
                           S
                         </button>
@@ -1258,6 +1258,7 @@ export function TrackTimeline() {
             <button
               type="button"
               onClick={() => void splitSelectedAtPlayhead()}
+              title="Split (S)"
               className="btn-sculpt-cream inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
             >
               <Scissors className="h-3.5 w-3.5" /> Split
@@ -1274,6 +1275,7 @@ export function TrackTimeline() {
             <button
               type="button"
               onClick={() => deleteClip(selectedTrack.id, selectedClip.blobId)}
+              title="Delete (Delete/Backspace)"
               className="btn-sculpt-destructive inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
