@@ -603,3 +603,11 @@
   .animate-paste-glow { animation: none; }
   .onb-squiggly { animation: none; }
 }
+
+/* Radix sets `pointer-events: none` on <body> while a modal Dialog is open,
+   restoring it only on the Dialog's own content. Sonner's toast portal is a
+   sibling of the Dialog's portal, so it inherits that `none` and becomes
+   unclickable (e.g. an "Undo" action toast fired from inside a modal). */
+.toaster {
+  pointer-events: auto;
+}

@@ -47,3 +47,15 @@ export function removeRecent(id: string) {
     /* ignore */
   }
 }
+
+/** Re-inserts a previously removed entry at `index` — used to undo `removeRecent`. */
+export function restoreRecent(entry: RecentProject, index: number) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const list = listRecent();
+    list.splice(Math.min(index, list.length), 0, entry);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, MAX)));
+  } catch {
+    /* ignore */
+  }
+}

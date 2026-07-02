@@ -25,7 +25,8 @@ import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore } from "@/store/ui";
-import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
+import { listRecent, removeRecent, restoreRecent, type RecentProject } from "@/lib/recent-projects";
+import { toast as sonnerToast } from "sonner";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -157,9 +158,13 @@ export default function Landing() {
       navigate("/app");
     });
   };
-  const removeOne = (id: string) => {
-    removeRecent(id);
+  const removeOne = (r: RecentProject) => {
+    const index = recents.findIndex((x) => x.id === r.id);
+    removeRecent(r.id);
     setRecents(listRecent());
+    sonnerToast(`Removed "${r.name}" from recents`, {
+      action: { label: "Undo", onClick: () => { restoreRecent(r, index); setRecents(listRecent()); } },
+    });
   };
   const startCapture = (capture: "record" | "lyrics") => {
     guardRecordings(() => {
@@ -205,6 +210,20 @@ export default function Landing() {
           <span>and Experiment.</span>
           
         </p>
+
+        {recents.length > 0 && (
+          <button
+            type="button"
+            onClick={() => openRecent(recents[0])}
+            className="mt-8 w-full max-w-md rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-3 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
+          >
+            <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
+              <h3 className="font-display text-lg truncate">{recents[0].name}</h3>
+            </div>
+          </button>
+        )}
 
         <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
           <EmptyTapCard
@@ -284,7 +303,7 @@ export default function Landing() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => removeOne(r.id)}>
+                      <DropdownMenuItem onClick={() => removeOne(r)}>
                         Remove from recents
                       </DropdownMenuItem>
                     </DropdownMenuContent>

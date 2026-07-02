@@ -29,7 +29,7 @@ export function SkipTutorialButton() {
     <button
       type="button"
       onClick={() => disable()}
-      className="btn-sculpt-cream fixed bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-xs font-display font-semibold"
+      className="btn-sculpt-cream fixed bottom-20 left-4 inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-xs font-display font-semibold"
       style={{ zIndex: 10000 }}
     >
       Skip Tutorial
