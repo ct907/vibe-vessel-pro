@@ -2,6 +2,8 @@ import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { X } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { isOverlayRoute } from "@/lib/routes";
 
 interface Props {
   step: string;
@@ -212,8 +214,10 @@ export function AnchoredCoachMark({
     };
   }, [anchorRef, gap, anchorEdge, viewportBottom]);
 
+  const { pathname } = useLocation();
   const interactive = !!markProps.actionLabel && !!markProps.onAction;
   const visible = pos !== null && ready;
+  if (isOverlayRoute(pathname)) return null;
   return createPortal(
     <div
       ref={markWrapperRef}
