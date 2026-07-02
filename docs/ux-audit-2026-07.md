@@ -1,6 +1,8 @@
 # UX Audit — July 2026
 
-Method: live walkthrough of the running app (Chromium via Playwright, 1280×800 and 390×844), keyboard-only passes, reduced-motion emulation, and a code review of the flagged areas. Every finding below was verified against the running app and/or pinned to source. Fixes are recommendations only — nothing has been changed yet.
+**Status: all findings below (4 high, 7 medium, 8 low) have been fixed** in three follow-up commits on this branch, in the suggested order — quick wins, then keyboard/dialog a11y, then the product-level items. Each fix was verified live (Playwright) after implementation, not just typechecked. Two additional bugs were found and fixed only by testing the fixes themselves: Radix Dialog's `pointer-events: none` on `<body>` making the Sonner toast unclickable while a modal is open, and onboarding coach marks (portaled to `document.body`) still rendering on top of overlay routes despite the `inert` fix. See the git log on this branch for the four fix commits.
+
+Method: live walkthrough of the running app (Chromium via Playwright, 1280×800 and 390×844), keyboard-only passes, reduced-motion emulation, and a code review of the flagged areas. Every finding below was verified against the running app and/or pinned to source.
 
 ## What's working well
 
