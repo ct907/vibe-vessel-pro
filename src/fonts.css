@@ -1,0 +1,30 @@
+/* Self-hosted (via @fontsource) so the app's fonts survive being offline —
+   the "Use Offline" tagline used to depend on fonts.googleapis.com staying
+   reachable. Weights/styles mirror what the old Google Fonts URL requested. */
+
+@import "@fontsource/zain/200.css";
+@import "@fontsource/zain/300.css";
+@import "@fontsource/zain/300-italic.css";
+@import "@fontsource/zain/400.css";
+@import "@fontsource/zain/400-italic.css";
+@import "@fontsource/zain/700.css";
+@import "@fontsource/zain/800.css";
+@import "@fontsource/zain/900.css";
+
+@import "@fontsource/nunito/300.css";
+@import "@fontsource/nunito/300-italic.css";
+@import "@fontsource/nunito/400.css";
+@import "@fontsource/nunito/400-italic.css";
+@import "@fontsource/nunito/500.css";
+@import "@fontsource/nunito/600.css";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/800.css";
+
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+@import "@fontsource/noto-music/400.css";
+
+@import "@fontsource/caveat/400.css";
