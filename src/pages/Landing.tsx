@@ -25,17 +25,18 @@ import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore } from "@/store/ui";
-import { listRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
+import { listRecent, removeRecent, restoreRecent, type RecentProject } from "@/lib/recent-projects";
+import { toast as sonnerToast } from "sonner";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
 
-const TAGLINE_TEXT: CSSProperties = { color: "oklch(0.25 0.02 260)" };
-const LYRICS_STYLE: CSSProperties = { background: "oklch(0.8460 0.0483 311.68)" };
+const TAGLINE_TEXT: CSSProperties = { color: "var(--ink)" };
+const LYRICS_STYLE: CSSProperties = { background: "var(--section-tint-purple)" };
 const CHORDS_STYLE: CSSProperties = {
   background:
-    "linear-gradient(to right in oklch, oklch(0.9272 0.0651 83.56), oklch(0.8689 0.0539 11.07))",
+    "linear-gradient(to right in oklch, var(--section-tint-amber), var(--section-tint-rose))",
 };
-const PROGRESSIONS_STYLE: CSSProperties = { background: "oklch(0.9265 0.0286 238.25)" };
+const PROGRESSIONS_STYLE: CSSProperties = { background: "var(--section-tint-sky)" };
 
 function TaglineChip({ label, style }: { label: string; style: CSSProperties }) {
   return (
@@ -157,9 +158,13 @@ export default function Landing() {
       navigate("/app");
     });
   };
-  const removeOne = (id: string) => {
-    removeRecent(id);
+  const removeOne = (r: RecentProject) => {
+    const index = recents.findIndex((x) => x.id === r.id);
+    removeRecent(r.id);
     setRecents(listRecent());
+    sonnerToast(`Removed "${r.name}" from recents`, {
+      action: { label: "Undo", onClick: () => { restoreRecent(r, index); setRecents(listRecent()); } },
+    });
   };
   const startCapture = (capture: "record" | "lyrics") => {
     guardRecordings(() => {
@@ -180,31 +185,18 @@ export default function Landing() {
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
       <ChipScatterBackground />
       <main className="relative mx-auto max-w-[1600px] px-4 pt-10 pb-24 flex flex-col items-center text-center">
-        <div className="mt-10 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2">
-          <span
-            className="logomark-ink"
-            style={{
-              fontFamily: '"Noto Music"',
-              fontSize: 144,
-              lineHeight: "120px",
-              marginTop: 12,
-            }}
-          >
+        <h1
+          role="img"
+          aria-label="felt."
+          className="mt-10 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2 font-normal"
+        >
+          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 144, lineHeight: "120px", marginTop: 12 }}>
             𝆑
           </span>
-          <span
-            className="logomark-ink"
-            style={{
-              fontFamily: '"Noto Music"',
-              fontSize: 96,
-              fontStyle: "italic",
-              lineHeight: "120px",
-              marginLeft: -24,
-            }}
-          >
+          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 96, fontStyle: "italic", lineHeight: "120px", marginLeft: -24 }}>
             elt.
           </span>
-        </div>
+        </h1>
 
         <p className="mt-6 text-lg font-bold text-foreground/80">
           The Songwriter's Notebook. Use Offline. Save Locally.
@@ -218,6 +210,20 @@ export default function Landing() {
           <span>and Experiment.</span>
           
         </p>
+
+        {recents.length > 0 && (
+          <button
+            type="button"
+            onClick={() => openRecent(recents[0])}
+            className="mt-8 w-full max-w-md rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-3 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
+          >
+            <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
+              <h3 className="font-display text-lg truncate">{recents[0].name}</h3>
+            </div>
+          </button>
+        )}
 
         <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
           <EmptyTapCard
@@ -297,7 +303,7 @@ export default function Landing() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => removeOne(r.id)}>
+                      <DropdownMenuItem onClick={() => removeOne(r)}>
                         Remove from recents
                       </DropdownMenuItem>
                     </DropdownMenuContent>

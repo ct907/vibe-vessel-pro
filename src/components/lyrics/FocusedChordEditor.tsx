@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
@@ -120,6 +120,8 @@ export function FocusedChordEditor(props: Props) {
   );
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
 
@@ -131,6 +133,35 @@ export function FocusedChordEditor(props: Props) {
       dbg("unmounted — focusedEditorOpen: false");
     };
   }, [setEditorOpen]);
+
+  // Escape closes; Tab/Shift+Tab is trapped inside the dialog since this is a
+  // hand-rolled overlay (not Radix) and nothing else should be reachable
+  // while it's open.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        props.onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose]);
 
   useEffect(() => {
     if (isProgressionAdd) {
@@ -366,6 +397,10 @@ export function FocusedChordEditor(props: Props) {
       />
 
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="relative m-4 flex flex-1 flex-col rounded-lg overflow-hidden"
         style={{ background: "var(--ink-soft)", boxShadow: "var(--shadow-paper)" }}
       >
@@ -391,6 +426,7 @@ export function FocusedChordEditor(props: Props) {
               {headerEyebrow}
             </p>
             <h2
+              id={titleId}
               className="truncate"
               style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
             >
@@ -685,32 +721,31 @@ export function FocusedChordEditor(props: Props) {
             {suggestions.map((s) => {
               const colors = getChordColorClasses(s.symbol);
               return (
-                <button
+                <div
                   key={s.symbol.display}
-                  type="button"
-                  onClick={() => handlePick(s.symbol)}
                   style={colors.style}
                   className={cn(
                     colors.className,
-                    "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-3 text-left",
+                    "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none text-left",
                   )}
                 >
-                  <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => handlePick(s.symbol)}
+                    className="min-w-0 flex-1 px-3 py-3 text-left bg-transparent border-0"
+                  >
                     <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
                     <div className="text-xs opacity-80 truncate">{s.label}</div>
-                  </div>
-                  <span
-                    role="button"
+                  </button>
+                  <button
+                    type="button"
                     aria-label={`Preview ${s.symbol.display}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void playChord(s.symbol, undefined, octave);
-                    }}
-                    className="rounded-full p-2 bg-black/10 hover:bg-black/20"
+                    onClick={() => void playChord(s.symbol, undefined, octave)}
+                    className="rounded-full p-2 mr-2 shrink-0 bg-black/10 hover:bg-black/20"
                   >
                     <Play className="h-4 w-4" />
-                  </span>
-                </button>
+                  </button>
+                </div>
               );
             })}
           </div>

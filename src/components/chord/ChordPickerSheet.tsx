@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -229,9 +229,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
-        <div className="absolute top-2 left-4 text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
-          {initialChord ? "Edit Chord" : "Add Chords"}
-        </div>
+        <SheetTitle asChild>
+          <div className="absolute top-2 left-4 text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
+            {initialChord ? "Edit Chord" : "Add Chords"}
+          </div>
+        </SheetTitle>
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
@@ -323,28 +325,31 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
                   {suggestions.map((s) => {
                     const colors = getChordColorClasses(s.symbol);
                     return (
-                      <button
+                      <div
                         key={s.symbol.display}
                         style={colors.style}
                         className={cn(
                           colors.className,
-                          "noise-texture-chip group flex flex-col items-start gap-0.5 rounded-md border-none px-3 py-2 text-left min-w-[110px]",
+                          "noise-texture-chip group relative rounded-md border-none min-w-[110px]",
                         )}
-                        onClick={() => handlePick(s.symbol)}
                       >
-                        <div className="flex items-center gap-2 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handlePick(s.symbol)}
+                          className="flex flex-col items-start gap-0.5 w-full px-3 py-2 pr-8 text-left bg-transparent border-0"
+                        >
                           <span className="font-mono-chord font-semibold">{s.symbol.display}</span>
-                          <span
-                            role="button"
-                            aria-label={`Preview ${s.symbol.display}`}
-                            onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                            className="ml-auto rounded-full p-1 bg-black/10 hover:bg-black/20"
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                          </span>
-                        </div>
-                        <div className="text-[10px] opacity-80 truncate w-full">{s.label}</div>
-                      </button>
+                          <span className="text-[10px] opacity-80 truncate w-full">{s.label}</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Preview ${s.symbol.display}`}
+                          onClick={() => void playChord(s.symbol, undefined, octave)}
+                          className="absolute top-2 right-2 rounded-full p-1 bg-black/10 hover:bg-black/20"
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -355,28 +360,31 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
                   {suggestions.map((s) => {
                     const colors = getChordColorClasses(s.symbol);
                     return (
-                      <button
+                      <div
                         key={s.symbol.display}
                         style={colors.style}
                         className={cn(
                           colors.className,
-                          "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none px-3 py-2 text-left",
+                          "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none text-left",
                         )}
-                        onClick={() => handlePick(s.symbol)}
                       >
-                        <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => handlePick(s.symbol)}
+                          className="min-w-0 flex-1 px-3 py-2 text-left bg-transparent border-0"
+                        >
                           <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
                           <div className="text-xs opacity-80 truncate">{s.label}</div>
-                        </div>
-                        <span
-                          role="button"
+                        </button>
+                        <button
+                          type="button"
                           aria-label={`Preview ${s.symbol.display}`}
-                          onClick={(e) => { e.stopPropagation(); void playChord(s.symbol, undefined, octave); }}
-                          className="rounded-full p-1.5 bg-black/10 hover:bg-black/20"
+                          onClick={() => void playChord(s.symbol, undefined, octave)}
+                          className="rounded-full p-1.5 mr-2 shrink-0 bg-black/10 hover:bg-black/20"
                         >
                           <Play className="h-4 w-4" />
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

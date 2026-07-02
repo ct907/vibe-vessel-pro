@@ -1,8 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDefaultsStore, DEFAULTS_FALLBACK } from "@/store/defaults";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, RotateCcw } from "lucide-react";
+
+function DefaultNumberInput({
+  value, min, max, step, onCommit,
+}: { value: number; min: number; max: number; step?: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const commit = () => {
+    const n = Number(draft);
+    if (draft.trim() !== "" && Number.isFinite(n)) onCommit(n);
+    else setDraft(String(value));
+  };
+
+  return (
+    <Input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      className="w-28 font-mono-chord"
+    />
+  );
+}
 
 const Defaults = () => {
   const {
@@ -40,14 +68,12 @@ const Defaults = () => {
           label="Default chord length (beats)"
           help={`How long each new chord is when added to a pattern block. Default: ${DEFAULTS_FALLBACK.defaultChordLengthBeats}.`}
         >
-          <Input
-            type="number"
+          <DefaultNumberInput
+            value={defaultChordLengthBeats}
             min={0.5}
             max={16}
             step={0.5}
-            value={defaultChordLengthBeats}
-            onChange={(e) => setDefaultChordLength(Number(e.target.value) || DEFAULTS_FALLBACK.defaultChordLengthBeats)}
-            className="w-28 font-mono-chord"
+            onCommit={setDefaultChordLength}
           />
         </Field>
 
@@ -55,13 +81,11 @@ const Defaults = () => {
           label="Default pattern block length (bars)"
           help={`Number of bars in each new pattern block. Default: ${DEFAULTS_FALLBACK.defaultPatternBars}.`}
         >
-          <Input
-            type="number"
+          <DefaultNumberInput
+            value={defaultPatternBars}
             min={1}
             max={32}
-            value={defaultPatternBars}
-            onChange={(e) => setDefaultPatternBars(Number(e.target.value) || DEFAULTS_FALLBACK.defaultPatternBars)}
-            className="w-28 font-mono-chord"
+            onCommit={setDefaultPatternBars}
           />
         </Field>
 
@@ -69,13 +93,11 @@ const Defaults = () => {
           label="Default octave"
           help={`Octave used when adding chords and auditioning them. Range 2–6. Default: ${DEFAULTS_FALLBACK.defaultOctave}.`}
         >
-          <Input
-            type="number"
+          <DefaultNumberInput
+            value={defaultOctave}
             min={2}
             max={6}
-            value={defaultOctave}
-            onChange={(e) => setDefaultOctave(Number(e.target.value) || DEFAULTS_FALLBACK.defaultOctave)}
-            className="w-28 font-mono-chord"
+            onCommit={setDefaultOctave}
           />
         </Field>
       </main>
