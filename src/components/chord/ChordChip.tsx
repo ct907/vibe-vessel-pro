@@ -43,6 +43,11 @@ export function ChordChip({
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFiredRef = useRef(false);
   const lastTouchAtRef = useRef(0);
+  // Tracks where a touch began so a finger that's actually scrolling past the
+  // chip (not holding it) cancels the long-press/sustain timers instead of
+  // firing them.
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const MOVE_CANCEL_PX = 10;
   // Sustain bookkeeping
   const releaseRef = useRef<null | (() => void)>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +127,24 @@ export function ChordChip({
     releaseHold();
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartPosRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+    start(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const startPos = touchStartPosRef.current;
+    const t = e.touches[0];
+    if (!startPos || !t) return;
+    const dx = t.clientX - startPos.x;
+    const dy = t.clientY - startPos.y;
+    if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
+      touchStartPosRef.current = null;
+      cancel();
+    }
+  };
+
   const handleClick = (e: React.MouseEvent) => {
     if (swallowClickRef.current) {
       e.stopPropagation();
@@ -161,7 +184,8 @@ export function ChordChip({
         onMouseDown={() => start(false)}
         onMouseUp={cancel}
         onMouseLeave={cancel}
-        onTouchStart={() => start(true)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={cancel}
         onTouchCancel={cancel}
         onClick={handleClick}
