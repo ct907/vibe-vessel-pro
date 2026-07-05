@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal, Scissors } from "lucide-react";
+import { Plus, Trash2, Timer, GripVertical, Copy, Star, Repeat, Upload, X, MoreVertical, SlidersHorizontal, Scissors, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { useSongStore } from "@/store/song";
@@ -840,6 +840,24 @@ export function TrackTimeline() {
               >
                 {i * 4 + 1}
               </div>
+            ))}
+          </div>
+
+          {/* Section-start snap markers — tap an arrow to drop the playhead at a
+              section's first bar for easy overdubbing. */}
+          <div className="relative" style={{ height: 15 }}>
+            {layout.map((sec) => (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => setPlayheadSec(sec.startBar * secPerBar)}
+                title={`Snap playhead to ${sec.label}`}
+                aria-label={`Snap playhead to ${sec.label}`}
+                className="absolute bottom-0 flex -translate-x-1/2 items-center justify-center text-cocoa-deep/60 transition-colors hover:text-cocoa-deep"
+                style={{ left: LABEL_W + sec.startBar * PX_PER_BAR }}
+              >
+                <ChevronDown className="h-3.5 w-3.5" strokeWidth={3} />
+              </button>
             ))}
           </div>
 

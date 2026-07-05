@@ -2100,7 +2100,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
 
   return (
     <div
-      className="relative space-y-4 pb-24"
+      className="relative space-y-4 pb-24 min-h-[calc(100dvh-12rem)]"
       ref={progressionsRootRef}
       onClick={(e) => { if (e.target === e.currentTarget) setActiveChordId(null); }}
     >

@@ -2310,7 +2310,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
 
   return (
     <>
-    <div className="relative space-y-4" ref={lyricsRootRef}>
+    <div className="relative space-y-4 min-h-[calc(100dvh-12rem)]" ref={lyricsRootRef}>
       {sections.map((sec, i) => (
         <div key={sec.id} className="space-y-2">
           <SectionCard

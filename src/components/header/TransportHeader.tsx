@@ -526,6 +526,26 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const tapResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tapBpm, setTapBpm] = useState<number | null>(null);
 
+  // Keep the sticky header pinned to the visible viewport top when the on-screen
+  // keyboard opens. The viewport meta uses `interactive-widget=resizes-visual`,
+  // so only the visual viewport offsets — a plain `position: sticky` header
+  // would scroll above the fold. Translate it down by `visualViewport.offsetTop`
+  // (same visualViewport pattern WriteStickyBar uses for the bottom bar).
+  const [vvOffsetTop, setVvOffsetTop] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setVvOffsetTop(vv.offsetTop > 0 ? vv.offsetTop : 0);
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
   // [isPlaying] — React would run it on the false→true transition AFTER
   // handlePlay scheduled the first tick, killing the metronome moments
@@ -821,7 +841,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           </button>
         </div>
       </div>
-      <div className="sticky top-2 z-40 mx-2 sm:mx-4 mb-2">
+      <div
+        className="sticky top-2 z-40 mx-2 sm:mx-4 mb-2"
+        style={vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
+      >
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
         {inspirationPhotos.map((photo, i) => {
