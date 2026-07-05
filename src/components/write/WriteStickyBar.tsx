@@ -194,11 +194,11 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           WebkitBackdropFilter: "blur(8px) saturate(200%)",
         }}
       >
-        <div className="max-w-6xl mx-auto relative flex items-center justify-around px-4 py-3 gap-2 md:justify-center md:gap-9">
+        <div className="max-w-6xl mx-auto relative flex items-center justify-center px-4 py-3">
           {/* Level indicator during recording */}
           {recording && (
             <div
-              className="absolute top-1.5 left-1/2 -translate-x-1/2 h-1 w-14 overflow-hidden rounded-full"
+              className="absolute top-1.5 left-1/2 -translate-x-1/2 z-[1] h-1 w-14 overflow-hidden rounded-full"
               style={{ background: "rgba(255,255,255,0.2)" }}
             >
               <div
@@ -212,45 +212,55 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             </div>
           )}
 
-          {/* Record — always visible; disabled while a track is recording */}
-          <button
-            type="button"
-            onClick={toggle}
-            disabled={pending || (trackIsRecording && !recording)}
-            className={
-              "btn-sculpt-destructive inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none" +
-              (recording ? " animate-rec-pulse" : "") +
-              ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
-            }
-            aria-label={recording ? "Stop recording" : "Record a take"}
+          {/* Material 3 connected button group: one unified elevation, flush
+              segments with hairline dividers, only outer corners rounded. */}
+          <div
+            className="inline-flex items-stretch overflow-hidden rounded-2xl"
+            style={{ boxShadow: "var(--shadow-card)" }}
           >
-            <span
-              className="bg-white transition-all"
-              style={{ width: 12, height: 12, borderRadius: recording ? 3 : 6 }}
-            />
-            {pending ? "Saving…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
-          </button>
+            {/* Record — always visible; disabled while a track is recording */}
+            <button
+              type="button"
+              onClick={toggle}
+              disabled={pending || (trackIsRecording && !recording)}
+              className={
+                "inline-flex h-11 items-center gap-2 whitespace-nowrap px-4 text-sm font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
+                (recording ? " animate-rec-pulse" : "") +
+                ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
+              }
+              style={{ background: "var(--destructive)" }}
+              aria-label={recording ? "Stop recording" : "Record a take"}
+            >
+              <span
+                className="bg-white transition-all"
+                style={{ width: 12, height: 12, borderRadius: recording ? 3 : 6 }}
+              />
+              {pending ? "Saving…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setAddSectionOpen((o) => !o)}
-            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none"
-            aria-expanded={addSectionOpen}
-            aria-label="Add a song section"
-          >
-            <Plus className="h-4 w-4" />
-            Add Section
-          </button>
+            <button
+              type="button"
+              onClick={() => setAddSectionOpen((o) => !o)}
+              className="inline-flex h-11 items-center gap-2 whitespace-nowrap border-l border-black/15 px-4 text-sm font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              style={{ background: "var(--cocoa)" }}
+              aria-expanded={addSectionOpen}
+              aria-label="Add a song section"
+            >
+              <Plus className="h-4 w-4" />
+              Add Section
+            </button>
 
-          <button
-            type="button"
-            onClick={handleEditChords}
-            className="btn-sculpt-cocoa inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold md:max-w-[160px] md:flex-none"
-            aria-label="Open chord editing tools"
-          >
-            <Pencil className="h-4 w-4" />
-            Edit Chords
-          </button>
+            <button
+              type="button"
+              onClick={handleEditChords}
+              className="inline-flex h-11 items-center gap-2 whitespace-nowrap border-l border-black/15 px-4 text-sm font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              style={{ background: "var(--cocoa)" }}
+              aria-label="Open chord editing tools"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit Chords
+            </button>
+          </div>
         </div>
       </div>
     </div>

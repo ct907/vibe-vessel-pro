@@ -21,6 +21,7 @@ interface Props {
 export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }: Props) {
   const meta = useSongStore((s) => s.meta);
   const setTitle = useSongStore((s) => s.setTitle);
+  const setDescription = useSongStore((s) => s.setDescription);
   const sections = useSongStore((s) => s.sections);
   const setAllSectionsCollapsed = useSongStore((s) => s.setAllSectionsCollapsed);
   const formatChordsInSong = useSongStore((s) => s.formatChordsInSong);
@@ -32,6 +33,14 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }:
     ta.style.height = "auto";
     ta.style.height = `${ta.scrollHeight}px`;
   }, [meta.title]);
+
+  const descRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const ta = descRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [meta.description]);
 
   const allCollapsed = sections.length > 0 && sections.every((s) => s.collapsed);
   const canFormat = sections.some((s) => s.lines.some((l) => l.chords.length > 0));
@@ -86,7 +95,15 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }:
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <textarea
+        ref={descRef}
+        value={meta.description ?? ""}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Add liner notes…"
+        rows={1}
+        className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none text-sm leading-snug text-ink-soft placeholder:text-muted-foreground/50 px-0 pb-1 break-words text-center"
+      />
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
         <SongAttributesMenu />
         {metaSlot}
       </div>

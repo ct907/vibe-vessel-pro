@@ -140,7 +140,7 @@ const SECTIONS: Section[] = [
     steps: [
       "Tap \"Add Recording\" (or the Record button in the sticky bottom bar) to start capturing.",
       "Each take is saved to a takes library — mark up to three as \"best\" to keep them handy.",
-      "The app can auto-transcribe a take's chords and melody in the background as you record.",
+      "Use \"Convert to Chords\" to pick a take and detect its chords right on your device — the detected chords appear as chips you can drag onto your lyrics.",
       "In Arrange mode's Track view, drag a take onto a track to place it on the multitrack timeline, then trim, loop, or adjust its gain and pan.",
     ],
     tip: "Export Stems from the menu renders your tracks as WAV files if you want to finish the mix elsewhere.",

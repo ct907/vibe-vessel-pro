@@ -208,6 +208,8 @@ export interface InspirationPhoto {
 export interface SongState {
   meta: {
     title: string;
+    /** Optional free-form liner notes / description for the song. */
+    description?: string;
     keyRoot: string;
     keyMode: Mode;
     bpm: number;
@@ -229,6 +231,7 @@ export interface SongState {
 
   // ---- meta ----
   setTitle: (t: string) => void;
+  setDescription: (d: string) => void;
   setKey: (root: string, mode: Mode) => void;
   setBpm: (bpm: number) => void;
   setTimeSignature: (beatsPerBar: number, beatUnit: number) => void;
@@ -1479,6 +1482,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
+  setDescription: (description) => set((s) => ({ meta: { ...s.meta, description } })),
   setKey: (keyRoot, keyMode) => set((s) => {
     const semitones = (rootToPc(keyRoot) - rootToPc(s.meta.keyRoot) + 12) % 12;
     if (semitones === 0) return { meta: { ...s.meta, keyRoot, keyMode } };
