@@ -67,6 +67,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { createPortal } from "react-dom";
@@ -546,6 +547,31 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     };
   }, []);
 
+  // On mobile/tablet, retract the header (wordmark + inspiration photos +
+  // transport card) when the user scrolls down to free up vertical space for
+  // writing, and bring it back on the first upward scroll. Desktop has room
+  // to spare, so the header always stays put there.
+  const [headerHiddenByScroll, setHeaderHiddenByScroll] = useState(false);
+  useEffect(() => {
+    if (isDesktop) {
+      setHeaderHiddenByScroll(false);
+      return;
+    }
+    const SCROLL_DELTA_THRESHOLD = 8;
+    const MIN_SCROLL_BEFORE_HIDE = 40;
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const dy = y - lastY;
+      if (Math.abs(dy) < SCROLL_DELTA_THRESHOLD) return;
+      if (dy > 0 && y > MIN_SCROLL_BEFORE_HIDE) setHeaderHiddenByScroll(true);
+      else if (dy < 0) setHeaderHiddenByScroll(false);
+      lastY = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isDesktop]);
+
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
   // [isPlaying] — React would run it on the false→true transition AFTER
   // handlePlay scheduled the first tick, killing the metronome moments
@@ -807,6 +833,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
   return (
     <>
+      {/* On mobile/tablet the whole header (wordmark + inspiration photos +
+          transport card) retracts on scroll-down and returns on scroll-up to
+          free up vertical space. Desktop keeps it always visible. */}
+      <div
+        className={cn(!isDesktop && "sticky top-0 z-40 transition-transform duration-200 ease-out")}
+        style={!isDesktop ? { transform: `translateY(${headerHiddenByScroll ? "-100%" : "0"})` } : undefined}
+      >
       <div className="mx-auto mt-2 mb-2 flex w-full max-w-[1600px] items-center justify-between px-3 sm:px-5">
         <div className="flex items-center gap-2">
           <Link
@@ -842,7 +875,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         </div>
       </div>
       <div
-        className="sticky top-2 z-40 mx-2 sm:mx-4 mb-2"
+        className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && "sticky top-2")}
         style={vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
       >
       <div className="relative">
@@ -1289,6 +1322,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           onChange={handlePhotoUpload}
         />
       </div>
+    </div>
     </div>
     <SoundPanel open={soundOpen} onOpenChange={setSoundOpen} />
     <ExportLyricsSheet open={exportOpen} onOpenChange={setExportOpen} />
