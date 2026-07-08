@@ -550,7 +550,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   // On mobile/tablet, retract the header (wordmark + inspiration photos +
   // transport card) when the user scrolls down to free up vertical space for
   // writing, and bring it back on the first upward scroll. Desktop has room
-  // to spare, so the header always stays put there.
+  // to spare, so the header always stays put there. This must keep working
+  // with the on-screen keyboard open, so the scroll position is read from
+  // `visualViewport.pageTop` (falls back to window.scrollY) — the layout
+  // viewport's own scroll position can stay static while the keyboard is up
+  // even as the visible content scrolls, since the page uses
+  // `interactive-widget=resizes-visual`.
   const [headerHiddenByScroll, setHeaderHiddenByScroll] = useState(false);
   useEffect(() => {
     if (isDesktop) {
@@ -559,9 +564,10 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     }
     const SCROLL_DELTA_THRESHOLD = 8;
     const MIN_SCROLL_BEFORE_HIDE = 40;
-    let lastY = window.scrollY;
+    const getScrollY = () => window.visualViewport?.pageTop ?? window.scrollY;
+    let lastY = getScrollY();
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = getScrollY();
       const dy = y - lastY;
       if (Math.abs(dy) < SCROLL_DELTA_THRESHOLD) return;
       if (dy > 0 && y > MIN_SCROLL_BEFORE_HIDE) setHeaderHiddenByScroll(true);
@@ -569,7 +575,13 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       lastY = y;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.visualViewport?.addEventListener("scroll", onScroll);
+    window.visualViewport?.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("resize", onScroll);
+    };
   }, [isDesktop]);
 
   // Stop the metronome only on unmount. Don't return a cleanup keyed to
@@ -838,9 +850,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           free up vertical space. Desktop keeps it always visible. */}
       <div
         className={cn(!isDesktop && "sticky top-0 z-40 transition-transform duration-200 ease-out")}
-        style={!isDesktop ? { transform: `translateY(${headerHiddenByScroll ? "-100%" : "0"})` } : undefined}
+        style={
+          !isDesktop
+            ? { transform: `translateY(${vvOffsetTop}px) translateY(${headerHiddenByScroll ? "-100%" : "0"})` }
+            : undefined
+        }
       >
-      <div className="mx-auto mt-2 mb-2 flex w-full max-w-[1600px] items-center justify-between px-3 sm:px-5">
+      <div
+        className="mx-auto mt-2 mb-2 flex w-full max-w-[1600px] items-center justify-between px-3 sm:px-5 rounded-b-xl"
+        style={{ background: "color-mix(in oklch, var(--paper) 50%, transparent)" }}
+      >
         <div className="flex items-center gap-2">
           <Link
             to="/"
@@ -876,7 +895,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       </div>
       <div
         className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && "sticky top-2")}
-        style={vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
+        style={isDesktop && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
       >
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
