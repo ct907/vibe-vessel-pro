@@ -118,11 +118,18 @@ function reapVoices() {
 }
 
 function steal(n: number) {
-  // Steal the oldest voices (front of array).
-  for (let i = 0; i < n && liveVoices.length > 0; i++) {
-    const v = liveVoices.shift()!;
-    try { v.release(getAudioContext().currentTime); } catch { /* noop */ }
-    setTimeout(() => { try { v.dispose(); } catch { /* noop */ } }, 200);
+  const now = getAudioContext().currentTime;
+  // Only steal voices that have already started — never cancel a future-scheduled
+  // note's attack envelope, which would silence it before it plays.
+  let stolen = 0;
+  for (let i = 0; i < liveVoices.length && stolen < n; i++) {
+    if (liveVoices[i].startsAt <= now) {
+      const v = liveVoices.splice(i, 1)[0];
+      try { v.release(now); } catch { /* noop */ }
+      setTimeout(() => { try { v.dispose(); } catch { /* noop */ } }, 200);
+      stolen++;
+      i--;
+    }
   }
 }
 
@@ -151,7 +158,12 @@ function spawnNote(
 
 function ensureHeadroom(need: number) {
   reapVoices();
-  const overflow = (liveVoices.length + need) - MAX_VOICES;
+  const now = getAudioContext().currentTime;
+  // Only count voices that are currently playing or starting within the next
+  // 100 ms. Future-scheduled voices don't consume audible resources yet and
+  // must not be evicted — doing so cancels their scheduled attack envelope.
+  const activeCount = liveVoices.filter(v => v.startsAt <= now + 0.1).length;
+  const overflow = (activeCount + need) - MAX_VOICES;
   if (overflow > 0) steal(overflow);
 }
 
