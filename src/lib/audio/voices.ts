@@ -33,6 +33,8 @@ export interface Voice {
   dispose(): void;
   /** Audio-context time at which the voice will be silent and self-removable. */
   endsAt: number;
+  /** Audio-context time at which the voice will start (set by start()). */
+  startsAt: number;
 }
 
 // Convenience: schedule a smooth ADSR on a GainNode at the given start time.
@@ -107,9 +109,11 @@ function makeFmVoice(p: VoiceParams): Voice {
 
   const peak = velocity;
   let endsAt = Infinity;
+  let startsAt = Infinity;
 
   return {
     start(at: number) {
+      startsAt = at;
       carrier.start(at);
       modulator.start(at);
       applyAttack(amp, adsr, peak, at);
@@ -134,6 +138,7 @@ function makeFmVoice(p: VoiceParams): Voice {
       try { modGain.disconnect(); } catch { /* noop */ }
     },
     get endsAt() { return endsAt; },
+    get startsAt() { return startsAt; },
   };
 }
 
@@ -228,9 +233,11 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
 
   const peak = velocity * 0.7;
   let endsAt = Infinity;
+  let startsAt = Infinity;
 
   return {
     start(at: number) {
+      startsAt = at;
       sources.forEach((s) => s.o.start(at));
       lfo?.start(at);
       applyAttack(amp, adsr, peak, at);
@@ -248,6 +255,7 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
       try { amp.disconnect(); } catch {/*noop*/}
     },
     get endsAt() { return endsAt; },
+    get startsAt() { return startsAt; },
   };
 }
 
@@ -310,9 +318,11 @@ function makeFormantVoice(p: VoiceParams): Voice {
 
   const peak = velocity * 0.6;
   let endsAt = Infinity;
+  let startsAt = Infinity;
 
   return {
     start(at: number) {
+      startsAt = at;
       sources.forEach((o) => o.start(at));
       vibrato.start(at);
       applyAttack(amp, adsr, peak, at);
@@ -331,6 +341,7 @@ function makeFormantVoice(p: VoiceParams): Voice {
       try { amp.disconnect(); } catch {/*noop*/}
     },
     get endsAt() { return endsAt; },
+    get startsAt() { return startsAt; },
   };
 }
 
