@@ -1247,10 +1247,8 @@ function SectionGroup({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className={cn(
-                "relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide",
-                notesOpen ? "btn-sculpt-amber" : "btn-sculpt-cream",
-              )}
+              className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4]"
+              style={{ color: "oklch(0.3267 0.027 60.1)" }}
             >
               {notesOpen ? "Hide Notes" : "Show Notes"}
               {hasComment && (
