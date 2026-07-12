@@ -985,6 +985,7 @@ function SectionCard({
   };
 
   const hasComment = !!(section.comment && section.comment.trim().length);
+  const hasChords = section.chords.length > 0;
   const chordsVisible = getSectionChordsVisible(section);
   const notesOpen = section.notesOpen ?? false;
 
@@ -1261,20 +1262,19 @@ function SectionCard({
             onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
             disabled={section.type === "instrumental"}
             title={section.type === "instrumental" ? "Instrumental sections always show chords" : undefined}
-            className={cn(
-              "inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed",
-              chordsVisible ? "btn-sculpt-amber" : "btn-sculpt-cream",
-            )}
+            className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4] disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: "oklch(0.3267 0.027 60.1)" }}
           >
             {chordsVisible ? "Hide Chords" : "Add Chords"}
+            {hasChords && (
+              <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+            )}
           </button>
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className={cn(
-                "relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide",
-                notesOpen ? "btn-sculpt-amber" : "btn-sculpt-cream",
-              )}
+              className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4]"
+              style={{ color: "oklch(0.3267 0.027 60.1)" }}
             >
               {notesOpen ? "Hide Notes" : "Show Notes"}
               {hasComment && (
