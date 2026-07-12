@@ -46,7 +46,6 @@ import {
   Music2,
   Pencil,
   ListMusic,
-  MessageSquare,
   KeyRound,
   Sparkles,
   Play,
@@ -63,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
@@ -964,6 +964,7 @@ function SectionGroup({
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
   const setSectionComment = useSongStore((s) => s.setSectionComment);
+  const setSectionNotesOpen = useSongStore((s) => s.setSectionNotesOpen);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
   const section = useSongStore((s) => s.sections.find((sec) => sec.id === sectionId));
   const allSections = useSongStore((s) => s.sections);
@@ -972,9 +973,9 @@ function SectionGroup({
   const canDeleteSection = totalSections > 1;
   const { theme } = useTheme();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
-  const [commentOpen, setCommentOpen] = useState(false);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const hasComment = !!(section?.comment && section.comment.trim().length);
+  const notesOpen = section?.notesOpen ?? false;
   const effectiveOffsets = useMemo(() => computeEffectiveOffsets(allSections), [allSections]);
   const effectiveOffset = effectiveOffsets[index] ?? 0;
   const isFirstSection = index === 0;
@@ -1236,7 +1237,39 @@ function SectionGroup({
         )}
       </div>
 
-
+      {/* Notes toggle row */}
+      <Collapsible
+        open={notesOpen}
+        onOpenChange={(o) => setSectionNotesOpen(sectionId, o)}
+        className="mt-2"
+      >
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide",
+                notesOpen ? "btn-sculpt-amber" : "btn-sculpt-cream",
+              )}
+            >
+              {notesOpen ? "Hide Notes" : "Show Notes"}
+              {hasComment && (
+                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+          <div className="mt-2 w-full">
+            <Textarea
+              value={section?.comment ?? ""}
+              onChange={(e) => setSectionComment(sectionId, e.target.value)}
+              placeholder="Notes for this section…"
+              className="min-h-[80px] font-display text-base"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Pattern blocks within this section. Pattern-block reordering is
           intentionally NOT exposed: the lyrics tab's chord row order is
@@ -1364,18 +1397,6 @@ function SectionGroup({
                 <Plus className="h-4 w-4" />
                 <span className="text-xs font-display uppercase tracking-wide">Add block</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setCommentOpen((o) => !o)}
-                className="relative h-10 w-10 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                aria-label={hasComment ? "View comment" : "Add comment"}
-                title={hasComment ? "View comment" : "Add comment"}
-              >
-                <MessageSquare className="h-4 w-4" />
-                {hasComment && (
-                  <span aria-hidden className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-                )}
-              </button>
             </div>
           );
           if (!sectionHasChords && !sectionHasLyrics) {
@@ -1394,16 +1415,6 @@ function SectionGroup({
             </div>
           );
         })()}
-        {commentOpen && (
-          <div className="mt-3 w-full">
-            <Textarea
-              value={section?.comment ?? ""}
-              onChange={(e) => setSectionComment(sectionId, e.target.value)}
-              placeholder="Notes for this section…"
-              className="min-h-[80px] font-display text-base"
-            />
-          </div>
-        )}
         </>
 
 
