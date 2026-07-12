@@ -97,6 +97,10 @@ export interface Section {
   chords: SectionChord[];
   /** Optional notes/comment for this section. */
   comment?: string;
+  /** Section-wide override for whether chord rows render for this section's lines in Write and Record. Undefined = use getSectionChordsVisible()'s default. */
+  chordsVisible?: boolean;
+  /** Whether the notes/comment accordion is expanded. Undefined = closed. */
+  notesOpen?: boolean;
   /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
   color?: string | null;
   /** When false, this section plays as block chords even if the global arp is on. Default true. */
@@ -247,6 +251,8 @@ export interface SongState {
   toggleSectionCollapsed: (id: string) => void;
   setAllSectionsCollapsed: (collapsed: boolean) => void;
   setSectionComment: (id: string, comment: string) => void;
+  setSectionChordsVisible: (id: string, visible: boolean) => void;
+  setSectionNotesOpen: (id: string, open: boolean) => void;
   setSectionColor: (id: string, color: string | null) => void;
   setSectionArpArmed: (id: string, armed: boolean) => void;
   setSectionKeyChangeOffset: (id: string, offset: number | undefined) => void;
@@ -878,6 +884,17 @@ export function getLineChordsViaSSOT(section: Section, lineId: string): ChordAnc
     if (!seen.has(a.id)) out.push(a);
   }
   return out;
+}
+
+/**
+ * Effective chord-row visibility for a section in Write and Record. Explicit
+ * user choice (chordsVisible !== undefined) always wins; otherwise defaults to
+ * visible when the section already has chord content, or is instrumental
+ * (chord-only, so hiding would be nonsensical).
+ */
+export function getSectionChordsVisible(section: Section): boolean {
+  if (section.chordsVisible != null) return section.chordsVisible;
+  return section.type === "instrumental" || section.chords.length > 0;
 }
 
 /**
@@ -1704,6 +1721,12 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   })),
   setSectionComment: (id, comment) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, comment } : sec)),
+  })),
+  setSectionChordsVisible: (id, visible) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, chordsVisible: visible } : sec)),
+  })),
+  setSectionNotesOpen: (id, open) => set((s) => ({
+    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, notesOpen: open } : sec)),
   })),
   setSectionColor: (id, color) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, color: color ?? null } : sec)),

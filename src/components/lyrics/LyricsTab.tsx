@@ -9,6 +9,7 @@ import {
   useSongStore,
   getSectionDisplayName,
   getLineChordsViaSSOT,
+  getSectionChordsVisible,
   withHistoryGroup,
   patternPlayBeats,
   CHORD_ROW_SLOTS,
@@ -27,6 +28,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +61,6 @@ import {
   Copy,
   ArrowUp,
   ArrowDown,
-  MessageSquare,
   X,
   Wand2,
   Sparkles,
@@ -145,6 +146,7 @@ interface LineRowProps {
   line: LyricLine;
   active?: boolean;
   isFirst: boolean;
+  chordsVisible: boolean;
   onAddLineAfter: () => string | void;
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
@@ -169,6 +171,7 @@ function LineRow({
   section,
   line,
   active,
+  chordsVisible,
   onAddLineAfter,
   onMergeUp,
   onPickerOpen,
@@ -325,6 +328,7 @@ function LineRow({
       {/* CHORD ROW + edit pencil. Each slot is its own Droppable so pangea's
           contiguous-index requirement is naturally satisfied (each slot holds
           at most one Draggable at index 0). */}
+      {chordsVisible && (
       <div className="flex items-stretch gap-1" style={{ paddingBottom: 4 }}>
         <div
           data-chord-row={line.id}
@@ -509,10 +513,12 @@ function LineRow({
           </div>
 
       </div>
+      )}
 
       {/* Floating chord movement menu — appears below chord row when a chord is active.
           Hidden on mobile; mobile uses the global FloatingChordToolbar. */}
       {(() => {
+        if (!chordsVisible) return null;
         if (isMobile) return null;
         if (!activeChordId) return null;
         const activeAnchor = lineChords.find((c) => c.id === activeChordId);
@@ -855,6 +861,8 @@ function SectionCard({
     toggleSectionCollapsed,
     upsertChordAt,
     setSectionComment,
+    setSectionChordsVisible,
+    setSectionNotesOpen,
     setSectionColor,
     setSectionArpArmed,
     suppressCrossTabDeleteWarning,
@@ -868,7 +876,6 @@ function SectionCard({
   const [draftLabel, setDraftLabel] = useState(section.label);
   const prevTypeRef = useRef<SectionType | null>(null);
   const prevLabelRef = useRef<string>(section.label);
-  const [commentOpen, setCommentOpen] = useState(false);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
   const [overdubOpen, setOverdubOpen] = useState(false);
@@ -978,6 +985,8 @@ function SectionCard({
   };
 
   const hasComment = !!(section.comment && section.comment.trim().length);
+  const chordsVisible = getSectionChordsVisible(section);
+  const notesOpen = section.notesOpen ?? false;
 
   return (
     <div
@@ -1090,23 +1099,6 @@ function SectionCard({
               onChange={(c) => setSectionColor(section.id, c)}
               className={isMobile ? "hidden" : undefined}
             />
-            <button
-              onClick={() => {
-                if (section.collapsed) toggleSectionCollapsed(section.id);
-                setCommentOpen((o) => !o);
-              }}
-              className="relative h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
-              aria-label={hasComment ? "View comment" : "Add comment"}
-            >
-              <Plus className="h-3 w-3 absolute top-2 left-2" />
-              <MessageSquare className="h-4 w-4" />
-              {hasComment && (
-                <span
-                  aria-hidden
-                  className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary"
-                />
-              )}
-            </button>
             <button
               type="button"
               onClick={() => duplicateSection(section.id)}
@@ -1257,6 +1249,52 @@ function SectionCard({
 
       </div>
 
+      {/* Chords / Notes toggle row */}
+      <Collapsible
+        open={notesOpen}
+        onOpenChange={(o) => setSectionNotesOpen(section.id, o)}
+        className="mt-2"
+      >
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
+            disabled={section.type === "instrumental"}
+            title={section.type === "instrumental" ? "Instrumental sections always show chords" : undefined}
+            className={cn(
+              "inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed",
+              chordsVisible ? "btn-sculpt-amber" : "btn-sculpt-cream",
+            )}
+          >
+            {chordsVisible ? "Hide Chords" : "Add Chords"}
+          </button>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold uppercase tracking-wide",
+                notesOpen ? "btn-sculpt-amber" : "btn-sculpt-cream",
+              )}
+            >
+              {notesOpen ? "Hide Notes" : "Show Notes"}
+              {hasComment && (
+                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+          <div className="mt-2 w-full">
+            <Textarea
+              value={section.comment ?? ""}
+              onChange={(e) => setSectionComment(section.id, e.target.value)}
+              placeholder="Notes for this section…"
+              className="min-h-[80px] font-display text-base"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
       {/* Body */}
       {!section.collapsed && (
         <>
@@ -1270,6 +1308,7 @@ function SectionCard({
                 line={line}
                 isFirst={i === 0}
                 active={activeLineId === line.id}
+                chordsVisible={chordsVisible}
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onMergeUp={(kind) => handleMergeUp(line.id, kind)}
                 onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
@@ -1308,7 +1347,7 @@ function SectionCard({
           {/* Progression-only chords: anchored to blocks, not lyric words.
               Tap to select, again (or long-press) to edit; reorder with the
               arrows; X removes. They follow block order, not the lyrics. */}
-          {unplacedChords.length > 0 && (
+          {chordsVisible && unplacedChords.length > 0 && (
             <div
               data-chord-keep
               className="mt-2 rounded-md px-2 py-2"
@@ -1385,18 +1424,6 @@ function SectionCard({
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {/* Comment textarea (toggle button is in the section header) */}
-          {commentOpen && (
-            <div className="mt-3 w-full">
-              <Textarea
-                value={section.comment ?? ""}
-                onChange={(e) => setSectionComment(section.id, e.target.value)}
-                placeholder="Notes for this section…"
-                className="min-h-[80px] font-display text-base"
-              />
             </div>
           )}
         </>
