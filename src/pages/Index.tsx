@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { nanoid } from "nanoid";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
   DragDropContext,
@@ -16,8 +17,9 @@ import { WriteMode } from "@/components/write/WriteMode";
 import { ArrangeMode } from "@/components/arrange/ArrangeMode";
 import { useSongStore, beginInteraction, endInteraction } from "@/store/song";
 import { useDndStore } from "@/store/dnd";
-import { useTakesStore } from "@/store/takes";
+import { useTakesStore, type Take } from "@/store/takes";
 import { useRecordingsStore, type RecClip } from "@/store/recordings";
+import { getAudioBlob, putAudioBlob } from "@/lib/audio/blob-store";
 import { useAppBackgroundStore, getPatternStyle, getMaskStyle } from "@/store/appBackground";
 import { useTheme } from "@/hooks/use-theme";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
@@ -25,6 +27,28 @@ import { useOnboardingStore } from "@/store/onboarding";
 
 const isTabName = (v: string | null): v is TabName =>
   v === "lyrics" || v === "chords" || v === "progressions" || v === "recordings" || v === "voicekey";
+
+/**
+ * Dropping a take onto a track copies its audio under a new blob id rather
+ * than reusing the take's id — otherwise deleting the clip (or the take)
+ * later would silently delete audio the other one still depends on.
+ */
+async function addTakeCopyAsClip(trackId: string, take: Take, startSec: number) {
+  if (!take.blobId) return;
+  const blob = await getAudioBlob(take.blobId);
+  if (!blob) return;
+  const newBlobId = nanoid();
+  await putAudioBlob(newBlobId, blob);
+  const clip: RecClip = {
+    blobId: newBlobId,
+    mime: take.mime ?? "audio/webm",
+    durationSec: take.durationSec,
+    startSec,
+    trimStartSec: 0,
+    trimEndSec: take.durationSec,
+  };
+  useRecordingsStore.getState().addClip(trackId, clip);
+}
 
 const Index = () => {
   const bg = useAppBackgroundStore();
@@ -124,19 +148,10 @@ const Index = () => {
         const takeId = result.draggableId.slice("take:".length);
         const take = useTakesStore.getState().takes.find((t) => t.id === takeId);
         if (take?.blobId) {
-          const { addClip, playheadSec } = useRecordingsStore.getState();
           // Land the take where the playhead is — the same place a new recording
           // would start — rather than always appending at the track end.
-          const startSec = playheadSec;
-          const clip: RecClip = {
-            blobId: take.blobId,
-            mime: take.mime ?? "audio/webm",
-            durationSec: take.durationSec,
-            startSec,
-            trimStartSec: 0,
-            trimEndSec: take.durationSec,
-          };
-          addClip(trackId, clip);
+          const startSec = useRecordingsStore.getState().playheadSec;
+          void addTakeCopyAsClip(trackId, take, startSec);
         }
       }
     } finally {

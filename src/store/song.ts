@@ -4283,25 +4283,39 @@ export function downloadProjectJSON(filename = "song.json") {
 }
 
 export async function buildProjectZipBlob(): Promise<Blob> {
-  const [{ default: JSZip }, { useRecordingsStore }, { getAudioBlob }, { extFromMime }] = await Promise.all([
+  const [{ default: JSZip }, { useRecordingsStore }, { useTakesStore }, { getAudioBlob }, { extFromMime }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
+    import("@/store/takes"),
     import("@/lib/audio/blob-store"),
     import("@/lib/audio/waveform"),
   ]);
-  const songJson = useSongStore.getState().toJSON() as SerializedSong & { recordings?: { tracks: unknown[] } };
+  const songJson = useSongStore.getState().toJSON() as SerializedSong & { recordings?: { tracks: unknown[] }; takes?: unknown[] };
   const recordingsJson = useRecordingsStore.getState().toJSON();
-  (songJson as SerializedSong & { recordings?: typeof recordingsJson }).recordings = recordingsJson;
+  const takesJson = useTakesStore.getState().toJSON();
+  songJson.recordings = recordingsJson;
+  songJson.takes = takesJson.takes;
   const zip = new JSZip();
   zip.file("song.json", JSON.stringify(songJson, null, 2));
   const audioFolder = zip.folder("audio");
   if (audioFolder) {
+    const writtenBlobIds = new Set<string>();
     for (const track of recordingsJson.tracks) {
       for (const clip of track.clips ?? []) {
+        if (writtenBlobIds.has(clip.blobId)) continue;
         const blob = await getAudioBlob(clip.blobId);
         if (blob) {
           audioFolder.file(`${clip.blobId}.${extFromMime(blob.type)}`, blob);
+          writtenBlobIds.add(clip.blobId);
         }
+      }
+    }
+    for (const take of takesJson.takes) {
+      if (!take.blobId || writtenBlobIds.has(take.blobId)) continue;
+      const blob = await getAudioBlob(take.blobId);
+      if (blob) {
+        audioFolder.file(`${take.blobId}.${extFromMime(blob.type)}`, blob);
+        writtenBlobIds.add(take.blobId);
       }
     }
   }
@@ -4321,15 +4335,16 @@ export async function downloadProjectZip(filename = "song.zip") {
 }
 
 async function loadProjectFromZipFile(file: File): Promise<void> {
-  const [{ default: JSZip }, { useRecordingsStore }] = await Promise.all([
+  const [{ default: JSZip }, { useRecordingsStore }, { useTakesStore }] = await Promise.all([
     import("jszip"),
     import("@/store/recordings"),
+    import("@/store/takes"),
   ]);
   const zip = await JSZip.loadAsync(file);
   const songFile = zip.file("song.json");
   if (!songFile) throw new Error("Missing song.json in archive");
   const songText = await songFile.async("string");
-  const data = JSON.parse(songText) as SerializedSong & { recordings?: { tracks: unknown[] } };
+  const data = JSON.parse(songText) as SerializedSong & { recordings?: { tracks: unknown[] }; takes?: unknown[] };
   useSongStore.getState().loadFromJSON(data);
 
   // Restore audio blobs.
@@ -4359,6 +4374,15 @@ async function loadProjectFromZipFile(file: File): Promise<void> {
   } else {
     useRecordingsStore.getState().clear();
   }
+
+  // Restore takes store state.
+  const takes = (data as { takes?: unknown }).takes;
+  if (Array.isArray(takes)) {
+    // Cast to the store's Take[] shape — JSON shape matches at runtime.
+    useTakesStore.getState().hydrate(takes as Parameters<ReturnType<typeof useTakesStore.getState>["hydrate"]>[0]);
+  } else {
+    useTakesStore.getState().clear();
+  }
 }
 
 export async function loadProjectFromFile(file: File): Promise<void> {
@@ -4373,8 +4397,9 @@ export async function loadProjectFromFile(file: File): Promise<void> {
       try {
         const data = JSON.parse(String(reader.result));
         useSongStore.getState().loadFromJSON(data);
-        // Plain JSON has no recordings — clear them.
+        // Plain JSON has no recordings or takes — clear them.
         import("@/store/recordings").then((m) => m.useRecordingsStore.getState().clear()).catch(() => { /* noop */ });
+        import("@/store/takes").then((m) => m.useTakesStore.getState().clear()).catch(() => { /* noop */ });
         resolve();
       } catch (e) {
         reject(e);

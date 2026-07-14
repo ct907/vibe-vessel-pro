@@ -34,6 +34,8 @@ interface TakesState {
   removeTake: (id: string) => void;
   renameTake: (id: string, name: string) => void;
   clear: () => void;
+  hydrate: (takes: Take[]) => void;
+  toJSON: () => { takes: Take[] };
 }
 
 export const useTakesStore = create<TakesState>((set, get) => ({
@@ -73,6 +75,8 @@ export const useTakesStore = create<TakesState>((set, get) => ({
   renameTake: (id, name) =>
     set((s) => ({ takes: s.takes.map((t) => (t.id === id ? { ...t, name: name.trim() || t.name } : t)) })),
   clear: () => set({ takes: [] }),
+  hydrate: (takes) => set({ takes }),
+  toJSON: () => ({ takes: get().takes }),
 }));
 
 // ---- localStorage persistence ----
@@ -85,7 +89,7 @@ export function hydrateTakesFromStorage() {
     const raw = localStorage.getItem(TAKES_STORAGE_KEY);
     if (!raw) return;
     const takes = JSON.parse(raw);
-    if (Array.isArray(takes)) useTakesStore.setState({ takes });
+    if (Array.isArray(takes)) useTakesStore.getState().hydrate(takes);
   } catch { /* ignore */ }
 }
 
