@@ -1493,11 +1493,23 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     rangeAnchorRef.current = { patternId, chordId };
     setMultiSelected((prev) => {
       const next = new Map(prev);
+      // Starting a multi-select from an already-active chord (e.g. click one
+      // chord, then Ctrl+click another) should carry the active chord into
+      // the selection — otherwise it stays visually "selected" but is
+      // silently skipped by every multi-select action (resize, shift, etc).
+      if (next.size === 0 && activeChordId && activeChordId !== chordId) {
+        const activePattern = progression.find((p) => {
+          const owner = sections.find((s) => s.id === (p.sectionId ?? p.id));
+          const chords = owner ? getPatternChordsViaSSOT(owner, p) : p.chords;
+          return chords.some((c) => c.id === activeChordId);
+        });
+        if (activePattern) next.set(activeChordId, activePattern.id);
+      }
       if (next.has(chordId)) next.delete(chordId);
       else next.set(chordId, patternId);
       return next;
     });
-  }, []);
+  }, [activeChordId, progression, sections]);
 
   const rangeSelectProgChords = useCallback((patternId: string, chordId: string) => {
     const pat = progression.find((p) => p.id === patternId);
@@ -2179,7 +2191,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       {/* Cross-block multi-select toolbar (desktop). */}
       {!isMobile && multiSelected.size > 0 && (
         <div className="sticky bottom-10 z-30 flex justify-center pointer-events-none">
-          <div className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-3 py-2 pointer-events-auto">
+          <div data-chord-keep className="flex items-center gap-1.5 rounded-lg border bg-popover shadow-md px-3 py-2 pointer-events-auto">
             <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handleMultiShift(-1)} aria-label="Move selection earlier" title="Move left (← also works)">
               <ChevronLeft className="h-5 w-5" />
             </Button>
