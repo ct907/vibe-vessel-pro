@@ -2802,22 +2802,24 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         }
       }
       if (!placed) {
+        // Spawn a continuation block sized to actually hold this chord —
+        // clamping it to an unrelated reference block's bar count would
+        // silently truncate a chord the user never asked to shrink.
         const ref = blocks[blocks.length - 1];
         const newId = nanoid();
+        const neededBars = Math.ceil((want - 1e-9) / ref.beatsPerBar);
         const newBlock: PatternBlock = {
           id: newId,
           sectionId,
           label: `${ref.label} (cont.)`,
-          bars: ref.bars,
+          bars: Math.max(ref.bars, neededBars),
           beatsPerBar: ref.beatsPerBar,
           chords: [],
         };
-        const cap = newBlock.bars * newBlock.beatsPerBar;
-        const placedLen = Math.min(want, cap);
         blocks.push(newBlock);
-        blockUsage.push(placedLen);
+        blockUsage.push(want);
         blockIndexById.set(newId, blocks.length - 1);
-        placementById.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: placedLen });
+        placementById.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: want });
       }
     }
 
@@ -3133,23 +3135,25 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         }
       }
       if (!placed) {
-        // Spawn continuation block at end of section.
+        // Spawn continuation block at end of section, sized to actually hold
+        // the overflow chord — clamping the chord to an unrelated reference
+        // block's existing bar count would silently discard the requested
+        // growth instead of making room for it.
         const ref = blocks[blocks.length - 1];
         const newId = nanoid();
+        const neededBars = Math.ceil((len - 1e-9) / ref.beatsPerBar);
         const newBlock: PatternBlock = {
           id: newId,
           sectionId,
           label: `${ref.label} (cont.)`,
-          bars: ref.bars,
+          bars: Math.max(ref.bars, neededBars),
           beatsPerBar: ref.beatsPerBar,
           chords: [],
         };
-        const cap = newBlock.bars * newBlock.beatsPerBar;
-        const placedLen = Math.min(len, cap);
         blocks.push(newBlock);
-        blockUsage.push(placedLen);
+        blockUsage.push(len);
         blockIndexById.set(newId, blocks.length - 1);
-        placementById.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: placedLen });
+        placementById.set(sc.id, { patternId: newId, startBeat: 0, lengthBeats: len });
       }
     }
 
