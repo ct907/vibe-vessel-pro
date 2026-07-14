@@ -13,6 +13,7 @@ import { transcribeBlob } from "@/lib/music/transcribe";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import type { ChordSymbol } from "@/lib/music/chords";
 import { Waveform } from "@/components/common/Waveform";
+import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -368,6 +369,7 @@ function TakeCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(take.name);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
   const scrubbing = useRef(false);
 
@@ -466,7 +468,7 @@ function TakeCard({
                 <Sparkles className="h-4 w-4" /> Convert to Chords
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -516,6 +518,18 @@ function TakeCard({
           </span>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this take?"
+        description={`"${take.name}" and its audio will be permanently deleted. This can't be undone.`}
+        confirmLabel="Delete take"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete();
+        }}
+      />
     </div>
   );
 }

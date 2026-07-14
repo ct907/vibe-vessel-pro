@@ -188,8 +188,10 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
         )}
 
         {/* Connected button group — no bar backdrop; the segments themselves
-            (each with a solid fill) are the only visible surface. */}
-        <div className="relative flex items-center justify-center py-3">
+            (each with a solid fill) are the only visible surface. Flush with
+            the bottom edge (respecting the safe-area padding on the outer
+            fixed container above) rather than floating a gap above it. */}
+        <div className="relative flex items-center justify-center pt-3">
           {/* Level indicator during recording */}
           {recording && (
             <div
