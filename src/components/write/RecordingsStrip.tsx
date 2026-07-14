@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Draggable, Droppable, type DraggableProvided } from "@hello-pangea/dnd";
-import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, X } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, X, Mic, ChevronDown } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { useTranscriptionStore, type TranscribedChord } from "@/store/transcription";
 import { useSongStore } from "@/store/song";
@@ -39,6 +39,8 @@ export function RecordingsStrip() {
   const clearTake = useTranscriptionStore((s) => s.clearTake);
 
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
   const [backupHintDismissed, setBackupHintDismissed] = useState(() => {
     try {
       return localStorage.getItem("vv:backup-hint-dismissed") === "1";
@@ -55,6 +57,7 @@ export function RecordingsStrip() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeTakeIdRef = useRef<string | null>(null);
 
   const stopAudio = () => {
     audioRef.current?.pause();
@@ -67,37 +70,70 @@ export function RecordingsStrip() {
 
   useEffect(() => () => stopAudio(), []);
 
-  const handlePlay = async (take: Take) => {
-    if (playingId === take.id) {
-      stopAudio();
-      setPlayingId(null);
+  const startPlayback = async (take: Take, atSec = 0) => {
+    activeTakeIdRef.current = take.id;
+    stopAudio();
+    if (!take.blobId) {
+      activeTakeIdRef.current = null;
       return;
     }
-    stopAudio();
-    setPlayingId(take.id);
-
-    if (take.blobId) {
-      const blob = await getAudioBlob(take.blobId);
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        blobUrlRef.current = url;
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          blobUrlRef.current = null;
-          audioRef.current = null;
-          setPlayingId(null);
-        };
-        audio.play().catch(() => setPlayingId(null));
-      }
+    const blob = await getAudioBlob(take.blobId);
+    if (activeTakeIdRef.current !== take.id) return; // superseded by a newer play/seek
+    if (!blob) {
+      activeTakeIdRef.current = null;
+      return;
     }
+    const url = URL.createObjectURL(blob);
+    blobUrlRef.current = url;
+    const audio = new Audio(url);
+    audio.currentTime = atSec;
+    audioRef.current = audio;
+    audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      blobUrlRef.current = null;
+      audioRef.current = null;
+      activeTakeIdRef.current = null;
+      setPlayingId(null);
+      setCurrentTime(0);
+    };
+    setPlayingId(take.id);
+    setCurrentTime(atSec);
+    audio.play().catch(() => {
+      activeTakeIdRef.current = null;
+      setPlayingId(null);
+      setCurrentTime(0);
+    });
+  };
+
+  const handlePlay = (take: Take) => {
+    if (playingId === take.id) {
+      stopAudio();
+      activeTakeIdRef.current = null;
+      setPlayingId(null);
+      setCurrentTime(0);
+      return;
+    }
+    void startPlayback(take, 0);
+  };
+
+  const handleSeek = (take: Take, sec: number) => {
+    if (activeTakeIdRef.current === take.id) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = sec;
+        setCurrentTime(sec);
+      }
+      return;
+    }
+    void startPlayback(take, sec);
   };
 
   const handleDelete = (take: Take) => {
     if (playingId === take.id) {
       stopAudio();
+      activeTakeIdRef.current = null;
       setPlayingId(null);
+      setCurrentTime(0);
     }
     removeTake(take.id);
     clearTake(take.id);
@@ -161,14 +197,36 @@ export function RecordingsStrip() {
 
   return (
     <div className="mb-3">
-      <div className="flex items-center justify-between px-4 pb-1.5">
-        <span className="font-mono-chord text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-soft">
-          Recordings
-        </span>
+      <div
+        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4] select-none"
+        style={{ color: "oklch(0.3267 0.027 60.1)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand recordings" : "Collapse recordings"}
+          title={collapsed ? "Expand recordings" : "Collapse recordings"}
+          className="inline-flex min-w-0 items-center gap-2 rounded-[var(--pill-radius,8px)]"
+          style={{
+            padding: "5px 12px",
+            background: "transparent",
+            color: "inherit",
+            fontFamily: "'Nunito', system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          <Mic className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate">Recordings</span>
+          <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 transition-transform", collapsed && "-rotate-90")} />
+        </button>
         {takes.length > 0 && (
           <span
-            className="inline-flex items-center gap-1 text-[11px] font-bold"
-            style={{ color: atMax ? "var(--primary-strong)" : "var(--ink-soft)" }}
+            className="ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] font-bold"
+            style={{ color: atMax ? "var(--primary-strong)" : "inherit" }}
           >
             <Star className="h-3 w-3 fill-[var(--star,#e8a838)] text-[var(--star,#e8a838)]" />
             {bestCount} of {MAX_BEST_TAKES} best takes
@@ -176,7 +234,9 @@ export function RecordingsStrip() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 px-4 pb-2">
+      {!collapsed && (
+      <>
+      <div className="flex items-center gap-2 px-4 pt-2 pb-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -234,17 +294,19 @@ export function RecordingsStrip() {
       )}
 
       {takes.length > 0 ? (
-        <div className="hide-scroll flex items-start gap-2 overflow-x-auto px-4 pb-2" style={{ scrollSnapType: "x mandatory" }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 px-4 pb-2">
           {takes.map((take) => {
             const st = status[take.id] ?? "idle";
             const detected = chordsByTake[take.id] ?? [];
             return (
-              <div key={take.id} className="flex shrink-0 flex-col gap-1.5" style={{ scrollSnapAlign: "start" }}>
+              <div key={take.id} className="flex flex-col gap-1.5">
                 <TakeCard
                   take={take}
                   playing={playingId === take.id}
+                  currentTime={playingId === take.id ? currentTime : 0}
                   transcribing={st === "transcribing"}
                   onPlay={() => handlePlay(take)}
+                  onSeek={(sec) => handleSeek(take, sec)}
                   onStar={() => toggleBest(take.id)}
                   onDelete={() => handleDelete(take)}
                   onTranscribe={() => void handleTranscribe(take)}
@@ -273,6 +335,8 @@ export function RecordingsStrip() {
           </p>
         </div>
       )}
+      </>
+      )}
     </div>
   );
 }
@@ -280,8 +344,10 @@ export function RecordingsStrip() {
 function TakeCard({
   take,
   playing,
+  currentTime,
   transcribing,
   onPlay,
+  onSeek,
   onStar,
   onDelete,
   onTranscribe,
@@ -290,8 +356,10 @@ function TakeCard({
 }: {
   take: Take;
   playing: boolean;
+  currentTime: number;
   transcribing: boolean;
   onPlay: () => void;
+  onSeek: (sec: number) => void;
   onStar: () => void;
   onDelete: () => void;
   onTranscribe: () => void;
@@ -300,15 +368,40 @@ function TakeCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(take.name);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const scrubbing = useRef(false);
 
   const commit = () => {
     onRename(draft);
     setEditing(false);
   };
 
+  const seekFromClientX = (clientX: number) => {
+    const el = waveformRef.current;
+    if (!el || take.durationSec <= 0) return;
+    const rect = el.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    onSeek(frac * take.durationSec);
+  };
+
+  const handleWaveformPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    scrubbing.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    seekFromClientX(e.clientX);
+  };
+  const handleWaveformPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbing.current) return;
+    seekFromClientX(e.clientX);
+  };
+  const handleWaveformPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    scrubbing.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   return (
     <div
-      className="flex w-[168px] flex-col gap-2 rounded-xl border border-border bg-card p-2.5"
+      className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card p-2.5"
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div className="flex items-start justify-between gap-1">
@@ -395,7 +488,23 @@ function TakeCard({
             <Play className="h-2.5 w-2.5 fill-white text-white" />
           )}
         </button>
-        <Waveform width={96} height={18} seed={take.seed} color="var(--primary)" />
+        <div
+          ref={waveformRef}
+          className="flex-1 min-w-0 touch-none cursor-pointer"
+          onPointerDown={handleWaveformPointerDown}
+          onPointerMove={handleWaveformPointerMove}
+          onPointerUp={handleWaveformPointerUp}
+          onPointerCancel={handleWaveformPointerUp}
+        >
+          <Waveform
+            width={96}
+            height={18}
+            seed={take.seed}
+            color="var(--primary)"
+            stretch
+            progress={playing && take.durationSec > 0 ? currentTime / take.durationSec : undefined}
+          />
+        </div>
         <span className="shrink-0 font-mono-chord text-[9.5px] text-ink-soft">{take.duration}</span>
       </div>
 
@@ -413,7 +522,7 @@ function TakeCard({
 
 function DetectedChordsStrip({ takeId, chords }: { takeId: string; chords: TranscribedChord[] }) {
   return (
-    <div className="w-[168px]">
+    <div className="w-full">
       <div className="mb-0.5 flex items-center gap-1 px-0.5">
         <ListMusic className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
         <span className="font-mono-chord text-[9px] font-semibold uppercase tracking-wide text-ink-soft">
