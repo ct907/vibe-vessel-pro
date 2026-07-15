@@ -1162,7 +1162,25 @@ function SectionCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Section</DropdownMenuLabel>
+                <DropdownMenuLabel>Move Section</DropdownMenuLabel>
+                <div className="flex items-center gap-1 px-1 pb-1">
+                  <DropdownMenuItem
+                    onClick={() => onMoveSection?.(section.id, -1)}
+                    disabled={index === 0}
+                    aria-label="Move section up"
+                    className="flex-1 justify-center gap-1.5"
+                  >
+                    <ArrowUp className="h-4 w-4" /> Up
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onMoveSection?.(section.id, 1)}
+                    disabled={index >= total - 1}
+                    aria-label="Move section down"
+                    className="flex-1 justify-center gap-1.5"
+                  >
+                    <ArrowDown className="h-4 w-4" /> Down
+                  </DropdownMenuItem>
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>

@@ -9,7 +9,6 @@ import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +23,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -53,6 +56,7 @@ import {
   Maximize2,
   Lock,
   Unlock,
+  Check,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -960,6 +964,7 @@ function SectionGroup({
   const isMobile = useIsMobile();
   const addPatternToSection = useSongStore((s) => s.addPatternToSection);
   const updateSection = useSongStore((s) => s.updateSection);
+  const toggleSectionCollapsed = useSongStore((s) => s.toggleSectionCollapsed);
   const duplicateSection = useSongStore((s) => s.duplicateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
   const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
@@ -1015,6 +1020,18 @@ function SectionGroup({
     setCustomRenameOpen(false);
   }
 
+  function changeSectionType(next: SectionType) {
+    if (next === "custom") {
+      prevTypeRef.current = section?.type ?? "verse";
+      prevLabelRef.current = section?.label ?? "";
+      updateSection(sectionId, { type: next, label: section?.label || "Section" });
+      setDraftLabel(section?.label && section?.type === "custom" ? section.label : "");
+      setCustomRenameOpen(true);
+    } else {
+      updateSection(sectionId, { type: next, label: section?.label ?? "" });
+    }
+  }
+
   return (
     <div
       ref={cardRef}
@@ -1027,47 +1044,31 @@ function SectionGroup({
         className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4]"
         style={{ color: "oklch(0.3267 0.027 60.1)" }}
       >
-        <Select
-          value={section?.type ?? "verse"}
-          onValueChange={(v) => {
-            const next = v as SectionType;
-            if (next === "custom") {
-              prevTypeRef.current = section?.type ?? "verse";
-              prevLabelRef.current = section?.label ?? "";
-              updateSection(sectionId, { type: next, label: section?.label || "Section" });
-              setDraftLabel(section?.label && section?.type === "custom" ? section.label : "");
-              setCustomRenameOpen(true);
-            } else {
-              updateSection(sectionId, { type: next, label: section?.label ?? "" });
-            }
-          }}
+        <button
+          type="button"
+          onClick={() => toggleSectionCollapsed(sectionId)}
           disabled={sortMode}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand section" : "Collapse section"}
+          title={collapsed ? "Expand section" : "Collapse section"}
+          className="inline-flex min-w-0 items-center gap-2 rounded-[var(--pill-radius,8px)] disabled:opacity-100"
+          style={{
+            padding: "5px 12px",
+            background: "transparent",
+            color: "inherit",
+            fontFamily: "'Nunito', system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
         >
-          <SelectTrigger
-            className="h-auto w-auto min-w-[120px] border-0 shadow-none outline-none ring-0 focus:ring-0 gap-2"
-            style={{
-              padding: "5px 12px",
-              borderRadius: "var(--pill-radius, 8px)",
-              background: "transparent",
-              color: "inherit",
-              fontFamily: "'Nunito', system-ui, sans-serif",
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            <Music2 style={{ width: 14, height: 14, flexShrink: 0 }} />
-            <SelectValue>{displayName}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {SECTION_TYPES.map((t) => (
-              <SelectItem key={t} value={t} className="text-xs capitalize">
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Music2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate">{displayName}</span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 shrink-0 transition-transform", collapsed && "-rotate-90")}
+          />
+        </button>
         {section?.type === "custom" && !sortMode && (
           <Button
             size="icon"
@@ -1157,18 +1158,43 @@ function SectionGroup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => onMoveSection?.(sectionId, -1)}
-                  disabled={index === 0}
-                >
-                  <ArrowUp className="h-4 w-4" /> Move section up
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onMoveSection?.(sectionId, 1)}
-                  disabled={index >= totalSections - 1}
-                >
-                  <ArrowDown className="h-4 w-4" /> Move section down
-                </DropdownMenuItem>
+                <DropdownMenuLabel>Move Section</DropdownMenuLabel>
+                <div className="flex items-center gap-1 px-1 pb-1">
+                  <DropdownMenuItem
+                    onClick={() => onMoveSection?.(sectionId, -1)}
+                    disabled={index === 0}
+                    aria-label="Move section up"
+                    className="flex-1 justify-center gap-1.5"
+                  >
+                    <ArrowUp className="h-4 w-4" /> Up
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onMoveSection?.(sectionId, 1)}
+                    disabled={index >= totalSections - 1}
+                    aria-label="Move section down"
+                    className="flex-1 justify-center gap-1.5"
+                  >
+                    <ArrowDown className="h-4 w-4" /> Down
+                  </DropdownMenuItem>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Music2 className="h-4 w-4" /> Change type
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {SECTION_TYPES.map((t) => (
+                      <DropdownMenuItem
+                        key={t}
+                        className="capitalize"
+                        onClick={() => changeSectionType(t)}
+                      >
+                        {t}
+                        {section?.type === t && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator />
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
@@ -1273,6 +1299,7 @@ function SectionGroup({
           intentionally NOT exposed: the lyrics tab's chord row order is
           driven by the same SSOT, and re-arranging blocks here would
           desync the two surfaces. Blocks are now plain children. */}
+      {!collapsed && (
       <>
 
 
@@ -1414,6 +1441,7 @@ function SectionGroup({
           );
         })()}
         </>
+      )}
 
 
 
