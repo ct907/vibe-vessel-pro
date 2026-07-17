@@ -1396,12 +1396,20 @@ function SectionGroup({
                   );
                   firstBlock = fresh[0];
                 }
-                if (firstBlock) onPickerOpen(firstBlock.id, 0);
+                if (!firstBlock) return;
+                if (pasteMode) {
+                  onPasteIntoBlock?.(firstBlock.id);
+                } else {
+                  onPickerOpen(firstBlock.id, 0);
+                }
               }}
-              className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+              className={cn(
+                "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
+                pasteMode && "animate-paste-glow cursor-copy",
+              )}
             >
               <Plus className="h-4 w-4" />
-              <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+              <span className="text-sm font-display uppercase tracking-wide">{pasteMode ? "Paste chords" : "Add chords"}</span>
             </button>
           );
           const addBlockRow = (
@@ -2463,165 +2471,163 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         />
       )}
 
-      {(activeChordId !== null || multiSelected.size > 0 || pasteMode) && (
-        <FloatingChordToolbar
-          mode="progression"
-          hideTrigger
-          autoExpandOnContext={false}
-          activeChord={toolbarContext.activeChordData}
-          selectedCount={multiSelected.size}
-          selectedOctaves={toolbarContext.selectedOctaves}
-          canShiftLeft={toolbarContext.canShiftLeft}
-          canShiftRight={toolbarContext.canShiftRight}
-          onShift={(dir) => {
-            if (multiSelected.size > 0) { handleMultiShift(dir); return; }
-            if (!activeChordId || !toolbarContext.activePatternId) return;
-            movePatternChord(toolbarContext.activePatternId, activeChordId, dir);
-          }}
-          onMoveVertical={(dir) => {
-            if (!activeChordId) return;
-            const { sections: s, progression: prog } = useSongStore.getState();
-            const orderedBlocks = s.flatMap((sec) => prog.filter((p) => (p.sectionId ?? p.id) === sec.id));
-            const patternOfActive = orderedBlocks.find((p) => {
-              const owner = s.find((sec) => sec.id === (p.sectionId ?? p.id));
-              return (owner ? getPatternChordsViaSSOT(owner, p) : p.chords).some((c) => c.id === activeChordId);
+      <FloatingChordToolbar
+        mode="progression"
+        hideTrigger
+        autoExpandOnContext={false}
+        activeChord={toolbarContext.activeChordData}
+        selectedCount={multiSelected.size}
+        selectedOctaves={toolbarContext.selectedOctaves}
+        canShiftLeft={toolbarContext.canShiftLeft}
+        canShiftRight={toolbarContext.canShiftRight}
+        onShift={(dir) => {
+          if (multiSelected.size > 0) { handleMultiShift(dir); return; }
+          if (!activeChordId || !toolbarContext.activePatternId) return;
+          movePatternChord(toolbarContext.activePatternId, activeChordId, dir);
+        }}
+        onMoveVertical={(dir) => {
+          if (!activeChordId) return;
+          const { sections: s, progression: prog } = useSongStore.getState();
+          const orderedBlocks = s.flatMap((sec) => prog.filter((p) => (p.sectionId ?? p.id) === sec.id));
+          const patternOfActive = orderedBlocks.find((p) => {
+            const owner = s.find((sec) => sec.id === (p.sectionId ?? p.id));
+            return (owner ? getPatternChordsViaSSOT(owner, p) : p.chords).some((c) => c.id === activeChordId);
+          });
+          if (!patternOfActive) return;
+          const bIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
+          const adjBlock = orderedBlocks[bIdx + dir];
+          if (!adjBlock) return;
+          const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
+          const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
+          useSongStore.getState().movePatternChordToPatternAt(
+            patternOfActive.id, adjBlock.id, activeChordId,
+            adjChords.length,
+          );
+          setChordEditorRef.current((prev) =>
+            prev?.chordId === activeChordId
+              ? { patternId: adjBlock.id, chordId: activeChordId, sectionId: adjBlock.sectionId ?? adjBlock.id }
+              : prev,
+          );
+        }}
+        canMoveUp={toolbarContext.canMoveUp}
+        canMoveDown={toolbarContext.canMoveDown}
+        onResize={(delta) => {
+          if (multiSelected.size > 0) { handleMultiResize(delta); return; }
+          if (!activeChordId || !toolbarContext.activePatternId) return;
+          resizePatternChordsWithOverflow(toolbarContext.activePatternId, [activeChordId], delta);
+        }}
+        onOctaveChange={(oct) => {
+          if (multiSelected.size > 0) {
+            const byPattern = new Map<string, string[]>();
+            for (const [cid, pid] of multiSelected) {
+              const arr = byPattern.get(pid) ?? [];
+              arr.push(cid);
+              byPattern.set(pid, arr);
+            }
+            for (const [pid, cids] of byPattern) bulkSetChordOctave(pid, cids, oct);
+            return;
+          }
+          if (!activeChordId || !toolbarContext.activePatternId) return;
+          const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
+          const chord = pat?.chords.find((c) => c.id === activeChordId);
+          if (!chord) return;
+          updatePatternChord(toolbarContext.activePatternId, activeChordId, { chord: { ...chord.chord, octave: oct } });
+        }}
+        onSelectAll={() => {
+          if (!toolbarContext.activePatternId) return;
+          const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
+          const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
+          const chords = sec && pat ? getPatternChordsViaSSOT(sec, pat) : (pat?.chords ?? []);
+          setMultiSelected(new Map(chords.map((c) => [c.id, toolbarContext.activePatternId!])));
+        }}
+        onClearAll={() => setMultiSelected(new Map())}
+        onEnterMultiSelect={() => {
+          if (activeChordId && toolbarContext.activePatternId) {
+            setMultiSelected((prev) => {
+              const next = new Map(prev);
+              next.set(activeChordId, toolbarContext.activePatternId!);
+              return next;
             });
-            if (!patternOfActive) return;
-            const bIdx = orderedBlocks.findIndex((b) => b.id === patternOfActive.id);
-            const adjBlock = orderedBlocks[bIdx + dir];
-            if (!adjBlock) return;
-            const adjOwner = s.find((sec) => sec.id === (adjBlock.sectionId ?? adjBlock.id));
-            const adjChords = adjOwner ? getPatternChordsViaSSOT(adjOwner, adjBlock) : adjBlock.chords;
-            useSongStore.getState().movePatternChordToPatternAt(
-              patternOfActive.id, adjBlock.id, activeChordId,
-              adjChords.length,
-            );
-            setChordEditorRef.current((prev) =>
-              prev?.chordId === activeChordId
-                ? { patternId: adjBlock.id, chordId: activeChordId, sectionId: adjBlock.sectionId ?? adjBlock.id }
-                : prev,
-            );
-          }}
-          canMoveUp={toolbarContext.canMoveUp}
-          canMoveDown={toolbarContext.canMoveDown}
-          onResize={(delta) => {
-            if (multiSelected.size > 0) { handleMultiResize(delta); return; }
-            if (!activeChordId || !toolbarContext.activePatternId) return;
-            resizePatternChordsWithOverflow(toolbarContext.activePatternId, [activeChordId], delta);
-          }}
-          onOctaveChange={(oct) => {
-            if (multiSelected.size > 0) {
-              const byPattern = new Map<string, string[]>();
-              for (const [cid, pid] of multiSelected) {
-                const arr = byPattern.get(pid) ?? [];
-                arr.push(cid);
-                byPattern.set(pid, arr);
-              }
-              for (const [pid, cids] of byPattern) bulkSetChordOctave(pid, cids, oct);
-              return;
+          }
+        }}
+        onDuplicate={() => {
+          const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
+          const affectedSections = new Set<string>();
+          const dupOne = (patternId: string, chordId: string) => {
+            const pat = prog.find((p) => p.id === patternId);
+            const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
+            if (!sec || !pat) return;
+            const chords = getPatternChordsViaSSOT(sec, pat);
+            const idx = chords.findIndex((c) => c.id === chordId);
+            if (idx < 0) return;
+            const c = chords[idx];
+            // Preserve a progression-only chord's lyricless state in its copy.
+            const lyricless = !sec.chords.find((x) => x.id === chordId)?.lyricsPlacement;
+            addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
+            affectedSections.add(sec.id);
+          };
+          // One grouped undo step for the whole duplicate (all inserts + reflow).
+          withHistoryGroup(() => {
+          if (multiSelected.size > 0) {
+            const byPattern = new Map<string, string[]>();
+            for (const [cid, pid] of multiSelected) {
+              const arr = byPattern.get(pid) ?? [];
+              arr.push(cid);
+              byPattern.set(pid, arr);
             }
-            if (!activeChordId || !toolbarContext.activePatternId) return;
-            const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
-            const chord = pat?.chords.find((c) => c.id === activeChordId);
-            if (!chord) return;
-            updatePatternChord(toolbarContext.activePatternId, activeChordId, { chord: { ...chord.chord, octave: oct } });
-          }}
-          onSelectAll={() => {
-            if (!toolbarContext.activePatternId) return;
-            const pat = progression.find((p) => p.id === toolbarContext.activePatternId);
-            const sec = pat ? sections.find((s) => s.id === (pat.sectionId ?? pat.id)) : null;
-            const chords = sec && pat ? getPatternChordsViaSSOT(sec, pat) : (pat?.chords ?? []);
-            setMultiSelected(new Map(chords.map((c) => [c.id, toolbarContext.activePatternId!])));
-          }}
-          onClearAll={() => setMultiSelected(new Map())}
-          onEnterMultiSelect={() => {
-            if (activeChordId && toolbarContext.activePatternId) {
-              setMultiSelected((prev) => {
-                const next = new Map(prev);
-                next.set(activeChordId, toolbarContext.activePatternId!);
-                return next;
-              });
-            }
-          }}
-          onDuplicate={() => {
-            const { sections: s, progression: prog, addChordToPatternSlot } = useSongStore.getState();
-            const affectedSections = new Set<string>();
-            const dupOne = (patternId: string, chordId: string) => {
-              const pat = prog.find((p) => p.id === patternId);
+            for (const [pid, cids] of byPattern) {
+              const pat = prog.find((p) => p.id === pid);
               const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
-              if (!sec || !pat) return;
-              const chords = getPatternChordsViaSSOT(sec, pat);
-              const idx = chords.findIndex((c) => c.id === chordId);
-              if (idx < 0) return;
-              const c = chords[idx];
-              // Preserve a progression-only chord's lyricless state in its copy.
-              const lyricless = !sec.chords.find((x) => x.id === chordId)?.lyricsPlacement;
-              addChordToPatternSlot(patternId, c.chord, idx + 1, c.lengthBeats, lyricless);
-              affectedSections.add(sec.id);
-            };
-            // One grouped undo step for the whole duplicate (all inserts + reflow).
+              if (!sec || !pat) continue;
+              const order = getPatternChordsViaSSOT(sec, pat).map((c) => c.id);
+              // Insert from the rightmost selection first so earlier indices
+              // stay valid as copies shift later chords rightward.
+              [...cids]
+                .sort((a, b) => order.indexOf(b) - order.indexOf(a))
+                .forEach((cid) => dupOne(pid, cid));
+            }
+          } else if (activeChordId && toolbarContext.activePatternId) {
+            dupOne(toolbarContext.activePatternId, activeChordId);
+          }
+          // Repack the lyric mirror(s) so the Write row follows SSOT order, the
+          // same as the paste path. addChordToPatternSlot lands the lyric anchor
+          // on the leftmost free slot, which otherwise leaves the duplicate out
+          // of order in the Write view.
+          const { autoLayoutSection } = useSongStore.getState();
+          for (const secId of affectedSections) {
+            autoLayoutSection(secId, window.innerWidth, 28);
+          }
+          });
+        }}
+        onDelete={() => {
+          if (multiSelected.size > 0) {
+            const byPattern = new Map<string, string[]>();
+            for (const [cid, pid] of multiSelected) {
+              const arr = byPattern.get(pid) ?? [];
+              arr.push(cid);
+              byPattern.set(pid, arr);
+            }
+            const removeBatch = useSongStore.getState().removePatternChordsBatch;
             withHistoryGroup(() => {
-            if (multiSelected.size > 0) {
-              const byPattern = new Map<string, string[]>();
-              for (const [cid, pid] of multiSelected) {
-                const arr = byPattern.get(pid) ?? [];
-                arr.push(cid);
-                byPattern.set(pid, arr);
-              }
-              for (const [pid, cids] of byPattern) {
-                const pat = prog.find((p) => p.id === pid);
-                const sec = pat ? s.find((x) => x.id === (pat.sectionId ?? pat.id)) : null;
-                if (!sec || !pat) continue;
-                const order = getPatternChordsViaSSOT(sec, pat).map((c) => c.id);
-                // Insert from the rightmost selection first so earlier indices
-                // stay valid as copies shift later chords rightward.
-                [...cids]
-                  .sort((a, b) => order.indexOf(b) - order.indexOf(a))
-                  .forEach((cid) => dupOne(pid, cid));
-              }
-            } else if (activeChordId && toolbarContext.activePatternId) {
-              dupOne(toolbarContext.activePatternId, activeChordId);
-            }
-            // Repack the lyric mirror(s) so the Write row follows SSOT order, the
-            // same as the paste path. addChordToPatternSlot lands the lyric anchor
-            // on the leftmost free slot, which otherwise leaves the duplicate out
-            // of order in the Write view.
-            const { autoLayoutSection } = useSongStore.getState();
-            for (const secId of affectedSections) {
-              autoLayoutSection(secId, window.innerWidth, 28);
-            }
+              for (const [pid, cids] of byPattern) removeBatch(pid, cids);
             });
-          }}
-          onDelete={() => {
-            if (multiSelected.size > 0) {
-              const byPattern = new Map<string, string[]>();
-              for (const [cid, pid] of multiSelected) {
-                const arr = byPattern.get(pid) ?? [];
-                arr.push(cid);
-                byPattern.set(pid, arr);
-              }
-              const removeBatch = useSongStore.getState().removePatternChordsBatch;
-              withHistoryGroup(() => {
-                for (const [pid, cids] of byPattern) removeBatch(pid, cids);
-              });
-              setMultiSelected(new Map());
-              setActiveChordId(null);
-              return;
-            }
-            if (!activeChordId || !toolbarContext.activePatternId) return;
-            useSongStore.getState().removePatternChordsBatch(toolbarContext.activePatternId, [activeChordId]);
+            setMultiSelected(new Map());
             setActiveChordId(null);
-          }}
-          onCopy={handleCopyChords}
-          onCut={handleCutChords}
-          canCut={activeChordId !== null || multiSelected.size > 0}
-          canPaste={chordClipboard.length > 0}
-          onPaste={handlePasteRequest}
-          pasteMode={pasteMode}
-          onCancelPaste={() => setPasteMode(false)}
-          onExitEdit={() => { setActiveChordId(null); setMultiSelected(new Map()); }}
-        />
-      )}
+            return;
+          }
+          if (!activeChordId || !toolbarContext.activePatternId) return;
+          useSongStore.getState().removePatternChordsBatch(toolbarContext.activePatternId, [activeChordId]);
+          setActiveChordId(null);
+        }}
+        onCopy={handleCopyChords}
+        onCut={handleCutChords}
+        canCut={activeChordId !== null || multiSelected.size > 0}
+        canPaste={chordClipboard.length > 0}
+        onPaste={handlePasteRequest}
+        pasteMode={pasteMode}
+        onCancelPaste={() => setPasteMode(false)}
+        onExitEdit={() => { setActiveChordId(null); setMultiSelected(new Map()); }}
+      />
 
       <WhyThisChordSheet />
     </div>
