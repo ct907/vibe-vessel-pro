@@ -111,9 +111,13 @@ describe("block locking", () => {
     expect(patternUsedBeats(block())).toBe(8);
   });
 
-  it("growing an already-locked block that has empty room does not scale its chords", () => {
-    useSongStore.getState().setPatternLock("B1", 12); // room for one more 4-beat chord
-    useSongStore.getState().setPatternLock("B1", 16); // still not full — grow, don't scale
+  it("growing an already-locked block that has empty room still scales its chords proportionally", () => {
+    useSongStore.getState().setPatternLock("B1", 16); // first lock — no scaling; leaves room
     expect(block().chords.map((c) => c.lengthBeats)).toEqual([4, 4]);
+
+    useSongStore.getState().setPatternLock("B1", 24); // grow an already-locked, non-full block
+    expect(block().lockedBeats).toBe(24);
+    expect(block().chords.map((c) => c.lengthBeats)).toEqual([6, 6]);
+    expect(patternUsedBeats(block())).toBe(12); // still has room — but the room scaled too
   });
 });

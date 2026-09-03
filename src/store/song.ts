@@ -2880,16 +2880,15 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     // Never lock below existing content — that would auto-unlock on derive.
     const floor = Math.max(pattern.beatsPerBar, Math.ceil(patternUsedBeats(pattern) / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar);
     const nextLocked = Math.max(floor, lockedBeats);
-    // Resizing an ALREADY-locked, fully-filled block scales its chords
-    // proportionally with the new capacity so they keep filling the block
+    // Resizing an ALREADY-locked block scales its chords proportionally with
+    // the new capacity — whether or not the block is fully filled — so a
+    // block's content keeps the same relative proportions as it's resized
     // (e.g. two 4-beat chords in an 8-beat block become two 8-beat chords
     // when the block is grown to 16 beats). Locking a flexible block for the
     // first time never scales — it just fixes the current size.
     const wasLocked = pattern.lockedBeats != null;
     const prevCapacity = patternCapacityBeats(pattern);
-    const usedBeats = patternUsedBeats(pattern);
-    const isFull = usedBeats > 1e-9 && Math.abs(usedBeats - prevCapacity) < 1e-6;
-    const scale = wasLocked && isFull ? nextLocked / prevCapacity : 1;
+    const scale = wasLocked ? nextLocked / prevCapacity : 1;
     const sectionId = pattern.sectionId ?? pattern.id;
     const sections = scale === 1
       ? s.sections
