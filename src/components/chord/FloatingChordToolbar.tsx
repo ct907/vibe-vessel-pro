@@ -590,9 +590,6 @@ export function FloatingChordToolbar({
               aria-label="Move chord"
               className="flex shrink-0 flex-col items-center justify-center gap-1 border-r px-2"
             >
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/70 select-none">
-                Move
-              </span>
               <div
                 className="grid place-items-center"
                 style={{ gridTemplateColumns: "repeat(3, 2rem)", gridTemplateRows: "repeat(3, 2rem)" }}
