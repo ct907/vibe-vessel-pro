@@ -484,7 +484,7 @@ export function FloatingChordToolbar({
         style={ANIM_STYLE}
         className={cn(
           "absolute bottom-0 right-0 origin-bottom-right pointer-events-auto",
-          "rounded-2xl border bg-[var(--paper-card)] shadow-lg overflow-hidden",
+          "rounded-2xl border bg-[var(--paper-card)] dark:bg-[var(--cocoa-soft)] dark:text-[var(--cocoa-foreground)] shadow-lg overflow-hidden",
           "w-[22rem] max-w-[calc(100vw-2rem)]",
           expanded || pasteMode ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
         )}
@@ -496,6 +496,7 @@ export function FloatingChordToolbar({
           <span
             className={cn(
               "flex-1 text-center text-base font-mono-chord font-semibold select-none truncate",
+              "dark:text-[var(--cocoa-foreground)]",
               hasContext ? "text-foreground" : "capitalize text-[var(--ink-soft)]",
             )}
           >
@@ -518,8 +519,8 @@ export function FloatingChordToolbar({
         <div className="flex flex-col divide-y">
           {/* Select: multi-select · select-all · copy · cut · paste — full width
               so the controls aren't crammed. */}
-          <div className="flex items-center gap-1 px-3 py-2" style={{ background: "var(--paper-shade)" }}>
-            <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+          <div className="flex items-center gap-1 px-3 py-2 bg-[var(--paper-shade-soft)] dark:bg-[var(--ink-soft)]">
+            <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] dark:text-[var(--cocoa-foreground)] select-none">
               Select
             </span>
             <Button
@@ -632,7 +633,7 @@ export function FloatingChordToolbar({
             {/* Length (progression only): −½ · beats · +½ */}
             {mode === "progression" && (
               <div className="flex items-center gap-1 px-3 py-2">
-                <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+                <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] dark:text-[var(--cocoa-foreground)] select-none">
                   Length
                 </span>
                 <Button
@@ -646,7 +647,7 @@ export function FloatingChordToolbar({
                 >
                   <Minus className="h-5 w-5" />
                 </Button>
-                <span className="w-9 text-center text-sm font-mono-chord text-muted-foreground select-none">
+                <span className="w-9 text-center text-sm font-mono-chord text-muted-foreground dark:text-[var(--cocoa-foreground)] select-none">
                   {activeChord?.lengthBeats !== undefined
                     ? `${Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b`
                     : "—"}
@@ -667,7 +668,7 @@ export function FloatingChordToolbar({
 
             {/* Chord Octave */}
             <div className="flex items-center gap-2 px-3 py-2">
-              <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
+              <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] dark:text-[var(--cocoa-foreground)] select-none">
                 Chord Octave
               </span>
               <Select
@@ -675,7 +676,7 @@ export function FloatingChordToolbar({
                 disabled={octaveDisabled}
                 onValueChange={(v) => onOctaveChange?.(Number(v))}
               >
-                <SelectTrigger className="h-8 w-16 rounded-lg border-0 bg-[var(--paper-shade)] text-sm font-mono-chord shadow-none focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="h-8 w-16 rounded-lg border-0 bg-[var(--paper-shade)] text-sm font-mono-chord shadow-none focus:ring-0 focus:ring-offset-0 dark:text-[var(--ink)]">
                   <SelectValue>{octaveDisplay}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
