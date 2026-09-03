@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDndStore } from "@/store/dnd";
-import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHistoryGroup, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
+import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHistoryGroup, minLockBeats as minLockBeatsForPattern, type PatternBlock as PatternBlockType, type SectionType } from "@/store/song";
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -285,12 +285,11 @@ function PatternBlock({
   const activeChordInThisBlockRef = useRef<typeof sortedChords[number] | null>(null);
   const usedBeats = sortedChords.reduce((sum, c) => sum + c.lengthBeats, 0);
   const isLocked = pattern.lockedBeats != null;
-  // Smallest lock that still fits current content (whole bars, ≥ 1 bar). The
-  // store clamps to this too — shown here so the stepper can't go lower.
-  const minLockBeats = Math.max(
-    pattern.beatsPerBar,
-    Math.ceil(usedBeats / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar,
-  );
+  // Smallest lock beats can go to — the store clamps to this too, shown here
+  // so the stepper can't go lower. An already-locked block scales its chords
+  // down as it shrinks, so it only needs a 1-bar floor; a not-yet-locked
+  // block can't shrink below its (non-scaling) content.
+  const minLockBeats = minLockBeatsForPattern(pattern);
   const canDeleteThisBlock = totalBlocksInSong > 1;
   // Crop-to-fit: effective played length (capped at capacity). When cropped,
   // the grid is drawn shrunk to this many beats while the card keeps its width.

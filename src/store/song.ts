@@ -195,6 +195,25 @@ export function patternRejectsAdd(p: PatternBlock | undefined, addLen: number): 
   return patternUsedBeats(p) + addLen > patternCapacityBeats(p) + 1e-9;
 }
 
+/**
+ * The smallest a block can be locked to. A block being locked for the FIRST
+ * time doesn't scale its existing chords, so it can never be locked below
+ * what's already there (whole bars, ≥ 1 bar). An ALREADY-locked block scales
+ * its chords with it when resized, so the only floor is a single bar, plus
+ * enough capacity that no chord's scaled length would drop below the 0.5-beat
+ * minimum.
+ */
+export function minLockBeats(p: PatternBlock): number {
+  const beatsPerBar = p.beatsPerBar;
+  if (p.lockedBeats == null) {
+    return Math.max(beatsPerBar, Math.ceil(patternUsedBeats(p) / beatsPerBar - 1e-9) * beatsPerBar);
+  }
+  const capacity = patternCapacityBeats(p);
+  const minChordLen = p.chords.length ? Math.min(...p.chords.map((c) => c.lengthBeats)) : 0;
+  const minCapacityForChords = minChordLen > 0 ? capacity * (0.5 / minChordLen) : 0;
+  return Math.max(beatsPerBar, minCapacityForChords);
+}
+
 const LOCKED_BLOCK_FULL_MSG = "Block is locked — unlock it or shorten chords to add more.";
 
 export interface BasketItem {
@@ -2877,15 +2896,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
     }
-    // Never lock below existing content — that would auto-unlock on derive.
-    const floor = Math.max(pattern.beatsPerBar, Math.ceil(patternUsedBeats(pattern) / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar);
-    const nextLocked = Math.max(floor, lockedBeats);
+    const nextLocked = Math.max(minLockBeats(pattern), lockedBeats);
     // Resizing an ALREADY-locked block scales its chords proportionally with
-    // the new capacity — whether or not the block is fully filled — so a
-    // block's content keeps the same relative proportions as it's resized
-    // (e.g. two 4-beat chords in an 8-beat block become two 8-beat chords
-    // when the block is grown to 16 beats). Locking a flexible block for the
-    // first time never scales — it just fixes the current size.
+    // the new capacity — whether growing or shrinking, and whether or not
+    // the block is fully filled — so a block's content keeps the same
+    // relative proportions as it's resized (e.g. two 4-beat chords in an
+    // 8-beat block become two 8-beat chords when the block is grown to 16
+    // beats, or two 2-beat chords when shrunk to 4). Locking a flexible
+    // block for the first time never scales — it just fixes the current size.
     const wasLocked = pattern.lockedBeats != null;
     const prevCapacity = patternCapacityBeats(pattern);
     const scale = wasLocked ? nextLocked / prevCapacity : 1;
