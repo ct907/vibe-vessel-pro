@@ -89,4 +89,31 @@ describe("block locking", () => {
     expect(block().chords.length).toBe(2);
     expect(patternUsedBeats(block())).toBe(8);
   });
+
+  it("growing an already-locked, fully-filled block scales its chords proportionally", () => {
+    // Two 4-beat chords = 8 beats. Lock to exactly that (no scaling — it's
+    // just fixing the current size).
+    useSongStore.getState().setPatternLock("B1", 8);
+    expect(block().chords.map((c) => c.lengthBeats)).toEqual([4, 4]);
+
+    // Growing the already-locked block to 16 beats scales the two chords to
+    // 8 beats each, keeping the block full.
+    useSongStore.getState().setPatternLock("B1", 16);
+    expect(block().lockedBeats).toBe(16);
+    expect(block().chords.map((c) => c.lengthBeats)).toEqual([8, 8]);
+    expect(patternUsedBeats(block())).toBe(16);
+  });
+
+  it("locking a flexible block for the first time does not scale its chords, even to a larger size", () => {
+    useSongStore.getState().setPatternLock("B1", 12);
+    expect(block().lockedBeats).toBe(12);
+    expect(block().chords.map((c) => c.lengthBeats)).toEqual([4, 4]);
+    expect(patternUsedBeats(block())).toBe(8);
+  });
+
+  it("growing an already-locked block that has empty room does not scale its chords", () => {
+    useSongStore.getState().setPatternLock("B1", 12); // room for one more 4-beat chord
+    useSongStore.getState().setPatternLock("B1", 16); // still not full — grow, don't scale
+    expect(block().chords.map((c) => c.lengthBeats)).toEqual([4, 4]);
+  });
 });

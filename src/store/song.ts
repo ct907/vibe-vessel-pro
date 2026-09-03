@@ -2863,20 +2863,54 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     }),
   })); },
 
-  setPatternLock: (id, lockedBeats) => { pushHistory(get); return set((s) => ({
-    progression: s.progression.map((p) => {
-      if (p.id !== id) return p;
-      if (lockedBeats == null) {
-        const { lockedBeats: _drop, ...rest } = p;
-        return rest;
-      }
-      // Never lock below existing content — that would auto-unlock on derive.
-      const floor = Math.max(p.beatsPerBar, Math.ceil(patternUsedBeats(p) / p.beatsPerBar - 1e-9) * p.beatsPerBar);
-      return { ...p, lockedBeats: Math.max(floor, lockedBeats) };
-    }),
-    [SSOT_MODE]: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any)); },
+  setPatternLock: (id, lockedBeats) => { pushHistory(get); return set((s) => {
+    const pattern = s.progression.find((p) => p.id === id);
+    if (!pattern) return {};
+    if (lockedBeats == null) {
+      return ({
+        progression: s.progression.map((p) => {
+          if (p.id !== id) return p;
+          const { lockedBeats: _drop, ...rest } = p;
+          return rest;
+        }),
+        [SSOT_MODE]: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    }
+    // Never lock below existing content — that would auto-unlock on derive.
+    const floor = Math.max(pattern.beatsPerBar, Math.ceil(patternUsedBeats(pattern) / pattern.beatsPerBar - 1e-9) * pattern.beatsPerBar);
+    const nextLocked = Math.max(floor, lockedBeats);
+    // Resizing an ALREADY-locked, fully-filled block scales its chords
+    // proportionally with the new capacity so they keep filling the block
+    // (e.g. two 4-beat chords in an 8-beat block become two 8-beat chords
+    // when the block is grown to 16 beats). Locking a flexible block for the
+    // first time never scales — it just fixes the current size.
+    const wasLocked = pattern.lockedBeats != null;
+    const prevCapacity = patternCapacityBeats(pattern);
+    const usedBeats = patternUsedBeats(pattern);
+    const isFull = usedBeats > 1e-9 && Math.abs(usedBeats - prevCapacity) < 1e-6;
+    const scale = wasLocked && isFull ? nextLocked / prevCapacity : 1;
+    const sectionId = pattern.sectionId ?? pattern.id;
+    const sections = scale === 1
+      ? s.sections
+      : s.sections.map((sec) => {
+          if (sec.id !== sectionId) return sec;
+          return {
+            ...sec,
+            chords: sec.chords.map((sc) =>
+              sc.progressionPlacement?.patternId === id
+                ? { ...sc, progressionPlacement: { ...sc.progressionPlacement, lengthBeats: sc.progressionPlacement.lengthBeats * scale } }
+                : sc,
+            ),
+          };
+        });
+    return ({
+      sections,
+      progression: s.progression.map((p) => (p.id === id ? { ...p, lockedBeats: nextLocked } : p)),
+      [SSOT_MODE]: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  }); },
 
   // Add chord into pattern (SSOT-first). Creates a SectionChord targeting the
   // specific pattern; mirrors derive `line.chords` + `pattern.chords`.

@@ -518,7 +518,7 @@ export function FloatingChordToolbar({
         <div className="flex flex-col divide-y">
           {/* Select: multi-select · select-all · copy · cut · paste — full width
               so the controls aren't crammed. */}
-          <div className="flex items-center gap-1 px-3 py-2">
+          <div className="flex items-center gap-1 px-3 py-2" style={{ background: "var(--paper-shade)" }}>
             <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] select-none">
               Select
             </span>
@@ -590,9 +590,12 @@ export function FloatingChordToolbar({
               aria-label="Move chord"
               className="flex shrink-0 flex-col items-center justify-center gap-1 border-r px-2"
             >
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/70 select-none">
+                Move
+              </span>
               <div
                 className="grid place-items-center"
-                style={{ gridTemplateColumns: "repeat(3, 2rem)", gridTemplateRows: "repeat(2, 2rem)" }}
+                style={{ gridTemplateColumns: "repeat(3, 2rem)", gridTemplateRows: "repeat(3, 2rem)" }}
               >
                 <span />
                 <DPadButton
@@ -608,22 +611,22 @@ export function FloatingChordToolbar({
                   disabled={!hasContext || !canShiftLeft}
                   onClick={() => onShift(-1)}
                 />
-                <DPadButton
-                  icon={<ChevronDown className="h-6 w-6" />}
-                  label={mode === "lyrics" ? "Move to row below" : "Move to next block"}
-                  disabled={!hasContext || !canMoveDown}
-                  onClick={() => onMoveVertical?.(1)}
-                />
+                <span />
                 <DPadButton
                   icon={<ChevronRight className="h-6 w-6" />}
                   label="Move later"
                   disabled={!hasContext || !canShiftRight}
                   onClick={() => onShift(1)}
                 />
+                <span />
+                <DPadButton
+                  icon={<ChevronDown className="h-6 w-6" />}
+                  label={mode === "lyrics" ? "Move to row below" : "Move to next block"}
+                  disabled={!hasContext || !canMoveDown}
+                  onClick={() => onMoveVertical?.(1)}
+                />
+                <span />
               </div>
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/70 select-none">
-                Move
-              </span>
             </div>
 
             {/* Middle: Length + Chord Octave. */}
