@@ -2044,6 +2044,22 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChordId, multiSelected, sections, progression]);
 
+  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
+  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
+  useEffect(() => {
+    if (!chordPickerRequest) return;
+    setChordPickerRequest(false);
+    if (activeChordId && toolbarContext.activePatternId) {
+      openChordEditor(toolbarContext.activePatternId, activeChordId);
+      return;
+    }
+    const lastBlock = sections.flatMap((sec) => progression.filter((p) => (p.sectionId ?? p.id) === sec.id)).pop();
+    const owner = lastBlock ? sections.find((sec) => sec.id === (lastBlock.sectionId ?? lastBlock.id)) : undefined;
+    if (!lastBlock || !owner) return;
+    openPicker(lastBlock.id, getPatternChordsViaSSOT(owner, lastBlock).length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chordPickerRequest]);
+
   const handleChordClick = (_patternId: string, chordId: string) => {
     // Tapping a chord only selects it — the pencil overlay opens the editor.
     if (activeChordId === chordId) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Move } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore, type SectionType } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -32,6 +32,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -145,6 +146,11 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
 
   const handleEditChords = () => {
     onEditorAction?.();
+    setChordPickerRequest(true);
+  };
+
+  const handleMoveChords = () => {
+    onEditorAction?.();
     setChordToolbarOpen(true);
   };
 
@@ -221,7 +227,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               onClick={toggle}
               disabled={pending || (trackIsRecording && !recording)}
               className={
-                "flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
+                "flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-xs font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
                 (recording ? " animate-rec-pulse" : "") +
                 ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
               }
@@ -230,7 +236,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             >
               <span
                 className="bg-white transition-all"
-                style={{ width: 12, height: 12, borderRadius: recording ? 3 : 6 }}
+                style={{ width: 10, height: 10, borderRadius: recording ? 2 : 5 }}
               />
               {pending ? "Saving…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
             </button>
@@ -238,24 +244,35 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             <button
               type="button"
               onClick={() => setAddSectionOpen((o) => !o)}
-              className="flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap border-l border-black/15 px-4 text-sm font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
               style={{ background: "var(--cocoa)" }}
               aria-expanded={addSectionOpen}
               aria-label="Add a song section"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               Add Section
             </button>
 
             <button
               type="button"
               onClick={handleEditChords}
-              className="flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap border-l border-black/15 px-4 text-sm font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
               style={{ background: "var(--cocoa)" }}
-              aria-label="Open chord editing tools"
+              aria-label="Open chord picker"
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="h-3.5 w-3.5" />
               Edit Chords
+            </button>
+
+            <button
+              type="button"
+              onClick={handleMoveChords}
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              style={{ background: "var(--cocoa)" }}
+              aria-label="Open move chords menu"
+            >
+              <Move className="h-3.5 w-3.5" />
+              Move Chords
             </button>
           </div>
         </div>
