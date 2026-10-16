@@ -1,5 +1,33 @@
 # UX Test — Persona Workflows (October 2026)
 
+**Status: all eight recommended fixes are implemented** on this branch and each
+was re-verified with the same Playwright scenarios that found the problem:
+
+| Fix | Commit | Re-test result |
+|---|---|---|
+| 1–2, 7 Song library | `16dfa6b` | All three ideas found a week later, named by first line, with dates; search works; Continue keeps "…jacket"; a voice memo survives switching songs and a reload; legacy recents migrate without duplicates |
+| 3 Chord picker | `d45b92e` | C Am F G stays in order, desktop and mobile, 1 or 2+ lines, 0–1200 ms pauses (was C F G Am / C Am); a chord tapped above "dancing" stays there; hand-placed chords survive later adds |
+| 4 Audio plays alone | `1ffc318` | Play with only a 12 s clip plays all 12 s; with a 4-bar progression the loop grows to 2× so nothing is cut (was 10.43 s of 15 s) |
+| 5 Overdub | `1ffc318` | One-bar count-in, then Track 1 plays while Track 2 records; take placed at the playhead (also from mid-timeline, 5.22 s) |
+| 6 Takes grid | `79ebca3` | Take name 106 px wide at 1280 px (was 3 px) |
+| 8 Flow polish | `296f776`, `19baa32` | Typing after Add Section / "/" lands in the new section; takes loop; detected C Am F G → song as 4-beat chords; first Arrange visit puts the take on Track 1 |
+
+Found and fixed along the way: the one-line-section chord drop was a second bug
+(the overflow resolver treated flexible blocks as full and stole focus);
+"Play from this section" started recordings from the top while chords started at
+the section; and the engine double-scheduled loops whenever Play didn't await
+chords first. Not addressed (outside the eight fixes): duplicate makes "Verse
+copy" with all lyrics, no line drag between sections, new sections start with
+chords hidden.
+
+Note for contributors: the root `tsconfig.json` is solution-style
+(`"files": []`), so `npx tsc --noEmit` type-checks nothing. Use
+`npx tsc --noEmit -p tsconfig.app.json`; on this branch it reports only two
+pre-existing errors (a dead `onDuplicate` prop passed to `FloatingChordToolbar`
+since `d912e8b`).
+
+---
+
 Three workflow-based tests of the current `main` (a9e8c14). The July audit covered
 accessibility and polish; this one asks a different question: **can each kind of
 songwriter get through their real job without losing work or losing their flow?**
