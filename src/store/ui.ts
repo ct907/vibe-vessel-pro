@@ -62,6 +62,9 @@ interface UIState {
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
   /** One-shot signal: WriteStickyBar requests the active tab to open its chord picker sheet. */
+  /** True while a chord (or multi-selection) is active; the sticky bar glows to show it's ready to act on it. */
+  chordSelectionActive: boolean;
+  setChordSelectionActive: (v: boolean) => void;
   chordPickerRequest: boolean;
   setChordPickerRequest: (v: boolean) => void;
   /** Chord clipboard shared across tabs. */
@@ -88,6 +91,8 @@ export const useUIStore = create<UIState>((set) => ({
   setArrangeView: (arrangeView) => set({ arrangeView }),
   chordToolbarOpen: false,
   setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
+  chordSelectionActive: false,
+  setChordSelectionActive: (v) => set({ chordSelectionActive: v }),
   chordPickerRequest: false,
   setChordPickerRequest: (v) => set({ chordPickerRequest: v }),
   chordClipboard: [],

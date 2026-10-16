@@ -73,6 +73,7 @@ import {
   KeyRound,
   Mic,
   Play,
+  Square,
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -455,7 +456,6 @@ function LineRow({
                             }
                             const nextActive = activeChordId === anchor!.id ? null : anchor!.id;
                             onSetActiveChordId(nextActive);
-                            if (nextActive) setChordToolbarOpen(true);
                           }}
                           onLongPress={() => {
                             onSetActiveChordId(null);
@@ -1085,8 +1085,12 @@ function SectionCard({
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              disabled={!firstSectionChord}
+              disabled={!firstSectionChord && !isSectionPlaying}
               onClick={() => {
+                if (isSectionPlaying) {
+                  window.dispatchEvent(new Event("lovable:request-stop"));
+                  return;
+                }
                 if (!firstSectionChord?.progressionPlacement) return;
                 usePlaybackStore.getState().setStartFromChord(
                   firstSectionChord.progressionPlacement.patternId,
@@ -1100,25 +1104,16 @@ function SectionCard({
                   ? "bg-[var(--primary)] text-white"
                   : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
-              aria-label="Play from this section"
-              title="Play from this section"
+              aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
+              title={isSectionPlaying ? "Stop" : "Play from this section"}
             >
-              <Play className={cn("h-4 w-4", isSectionPlaying && "fill-white")} />
+              {isSectionPlaying ? <Square className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4" />}
             </button>
             <SectionColorPicker
               value={section.color}
               onChange={(c) => setSectionColor(section.id, c)}
               className={isMobile ? "hidden" : undefined}
             />
-            <button
-              type="button"
-              onClick={() => duplicateSection(section.id)}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
-              aria-label="Duplicate section"
-              title="Duplicate section"
-            >
-              <Copy className="h-4 w-4" />
-            </button>
             {recTracks.length > 0 && (
               <Popover open={overdubOpen} onOpenChange={setOverdubOpen}>
                 <PopoverTrigger asChild>
@@ -1209,6 +1204,9 @@ function SectionCard({
                     ))}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => duplicateSection(section.id)}>
+                  <Copy className="h-4 w-4" /> Duplicate section
+                </DropdownMenuItem>
                 {isMobile && (
                   <>
                     <DropdownMenuSeparator />
@@ -1611,6 +1609,12 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
+  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
+  const hasChordSelection = activeChordId !== null || lyricMultiSelected.size > 0;
+  useEffect(() => {
+    setChordSelectionActive(hasChordSelection);
+    return () => setChordSelectionActive(false);
+  }, [hasChordSelection, setChordSelectionActive]);
   const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
   const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
   useEffect(() => {

@@ -33,6 +33,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
   const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
+  const chordSelectionActive = useUIStore((s) => s.chordSelectionActive);
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -218,9 +219,15 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           {/* Material 3 connected button group: one unified elevation, flush
               segments with hairline dividers, only outer corners rounded. */}
           <div
-            className="flex w-full items-stretch overflow-hidden rounded-2xl"
+            className="relative flex w-full items-stretch overflow-hidden rounded-2xl"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
+            {chordSelectionActive && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 z-[2] rounded-2xl animate-toolbar-glow"
+              />
+            )}
             {/* Record — always visible; disabled while a track is recording */}
             <button
               type="button"
