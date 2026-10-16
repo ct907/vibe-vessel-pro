@@ -635,7 +635,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     // tolerated so Play always plays whatever chords actually exist.
     const built = buildPlayback(sections, progression, startFromChordId);
     if (!built) {
-      toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
+      toast({ title: "Nothing to play yet", description: "Add some chords or record a track first." });
       return;
     }
     if (built.startAnchorStale) {
