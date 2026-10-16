@@ -1404,12 +1404,20 @@ function SectionGroup({
                   );
                   firstBlock = fresh[0];
                 }
-                if (firstBlock) onPickerOpen(firstBlock.id, 0);
+                if (!firstBlock) return;
+                if (pasteMode) {
+                  onPasteIntoBlock?.(firstBlock.id);
+                } else {
+                  onPickerOpen(firstBlock.id, 0);
+                }
               }}
-              className="w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors"
+              className={cn(
+                "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
+                pasteMode && "animate-paste-glow cursor-copy",
+              )}
             >
               <Plus className="h-4 w-4" />
-              <span className="text-sm font-display uppercase tracking-wide">Add chords</span>
+              <span className="text-sm font-display uppercase tracking-wide">{pasteMode ? "Paste chords" : "Add chords"}</span>
             </button>
           );
           const addBlockRow = (
