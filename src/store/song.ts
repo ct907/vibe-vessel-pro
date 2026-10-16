@@ -8,7 +8,6 @@ import { useAppBackgroundStore, PATTERN_KEYS, MASK_KEYS, type BackgroundPattern,
 import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/SectionColorPicker";
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
-import { pushRecent } from "@/lib/recent-projects";
 import { notifyStorageQuota } from "@/lib/storage-quota";
 import { toast } from "sonner";
 
@@ -230,6 +229,8 @@ export interface InspirationPhoto {
 
 export interface SongState {
   meta: {
+    /** Stable identity for the song library; absent in projects saved before it existed. */
+    songId?: string;
     title: string;
     /** Optional free-form liner notes / description for the song. */
     description?: string;
@@ -1505,7 +1506,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   }) as typeof rawSet;
 
   return {
-  meta: { title: "Untitled Song", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
+  meta: { songId: nanoid(), title: "", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
   sections: [seed.section],
   basket: [],
   progression: [seed.pattern],
@@ -1766,7 +1767,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     redoStack.length = 0;
     const fresh = makeSection("verse");
     set((s) => ({
-      meta: { title: "", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
+      meta: { songId: nanoid(), title: "", keyRoot: "C", keyMode: "maj", bpm: 92, beatsPerBar: 4, beatUnit: 4 },
       sections: [fresh.section],
       progression: [fresh.pattern],
       basket: [],
@@ -4311,16 +4312,6 @@ export function songHasContent(s = useSongStore.getState()): boolean {
   return s.sections.some(
     (sec) => sec.chords.length > 0 || sec.lines.some((l) => l.text.trim().length > 0),
   );
-}
-
-/** Snapshot the current song into recents before it gets wiped by a "new song"
- *  flow, so an in-progress idea is always recoverable from the landing page. */
-export function commitCurrentSongToRecents() {
-  const s = useSongStore.getState();
-  if (!songHasContent(s)) return;
-  try {
-    pushRecent({ name: s.meta.title || "Untitled Song", snapshot: s.toJSON() });
-  } catch { /* ignore */ }
 }
 
 // ---- File save / load ----

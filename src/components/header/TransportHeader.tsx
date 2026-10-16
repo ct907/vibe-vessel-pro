@@ -2,8 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore, patternPlayBeats } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
-import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, commitCurrentSongToRecents, type InspirationPhoto } from "@/store/song";
-import { listRecent, restoreRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
+import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import {
+  commitCurrentSongToRecents,
+  listRecent,
+  currentSongHasContent,
+  openRecentSong,
+  restoreRecent,
+  removeRecent,
+  songDisplayName,
+  type RecentProject,
+} from "@/lib/recent-projects";
+import { RecentProjectsList } from "@/components/common/RecentProjectsList";
 import { useDriveStore, saveProject, loadProjectFromDrive, loadLocalVersionIntoSong } from "@/store/drive";
 import { listLocalVersions, listCheckpoints, type LocalVersionMeta } from "@/lib/local-versions";
 import type { DriveFile } from "@/lib/drive/drive";
@@ -36,7 +46,6 @@ import {
   RotateCcw,
   Archive,
   History,
-  MoreVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -501,7 +510,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recentProjectsOpen, setRecentProjectsOpen] = useState(false);
   const [recents, setRecents] = useState<RecentProject[]>([]);
-  const [pendingRecent, setPendingRecent] = useState<RecentProject | null>(null);
   const driveConfigured = useDriveStore((s) => s.configured);
   const driveOnline = useDriveStore((s) => s.online);
   const driveConnected = useDriveStore((s) => s.connected);
@@ -524,6 +532,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [soundOpen, setSoundOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmNewSong, setConfirmNewSong] = useState(false);
+  const currentName = confirmNewSong && currentSongHasContent() ? songDisplayName(useSongStore.getState().toJSON()) : null;
   const [stemsProgress, setStemsProgress] = useState<StemExportProgress | null>(null);
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
@@ -762,6 +771,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const handleLoad = async (file?: File) => {
     if (!file) return;
     try {
+      void commitCurrentSongToRecents();
       await loadProjectFromFile(file);
       toast({ title: "Project loaded", description: file.name });
     } catch {
@@ -770,33 +780,23 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     setFileInputKey((k) => k + 1);
   };
 
-  const loadRecent = (r: RecentProject) => {
-    commitCurrentSongToRecents();
-    useSongStore.getState().loadFromJSON(r.snapshot);
-    // Recent-project snapshots don't carry recordings — start clean rather
-    // than inheriting whatever takes/clips the previous song had.
-    useTakesStore.getState().clear();
-    useRecordingsStore.getState().clear();
+  const openRecentProjects = () => {
+    // Save the live song first so the list shows its latest name and position.
+    void commitCurrentSongToRecents().then(listRecent).then(setRecents);
+    setRecentProjectsOpen(true);
+    setNavOpen(false);
+  };
+
+  const handleOpenRecent = (r: RecentProject) => {
+    openRecentSong(r);
     setRecentProjectsOpen(false);
     toast({ title: "Project loaded", description: r.name });
   };
 
-  const handleOpenRecent = (r: RecentProject) => {
-    const takes = useTakesStore.getState().takes.length;
-    const clips = useRecordingsStore.getState().tracks.reduce((n, t) => n + t.clips.length, 0);
-    if (takes + clips > 0) {
-      setPendingRecent(r);
-    } else {
-      loadRecent(r);
-    }
-  };
-
   const removeOneRecent = (r: RecentProject) => {
-    const index = recents.findIndex((x) => x.id === r.id);
-    removeRecent(r.id);
-    setRecents(listRecent());
+    void removeRecent(r.id).then(listRecent).then(setRecents);
     sonnerToast(`Removed "${r.name}" from recents`, {
-      action: { label: "Undo", onClick: () => { restoreRecent(r, index); setRecents(listRecent()); } },
+      action: { label: "Undo", onClick: () => { void restoreRecent(r).then(listRecent).then(setRecents); } },
     });
   };
 
@@ -850,6 +850,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
   const handleOpenDriveFile = async (file: DriveFile) => {
     try {
+      void commitCurrentSongToRecents();
       await loadProjectFromDrive(file.id);
       toast({ title: "Project loaded", description: file.name });
       setDriveDialogOpen(false);
@@ -1069,18 +1070,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                         <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                           <Upload className="h-4 w-4" /> From a .zip or .json file
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setRecents(listRecent());
-                            setRecentProjectsOpen(true);
-                            setNavOpen(false);
-                          }}
-                        >
+                        <DropdownMenuItem onClick={openRecentProjects}>
                           <History className="h-4 w-4" /> Recent projects
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2 border-0"
+                    style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                    onClick={openRecentProjects}
+                  >
+                    <History className="h-4 w-4" /> Recent projects
+                  </Button>
                   {(driveConfigured || hasLocalVersions) && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -1484,23 +1487,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <AlertDialogHeader>
           <AlertDialogTitle>Start a new song?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will clear all lyrics, chords, and progressions in the current song. Make sure
-            you've saved your work first — unsaved changes can't be recovered.
+            {currentName
+              ? `"${currentName}" and its recordings stay in Recent projects, so you can come back to it.`
+              : "You'll start from a blank page."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            variant="outline"
-            onClick={() =>
-              void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip")
-            }
-          >
-            <Save className="h-4 w-4" /> Save first
-          </Button>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
+              void commitCurrentSongToRecents();
               resetSong();
               useTakesStore.getState().clear();
               useRecordingsStore.getState().clear();
@@ -1521,56 +1517,14 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <DialogHeader>
           <DialogTitle>Recent Projects</DialogTitle>
           <DialogDescription>
-            Projects saved in this browser. Recordings aren't included — export a backup (.zip)
-            to keep those.
+            Songs saved in this browser, with their recordings. To move one to another device,
+            use Export Backup (.zip).
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-md border border-border divide-y divide-border">
-          {recents.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">
-              No recent projects yet.
-            </p>
-          ) : (
-            recents.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 px-2">
-                <button
-                  type="button"
-                  className="flex-1 min-w-0 text-left py-3"
-                  onClick={() => handleOpenRecent(r)}
-                >
-                  <div className="font-display text-base truncate">{r.name}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(r.savedAt).toLocaleString()}</div>
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`More actions for ${r.name}`}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => removeOneRecent(r)}>
-                      Remove from recents
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          )}
-        </div>
+        <RecentProjectsList songs={recents} onOpen={handleOpenRecent} onRemove={removeOneRecent} limit={50} />
       </DialogContent>
     </Dialog>
 
-    <ConfirmDeleteDialog
-      open={!!pendingRecent}
-      onOpenChange={(o) => { if (!o) setPendingRecent(null); }}
-      title="Switch to this project?"
-      description="This song has recordings that haven't been backed up — recent-project snapshots don't include audio. Switching will clear them from this session. Use Export Backup (.zip) first if you want to keep them."
-      confirmLabel="Switch project"
-      onConfirm={() => {
-        if (pendingRecent) loadRecent(pendingRecent);
-        setPendingRecent(null);
-      }}
-    />
 
     <Dialog open={driveDialogOpen} onOpenChange={setDriveDialogOpen}>
       <DialogContent className="max-h-[80vh] overflow-y-auto">
