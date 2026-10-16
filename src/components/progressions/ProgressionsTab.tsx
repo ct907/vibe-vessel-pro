@@ -52,6 +52,7 @@ import {
   KeyRound,
   Sparkles,
   Play,
+  Square,
   Scissors,
   Maximize2,
   Lock,
@@ -1117,8 +1118,12 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              disabled={!firstSectionChord}
+              disabled={!firstSectionChord && !isSectionPlaying}
               onClick={() => {
+                if (isSectionPlaying) {
+                  window.dispatchEvent(new Event("lovable:request-stop"));
+                  return;
+                }
                 if (!firstSectionChord?.progressionPlacement) return;
                 usePlaybackStore.getState().setStartFromChord(
                   firstSectionChord.progressionPlacement.patternId,
@@ -1132,19 +1137,10 @@ function SectionGroup({
                   ? "bg-[var(--primary)] text-white"
                   : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
-              aria-label="Play from this section"
-              title="Play from this section"
+              aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
+              title={isSectionPlaying ? "Stop" : "Play from this section"}
             >
-              <Play className={cn("h-4 w-4", isSectionPlaying && "fill-white")} />
-            </button>
-            <button
-              type="button"
-              onClick={() => duplicateSection(sectionId)}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
-              aria-label="Duplicate section"
-              title="Duplicate section"
-            >
-              <Copy className="h-4 w-4" />
+              {isSectionPlaying ? <Square className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4" />}
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1194,6 +1190,9 @@ function SectionGroup({
                     ))}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
+                  <Copy className="h-4 w-4" /> Duplicate section
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
@@ -2033,6 +2032,12 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChordId, multiSelected, sections, progression]);
 
+  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
+  const hasChordSelection = activeChordId !== null || multiSelected.size > 0;
+  useEffect(() => {
+    setChordSelectionActive(hasChordSelection);
+    return () => setChordSelectionActive(false);
+  }, [hasChordSelection, setChordSelectionActive]);
   const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
   const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
   useEffect(() => {
