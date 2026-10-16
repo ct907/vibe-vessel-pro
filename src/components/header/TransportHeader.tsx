@@ -89,7 +89,7 @@ import { cn } from "@/lib/utils";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { createPortal } from "react-dom";
-import { useRecordingsStore } from "@/store/recordings";
+import { useRecordingsStore, clipEndSec } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { downloadMidi } from "@/lib/export/midi";
 import { exportStemsAsZip, type StemExportProgress } from "@/lib/export/wav-stems";
@@ -628,7 +628,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     }
   }, [meta.bpm, isPlaying]);
 
-  const handlePlay = async (requestedStartAt?: number) => {
+  const handlePlay = async (requestedStartAt?: number, fromSec?: number) => {
     stopRequestedRef.current = false;
     await ensureAudio();
     // Defensive: AudioContext may be suspended after autoplay-policy
@@ -637,29 +637,45 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
     } catch { /* ignore */ }
-    const startFromChordId = usePlaybackStore.getState().startFromChordId;
+    // An overdub (fromSec) plays from the timeline playhead, not a chord anchor.
+    const startFromChordId = fromSec == null ? usePlaybackStore.getState().startFromChordId : null;
 
     // Walk the SSOT (section.chords) directly instead of the legacy
     // pattern.chords mirror. Orphaned placements / empty sections are
     // tolerated so Play always plays whatever chords actually exist.
     const built = buildPlayback(sections, progression, startFromChordId);
-    if (!built) {
+    const beatSec = 60 / meta.bpm;
+    const audioEndBeats = useRecordingsStore.getState().tracks.reduce(
+      (m, t) => t.clips.reduce((mm, c) => Math.max(mm, clipEndSec(c) + (t.offsetMs ?? 0) / 1000), m),
+      0,
+    ) / beatSec;
+    if (!built && audioEndBeats <= 0 && fromSec == null) {
       toast({ title: "Nothing to play yet", description: "Add some chords or record a track first." });
       return;
     }
-    if (built.startAnchorStale) {
+    if (built?.startAnchorStale) {
       usePlaybackStore.getState().setStartFromChord(null, null);
     }
-    const anchorAtPlay = built.startAnchorStale ? null : startFromChordId;
+    const anchorAtPlay = built && !built.startAnchorStale ? startFromChordId : null;
     startFromChordIdAtPlayRef.current = anchorAtPlay;
-    playMetaRef.current = built.meta;
-    loopBeatsRef.current = built.loopBeats;
+    playMetaRef.current = built?.meta ?? [];
+
+    // The recordings loop must hold every clip: whole repeats of the chord loop
+    // (so chords stay aligned) or, with no chords, whole bars. An overdub plays
+    // straight through instead, so the take lines up with what was heard.
+    const progBeats = built?.loopBeats ?? 0;
+    const engineLoopBeats = fromSec != null
+      ? Math.max(audioEndBeats, fromSec / beatSec) + 600 / beatSec
+      : progBeats > 0
+        ? progBeats * Math.max(1, Math.ceil(audioEndBeats / progBeats - 1e-9))
+        : Math.max(1, Math.ceil(audioEndBeats / meta.beatsPerBar - 1e-9)) * meta.beatsPerBar;
+    loopBeatsRef.current = engineLoopBeats;
 
     setIsPlaying(true);
     setPlayingStore(true);
     // Seed the playhead to the first chord immediately so the visual indicator
     // appears even if the first draw callback is delayed.
-    setCurrent(built.meta[0] ?? null);
+    setCurrent(built?.meta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     // requestedStartAt comes from count-in (pre-calculated beat-1 AC time);
@@ -674,28 +690,30 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         startAt: startAt + attack,
       });
     }
-    await playProgression(built.events, meta.bpm, {
-      onChordStart: (idx) => {
-        const m = playMetaRef.current;
-        setCurrent(m[idx % m.length] ?? null);
-      },
-      loopBeats: built.loopBeats,
-      startAt,
-    });
-    // Start the recordings engine in lockstep with the progression. Compute
-    // the seconds offset corresponding to startFromChordId so the audio
-    // playhead aligns to the same musical position.
-    let playheadOffsetSec = 0;
+    if (built) {
+      await playProgression(built.events, meta.bpm, {
+        onChordStart: (idx) => {
+          const m = playMetaRef.current;
+          setCurrent(m[idx % m.length] ?? null);
+        },
+        loopBeats: built.loopBeats,
+        startAt,
+        fromBeat: fromSec != null ? (fromSec / beatSec) % built.loopBeats : 0,
+      });
+    }
+    // Start the recordings engine in lockstep with the progression, at the same
+    // musical position: the overdub's playhead, or the start-from chord. The
+    // built events are rotated to put that chord at beat 0, so its position
+    // comes from an unrotated build.
+    let playheadOffsetSec = fromSec ?? 0;
     if (anchorAtPlay) {
-      const idx = built.meta.findIndex((m) => m.patternChordId === anchorAtPlay);
-      if (idx >= 0) {
-        const beat = built.events[idx]?.startBeat ?? 0;
-        playheadOffsetSec = (beat * 60) / meta.bpm;
-      }
+      const plain = buildPlayback(sections, progression, null);
+      const idx = plain ? plain.meta.findIndex((m) => m.patternChordId === anchorAtPlay) : -1;
+      if (plain && idx >= 0) playheadOffsetSec = plain.events[idx].startBeat * beatSec;
     }
     startRecordingsEngine({
       bpm: meta.bpm,
-      loopBeats: built.loopBeats,
+      loopBeats: engineLoopBeats,
       startAtCtxTime: startAt,
       playheadOffsetSec,
     });
@@ -750,8 +768,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   useEffect(() => {
     const onReq = () => { handlePlay(); };
     const onReqAt = (e: Event) => {
-      const t = (e as CustomEvent<{ startAtAcTime: number }>).detail?.startAtAcTime;
-      handlePlay(t);
+      const detail = (e as CustomEvent<{ startAtAcTime: number; fromSec?: number }>).detail;
+      handlePlay(detail?.startAtAcTime, detail?.fromSec);
     };
     const onStop = () => { handleStop(); };
     window.addEventListener("lovable:request-play", onReq);

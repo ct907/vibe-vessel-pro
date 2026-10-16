@@ -30,6 +30,8 @@ import {
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob, deleteAudioBlob, getAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
+import { scheduleCountIn } from "@/lib/audio/metronome";
+import { useMetronomeStore } from "@/store/metronome";
 import { decodeBlob, cachedPeaks, invalidatePeaks } from "@/lib/audio/waveform";
 import {
   clearDecodedCache,
@@ -414,6 +416,9 @@ export function TrackTimeline() {
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
+  // Set while a take records over the backing: where it started on the
+  // timeline, and the AudioContext times the recorder and the backing began.
+  const overdubRef = useRef<{ fromSec: number; recStartedAt: number; playAt: number } | null>(null);
   const [pendingTid, setPendingTid] = useState<string | null>(null);
   const [recLevel, setRecLevel] = useState(0);
   const [recElapsed, setRecElapsed] = useState(0);
@@ -738,15 +743,28 @@ export function TrackTimeline() {
       setRecording(false, null);
       setRecLevel(0);
       if (!handle) return;
+      const take = overdubRef.current;
+      overdubRef.current = null;
+      if (take) window.dispatchEvent(new CustomEvent("lovable:request-stop"));
       setPendingTid(tid);
       try {
         const { blob, durationSec, mime } = await handle.stop();
+        // Line the take up with the backing: drop the count-in from its head
+        // so the audio heard at the playhead lands at the playhead.
+        const fromSec = take?.fromSec ?? useRecordingsStore.getState().playheadSec;
+        const lead = take ? take.playAt - take.recStartedAt : 0;
+        const trimStartSec = Math.min(durationSec, Math.max(0, lead));
+        if (durationSec - trimStartSec < 0.05) {
+          toast("Stopped during the count-in — nothing recorded.");
+          return;
+        }
         const blobId = nanoid();
         await putAudioBlob(blobId, blob);
-        const startSec = useRecordingsStore.getState().playheadSec;
-        const clip: RecClip = { blobId, mime, durationSec, startSec, trimStartSec: 0, trimEndSec: durationSec };
+        const startSec = fromSec + Math.max(0, -lead);
+        const clip: RecClip = { blobId, mime, durationSec, startSec, trimStartSec, trimEndSec: durationSec };
         addClip(tid, clip);
-        setPlayheadSec(startSec + durationSec);
+        // Back to where the take started, ready for the next pass over the same part.
+        setPlayheadSec(fromSec);
       } catch {
         toast.error("Couldn't save that recording", {
           description: "Something went wrong storing the audio. Please try recording again.",
@@ -769,8 +787,26 @@ export function TrackTimeline() {
       const handle = await startRecording({ onLevel: setRecLevel });
       recorderRef.current = handle;
       setRecording(true, tid);
+      // Jam along: with chords or other clips to hear, count in one bar and
+      // play everything from the playhead while the take records.
+      const st = useRecordingsStore.getState();
+      const hasBacking =
+        useSongStore.getState().sections.some((sec) => sec.chords.some((c) => c.progressionPlacement)) ||
+        st.tracks.some((t) => t.id !== tid && t.clips.length > 0);
+      if (hasBacking) {
+        const recStartedAt = ac.currentTime;
+        const playAt = recStartedAt + 0.1 + (beatsPerBar * 60) / bpm;
+        const fromSec = st.playheadSec;
+        overdubRef.current = { fromSec, recStartedAt, playAt };
+        window.dispatchEvent(new CustomEvent("lovable:request-stop"));
+        scheduleCountIn({ bpm, beatsPerBar, volume: Math.max(0.4, useMetronomeStore.getState().volume), endAt: playAt });
+        window.dispatchEvent(new CustomEvent("lovable:request-play-at", { detail: { startAtAcTime: playAt, fromSec } }));
+      }
     } catch {
       setRecording(false, null);
+      toast.error("Can't access the microphone", {
+        description: "Allow mic access in your browser settings, then try again.",
+      });
     }
   };
 
