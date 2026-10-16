@@ -1601,6 +1601,27 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
+  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
+  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
+  useEffect(() => {
+    if (!chordPickerRequest) return;
+    setChordPickerRequest(false);
+    for (const sec of sections) {
+      for (const l of sec.lines) {
+        const a = l.chords.find((c) => c.id === activeChordId);
+        if (a) {
+          setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: a.slotIndex ?? 0, anchorId: a.id });
+          return;
+        }
+      }
+    }
+    const sec = sections[sections.length - 1];
+    const l = sec?.lines[sec.lines.length - 1];
+    if (!sec || !l) return;
+    const lastSlot = l.chords.reduce((m, c) => Math.max(m, c.slotIndex ?? 0), -1);
+    setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, lastSlot + 1) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chordPickerRequest]);
   const rangeAnchorRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
   const toggleLyricMultiSelected = useCallback(
     (anchorId: string, ctx: { sectionId: string; lineId: string }) => {
@@ -2665,6 +2686,9 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                     id: activeCtx.anchor.id,
                     display: activeCtx.anchor.chord.display,
                     octave: activeCtx.anchor.chord.octave,
+                    lengthBeats: sections
+                      .find((sec) => sec.id === activeCtx.sectionId)
+                      ?.chords.find((sc) => sc.id === activeCtx.anchor.id)?.progressionPlacement?.lengthBeats,
                   }
                 : null
             }
@@ -2732,6 +2756,21 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
                   const next = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, slot + dir));
                   if (next !== slot) moveChordToSlot(t.sectionId, t.lineId, t.id, next);
                 }
+              });
+            }}
+            onResize={(delta) => {
+              const byPattern = new Map<string, string[]>();
+              for (const t of targets) {
+                const pid = sections
+                  .find((sec) => sec.id === t.sectionId)
+                  ?.chords.find((sc) => sc.id === t.id)?.progressionPlacement?.patternId;
+                if (!pid) continue;
+                byPattern.set(pid, [...(byPattern.get(pid) ?? []), t.id]);
+              }
+              withHistoryGroup(() => {
+                byPattern.forEach((ids, pid) => {
+                  useSongStore.getState().resizePatternChordsWithOverflow(pid, ids, delta);
+                });
               });
             }}
             onOctaveChange={(oct) => {

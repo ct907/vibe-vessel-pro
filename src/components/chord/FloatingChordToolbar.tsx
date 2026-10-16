@@ -307,7 +307,7 @@ export function FloatingChordToolbar({
   const bottomClass = hideTrigger ? "bottom-16" : "bottom-4";
 
   const lenBadge =
-    mode === "progression" && activeChord?.lengthBeats !== undefined ? (
+    activeChord?.lengthBeats !== undefined ? (
       <span className="px-1 text-xs font-mono-chord text-muted-foreground select-none">
         {Number.isInteger(activeChord.lengthBeats) ? activeChord.lengthBeats : activeChord.lengthBeats.toFixed(1)}b
       </span>
@@ -390,24 +390,20 @@ export function FloatingChordToolbar({
             {middleLabel}
           </span>
           {divider}
-          {mode === "progression" && (
-            <>
-              <LabeledBtn
-                icon={<Minus className="h-5 w-5" />}
-                label="Shorter"
-                disabled={beatDisabled}
-                onClick={() => onResize?.(-0.5)}
-              />
-              {lenBadge}
-              <LabeledBtn
-                icon={<Plus className="h-5 w-5" />}
-                label="Longer"
-                disabled={beatDisabled}
-                onClick={() => onResize?.(0.5)}
-              />
-              {divider}
-            </>
-          )}
+          <LabeledBtn
+            icon={<Minus className="h-5 w-5" />}
+            label="Shorter"
+            disabled={beatDisabled}
+            onClick={() => onResize?.(-0.5)}
+          />
+          {lenBadge}
+          <LabeledBtn
+            icon={<Plus className="h-5 w-5" />}
+            label="Longer"
+            disabled={beatDisabled}
+            onClick={() => onResize?.(0.5)}
+          />
+          {divider}
           <LabeledBtn
             icon={<ListChecks className="h-5 w-5" />}
             label="All"
@@ -630,9 +626,8 @@ export function FloatingChordToolbar({
             {/* Middle: Length + Chord Octave. */}
             <div className="flex min-w-0 flex-1 flex-col divide-y">
 
-            {/* Length (progression only): −½ · beats · +½ */}
-            {mode === "progression" && (
-              <div className="flex items-center gap-1 px-3 py-2">
+            {/* Length: −½ · beats · +½ */}
+            <div className="flex items-center gap-1 px-3 py-2">
                 <span className="mr-auto text-sm font-mono-chord text-[var(--ink-soft)] dark:text-[var(--cocoa-foreground)] select-none">
                   Length
                 </span>
@@ -664,7 +659,6 @@ export function FloatingChordToolbar({
                   <Plus className="h-5 w-5" />
                 </Button>
               </div>
-            )}
 
             {/* Chord Octave */}
             <div className="flex items-center gap-2 px-3 py-2">

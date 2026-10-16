@@ -51,6 +51,9 @@ interface UIState {
   /** One-shot signal: WriteStickyBar requests FloatingChordToolbar to expand. */
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
+  /** One-shot signal: WriteStickyBar requests the active tab to open its chord picker sheet. */
+  chordPickerRequest: boolean;
+  setChordPickerRequest: (v: boolean) => void;
   /** Chord clipboard shared across tabs. */
   chordClipboard: ClipboardChord[];
   setChordClipboard: (chords: ClipboardChord[]) => void;
@@ -73,6 +76,8 @@ export const useUIStore = create<UIState>((set) => ({
   setArrangeView: (arrangeView) => set({ arrangeView }),
   chordToolbarOpen: false,
   setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
+  chordPickerRequest: false,
+  setChordPickerRequest: (v) => set({ chordPickerRequest: v }),
   chordClipboard: [],
   setChordClipboard: (chords) => set({ chordClipboard: chords }),
 }));
