@@ -243,6 +243,8 @@ function PatternBlock({
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setWhyChord = useUIStore((s) => s.setWhyChord);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const sheetOpen = useUIStore((s) => s.focusedEditorOpen);
+  const sheetTarget = useUIStore((s) => s.focusedEditorTarget);
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
 
@@ -583,12 +585,16 @@ function PatternBlock({
                 const c = occupied ? item.chord : undefined;
                 const slotIdx = item.slotIdx;
                 const basis = item.basis;
+                const sheetTargeted =
+                  sheetOpen && sheetTarget?.patternId === pattern.id &&
+                  (occupied ? sheetTarget.chordId === c?.id : !sheetTarget.chordId && sheetTarget.slotIndex === slotIdx);
                 return (
                       <div
                         key={`pslot-${itemIdx}`}
                         className={cn(
                           "relative min-w-0 flex items-stretch z-10",
                           !occupied && "border border-dashed border-transparent justify-center",
+                          sheetTargeted && "rounded-md bg-primary/25 ring-2 ring-[var(--primary-strong)]",
                         )}
                         style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
@@ -676,6 +682,10 @@ function PatternBlock({
                                   }
                                   if (e.shiftKey || isShiftDownRef.current) {
                                     onShiftSelectChord?.(pattern.id, c.id);
+                                    return;
+                                  }
+                                  if (sheetOpen) {
+                                    onEditChordOpen(pattern.id, c.id);
                                     return;
                                   }
                                   setFocusedPattern(pattern.id);
@@ -1983,6 +1993,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       setPicker({ patternId, atBeat, replaceChordId: chordId });
       return;
     }
+    setPatternAddSlot(null);
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 
@@ -2076,6 +2087,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     if (isMobile && !replaceChordId) {
       const pat = progression.find((p) => p.id === patternId);
       if (pat) {
+        setChordEditor(null);
         setPatternAddSlot({ patternId, atBeat, sectionId: pat.sectionId ?? pat.id });
         return;
       }
@@ -2440,7 +2452,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         }}
       />
 
-      {chordEditor && (
+      {/* One element position for both modes so tapping between an empty slot
+          and an existing chord retargets the open sheet instead of remounting it. */}
+      {chordEditor ? (
         <FocusedChordEditor
           mode="progression"
           sectionId={chordEditor.sectionId}
@@ -2449,9 +2463,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onClose={() => setChordEditor(null)}
           headerRef={focusedEditorHeaderRef}
         />
-      )}
-
-      {patternAddSlot && (
+      ) : patternAddSlot ? (
         <FocusedChordEditor
           mode="progression-add"
           sectionId={patternAddSlot.sectionId}
@@ -2460,7 +2472,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onClose={() => setPatternAddSlot(null)}
           headerRef={focusedEditorHeaderRef}
         />
-      )}
+      ) : null}
 
       <FloatingChordToolbar
         mode="progression"
