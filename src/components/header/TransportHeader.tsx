@@ -650,7 +650,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       0,
     ) / beatSec;
     if (!built && audioEndBeats <= 0 && fromSec == null) {
-      toast({ title: "Nothing to play yet", description: "Add some chords or record a track first." });
+      toast({
+        title: "Nothing to play yet",
+        description: useTakesStore.getState().takes.length > 0
+          ? "Takes play from their own play buttons. Open Arrange to put one on a track."
+          : "Add some chords or record something first.",
+      });
       return;
     }
     if (built?.startAnchorStale) {
