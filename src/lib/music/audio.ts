@@ -423,6 +423,8 @@ export interface PlayProgressionOptions {
   octave?: number;
   /** Optional: AudioContext time at which playback should start. */
   startAt?: number;
+  /** Optional: beat within the loop that `startAt` corresponds to; earlier chords are skipped. */
+  fromBeat?: number;
 }
 
 const LOOKAHEAD_MS = 25;
@@ -528,15 +530,16 @@ export async function playProgression(
   await ensureAudio();
   stopProgression();
 
-  const { onChordStart, onEnd, loopBeats, octave = 4, startAt } = options;
+  const { onChordStart, onEnd, loopBeats, octave = 4, startAt, fromBeat = 0 } = options;
   const ctx = getAudioContext();
 
   schedEvents = events;
   schedBpm = bpm;
   schedOctave = octave;
-  schedOriginAcTime = startAt != null ? startAt : ctx.currentTime + 0.04;
+  schedOriginAcTime = (startAt != null ? startAt : ctx.currentTime + 0.04) - fromBeat * (60 / bpm);
   schedLoopBeats = loopBeats && loopBeats > 0 ? loopBeats : null;
-  schedNextIdx = 0;
+  const firstIdx = events.findIndex((e) => e.startBeat >= fromBeat - 1e-9);
+  schedNextIdx = firstIdx < 0 ? events.length : firstIdx;
   schedOnChordStart = onChordStart;
   schedOnEnd = onEnd;
   schedEndedScheduled = false;

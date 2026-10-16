@@ -52,3 +52,52 @@ describe("reflow-on-load is lossless across devices", () => {
     expect(assertClean("reflow-phone-again")).toBe(n);
   });
 });
+
+/**
+ * The reflow runs after every chord add. It used to left-pack each line from
+ * slot 0, so a chord tapped above a word jumped to the start of the line and
+ * any hand-placed chord snapped back the next time a chord was added.
+ */
+describe("reflow keeps chords where the writer put them", () => {
+  const C = { root: "C", quality: "maj", display: "C", octave: 3 } as const;
+  const AM = { root: "A", quality: "min", display: "Am", octave: 3 } as const;
+  const CMAJ7 = { root: "C", quality: "maj7", display: "Cmaj7", octave: 3 } as const;
+  const slots = () => {
+    const sec = useSongStore.getState().sections[0];
+    return sec.chords.map((c) => c.lyricsPlacement!.slotIndex);
+  };
+  const setup = () => {
+    useSongStore.getState().resetSong();
+    const sec = useSongStore.getState().sections[0];
+    useSongStore.getState().setLineText(sec.id, sec.lines[0].id, "Moths are dancing where you used to stand");
+    return { sectionId: sec.id, lineId: sec.lines[0].id };
+  };
+
+  it("leaves a tapped chord on its slot", () => {
+    const { sectionId, lineId } = setup();
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 6, AM);
+    useSongStore.getState().autoLayoutSection(sectionId, 1280, 28);
+    expect(slots()).toEqual([6]);
+  });
+
+  it("only nudges a chord right as far as needed to clear the one before it", () => {
+    const { sectionId, lineId } = setup();
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 3, CMAJ7);
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 6, C);
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 7, AM);
+    useSongStore.getState().autoLayoutSection(sectionId, 1280, 28);
+    // Cmaj7 is 2 slots wide; C keeps 6; Am moves from 7 to 8 to leave one slot of spacing.
+    expect(slots()).toEqual([3, 6, 8]);
+  });
+
+  it("pulls chords left when they would run past the row's capacity", () => {
+    const { sectionId, lineId } = setup();
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 40, C);
+    useSongStore.getState().placeChordInSlot(sectionId, lineId, 45, AM);
+    // 360px phone: 0.8 * 360 / 28 = 10 slots per line.
+    useSongStore.getState().autoLayoutSection(sectionId, 360, 28);
+    const [c, am] = slots();
+    expect(am).toBeLessThanOrEqual(9);
+    expect(am - c).toBeGreaterThanOrEqual(2);
+  });
+});

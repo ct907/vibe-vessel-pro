@@ -295,7 +295,7 @@ export function RecordingsStrip() {
       )}
 
       {takes.length > 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 px-4 pb-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 px-4 pb-2">
           {takes.map((take) => {
             const st = status[take.id] ?? "idle";
             const detected = chordsByTake[take.id] ?? [];

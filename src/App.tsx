@@ -21,7 +21,7 @@ import {
 } from "@/store/recordings";
 import { hydrateTakesFromStorage, startTakesAutosave, useTakesStore } from "@/store/takes";
 import { pruneOrphanBlobs } from "@/lib/audio/blob-store";
-import { pushRecent } from "@/lib/recent-projects";
+import { commitCurrentSongToRecents, libraryBlobIds, migrateLegacyRecents } from "@/lib/recent-projects";
 import { startOfflineCheckpoints } from "@/store/drive";
 import { isOverlayRoute } from "@/lib/routes";
 
@@ -104,24 +104,35 @@ const App = () => {
     const unsubCrossTab = startCrossTabWarning();
     const unsubCheckpoints = startOfflineCheckpoints();
 
-    // Reclaim IndexedDB space from blobs no longer referenced by any restored
-    // take or recording clip (e.g. left behind by older sessions or crashes).
-    const referenced = new Set<string>([
-      ...referencedRecordingBlobIds(),
-      ...useTakesStore.getState().takes.map((t) => t.blobId).filter((id): id is string => !!id),
-    ]);
-    void pruneOrphanBlobs(referenced).catch(() => { /* non-fatal */ });
+    void migrateLegacyRecents();
 
-    let lastPush = 0;
-    const unsubRecents = useSongStore.subscribe((state) => {
-      const now = Date.now();
-      if (now - lastPush < 30_000) return;
-      lastPush = now;
-      try {
-        pushRecent({ name: state.meta.title || "Untitled Song", snapshot: state.toJSON() });
-      } catch { /* ignore */ }
-    });
-    return () => { unsub(); unsubRecordings(); unsubTakes(); unsubRecents(); unsubCrossTab(); unsubCheckpoints(); };
+    // Reclaim IndexedDB space from blobs no longer referenced by the live song's
+    // takes/clips or by any song in the library (e.g. left behind by crashes).
+    void libraryBlobIds()
+      .then((libraryIds) => pruneOrphanBlobs(new Set<string>([
+        ...libraryIds,
+        ...referencedRecordingBlobIds(),
+        ...useTakesStore.getState().takes.map((t) => t.blobId).filter((id): id is string => !!id),
+      ])))
+      .catch(() => { /* non-fatal */ });
+
+    // Keep the live song's library entry current, so it can be found again
+    // from Recent projects with its recordings.
+    let saveTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleSave = () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => void commitCurrentSongToRecents(), 2000);
+    };
+    const unsubLibrary = [
+      useSongStore.subscribe(scheduleSave),
+      useTakesStore.subscribe((s, prev) => { if (s.takes !== prev.takes) scheduleSave(); }),
+      useRecordingsStore.subscribe((s, prev) => { if (s.tracks !== prev.tracks) scheduleSave(); }),
+    ];
+    return () => {
+      clearTimeout(saveTimer);
+      unsubLibrary.forEach((u) => u());
+      unsub(); unsubRecordings(); unsubTakes(); unsubCrossTab(); unsubCheckpoints();
+    };
   }, []);
 
   useEffect(() => {

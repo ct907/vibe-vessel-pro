@@ -2,8 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore, patternPlayBeats } from "@/store/song";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
-import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, commitCurrentSongToRecents, type InspirationPhoto } from "@/store/song";
-import { listRecent, restoreRecent, removeRecent, type RecentProject } from "@/lib/recent-projects";
+import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import {
+  commitCurrentSongToRecents,
+  listRecent,
+  currentSongHasContent,
+  openRecentSong,
+  restoreRecent,
+  removeRecent,
+  songDisplayName,
+  type RecentProject,
+} from "@/lib/recent-projects";
+import { RecentProjectsList } from "@/components/common/RecentProjectsList";
 import { useDriveStore, saveProject, loadProjectFromDrive, loadLocalVersionIntoSong } from "@/store/drive";
 import { listLocalVersions, listCheckpoints, type LocalVersionMeta } from "@/lib/local-versions";
 import type { DriveFile } from "@/lib/drive/drive";
@@ -36,7 +46,6 @@ import {
   RotateCcw,
   Archive,
   History,
-  MoreVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -80,7 +89,7 @@ import { cn } from "@/lib/utils";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { createPortal } from "react-dom";
-import { useRecordingsStore } from "@/store/recordings";
+import { useRecordingsStore, clipEndSec } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { downloadMidi } from "@/lib/export/midi";
 import { exportStemsAsZip, type StemExportProgress } from "@/lib/export/wav-stems";
@@ -501,7 +510,6 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recentProjectsOpen, setRecentProjectsOpen] = useState(false);
   const [recents, setRecents] = useState<RecentProject[]>([]);
-  const [pendingRecent, setPendingRecent] = useState<RecentProject | null>(null);
   const driveConfigured = useDriveStore((s) => s.configured);
   const driveOnline = useDriveStore((s) => s.online);
   const driveConnected = useDriveStore((s) => s.connected);
@@ -524,6 +532,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [soundOpen, setSoundOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmNewSong, setConfirmNewSong] = useState(false);
+  const currentName = confirmNewSong && currentSongHasContent() ? songDisplayName(useSongStore.getState().toJSON()) : null;
   const [stemsProgress, setStemsProgress] = useState<StemExportProgress | null>(null);
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
@@ -619,7 +628,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     }
   }, [meta.bpm, isPlaying]);
 
-  const handlePlay = async (requestedStartAt?: number) => {
+  const handlePlay = async (requestedStartAt?: number, fromSec?: number) => {
     stopRequestedRef.current = false;
     await ensureAudio();
     // Defensive: AudioContext may be suspended after autoplay-policy
@@ -628,29 +637,45 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
     } catch { /* ignore */ }
-    const startFromChordId = usePlaybackStore.getState().startFromChordId;
+    // An overdub (fromSec) plays from the timeline playhead, not a chord anchor.
+    const startFromChordId = fromSec == null ? usePlaybackStore.getState().startFromChordId : null;
 
     // Walk the SSOT (section.chords) directly instead of the legacy
     // pattern.chords mirror. Orphaned placements / empty sections are
     // tolerated so Play always plays whatever chords actually exist.
     const built = buildPlayback(sections, progression, startFromChordId);
-    if (!built) {
-      toast({ title: "Nothing to play yet", description: "Add chords to a pattern in Progressions." });
+    const beatSec = 60 / meta.bpm;
+    const audioEndBeats = useRecordingsStore.getState().tracks.reduce(
+      (m, t) => t.clips.reduce((mm, c) => Math.max(mm, clipEndSec(c) + (t.offsetMs ?? 0) / 1000), m),
+      0,
+    ) / beatSec;
+    if (!built && audioEndBeats <= 0 && fromSec == null) {
+      toast({ title: "Nothing to play yet", description: "Add some chords or record a track first." });
       return;
     }
-    if (built.startAnchorStale) {
+    if (built?.startAnchorStale) {
       usePlaybackStore.getState().setStartFromChord(null, null);
     }
-    const anchorAtPlay = built.startAnchorStale ? null : startFromChordId;
+    const anchorAtPlay = built && !built.startAnchorStale ? startFromChordId : null;
     startFromChordIdAtPlayRef.current = anchorAtPlay;
-    playMetaRef.current = built.meta;
-    loopBeatsRef.current = built.loopBeats;
+    playMetaRef.current = built?.meta ?? [];
+
+    // The recordings loop must hold every clip: whole repeats of the chord loop
+    // (so chords stay aligned) or, with no chords, whole bars. An overdub plays
+    // straight through instead, so the take lines up with what was heard.
+    const progBeats = built?.loopBeats ?? 0;
+    const engineLoopBeats = fromSec != null
+      ? Math.max(audioEndBeats, fromSec / beatSec) + 600 / beatSec
+      : progBeats > 0
+        ? progBeats * Math.max(1, Math.ceil(audioEndBeats / progBeats - 1e-9))
+        : Math.max(1, Math.ceil(audioEndBeats / meta.beatsPerBar - 1e-9)) * meta.beatsPerBar;
+    loopBeatsRef.current = engineLoopBeats;
 
     setIsPlaying(true);
     setPlayingStore(true);
     // Seed the playhead to the first chord immediately so the visual indicator
     // appears even if the first draw callback is delayed.
-    setCurrent(built.meta[0] ?? null);
+    setCurrent(built?.meta[0] ?? null);
     // Anchor metronome and progression to the SAME AudioContext time so the
     // first downbeat tick lines up with the first chord onset.
     // requestedStartAt comes from count-in (pre-calculated beat-1 AC time);
@@ -665,28 +690,30 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         startAt: startAt + attack,
       });
     }
-    await playProgression(built.events, meta.bpm, {
-      onChordStart: (idx) => {
-        const m = playMetaRef.current;
-        setCurrent(m[idx % m.length] ?? null);
-      },
-      loopBeats: built.loopBeats,
-      startAt,
-    });
-    // Start the recordings engine in lockstep with the progression. Compute
-    // the seconds offset corresponding to startFromChordId so the audio
-    // playhead aligns to the same musical position.
-    let playheadOffsetSec = 0;
+    if (built) {
+      await playProgression(built.events, meta.bpm, {
+        onChordStart: (idx) => {
+          const m = playMetaRef.current;
+          setCurrent(m[idx % m.length] ?? null);
+        },
+        loopBeats: built.loopBeats,
+        startAt,
+        fromBeat: fromSec != null ? (fromSec / beatSec) % built.loopBeats : 0,
+      });
+    }
+    // Start the recordings engine in lockstep with the progression, at the same
+    // musical position: the overdub's playhead, or the start-from chord. The
+    // built events are rotated to put that chord at beat 0, so its position
+    // comes from an unrotated build.
+    let playheadOffsetSec = fromSec ?? 0;
     if (anchorAtPlay) {
-      const idx = built.meta.findIndex((m) => m.patternChordId === anchorAtPlay);
-      if (idx >= 0) {
-        const beat = built.events[idx]?.startBeat ?? 0;
-        playheadOffsetSec = (beat * 60) / meta.bpm;
-      }
+      const plain = buildPlayback(sections, progression, null);
+      const idx = plain ? plain.meta.findIndex((m) => m.patternChordId === anchorAtPlay) : -1;
+      if (plain && idx >= 0) playheadOffsetSec = plain.events[idx].startBeat * beatSec;
     }
     startRecordingsEngine({
       bpm: meta.bpm,
-      loopBeats: built.loopBeats,
+      loopBeats: engineLoopBeats,
       startAtCtxTime: startAt,
       playheadOffsetSec,
     });
@@ -741,8 +768,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   useEffect(() => {
     const onReq = () => { handlePlay(); };
     const onReqAt = (e: Event) => {
-      const t = (e as CustomEvent<{ startAtAcTime: number }>).detail?.startAtAcTime;
-      handlePlay(t);
+      const detail = (e as CustomEvent<{ startAtAcTime: number; fromSec?: number }>).detail;
+      handlePlay(detail?.startAtAcTime, detail?.fromSec);
     };
     const onStop = () => { handleStop(); };
     window.addEventListener("lovable:request-play", onReq);
@@ -762,6 +789,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const handleLoad = async (file?: File) => {
     if (!file) return;
     try {
+      void commitCurrentSongToRecents();
       await loadProjectFromFile(file);
       toast({ title: "Project loaded", description: file.name });
     } catch {
@@ -770,33 +798,23 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     setFileInputKey((k) => k + 1);
   };
 
-  const loadRecent = (r: RecentProject) => {
-    commitCurrentSongToRecents();
-    useSongStore.getState().loadFromJSON(r.snapshot);
-    // Recent-project snapshots don't carry recordings — start clean rather
-    // than inheriting whatever takes/clips the previous song had.
-    useTakesStore.getState().clear();
-    useRecordingsStore.getState().clear();
+  const openRecentProjects = () => {
+    // Save the live song first so the list shows its latest name and position.
+    void commitCurrentSongToRecents().then(listRecent).then(setRecents);
+    setRecentProjectsOpen(true);
+    setNavOpen(false);
+  };
+
+  const handleOpenRecent = (r: RecentProject) => {
+    openRecentSong(r);
     setRecentProjectsOpen(false);
     toast({ title: "Project loaded", description: r.name });
   };
 
-  const handleOpenRecent = (r: RecentProject) => {
-    const takes = useTakesStore.getState().takes.length;
-    const clips = useRecordingsStore.getState().tracks.reduce((n, t) => n + t.clips.length, 0);
-    if (takes + clips > 0) {
-      setPendingRecent(r);
-    } else {
-      loadRecent(r);
-    }
-  };
-
   const removeOneRecent = (r: RecentProject) => {
-    const index = recents.findIndex((x) => x.id === r.id);
-    removeRecent(r.id);
-    setRecents(listRecent());
+    void removeRecent(r.id).then(listRecent).then(setRecents);
     sonnerToast(`Removed "${r.name}" from recents`, {
-      action: { label: "Undo", onClick: () => { restoreRecent(r, index); setRecents(listRecent()); } },
+      action: { label: "Undo", onClick: () => { void restoreRecent(r).then(listRecent).then(setRecents); } },
     });
   };
 
@@ -850,6 +868,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
 
   const handleOpenDriveFile = async (file: DriveFile) => {
     try {
+      void commitCurrentSongToRecents();
       await loadProjectFromDrive(file.id);
       toast({ title: "Project loaded", description: file.name });
       setDriveDialogOpen(false);
@@ -1069,18 +1088,20 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                         <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                           <Upload className="h-4 w-4" /> From a .zip or .json file
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setRecents(listRecent());
-                            setRecentProjectsOpen(true);
-                            setNavOpen(false);
-                          }}
-                        >
+                        <DropdownMenuItem onClick={openRecentProjects}>
                           <History className="h-4 w-4" /> Recent projects
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2 border-0"
+                    style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
+                    onClick={openRecentProjects}
+                  >
+                    <History className="h-4 w-4" /> Recent projects
+                  </Button>
                   {(driveConfigured || hasLocalVersions) && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -1484,23 +1505,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <AlertDialogHeader>
           <AlertDialogTitle>Start a new song?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will clear all lyrics, chords, and progressions in the current song. Make sure
-            you've saved your work first — unsaved changes can't be recovered.
+            {currentName
+              ? `"${currentName}" and its recordings stay in Recent projects, so you can come back to it.`
+              : "You'll start from a blank page."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            variant="outline"
-            onClick={() =>
-              void downloadProjectZip(meta.title.replace(/\s+/g, "-").toLowerCase() + ".zip")
-            }
-          >
-            <Save className="h-4 w-4" /> Save first
-          </Button>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
+              void commitCurrentSongToRecents();
               resetSong();
               useTakesStore.getState().clear();
               useRecordingsStore.getState().clear();
@@ -1521,56 +1535,14 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         <DialogHeader>
           <DialogTitle>Recent Projects</DialogTitle>
           <DialogDescription>
-            Projects saved in this browser. Recordings aren't included — export a backup (.zip)
-            to keep those.
+            Songs saved in this browser, with their recordings. To move one to another device,
+            use Export Backup (.zip).
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-md border border-border divide-y divide-border">
-          {recents.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">
-              No recent projects yet.
-            </p>
-          ) : (
-            recents.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 px-2">
-                <button
-                  type="button"
-                  className="flex-1 min-w-0 text-left py-3"
-                  onClick={() => handleOpenRecent(r)}
-                >
-                  <div className="font-display text-base truncate">{r.name}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(r.savedAt).toLocaleString()}</div>
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`More actions for ${r.name}`}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => removeOneRecent(r)}>
-                      Remove from recents
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          )}
-        </div>
+        <RecentProjectsList songs={recents} onOpen={handleOpenRecent} onRemove={removeOneRecent} limit={50} />
       </DialogContent>
     </Dialog>
 
-    <ConfirmDeleteDialog
-      open={!!pendingRecent}
-      onOpenChange={(o) => { if (!o) setPendingRecent(null); }}
-      title="Switch to this project?"
-      description="This song has recordings that haven't been backed up — recent-project snapshots don't include audio. Switching will clear them from this session. Use Export Backup (.zip) first if you want to keep them."
-      confirmLabel="Switch project"
-      onConfirm={() => {
-        if (pendingRecent) loadRecent(pendingRecent);
-        setPendingRecent(null);
-      }}
-    />
 
     <Dialog open={driveDialogOpen} onOpenChange={setDriveDialogOpen}>
       <DialogContent className="max-h-[80vh] overflow-y-auto">

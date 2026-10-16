@@ -64,6 +64,14 @@ export function startMetronome(opts: Opts) {
   tick();
 }
 
+/** One bar of clicks (downbeat accented) that ends exactly at `endAt` — a count-in. */
+export function scheduleCountIn(opts: { bpm: number; beatsPerBar: number; volume: number; endAt: number }) {
+  const beatSec = 60 / Math.max(20, opts.bpm);
+  for (let i = 0; i < opts.beatsPerBar; i++) {
+    scheduleClick(opts.endAt - (opts.beatsPerBar - i) * beatSec, i === 0, opts.volume);
+  }
+}
+
 export function updateMetronome(opts: Partial<Opts>) {
   if (!current) return;
   current = { ...current, ...opts };

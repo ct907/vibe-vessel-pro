@@ -1,31 +1,24 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { MoreVertical, Mic, Pencil, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Mic, Pencil, Save } from "lucide-react";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
+import { RecentProjectsList } from "@/components/common/RecentProjectsList";
 import { useIsDesktop } from "@/hooks/use-mobile";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useSongStore, commitCurrentSongToRecents, downloadProjectZip } from "@/store/song";
+import { useSongStore } from "@/store/song";
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore } from "@/store/ui";
-import { listRecent, removeRecent, restoreRecent, type RecentProject } from "@/lib/recent-projects";
+import {
+  commitCurrentSongToRecents,
+  currentSongHasContent,
+  listRecent,
+  openRecentSong,
+  removeRecent,
+  restoreRecent,
+  songDisplayName,
+  type RecentProject,
+} from "@/lib/recent-projects";
 import { toast as sonnerToast } from "sonner";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
@@ -123,63 +116,45 @@ const DECO_CHORDS = [
 
 export default function Landing() {
   const navigate = useNavigate();
-  const loadFromJSON = useSongStore((s) => s.loadFromJSON);
   const resetSong = useSongStore((s) => s.resetSong);
   const isDesktop = useIsDesktop();
   const tapVerb = isDesktop ? "Click" : "Tap";
   const [recents, setRecents] = useState<RecentProject[]>([]);
-  // Holds the navigation to run after the user resolves the "you have unsaved
-  // recordings" prompt. Recents/new songs start without audio, so leaving the
-  // current session would otherwise discard its recordings silently.
-  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
+  // The autosaved live song is always the freshest copy of what the writer was
+  // last doing, so "Continue" opens it rather than its (possibly older) library entry.
+  const [liveName] = useState(() =>
+    currentSongHasContent() ? songDisplayName(useSongStore.getState().toJSON()) : null,
+  );
 
   useEffect(() => {
-    setRecents(listRecent());
+    // Save the live song first so the list shows its latest name and position.
+    void commitCurrentSongToRecents().then(listRecent).then(setRecents);
   }, []);
 
-  const hasUnsavedRecordings = () => {
-    const takes = useTakesStore.getState().takes.length;
-    const clips = useRecordingsStore.getState().tracks.reduce((n, t) => n + t.clips.length, 0);
-    return takes + clips > 0;
-  };
-  const guardRecordings = (proceed: () => void) => {
-    if (hasUnsavedRecordings()) setPendingNav(() => proceed);
-    else proceed();
-  };
-
   const openRecent = (r: RecentProject) => {
-    guardRecordings(() => {
-      commitCurrentSongToRecents();
-      loadFromJSON(r.snapshot);
-      // Recents snapshots don't carry recordings — start the opened song clean
-      // rather than inheriting the previous session's takes.
-      useTakesStore.getState().clear();
-      useRecordingsStore.getState().clear();
-      navigate("/app");
-    });
+    openRecentSong(r);
+    navigate("/app");
   };
   const removeOne = (r: RecentProject) => {
-    const index = recents.findIndex((x) => x.id === r.id);
-    removeRecent(r.id);
-    setRecents(listRecent());
+    void removeRecent(r.id).then(listRecent).then(setRecents);
     sonnerToast(`Removed "${r.name}" from recents`, {
-      action: { label: "Undo", onClick: () => { restoreRecent(r, index); setRecents(listRecent()); } },
+      action: { label: "Undo", onClick: () => { void restoreRecent(r).then(listRecent).then(setRecents); } },
     });
   };
   const startCapture = (capture: "record" | "lyrics") => {
-    guardRecordings(() => {
-      commitCurrentSongToRecents();
-      resetSong();
-      useTakesStore.getState().clear();
-      useRecordingsStore.getState().clear();
-      useOnboardingStore.getState().resetForNewSong();
-      // Both capture intents live on the Write surface — make sure we land there
-      // even if a prior session left the app in Arrange mode (WriteMode only
-      // mounts in write mode, and it's what consumes the capture param).
-      useUIStore.getState().setMode("write");
-      navigate(`/app?capture=${capture}`);
-    });
+    // The current song (with its recordings) stays in the library.
+    void commitCurrentSongToRecents();
+    resetSong();
+    useTakesStore.getState().clear();
+    useRecordingsStore.getState().clear();
+    useOnboardingStore.getState().resetForNewSong();
+    // Both capture intents live on the Write surface — make sure we land there
+    // even if a prior session left the app in Arrange mode (WriteMode only
+    // mounts in write mode, and it's what consumes the capture param).
+    useUIStore.getState().setMode("write");
+    navigate(`/app?capture=${capture}`);
   };
+  const continueName = liveName ?? recents[0]?.name;
 
   return (
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
@@ -211,16 +186,16 @@ export default function Landing() {
           
         </p>
 
-        {recents.length > 0 && (
+        {continueName && (
           <button
             type="button"
-            onClick={() => openRecent(recents[0])}
+            onClick={() => (liveName ? navigate("/app") : openRecent(recents[0]))}
             className="mt-8 w-full max-w-md rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-3 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
           >
             <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
-              <h3 className="font-display text-lg truncate">{recents[0].name}</h3>
+              <h3 className="font-display text-lg truncate">{continueName}</h3>
             </div>
           </button>
         )}
@@ -274,84 +249,9 @@ export default function Landing() {
           >
             Recent Projects
           </button>
-          <div className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] divide-y divide-border/50">
-            {recents.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">
-                No recent projects yet.
-              </p>
-            ) : (
-              recents.map((r) => (
-                <div key={r.id} className="flex items-center gap-3 px-4 py-2">
-                  <button
-                    type="button"
-                    className="flex-1 text-left"
-                    onClick={() => openRecent(r)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display text-lg">{r.name}</h3>
-                    </div>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        aria-label={`More actions for ${r.name}`}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => removeOne(r)}>
-                        Remove from recents
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))
-            )}
-          </div>
+          <RecentProjectsList songs={recents} onOpen={openRecent} onRemove={removeOne} />
         </section>
       </main>
-
-      <AlertDialog open={!!pendingNav} onOpenChange={(o) => { if (!o) setPendingNav(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Leave this song?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This song has recordings that aren't saved to a file. Recents and new songs
-              start without audio, so these recordings will be removed. Save the project
-              first to keep them.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const proceed = pendingNav;
-                const title = useSongStore.getState().meta.title.replace(/\s+/g, "-").toLowerCase();
-                await downloadProjectZip(`${title || "song"}.zip`);
-                setPendingNav(null);
-                proceed?.();
-              }}
-            >
-              <Save className="h-4 w-4" /> Save first
-            </Button>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                const proceed = pendingNav;
-                setPendingNav(null);
-                proceed?.();
-              }}
-            >
-              Discard &amp; continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { pcToName, midiToNoteName } from "@/lib/music/chords";
 import { playNotes } from "@/lib/music/audio";
-import { useSongStore, commitCurrentSongToRecents } from "@/store/song";
+import { useSongStore } from "@/store/song";
+import { commitCurrentSongToRecents } from "@/lib/recent-projects";
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -458,7 +459,7 @@ export function VoiceKeyTab() {
   };
 
   const applyKeyToNewSong = () => {
-    commitCurrentSongToRecents();
+    void commitCurrentSongToRecents();
     resetSong();
     useTakesStore.getState().clear();
     useRecordingsStore.getState().clear();

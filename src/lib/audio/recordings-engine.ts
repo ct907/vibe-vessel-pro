@@ -47,6 +47,8 @@ interface ActiveTrackNodes {
 
 interface EngineState {
   running: boolean;
+  /** AudioContext time playback begins; audio before it is never scheduled. */
+  playFromCtxTime: number;
   loopStartCtxTime: number;
   loopSec: number;
   scheduledUntilLoop: number;
@@ -57,6 +59,7 @@ interface EngineState {
 
 const state: EngineState = {
   running: false,
+  playFromCtxTime: 0,
   loopStartCtxTime: 0,
   loopSec: 0,
   scheduledUntilLoop: -1,
@@ -152,16 +155,19 @@ async function scheduleClipForLoop(
 
   for (let pos = clip.startSec; pos < fillEnd - 0.001; pos += body) {
     const startTime = loopStart + pos + trackOffsetSec;
-    if (startTime + 0.001 < ac.currentTime) continue;
     const remainingInFill = fillEnd - pos;
     const remainingInLoop = state.loopSec - pos;
     const length = Math.max(0.01, Math.min(body, remainingInFill, remainingInLoop));
     if (length <= 0.001) break;
+    // Starting mid-clip (play from the playhead, or a slow decode): join the
+    // clip where it would be now instead of skipping it.
+    const late = Math.max(0, Math.max(ac.currentTime, state.playFromCtxTime) - startTime);
+    if (late >= length - 0.001) continue;
     const source = ac.createBufferSource();
     source.buffer = buffer;
     source.connect(nodes.gain);
     try {
-      source.start(startTime, offset, length);
+      source.start(startTime + late, offset + late, length - late);
     } catch {
       break;
     }
@@ -212,6 +218,7 @@ export function startRecordingsEngine(opts: StartOptions) {
   // Shift the conceptual loop start backwards by the playhead offset so the
   // first scheduled iteration aligns with the requested musical position.
   const offset = opts.playheadOffsetSec ?? 0;
+  state.playFromCtxTime = opts.startAtCtxTime;
   state.loopStartCtxTime = opts.startAtCtxTime - offset;
   state.scheduledUntilLoop = -1;
   state.running = true;
@@ -286,6 +293,8 @@ export function updateEngineBpm(bpm: number, loopBeats: number): void {
   if (!state.running) return;
   const newLoopSec = (loopBeats * 60) / bpm;
   if (!isFinite(newLoopSec) || newLoopSec <= 0.05) return;
+  // Rescheduling an unchanged loop would queue the next iterations a second time.
+  if (Math.abs(newLoopSec - state.loopSec) < 1e-6) return;
   state.loopSec = newLoopSec;
   // Reset the schedule-ahead counter so the tick immediately reschedules any
   // future loops with the new loop duration.
