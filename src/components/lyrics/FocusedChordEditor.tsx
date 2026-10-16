@@ -3,6 +3,7 @@ import type { CSSProperties, RefObject } from "react";
 import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
+import { playChord } from "@/lib/music/audio";
 import {
   useSongStore,
   getSectionDisplayName,
@@ -111,6 +112,7 @@ export function FocusedChordEditor(props: Props) {
   const [query, setQuery] = useState("");
   const [octave, setOctave] = useState(3);
   const [view, setView] = useState<"type" | "browse">("type");
+  const [previewed, setPreviewed] = useState<string | null>(null);
   const [kbOffset, setKbOffset] = useState(0);
   const [obstruct, setObstruct] = useState(0);
   // Local cursor for progression-add multi-typed-Enter: starts at props.atBeat,
@@ -175,6 +177,8 @@ export function FocusedChordEditor(props: Props) {
     setTimeout(() => inputRef.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
+
+  useEffect(() => setPreviewed(null), [query]);
 
   // Publish the targeted slot/chord so the song rows can highlight it.
   useEffect(() => {
@@ -553,20 +557,34 @@ export function FocusedChordEditor(props: Props) {
         >
           {suggestions.map((s) => {
             const colors = getChordColorClasses(s.symbol);
+            const isPreviewed = previewed === s.symbol.display;
             return (
-              <button
+              <div
                 key={s.symbol.display}
-                type="button"
-                onClick={() => handlePick(s.symbol)}
                 style={colors.style}
-                className={`${colors.className} noise-texture-chip flex shrink-0 items-center gap-2 rounded-md border-none px-3 py-2 text-left`}
+                className={`${colors.className} noise-texture-chip flex shrink-0 items-stretch rounded-md border-none ${isPreviewed ? "ring-2 ring-[var(--primary-strong)]" : ""}`}
               >
-                <span className="min-w-0">
+                <button
+                  type="button"
+                  aria-label={`Preview ${s.symbol.display}`}
+                  onClick={() => {
+                    setPreviewed(s.symbol.display);
+                    void playChord(s.symbol, undefined, octave);
+                  }}
+                  className="min-w-0 py-2 pl-3 pr-2 text-left bg-transparent border-0"
+                >
                   <span className="block font-mono-chord text-sm font-semibold leading-tight">{s.symbol.display}</span>
                   <span className="block whitespace-nowrap font-mono-chord text-[10px] opacity-80 leading-tight">{s.label}</span>
-                </span>
-                <Plus className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-              </button>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Add ${s.symbol.display}`}
+                  onClick={() => handlePick(s.symbol)}
+                  className="flex items-center px-2 bg-transparent border-0"
+                >
+                  <Plus className="h-5 w-5 opacity-70" aria-hidden />
+                </button>
+              </div>
             );
           })}
         </div>
