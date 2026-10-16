@@ -42,7 +42,7 @@ export interface LayoutConfig {
 }
 
 /** How many slots a chord visually occupies. Short chords = 1; longer = 2. */
-function chordSlotWidth(display: string): number {
+export function chordSlotWidth(display: string): number {
   return display.length <= 3 ? 1 : 2;
 }
 
@@ -82,9 +82,11 @@ export function splitLyricLine(text: string, maxChars: number): string[] {
 }
 
 /**
- * Re-pack chord positions on each line, left-to-right, with 1 spacing slot
- * between chords. Wraps to slot 0 if a chord doesn't fit (last-resort overlap;
- * the caller should have already split lines so this is rare).
+ * Re-pack chord positions on each line, left-to-right, with at least 1 spacing
+ * slot between chords. A chord keeps the slot the writer put it on (above the
+ * word they sing it on) unless that would overlap the previous chord or push the
+ * remaining chords past `slotsPerLine`. Wraps to slot 0 if a chord doesn't fit
+ * (last-resort overlap; the caller should have already split lines so this is rare).
  */
 function autoLayoutChordsPerLine(
   chords: SectionChord[],
@@ -106,16 +108,20 @@ function autoLayoutChordsPerLine(
   const newPlacement = new Map<string, { lineId: string; slotIndex: number }>();
   lines.forEach((line) => {
     const lineChords = byLine.get(line.id) ?? [];
+    const widths = lineChords.map((sc) => chordSlotWidth(sc.chord.display));
     let cursor = 0;
-    for (const sc of lineChords) {
-      const w = chordSlotWidth(sc.chord.display);
+    lineChords.forEach((sc, i) => {
       if (cursor >= cap && cursor !== 0) {
         // Wrap (shouldn't happen often after line-splitting); reset to 0.
         cursor = 0;
       }
-      newPlacement.set(sc.id, { lineId: line.id, slotIndex: cursor });
-      cursor += w + SPACING;
-    }
+      // Slots needed from this chord's start to the end of the line's last chord.
+      const tail = widths.slice(i).reduce((sum, w) => sum + w + SPACING, -SPACING);
+      const wanted = Math.min(sc.lyricsPlacement!.slotIndex, cap - tail);
+      const slotIndex = Math.max(cursor, wanted);
+      newPlacement.set(sc.id, { lineId: line.id, slotIndex });
+      cursor = slotIndex + widths[i] + SPACING;
+    });
   });
   return chords.map((c) => {
     const np = newPlacement.get(c.id);

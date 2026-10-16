@@ -12,6 +12,7 @@ import {
   getSectionChordsVisible,
   withHistoryGroup,
   patternPlayBeats,
+  patternCapacityBeats,
   CHORD_ROW_SLOTS,
   type LyricLine,
   type Section,
@@ -79,6 +80,7 @@ import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
+import { chordSlotWidth } from "@/lib/music/chordLayout";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { FocusedRhymeEditor } from "@/components/lyrics/FocusedRhymeEditor";
@@ -1831,7 +1833,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const pendingGrownRef = useRef<Set<string>>(new Set());
   const [overflowToastFor, setOverflowToastFor] = useState<Record<string, number>>({});
   const [residualOverflowFor, setResidualOverflowFor] = useState<Record<string, boolean>>({});
-  const editorOpen = useUIStore((s) => s.focusedEditorOpen);
+  // The desktop/tablet ChordPickerSheet doesn't set focusedEditorOpen, so its
+  // open state gates the reflow too — otherwise chords repack under the cursor
+  // while the user is still typing them.
+  const editorOpen = useUIStore((s) => s.focusedEditorOpen) || picker !== null;
   const wasEditorOpenRef = useRef(false);
 
   const dbgLog = (...args: unknown[]) => {
@@ -2108,7 +2113,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     const sec = sections.find((s) => s.id === sectionId);
     const sectionBlocks = progression.filter((p) => (p.sectionId ?? p.id) === sectionId);
     if (!sec || !sectionBlocks.length) return null;
-    const totalCap = sectionBlocks.reduce((s, p) => s + p.bars * p.beatsPerBar, 0);
+    // Flexible blocks grow to fit their chords (see patternRejectsAdd), so only
+    // a section whose blocks are all locked can run out of room.
+    if (sectionBlocks.some((p) => p.lockedBeats == null)) return null;
+    const totalCap = sectionBlocks.reduce((s, p) => s + patternCapacityBeats(p), 0);
     const placedChords = sec.chords.filter((sc) => sc.progressionPlacement);
     const totalUsed = placedChords.reduce((s, sc) => s + sc.progressionPlacement!.lengthBeats, 0);
     const wouldOverflow = totalUsed + newChordCount * defaultChordLen > totalCap + 1e-9;
@@ -2139,7 +2147,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             setPatternChordLength(sc.progressionPlacement.patternId, result.id, newLength);
           }
         }
-        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + chordSlotWidth(chord.display) + 1);
       }
     });
     advancePickerAfterBatch(startSlot, nextSlot);
@@ -2158,7 +2166,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       updatePattern(lastBlock.id, { bars: lastBlock.bars + extraBars });
       for (const chord of chords) {
         const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
-        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + chordSlotWidth(chord.display) + 1);
       }
     });
     advancePickerAfterBatch(startSlot, nextSlot);
@@ -2174,7 +2182,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     withHistoryGroup(() => {
       for (const chord of chords) {
         const result = placeChordInSlot(sectionId, lineId, nextSlot, chord);
-        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + chordSlotWidth(chord.display) + 1);
       }
     });
     advancePickerAfterBatch(startSlot, nextSlot);
@@ -2223,14 +2231,14 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       setPickerQuery("");
       return;
     }
-    placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
+    const placed = placeChordInSlot(picker.sectionId, picker.lineId, picker.slotIndex, chord);
     setPickerQuery("");
     setPicker((prev) =>
       prev
         ? {
             ...prev,
             anchorId: undefined,
-            slotIndex: Math.min(CHORD_ROW_SLOTS - 1, prev.slotIndex + 1),
+            slotIndex: Math.min(CHORD_ROW_SLOTS - 1, (placed?.slotIndex ?? prev.slotIndex) + chordSlotWidth(chord.display) + 1),
           }
         : prev,
     );
@@ -2258,7 +2266,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     withHistoryGroup(() => {
       for (const chord of chords) {
         const result = placeChordInSlot(picker.sectionId, picker.lineId, nextSlot, chord);
-        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + 1);
+        nextSlot = Math.min(CHORD_ROW_SLOTS - 1, (result?.slotIndex ?? nextSlot) + chordSlotWidth(chord.display) + 1);
       }
     });
     setPickerQuery("");
