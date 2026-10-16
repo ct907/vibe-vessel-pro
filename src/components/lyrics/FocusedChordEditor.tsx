@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { CSSProperties, RefObject } from "react";
 import { ChordSymbol, suggestChords, parseChord, parseNashvilleInput, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
@@ -8,15 +8,13 @@ import {
   useSongStore,
   getSectionDisplayName,
   getLineChordsViaSSOT,
-  getPatternChordsViaSSOT,
   CHORD_ROW_SLOTS,
   type LyricLine,
 } from "@/store/song";
 import { useUIStore } from "@/store/ui";
 import { useOnboardingStore } from "@/store/onboarding";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronRight, Plus } from "lucide-react";
 import { PresetList } from "@/components/progressions/PresetList";
 import { SlashBassPicker } from "@/components/chord/ChordPickerSheet";
 
@@ -52,8 +50,6 @@ interface ProgressionAddModeProps {
 
 type Props = LyricsModeProps | ProgressionModeProps | ProgressionAddModeProps;
 
-const SLOT_PX = 28;
-
 const dbg = (...args: unknown[]) => {
   try {
     if (typeof window !== "undefined" && window.localStorage?.getItem("LV_DEBUG_LAYOUT") === "1") {
@@ -69,14 +65,16 @@ function chordSlotWidth(display: string): number {
 }
 
 /**
- * Full-screen overlay for adding or editing a chord.
+ * Mobile chord entry. The "type" view is a short, non-modal sheet docked above
+ * the keyboard so the tapped row stays visible; "Browse Popular Progressions"
+ * swaps it for a full-height modal.
  *
- * Two modes:
- *  - "lyrics" (default): adds chords to a lyric row, slot-by-slot, with a
- *    full 80-slot preview scroller.
+ * Modes:
+ *  - "lyrics" (default): adds chords to a lyric row, slot-by-slot. Taps on
+ *    other slots/chords retarget the open sheet.
  *  - "progression": replaces the chord family of a single chord in the
- *    progression view (tap-to-edit). Renders a compact preview of the
- *    pattern block instead of the lyric row.
+ *    progression view (tap-to-edit).
+ *  - "progression-add": adds chords to an empty progression slot.
  */
 export function FocusedChordEditor(props: Props) {
   const sections = useSongStore((s) => s.sections);
@@ -113,71 +111,82 @@ export function FocusedChordEditor(props: Props) {
   const [anchorId, setAnchorId] = useState<string | undefined>(lyricsInitialAnchorId);
   const [query, setQuery] = useState("");
   const [octave, setOctave] = useState(3);
+  const [view, setView] = useState<"type" | "browse">("type");
+  const [previewed, setPreviewed] = useState<string | null>(null);
+  const [kbOffset, setKbOffset] = useState(0);
+  const [obstruct, setObstruct] = useState(0);
   // Local cursor for progression-add multi-typed-Enter: starts at props.atBeat,
   // bumps after each insert so successive chords land left-to-right.
   const [progAddCursor, setProgAddCursor] = useState(
     isProgressionAdd ? (props as ProgressionAddModeProps).atBeat : 0,
   );
   const inputRef = useRef<HTMLInputElement>(null);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
+  const setEditorTarget = useUIStore((s) => s.setFocusedEditorTarget);
 
   useEffect(() => {
     setEditorOpen(true);
     dbg("mounted — focusedEditorOpen: true");
     return () => {
       setEditorOpen(false);
+      setEditorTarget(null);
       dbg("unmounted — focusedEditorOpen: false");
     };
-  }, [setEditorOpen]);
+  }, [setEditorOpen, setEditorTarget]);
 
-  // Escape closes; Tab/Shift+Tab is trapped inside the dialog since this is a
-  // hand-rolled overlay (not Radix) and nothing else should be reachable
-  // while it's open.
+  // Escape backs out of the browse modal first, then closes the editor.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        props.onClose();
-        return;
-      }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (view === "browse") setView("type");
+      else props.onClose();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [props.onClose]);
+  }, [props.onClose, view]);
+
+  // The sheet is non-modal, so taps on other slots/chords change the target
+  // props while it stays mounted — re-seed whenever the target changes.
+  const seedKey = isProgressionAdd
+    ? `add:${props.patternId}:${props.atBeat}`
+    : isProgression
+    ? `prog:${props.chordId}`
+    : `lyrics:${lyricsLineId}:${lyricsInitialSlot}:${lyricsInitialAnchorId ?? ""}`;
 
   useEffect(() => {
     if (isProgressionAdd) {
+      setProgAddCursor(props.atBeat);
       setQuery("");
+      setOctave(3);
     } else if (isProgression) {
       setQuery(progChord ? toSounding(progChord.chord).display : "");
       setOctave(progChord?.chord.octave ?? 3);
     } else {
+      setSlot(lyricsInitialSlot);
+      setAnchorId(lyricsInitialAnchorId);
       const lineChords = section ? getLineChordsViaSSOT(section, lyricsLineId) : [];
       const initialChord = lineChords.find((c) => c.id === lyricsInitialAnchorId)?.chord;
       setQuery(initialChord ? toSounding(initialChord).display : "");
       setOctave(initialChord?.octave ?? 3);
     }
+    setView("type");
     setTimeout(() => inputRef.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [seedKey]);
+
+  useEffect(() => setPreviewed(null), [query]);
+
+  // Publish the targeted slot/chord so the song rows can highlight it.
+  useEffect(() => {
+    if (isProgressionAdd) setEditorTarget({ patternId: props.patternId, slotIndex: progAddCursor });
+    else if (isProgression) setEditorTarget({ patternId: props.patternId, chordId: props.chordId });
+    else setEditorTarget({ lineId: lyricsLineId, slotIndex: slot, chordId: anchorId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey, slot, anchorId, progAddCursor]);
 
   // Live-update the chord's octave in the store as the user changes it.
   const octaveInitRef = useRef(true);
@@ -195,18 +204,60 @@ export function FocusedChordEditor(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [octave]);
 
-  // Auto-scroll the slot row so the active slot stays visible (lyrics only).
+  // Dock above the on-screen keyboard.
   useEffect(() => {
-    if (isProgression) return;
-    const el = scrollerRef.current;
-    if (!el) return;
-    const target = slot * SLOT_PX;
-    const viewLeft = el.scrollLeft;
-    const viewRight = viewLeft + el.clientWidth;
-    if (target < viewLeft + 40 || target > viewRight - 80) {
-      el.scrollTo({ left: Math.max(0, target - el.clientWidth / 2), behavior: "smooth" });
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setKbOffset(Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)));
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  // Publish how much of the page the sheet covers so the page can pad its
+  // bottom edge and the target row can be scrolled clear of it.
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = sheetRef.current;
+    if (view !== "type" || !el) {
+      root.style.removeProperty("--chord-sheet-h");
+      setObstruct(0);
+      return;
     }
-  }, [slot, isProgression]);
+    const apply = () => {
+      const h = el.offsetHeight + kbOffset;
+      root.style.setProperty("--chord-sheet-h", `${h}px`);
+      setObstruct(h);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--chord-sheet-h");
+    };
+  }, [view, kbOffset]);
+
+  // Keep the targeted row visible above the sheet.
+  useEffect(() => {
+    if (view !== "type" || !obstruct) return;
+    const selector = isProgression
+      ? `[data-pattern-chord="${props.chordId}"]`
+      : isProgressionAdd
+      ? `[data-pattern-block="${props.patternId}"]`
+      : `[data-line-id="${lyricsLineId}"]`;
+    const el = document.querySelector<HTMLElement>(selector);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const limit = window.innerHeight - obstruct - 12;
+    if (rect.bottom > limit) window.scrollBy({ top: rect.bottom - limit, behavior: "smooth" });
+    else if (rect.top < 96) window.scrollBy({ top: rect.top - 96, behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey, obstruct, view]);
 
   const meta = useSongStore((s) => s.meta);
   const effective = useMemo(
@@ -337,6 +388,7 @@ export function FocusedChordEditor(props: Props) {
       // Replace mode commits one progression and closes; add mode keeps the
       // editor open so the user can keep adding.
       if (isProgression) { props.onClose(); return; }
+      setView("type");
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 30);
       return;
@@ -354,6 +406,7 @@ export function FocusedChordEditor(props: Props) {
     if (chords.length > 1 && typeof window !== "undefined") {
       autoLayoutSection(props.sectionId, window.innerWidth, 28);
     }
+    setView("type");
     setSlot(cur);
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
@@ -364,398 +417,247 @@ export function FocusedChordEditor(props: Props) {
   if (isProgression && (!progPattern || !progChord)) return null;
   if (isProgressionAdd && !progPattern) return null;
 
-  // Build preview slot map for lyrics mode.
-  const liveChords = !isProgression && !isProgressionAdd && section
-    ? getLineChordsViaSSOT(section, lyricsLineId)
-    : [];
-  const slotMap: (typeof liveChords[number] | undefined)[] = new Array(CHORD_ROW_SLOTS).fill(undefined);
-  if (!isProgression && !isProgressionAdd) {
-    liveChords.forEach((c) => {
-      const s = c.slotIndex;
-      if (s != null && s >= 0 && s < CHORD_ROW_SLOTS) slotMap[s] = c;
-    });
-  }
+  const isAdding = isProgressionAdd || (!isProgression && !anchorId);
+  const showControls = !isAdding || query.trim().length > 0;
 
-  const headerEyebrow = isProgressionAdd
-    ? `Add chord to ${sectionLabel}`
-    : isProgression
-    ? `Editing chord · ${toSounding(progChord!.chord).display}`
-    : `Slot ${slot + 1} of ${CHORD_ROW_SLOTS} ${anchorId ? "· editing" : "· adding"}`;
-  const headerTitle = isProgressionAdd
-    ? "Add Chord"
-    : isProgression
-    ? `Edit Chord in ${sectionLabel}`
-    : `Add Chords to ${sectionLabel}`;
+  const blockIdx = isProgression || isProgressionAdd
+    ? progression
+        .filter((p) => (p.sectionId ?? p.id) === props.sectionId)
+        .findIndex((p) => p.id === props.patternId)
+    : section
+    ? section.lines.findIndex((l) => l.id === lyricsLineId)
+    : -1;
+  const headerEyebrow = `${sectionLabel}${blockIdx >= 0 ? ` block ${blockIdx + 1}` : ""}`;
 
-  return (
-    <div className="fixed inset-0 z-50 flex">
+  const stepBtnStyle: CSSProperties = {
+    padding: "10px 10px",
+    borderRadius: 8,
+    fontFamily: "'JetBrains Mono', monospace",
+    fontWeight: 700,
+    fontSize: 15,
+    background: "var(--paper-card)",
+    color: "var(--ink-soft)",
+    boxShadow: "var(--shadow-sculpt-cream-rest)",
+    border: "none",
+    cursor: "pointer",
+    lineHeight: 1,
+  };
+
+  const renderHeader = (title: string) => (
+    <div
+      ref={props.headerRef}
+      className="flex items-center gap-2 px-3 py-2 shrink-0"
+      style={{ background: "var(--paper-shade)" }}
+    >
+      <div className="flex-1 min-w-0">
+        <p
+          className="truncate"
+          style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
+        >
+          {headerEyebrow}
+        </p>
+        <h2
+          id={titleId}
+          className="truncate"
+          style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
+        >
+          {title}
+        </h2>
+      </div>
       <button
         type="button"
-        aria-label="Close chord editor"
         onClick={props.onClose}
-        className="absolute inset-0 bg-black/60"
-      />
-
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative m-4 flex flex-1 flex-col rounded-lg overflow-hidden"
-        style={{ background: "var(--ink-soft)", boxShadow: "var(--shadow-paper)" }}
+        className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-8 px-4 text-sm font-semibold shrink-0"
       >
-        {/* HEADER */}
+        Done
+      </button>
+    </div>
+  );
+
+  if (view === "browse") {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col">
+        <button
+          type="button"
+          aria-label="Back to typing chords"
+          onClick={() => setView("type")}
+          className="h-3 shrink-0 bg-black/60"
+        />
         <div
-          ref={props.headerRef}
-          className="flex items-center gap-2 px-3 py-2 shrink-0"
-          style={{ background: "var(--paper-shade)" }}
+          role="dialog"
+          aria-labelledby={titleId}
+          className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-t-xl"
+          style={{ background: "var(--paper-shade)", boxShadow: "var(--shadow-paper)" }}
         >
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 shrink-0"
-            aria-label="Close chord editor"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <p
-              className="truncate"
-              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-            >
-              {headerEyebrow}
-            </p>
-            <h2
-              id={titleId}
-              className="truncate"
-              style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
-            >
-              {headerTitle}
-            </h2>
+          {renderHeader("Browse Popular Progressions")}
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
+            <PresetList heading="" onUse={handlePresetUse} />
           </div>
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="btn-sculpt-amber inline-flex items-center justify-center rounded-lg h-8 px-3 text-sm font-semibold shrink-0"
-          >
-            Done
-          </button>
-        </div>
-
-        {/* PREVIEW */}
-        {!isProgression && !isProgressionAdd && liveChords.length > 0 && (
-          <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
-            <p
-              className="mb-1"
-              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-            >
-              Preview · scroll horizontally to see full row
-            </p>
-            <div
-              ref={scrollerRef}
-              className="overflow-x-auto rounded-sm"
-              style={{ minHeight: 32, background: "var(--paper-shade)" }}
-            >
-              <div
-                className="flex items-stretch"
-                style={{ minWidth: CHORD_ROW_SLOTS * SLOT_PX }}
-              >
-                {slotMap.map((c, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "shrink-0 h-8 flex items-center justify-center px-0.5",
-                      "w-7",
-                    )}
-                    style={{
-                      width: SLOT_PX,
-                      borderLeft: i > 0 ? "1px solid color-mix(in oklch, var(--ink) 8%, transparent)" : undefined,
-                      background: i === slot ? "color-mix(in oklch, var(--primary) 18%, transparent)" : undefined,
-                      boxShadow: i === slot ? "inset 0 0 0 1px var(--primary-strong)" : undefined,
-                      borderRadius: i === slot ? 2 : undefined,
-                    }}
-                  >
-                    {c && (
-                      <span className="font-mono-chord text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--ink)" }}>
-                        {toSounding(c.chord).display}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <p
-              className="mt-1 truncate"
-              style={{
-                fontFamily: "var(--font-display,'Zain',serif)",
-                fontSize: 16,
-                color: "var(--ink)",
-                background: "var(--paper-shade-soft)",
-                padding: "6px 10px",
-                borderRadius: 6,
-                marginTop: 6,
-              }}
-            >
-              {line!.text || (
-                <span style={{ fontStyle: "italic", opacity: 0.6 }}>(empty lyric line)</span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {isProgression && progChord && progPattern && (() => {
-          const progSorted = section
-            ? getPatternChordsViaSSOT(section, progPattern)
-            : [...progPattern.chords].sort((a, b) => a.startBeat - b.startBeat);
-          return (
-          <div className="px-3 py-2 shrink-0" style={{ background: "var(--paper-shade)" }}>
-            <p
-              className="mb-1"
-              style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
-            >
-              Preview · scroll horizontally to see full row
-            </p>
-            <div
-              ref={scrollerRef}
-              className="overflow-x-auto rounded-sm"
-              style={{ minHeight: 36, background: "var(--paper-shade)" }}
-            >
-              <div className="flex items-stretch gap-1 py-1">
-                {progSorted.map((c) => {
-                  const isActive = c.id === props.chordId;
-                  const sounding = toSounding(c.chord);
-                  return (
-                    <span
-                      key={c.id}
-                      className="shrink-0 inline-flex items-center justify-center rounded-md px-2 py-1 font-mono-chord text-[12px] font-semibold whitespace-nowrap"
-                      style={{
-                        background: isActive ? "color-mix(in oklch, var(--primary) 18%, transparent)" : "var(--paper-card)",
-                        boxShadow: isActive ? "inset 0 0 0 1px var(--primary-strong)" : undefined,
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {sounding.display}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          );
-        })()}
-
-
-        {/* Reorder controls — operate on the chord currently being edited. */}
-        {!isProgressionAdd && (isProgression || liveChords.length > 0) && (() => {
-          const moveChordToSlot = useSongStore.getState().moveChordToSlot;
-          const movePatternChord = useSongStore.getState().movePatternChord;
-          const canReorder = isProgression
-            ? !!progChord
-            : !!anchorId;
-          const onMove = (dir: -1 | 1) => {
-            if (isProgression) {
-              if (!progChord) return;
-              movePatternChord(props.patternId, props.chordId, dir);
-            } else {
-              if (!anchorId || !section) return;
-              const live = getLineChordsViaSSOT(section, lyricsLineId);
-              const cur = live.find((c) => c.id === anchorId);
-              if (!cur || cur.slotIndex == null) return;
-              const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, cur.slotIndex + dir));
-              if (target === cur.slotIndex) return;
-              moveChordToSlot(props.sectionId, lyricsLineId, anchorId, target);
-            }
-          };
-          return (
-            <div className="flex items-center justify-between gap-2 px-3 pt-2">
-              <span style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontSize: 11, color: "var(--cocoa-foreground)", opacity: 0.7 }}>Reorder this chord</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 disabled:opacity-30"
-                  disabled={!canReorder}
-                  onClick={() => onMove(-1)}
-                  aria-label="Move chord left"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-8 w-8 disabled:opacity-30"
-                  disabled={!canReorder}
-                  onClick={() => onMove(1)}
-                  aria-label="Move chord right"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-
-        <div className="px-3 py-3 shrink-0 flex items-center gap-2">
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a chord… e.g. Bbm9, Fmaj7"
-            style={{
-              flex: "1 1 0%",
-              minWidth: 0,
-              background: "var(--paper-card)",
-              boxShadow: "var(--shadow-sculpt-cream-rest)",
-              border: 0,
-              borderRadius: 8,
-              padding: "10px 14px",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontWeight: 600,
-              fontSize: 15,
-              color: "var(--ink)",
-              outline: "none",
-            }}
-            onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
-            onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (nashvilleChords) { e.preventDefault(); handlePickNashville(nashvilleChords); return; }
-                if (exact) { e.preventDefault(); handlePick(exact); return; }
-              } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-                e.preventDefault();
-                const dir: -1 | 1 = e.key === "ArrowLeft" ? -1 : 1;
-                if (isProgression) {
-                  useSongStore.getState().movePatternChord(props.patternId, props.chordId, dir);
-                } else if (anchorId && section) {
-                  const live = getLineChordsViaSSOT(section, lyricsLineId);
-                  const cur = live.find((c) => c.id === anchorId);
-                  if (cur && cur.slotIndex != null) {
-                    const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, cur.slotIndex + dir));
-                    useSongStore.getState().moveChordToSlot(props.sectionId, lyricsLineId, anchorId, target);
-                  }
-                }
-              }
-            }}
-          />
-          <div className="flex items-center gap-0.5 shrink-0">
+          <div className="px-3 py-2 shrink-0" style={{ background: "var(--cocoa-deep)" }}>
             <button
               type="button"
-              onClick={() => setOctave((o) => Math.max(1, o - 1))}
-              aria-label="Decrease octave"
-              style={{
-                padding: "10px 10px",
-                borderRadius: 8,
-                fontFamily: "'JetBrains Mono', monospace",
-                fontWeight: 700,
-                fontSize: 15,
-                background: "var(--paper-card)",
-                color: "var(--ink-soft)",
-                boxShadow: "var(--shadow-sculpt-cream-rest)",
-                border: "none",
-                cursor: "pointer",
-                lineHeight: 1,
+              onClick={() => {
+                setView("type");
+                setTimeout(() => inputRef.current?.focus(), 30);
               }}
-            >−</button>
-            <span style={{
-              minWidth: 28,
-              textAlign: "center" as const,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontWeight: 700,
-              fontSize: 15,
-              color: "var(--paper-card)",
-            }}>{octave}</span>
-            <button
-              type="button"
-              onClick={() => setOctave((o) => Math.min(7, o + 1))}
-              aria-label="Increase octave"
-              style={{
-                padding: "10px 10px",
-                borderRadius: 8,
-                fontFamily: "'JetBrains Mono', monospace",
-                fontWeight: 700,
-                fontSize: 15,
-                background: "var(--paper-card)",
-                color: "var(--ink-soft)",
-                boxShadow: "var(--shadow-sculpt-cream-rest)",
-                border: "none",
-                cursor: "pointer",
-                lineHeight: 1,
-              }}
-            >+</button>
+              className="btn-sculpt-cocoa inline-flex items-center gap-1 rounded-lg h-8 px-3 text-sm font-semibold"
+            >
+              Type In Chords
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-        </div>
-        <div className="px-3 pb-2 shrink-0" style={{ borderBottom: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
-          <SlashBassPicker query={query} onChange={setQuery} />
-        </div>
-
-        {/* NASHVILLE NUMBERS — a typed multi-number sequence (e.g. 4 5 3 6)
-            groups its chords here, directly under the input. A single number
-            instead populates the variations grid below. */}
-        {nashvilleChords && nashvilleChords.length > 1 && (
-          <button
-            type="button"
-            onClick={() => handlePickNashville(nashvilleChords)}
-            className="mx-3 mt-2 mb-1 flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0 rounded-lg hover:brightness-95 active:scale-[0.99] transition-all text-left"
-            style={{ background: "var(--paper-shade)" }}
-          >
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
-            {nashvilleChords.map((c, i) => (
-              <span
-                key={i}
-                className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
-                style={getChordColorClasses(c).style}
-              >
-                {c.display}
-              </span>
-            ))}
-            <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
-          </button>
-        )}
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3" style={{ background: "var(--ink-soft)" }}>
-          {!query.trim() && (
-            <p className="text-sm text-muted-foreground mb-3">
-              Type a root letter (A–G) for variations, or a full chord like{" "}
-              <code className="font-mono-chord">Fmaj7</code>. Or type Nashville numbers like <code className="font-mono-chord">2 5 1</code>.
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            {suggestions.map((s) => {
-              const colors = getChordColorClasses(s.symbol);
-              return (
-                <div
-                  key={s.symbol.display}
-                  style={colors.style}
-                  className={cn(
-                    colors.className,
-                    "noise-texture-chip group flex items-center justify-between gap-2 rounded-md border-none text-left",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handlePick(s.symbol)}
-                    className="min-w-0 flex-1 px-3 py-3 text-left bg-transparent border-0"
-                  >
-                    <div className="font-mono-chord font-semibold">{s.symbol.display}</div>
-                    <div className="text-xs opacity-80 truncate">{s.label}</div>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Preview ${s.symbol.display}`}
-                    onClick={() => void playChord(s.symbol, undefined, octave)}
-                    className="rounded-full p-2 mr-2 shrink-0 bg-black/10 hover:bg-black/20"
-                  >
-                    <Play className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {(isProgressionAdd || (!isProgression && !anchorId)) && (
-            <div className="mt-4" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
-              <PresetList onUse={handlePresetUse} />
-            </div>
-          )}
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div
+      ref={sheetRef}
+      role="dialog"
+      aria-labelledby={titleId}
+      className="fixed inset-x-0 z-50 flex flex-col overflow-hidden rounded-t-xl"
+      style={{
+        bottom: kbOffset,
+        maxHeight: "60dvh",
+        background: "var(--paper-shade)",
+        boxShadow: "var(--shadow-paper)",
+      }}
+    >
+      {renderHeader(isAdding ? "Add Chords" : "Edit Chord")}
+
+      {/* NASHVILLE NUMBERS — a typed multi-number sequence (e.g. 4 5 3 6)
+          groups its chords here. A single number instead populates the
+          variations strip below. */}
+      {nashvilleChords && nashvilleChords.length > 1 && (
+        <button
+          type="button"
+          onClick={() => handlePickNashville(nashvilleChords)}
+          className="mx-3 mb-2 flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0 rounded-lg active:scale-[0.99] transition-all text-left"
+          style={{ background: "var(--paper-card)" }}
+        >
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Nashville</span>
+          {nashvilleChords.map((c, i) => (
+            <span
+              key={i}
+              className="font-mono-chord font-semibold px-2 py-0.5 rounded-md text-sm noise-texture-chip"
+              style={getChordColorClasses(c).style}
+            >
+              {c.display}
+            </span>
+          ))}
+          <span className="text-[10px] text-muted-foreground ml-auto">↩ Add {nashvilleChords.length}</span>
+        </button>
+      )}
+
+      {showControls && suggestions.length > 0 && (
+        <div
+          className="flex gap-2 overflow-x-auto px-3 pb-2 shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {suggestions.map((s) => {
+            const colors = getChordColorClasses(s.symbol);
+            const isPreviewed = previewed === s.symbol.display;
+            return (
+              <div
+                key={s.symbol.display}
+                style={colors.style}
+                className={`${colors.className} noise-texture-chip flex shrink-0 items-stretch rounded-md border-none ${isPreviewed ? "ring-2 ring-[var(--primary-strong)]" : ""}`}
+              >
+                <button
+                  type="button"
+                  aria-label={`Preview ${s.symbol.display}`}
+                  onClick={() => {
+                    setPreviewed(s.symbol.display);
+                    void playChord(s.symbol, undefined, octave);
+                  }}
+                  className="min-w-0 py-2 pl-3 pr-2 text-left bg-transparent border-0"
+                >
+                  <span className="block font-mono-chord text-sm font-semibold leading-tight">{s.symbol.display}</span>
+                  <span className="block whitespace-nowrap font-mono-chord text-[10px] opacity-80 leading-tight">{s.label}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Add ${s.symbol.display}`}
+                  onClick={() => handlePick(s.symbol)}
+                  className="flex items-center px-2 bg-transparent border-0"
+                >
+                  <Plus className="h-5 w-5 opacity-70" aria-hidden />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="px-3 pb-3 shrink-0 flex items-center gap-2">
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Type A Chord e.g. Bbm9 or 4"
+          style={{
+            flex: "1 1 0%",
+            minWidth: 0,
+            background: "var(--paper-card)",
+            boxShadow: "var(--shadow-sculpt-cream-rest)",
+            border: 0,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 600,
+            fontSize: 15,
+            color: "var(--ink)",
+            outline: "none",
+          }}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-press)"; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-sculpt-cream-rest)"; }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              if (nashvilleChords) { e.preventDefault(); handlePickNashville(nashvilleChords); return; }
+              if (exact) { e.preventDefault(); handlePick(exact); return; }
+            } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+              e.preventDefault();
+              const dir: -1 | 1 = e.key === "ArrowLeft" ? -1 : 1;
+              if (isProgression) {
+                useSongStore.getState().movePatternChord(props.patternId, props.chordId, dir);
+              } else if (anchorId && section) {
+                const live = getLineChordsViaSSOT(section, lyricsLineId);
+                const cur = live.find((c) => c.id === anchorId);
+                if (cur && cur.slotIndex != null) {
+                  const target = Math.max(0, Math.min(CHORD_ROW_SLOTS - 1, cur.slotIndex + dir));
+                  useSongStore.getState().moveChordToSlot(props.sectionId, lyricsLineId, anchorId, target);
+                }
+              }
+            }
+          }}
+        />
+        {showControls && (
+          <>
+            <SlashBassPicker query={query} onChange={setQuery} />
+            <div className="flex items-center gap-0.5 shrink-0" onMouseDown={(e) => e.preventDefault()}>
+              <button type="button" onClick={() => setOctave((o) => Math.max(1, o - 1))} aria-label="Decrease octave" style={stepBtnStyle}>−</button>
+              <span style={{ minWidth: 24, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 15, color: "var(--ink)" }}>
+                {octave}
+              </span>
+              <button type="button" onClick={() => setOctave((o) => Math.min(7, o + 1))} aria-label="Increase octave" style={stepBtnStyle}>+</button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {isAdding && (
+        <div className="px-3 py-2 shrink-0" style={{ background: "var(--cocoa-deep)" }}>
+          <button
+            type="button"
+            onClick={() => setView("browse")}
+            className="btn-sculpt-cocoa inline-flex items-center gap-1 rounded-lg h-8 px-3 text-sm font-semibold"
+          >
+            Browse Popular Progressions
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

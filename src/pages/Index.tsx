@@ -189,7 +189,7 @@ const Index = () => {
         enableDefaultSensors={false}
         sensors={[useInstantMouseSensor, useKeyboardSensor, useInstantTouchSensor]}
       >
-        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-32">
+        <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[max(8rem,var(--chord-sheet-h,0px))]">
           <h2 className="sr-only">Songwriter's Notebook — write and arrange</h2>
 
           {isOverlay ? (

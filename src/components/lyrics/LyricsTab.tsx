@@ -207,6 +207,9 @@ function LineRow({
   const [slashType, setSlashType] = useState<SectionType>("verse");
   const [slashCustomLabel, setSlashCustomLabel] = useState("");
   const isMobile = useIsMobile();
+  const sheetOpen = useUIStore((s) => s.focusedEditorOpen);
+  const sheetTarget = useUIStore((s) => s.focusedEditorTarget);
+  const targetSlot = sheetOpen && sheetTarget?.lineId === line.id ? sheetTarget.slotIndex : undefined;
   // Focus a lyric line's textarea and place the caret. Used after split/merge/
   // paste and arrow navigation. The 10ms defer lets React render the new line
   // before we query for it (same pattern as the existing focus-after-add).
@@ -286,8 +289,8 @@ function LineRow({
   }, [line.text]);
 
   // Note: visualViewport scroll-into-view effect was removed. Mobile keyboard
-  // overlap is now handled by the FocusedChordEditor overlay (mobile only)
-  // and CSS `scroll-mt-24` on the row container above.
+  // overlap is handled by the FocusedChordEditor sheet (mobile only), which
+  // scrolls this row clear of itself.
 
   // ---- Slot row keyboard (undo / redo only) ----
   const onRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -313,12 +316,12 @@ function LineRow({
       ref={rowRef}
       className={cn(
         "group pt-1 transition-colors scroll-mt-24",
-        // On mobile, the FocusedChordEditor renders a clone of this row,
-        // so the underlying row should NOT be visually elevated. On desktop
-        // we keep the focus highlight so the user can see which row the
-        // bottom-sheet picker is editing.
+        // Desktop lifts the active row above the picker's overlay. Mobile's
+        // sheet has no overlay, so the row just gets the ring.
         active && !isMobile
           ? "relative z-[60] rounded-md ring-2 ring-primary/70 bg-paper px-2 -mx-2 shadow-lg"
+          : active
+          ? "relative rounded-md ring-2 ring-primary/40 bg-paper px-2 -mx-2"
           : "relative",
         // Chord-overflow continuation rows are a visual wrap of the line above,
         // not (yet) their own line — mark them so the single-block view reads
@@ -388,6 +391,7 @@ function LineRow({
                       hasActiveChordInLine ? "border-muted-foreground/20" : "border-transparent",
                       occupied ? "w-10" : "w-7",
                       slotIdx > 0 && (hasActiveChordInLine ? "border-l-muted-foreground/35" : "border-l-transparent"),
+                      targetSlot === slotIdx && "rounded-sm bg-primary/25 ring-2 ring-[var(--primary-strong)]",
                       dropSnapshot.isDraggingOver && !isInvalidDrop && "bg-accent/50 ring-1 ring-primary/50 rounded-sm",
                       dropSnapshot.isDraggingOver && isInvalidDrop && "bg-destructive/10 ring-1 ring-destructive/50 rounded-sm",
                     )}
@@ -443,6 +447,10 @@ function LineRow({
                             }
                             if (shift) {
                               onShiftSelectTapRef.current?.(anchor!.id);
+                              return;
+                            }
+                            if (sheetOpen) {
+                              onPickerOpen(line.id, slotIdx, anchor!.id);
                               return;
                             }
                             const nextActive = activeChordId === anchor!.id ? null : anchor!.id;

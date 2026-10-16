@@ -33,9 +33,19 @@ export interface ClipboardChord {
   lyricless?: boolean;
 }
 
+/** Slot/chord the open chord sheet is currently aimed at, so rows can highlight it. */
+export interface FocusedEditorTarget {
+  lineId?: string;
+  patternId?: string;
+  slotIndex?: number;
+  chordId?: string;
+}
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
+  focusedEditorTarget: FocusedEditorTarget | null;
+  setFocusedEditorTarget: (t: FocusedEditorTarget | null) => void;
   toolbarExpanded: boolean;
   setToolbarExpanded: (open: boolean) => void;
   multiSelectMode: boolean;
@@ -59,6 +69,8 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   focusedEditorOpen: false,
   setFocusedEditorOpen: (open) => set({ focusedEditorOpen: open }),
+  focusedEditorTarget: null,
+  setFocusedEditorTarget: (focusedEditorTarget) => set({ focusedEditorTarget }),
   toolbarExpanded: false,
   setToolbarExpanded: (open) => set({ toolbarExpanded: open }),
   multiSelectMode: false,
