@@ -23,6 +23,20 @@ const START_RECORDING_EVENT = "write:start-recording";
 
 const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
+/** Focus a lyric line (the song's first if no id) once it mounts — a new section or editor renders a frame or two after the state change. */
+export function focusLyricLine(lineId?: string) {
+  let tries = 0;
+  const tick = () => {
+    const el = document.querySelector<HTMLTextAreaElement>(lineId ? `[data-lyric-input="${lineId}"]` : "[data-lyric-input]");
+    if (el) {
+      el.focus();
+      return;
+    }
+    if (++tries < 10) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 /** Ask the mounted sticky bar to start recording, as if its Record button was pressed. */
 export function requestStickyBarRecording() {
   window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
@@ -143,6 +157,15 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     return () => window.removeEventListener(START_RECORDING_EVENT, onRequest);
   }, [pending]);
 
+  // A new section gets the caret straight away, so the writer keeps typing.
+  const addSectionAndFocus = (type: SectionType) => {
+    onEditorAction?.();
+    const id = addSection(type);
+    setAddSectionOpen(false);
+    const lineId = useSongStore.getState().sections.find((s) => s.id === id)?.lines[0]?.id;
+    if (lineId) focusLyricLine(lineId);
+  };
+
   const handleEditChords = () => {
     onEditorAction?.();
     setChordToolbarOpen(true);
@@ -170,14 +193,14 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
                 {SECTION_TYPES.map((t) => (
                   <button
                     key={t}
-                    onClick={() => { onEditorAction?.(); addSection(t); setAddSectionOpen(false); }}
+                    onClick={() => addSectionAndFocus(t)}
                     className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
                   >
                     <Plus className="h-3.5 w-3.5" />{t === "pre-chorus" ? "Pre-Chorus" : t}
                   </button>
                 ))}
                 <button
-                  onClick={() => { onEditorAction?.(); addSection("custom"); setAddSectionOpen(false); }}
+                  onClick={() => addSectionAndFocus("custom")}
                   className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
                 >
                   <Plus className="h-3.5 w-3.5" />Custom…

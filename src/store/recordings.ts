@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { notifyStorageQuota } from "@/lib/storage-quota";
+import { getAudioBlob, putAudioBlob } from "@/lib/audio/blob-store";
+import type { Take } from "@/store/takes";
 
 export type RecTrackId = string;
 export type RecBlobId = string;
@@ -430,6 +432,27 @@ export const useRecordingsStore = create<RecordingsState>((set, get) => ({
   },
   toJSON: () => ({ tracks: get().tracks }),
 }));
+
+/**
+ * Put a take on a track. Its audio is copied under a new blob id rather than
+ * reusing the take's — otherwise deleting the clip (or the take) later would
+ * silently delete audio the other one still depends on.
+ */
+export async function addTakeCopyAsClip(trackId: RecTrackId, take: Take, startSec: number) {
+  if (!take.blobId) return;
+  const blob = await getAudioBlob(take.blobId);
+  if (!blob) return;
+  const newBlobId = nanoid();
+  await putAudioBlob(newBlobId, blob);
+  useRecordingsStore.getState().addClip(trackId, {
+    blobId: newBlobId,
+    mime: take.mime ?? "audio/webm",
+    durationSec: take.durationSec,
+    startSec,
+    trimStartSec: 0,
+    trimEndSec: take.durationSec,
+  });
+}
 
 // ---- localStorage persistence ----
 // Persist only the track/clip metadata (blobId refs) so a refresh restores the

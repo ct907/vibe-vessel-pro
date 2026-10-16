@@ -3,7 +3,7 @@ import { Mic, ListMusic } from "lucide-react";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import type { TabName } from "@/store/ui";
 import { useSongStore } from "@/store/song";
-import { useRecordingsStore } from "@/store/recordings";
+import { useRecordingsStore, addTakeCopyAsClip } from "@/store/recordings";
 import { useTakesStore } from "@/store/takes";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
@@ -35,12 +35,17 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const isDesktop = useIsDesktop();
   const tapVerb = isDesktop ? "Click" : "Tap";
 
-  // Once a recording exists, give the user a track ready to drop takes into.
+  // Once a recording exists, give the user a track with their starred (or
+  // latest) take already on it, so Play has something to play and the next
+  // track can be recorded against it.
   const autoAdded = useRef(false);
   useEffect(() => {
     if (hasTakes && tracksEmpty && !autoAdded.current) {
       autoAdded.current = true;
-      addTrack();
+      const trackId = addTrack();
+      const takes = useTakesStore.getState().takes;
+      const take = takes.find((t) => t.best) ?? takes[0];
+      if (trackId && take) void addTakeCopyAsClip(trackId, take, 0);
     }
   }, [hasTakes, tracksEmpty, addTrack]);
 

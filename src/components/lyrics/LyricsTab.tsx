@@ -771,9 +771,10 @@ function LineRow({
             <Button variant="ghost" onClick={() => { setSlashDialog(false); setTimeout(() => lyricInputRef.current?.focus(), 0); }}>Cancel</Button>
             <Button
               onClick={() => {
-                addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
+                const id = addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
                 setSlashDialog(false);
-                lyricInputRef.current?.focus();
+                const firstLineId = useSongStore.getState().sections.find((s) => s.id === id)?.lines[0]?.id;
+                if (firstLineId) focusLineAt(firstLineId, 0);
               }}
             >
               Add section
