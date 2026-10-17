@@ -24,7 +24,9 @@ export function ChordActionRow({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [left, setLeft] = useState(0);
-  // Measure every render: the chip moves when chords reflow or the row resizes.
+  // Measure every render: the chip moves when chords are nudged, reflow, or the
+  // row resizes. Setting the same rounded value again bails out, so no loop.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const row = ref.current;
     const parent = row?.parentElement;
