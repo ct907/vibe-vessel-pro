@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -75,11 +75,14 @@ import {
   Play,
   Square,
   Check,
+  Guitar,
+  NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
+import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { chordSlotWidth } from "@/lib/music/chordLayout";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -1000,17 +1003,40 @@ function SectionCard({
   const chordsVisible = getSectionChordsVisible(section);
   const notesOpen = section.notesOpen ?? false;
 
+  const sectionToggles = (
+    <>
+      <SectionToggleButton
+        icon={<Guitar className="h-3.5 w-3.5" />}
+        label="Chords"
+        pressed={chordsVisible}
+        hasContent={hasChords}
+        onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
+        disabled={section.type === "instrumental"}
+        title={section.type === "instrumental" ? "Instrumental sections always show chords" : "Show or hide chords"}
+      />
+      <SectionToggleButton
+        icon={<NotebookPen className="h-3.5 w-3.5" />}
+        label="Notes"
+        pressed={notesOpen}
+        hasContent={hasComment}
+        onClick={() => setSectionNotesOpen(section.id, !notesOpen)}
+        title="Show or hide notes"
+      />
+    </>
+  );
+
   return (
     <div
       data-section-id={section.id}
       style={{ ...sectionTintStyle(section.color, 0.35), backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       className={cn("noise-texture-surface rounded-xl px-2 py-2 shadow-none border-0")}
     >
-      {/* Section header */}
+      {/* Section header — Chords/Notes sit in its row on desktop, a second row on mobile */}
       <div
-        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
+        className="px-3 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
         style={{ color: "oklch(0.3267 0.027 60.1)" }}
       >
+      <div className="flex items-center gap-2 h-12">
         <button
           type="button"
           onClick={() => toggleSectionCollapsed(section.id)}
@@ -1058,6 +1084,8 @@ function SectionCard({
             onCancelInitial={() => setPendingKeyChange(false)}
           />
         )}
+
+        {!sortMode && !isMobile && sectionToggles}
 
         {sortMode ? (
           <div className="ml-auto flex items-center gap-1">
@@ -1276,40 +1304,11 @@ function SectionCard({
         )}
 
       </div>
+      {!sortMode && isMobile && <div className="flex items-center gap-2 pb-2">{sectionToggles}</div>}
+      </div>
 
-      {/* Chords / Notes toggle row */}
-      <Collapsible
-        open={notesOpen}
-        onOpenChange={(o) => setSectionNotesOpen(section.id, o)}
-        className="mt-2"
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
-            disabled={section.type === "instrumental"}
-            title={section.type === "instrumental" ? "Instrumental sections always show chords" : undefined}
-            className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4] disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ color: "oklch(0.3267 0.027 60.1)" }}
-          >
-            {chordsVisible ? "Hide Chords" : "Add Chords"}
-            {hasChords && (
-              <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-            )}
-          </button>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4]"
-              style={{ color: "oklch(0.3267 0.027 60.1)" }}
-            >
-              {notesOpen ? "Hide Notes" : "Show Notes"}
-              {hasComment && (
-                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-        </div>
+      {/* Section notes */}
+      <Collapsible open={notesOpen} onOpenChange={(o) => setSectionNotesOpen(section.id, o)}>
         <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
           <div className="mt-2 w-full">
             <Textarea
