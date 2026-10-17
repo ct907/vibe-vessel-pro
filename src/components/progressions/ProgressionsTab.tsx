@@ -1370,6 +1370,7 @@ function SectionGroup({
                   <button
                     ref={addChordsRef}
                     type="button"
+                    data-pattern-block={p.id}
                     onClick={pasteMode ? () => onPasteIntoBlock?.(p.id) : () => onPickerOpen(p.id, 0)}
                     className={cn(
                       "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
@@ -2445,6 +2446,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         onOpenChange={(o) => { if (!o) setPicker(null); }}
         onPick={handlePick}
         headerRef={chordPickerHeaderRef}
+        targetSelector={picker ? (picker.replaceChordId ? `[data-pattern-chord="${picker.replaceChordId}"]` : `[data-pattern-block="${picker.patternId}"]`) : undefined}
         onPickBatch={(chords) => {
           if (!picker || picker.replaceChordId) return;
           const { addChordToPatternSlot } = useSongStore.getState();

@@ -2581,6 +2581,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             if (!o) setPicker(null);
           }}
           headerRef={chordPickerHeaderRef}
+          targetSelector={picker?.lineId ? `[data-line-id="${picker.lineId}"]` : undefined}
           initialChord={initialChord}
           onPick={handlePick}
           onPickBatch={handlePickBatch}
