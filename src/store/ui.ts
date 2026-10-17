@@ -33,9 +33,19 @@ export interface ClipboardChord {
   lyricless?: boolean;
 }
 
+/** Slot/chord the open chord sheet is currently aimed at, so rows can highlight it. */
+export interface FocusedEditorTarget {
+  lineId?: string;
+  patternId?: string;
+  slotIndex?: number;
+  chordId?: string;
+}
+
 interface UIState {
   focusedEditorOpen: boolean;
   setFocusedEditorOpen: (open: boolean) => void;
+  focusedEditorTarget: FocusedEditorTarget | null;
+  setFocusedEditorTarget: (t: FocusedEditorTarget | null) => void;
   toolbarExpanded: boolean;
   setToolbarExpanded: (open: boolean) => void;
   multiSelectMode: boolean;
@@ -51,6 +61,12 @@ interface UIState {
   /** One-shot signal: WriteStickyBar requests FloatingChordToolbar to expand. */
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
+  /** One-shot signal: WriteStickyBar requests the active tab to open its chord picker sheet. */
+  /** True while a chord (or multi-selection) is active; the sticky bar glows to show it's ready to act on it. */
+  chordSelectionActive: boolean;
+  setChordSelectionActive: (v: boolean) => void;
+  chordPickerRequest: boolean;
+  setChordPickerRequest: (v: boolean) => void;
   /** Chord clipboard shared across tabs. */
   chordClipboard: ClipboardChord[];
   setChordClipboard: (chords: ClipboardChord[]) => void;
@@ -59,6 +75,8 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   focusedEditorOpen: false,
   setFocusedEditorOpen: (open) => set({ focusedEditorOpen: open }),
+  focusedEditorTarget: null,
+  setFocusedEditorTarget: (focusedEditorTarget) => set({ focusedEditorTarget }),
   toolbarExpanded: false,
   setToolbarExpanded: (open) => set({ toolbarExpanded: open }),
   multiSelectMode: false,
@@ -73,6 +91,10 @@ export const useUIStore = create<UIState>((set) => ({
   setArrangeView: (arrangeView) => set({ arrangeView }),
   chordToolbarOpen: false,
   setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
+  chordSelectionActive: false,
+  setChordSelectionActive: (v) => set({ chordSelectionActive: v }),
+  chordPickerRequest: false,
+  setChordPickerRequest: (v) => set({ chordPickerRequest: v }),
   chordClipboard: [],
   setChordClipboard: (chords) => set({ chordClipboard: chords }),
 }));

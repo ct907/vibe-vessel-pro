@@ -52,6 +52,7 @@ import {
   KeyRound,
   Sparkles,
   Play,
+  Square,
   Scissors,
   Maximize2,
   Lock,
@@ -243,6 +244,8 @@ function PatternBlock({
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setWhyChord = useUIStore((s) => s.setWhyChord);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const sheetOpen = useUIStore((s) => s.focusedEditorOpen);
+  const sheetTarget = useUIStore((s) => s.focusedEditorTarget);
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
 
@@ -583,12 +586,16 @@ function PatternBlock({
                 const c = occupied ? item.chord : undefined;
                 const slotIdx = item.slotIdx;
                 const basis = item.basis;
+                const sheetTargeted =
+                  sheetOpen && sheetTarget?.patternId === pattern.id &&
+                  (occupied ? sheetTarget.chordId === c?.id : !sheetTarget.chordId && sheetTarget.slotIndex === slotIdx);
                 return (
                       <div
                         key={`pslot-${itemIdx}`}
                         className={cn(
                           "relative min-w-0 flex items-stretch z-10",
                           !occupied && "border border-dashed border-transparent justify-center",
+                          sheetTargeted && "rounded-md bg-primary/25 ring-2 ring-[var(--primary-strong)]",
                         )}
                         style={{ flex: `${basis} ${basis} 0%` }}
                         onClick={(e) => {
@@ -676,6 +683,10 @@ function PatternBlock({
                                   }
                                   if (e.shiftKey || isShiftDownRef.current) {
                                     onShiftSelectChord?.(pattern.id, c.id);
+                                    return;
+                                  }
+                                  if (sheetOpen) {
+                                    onEditChordOpen(pattern.id, c.id);
                                     return;
                                   }
                                   setFocusedPattern(pattern.id);
@@ -1117,8 +1128,12 @@ function SectionGroup({
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              disabled={!firstSectionChord}
+              disabled={!firstSectionChord && !isSectionPlaying}
               onClick={() => {
+                if (isSectionPlaying) {
+                  window.dispatchEvent(new Event("lovable:request-stop"));
+                  return;
+                }
                 if (!firstSectionChord?.progressionPlacement) return;
                 usePlaybackStore.getState().setStartFromChord(
                   firstSectionChord.progressionPlacement.patternId,
@@ -1132,19 +1147,10 @@ function SectionGroup({
                   ? "bg-[var(--primary)] text-white"
                   : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
-              aria-label="Play from this section"
-              title="Play from this section"
+              aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
+              title={isSectionPlaying ? "Stop" : "Play from this section"}
             >
-              <Play className={cn("h-4 w-4", isSectionPlaying && "fill-white")} />
-            </button>
-            <button
-              type="button"
-              onClick={() => duplicateSection(sectionId)}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
-              aria-label="Duplicate section"
-              title="Duplicate section"
-            >
-              <Copy className="h-4 w-4" />
+              {isSectionPlaying ? <Square className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4" />}
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1194,6 +1200,9 @@ function SectionGroup({
                     ))}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => duplicateSection(sectionId)}>
+                  <Copy className="h-4 w-4" /> Duplicate section
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {effectiveOffset === 0 && (
                   <DropdownMenuItem
@@ -1983,6 +1992,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       setPicker({ patternId, atBeat, replaceChordId: chordId });
       return;
     }
+    setPatternAddSlot(null);
     setChordEditor({ patternId, chordId, sectionId: pat.sectionId ?? pat.id });
   };
 
@@ -2033,6 +2043,28 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChordId, multiSelected, sections, progression]);
 
+  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
+  const hasChordSelection = activeChordId !== null || multiSelected.size > 0;
+  useEffect(() => {
+    setChordSelectionActive(hasChordSelection);
+    return () => setChordSelectionActive(false);
+  }, [hasChordSelection, setChordSelectionActive]);
+  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
+  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
+  useEffect(() => {
+    if (!chordPickerRequest) return;
+    setChordPickerRequest(false);
+    if (activeChordId && toolbarContext.activePatternId) {
+      openChordEditor(toolbarContext.activePatternId, activeChordId);
+      return;
+    }
+    const lastBlock = sections.flatMap((sec) => progression.filter((p) => (p.sectionId ?? p.id) === sec.id)).pop();
+    const owner = lastBlock ? sections.find((sec) => sec.id === (lastBlock.sectionId ?? lastBlock.id)) : undefined;
+    if (!lastBlock || !owner) return;
+    openPicker(lastBlock.id, getPatternChordsViaSSOT(owner, lastBlock).length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chordPickerRequest]);
+
   const handleChordClick = (_patternId: string, chordId: string) => {
     // Tapping a chord only selects it — the pencil overlay opens the editor.
     if (activeChordId === chordId) {
@@ -2076,6 +2108,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     if (isMobile && !replaceChordId) {
       const pat = progression.find((p) => p.id === patternId);
       if (pat) {
+        setChordEditor(null);
         setPatternAddSlot({ patternId, atBeat, sectionId: pat.sectionId ?? pat.id });
         return;
       }
@@ -2440,7 +2473,9 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         }}
       />
 
-      {chordEditor && (
+      {/* One element position for both modes so tapping between an empty slot
+          and an existing chord retargets the open sheet instead of remounting it. */}
+      {chordEditor ? (
         <FocusedChordEditor
           mode="progression"
           sectionId={chordEditor.sectionId}
@@ -2449,9 +2484,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onClose={() => setChordEditor(null)}
           headerRef={focusedEditorHeaderRef}
         />
-      )}
-
-      {patternAddSlot && (
+      ) : patternAddSlot ? (
         <FocusedChordEditor
           mode="progression-add"
           sectionId={patternAddSlot.sectionId}
@@ -2460,7 +2493,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onClose={() => setPatternAddSlot(null)}
           headerRef={focusedEditorHeaderRef}
         />
-      )}
+      ) : null}
 
       <FloatingChordToolbar
         mode="progression"
