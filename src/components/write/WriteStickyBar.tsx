@@ -302,10 +302,16 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               Add Section
             </button>
 
+            {/* Edit/Move act on the tapped chord or chord row, so they stay greyed
+                out until there is one. data-chord-keep stops the press from
+                clearing that selection before the click lands. */}
             <button
               type="button"
+              data-chord-keep
               onClick={handleEditChords}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              disabled={!chordSelectionActive}
+              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open chord picker"
             >
@@ -315,8 +321,11 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
 
             <button
               type="button"
+              data-chord-keep
               onClick={handleMoveChords}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              disabled={!chordSelectionActive}
+              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open move chords menu"
             >

@@ -68,6 +68,7 @@ import { cn } from "@/lib/utils";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
+import { ChordActionRow } from "@/components/chord/ChordActionRow";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
@@ -154,6 +155,8 @@ interface PatternProps {
   blocksInSection: number;
   otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
+  /** This block was tapped to add chords — the sticky bar's chord buttons act on it. */
+  targeted?: boolean;
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
   onEditChordOpen: (patternId: string, chordId: string) => void;
@@ -197,6 +200,7 @@ function PatternBlock({
   blocksInSection,
   otherPatterns,
   onPickerOpen,
+  targeted,
   onRequestDeleteBlock,
   onEditChordOpen,
   activeChordId,
@@ -374,7 +378,7 @@ function PatternBlock({
     <div
       ref={(el) => { (blockRef as React.MutableRefObject<HTMLDivElement | null>).current = el; if (blockRefProp) (blockRefProp as React.MutableRefObject<HTMLDivElement | null>).current = el; }}
       data-pattern-block={pattern.id}
-      className={cn("rounded-lg p-3 transition-shadow")}
+      className={cn("rounded-lg p-3 transition-shadow", targeted && "ring-2 ring-primary/60")}
       style={{
         background: "var(--paper-card)",
         boxShadow:
@@ -749,66 +753,6 @@ function PatternBlock({
                                 </span>
                               )}
                               {isActive && (
-                                <button
-                                  type="button"
-                                  className="absolute -top-1.5 -left-1.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
-                                  style={{ touchAction: "manipulation" }}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onPointerUp={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onTouchStart={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setChordToolbarOpen(true);
-                                  }}
-                                  aria-label="Edit chord"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {isActive && (
-                                <button
-                                  type="button"
-                                  className="absolute -top-1.5 -right-1.5 z-30 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
-                                  style={{ touchAction: "manipulation" }}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onPointerUp={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onTouchStart={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (blockSelectedIds.size > 1 && blockSelectedIds.has(c.id)) {
-                                      removePatternChordsBatch(pattern.id, Array.from(blockSelectedIds));
-                                    } else {
-                                      removePatternChordsBatch(pattern.id, [c.id]);
-                                    }
-                                    onClearMultiSelected();
-                                    onSetActiveChordId(null);
-                                  }}
-                                  aria-label="Delete chord"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {isActive && (
-                                <button
-                                  type="button"
-                                  className="absolute -bottom-1.5 -left-1.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
-                                  style={{ touchAction: "manipulation" }}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onPointerUp={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onTouchStart={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditChordOpen(pattern.id, c.id);
-                                  }}
-                                  aria-label="Open chord editor"
-                                >
-                                  <ListMusic className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {isActive && (
                                 <div
                                   role="slider"
                                   aria-label="Drag to resize chord length"
@@ -894,7 +838,26 @@ function PatternBlock({
           })()}
       </div>
 
-
+      {(() => {
+        const active = sortedChords.find((c) => c.id === activeChordId);
+        if (!active) return null;
+        return (
+          <ChordActionRow
+            chipSelector={`[data-pattern-chord="${active.id}"]`}
+            onEdit={() => onEditChordOpen(pattern.id, active.id)}
+            onMove={() => setChordToolbarOpen(true)}
+            onDelete={() => {
+              if (blockSelectedIds.size > 1 && blockSelectedIds.has(active.id)) {
+                removePatternChordsBatch(pattern.id, Array.from(blockSelectedIds));
+              } else {
+                removePatternChordsBatch(pattern.id, [active.id]);
+              }
+              onClearMultiSelected();
+              onSetActiveChordId(null);
+            }}
+          />
+        );
+      })()}
 
       <SpiceSheet
         open={spiceOpen}
@@ -919,6 +882,8 @@ interface SectionGroupProps {
   index: number;
   allPatterns: PatternBlockType[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
+  /** Block the sticky bar's chord buttons act on (last tapped to add chords). */
+  targetBlockId?: string | null;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
   onEditChordOpen: (patternId: string, chordId: string) => void;
@@ -951,6 +916,7 @@ function SectionGroup({
   index,
   allPatterns,
   onPickerOpen,
+  targetBlockId,
   onRequestDeleteSection,
   onRequestDeleteBlock,
   onEditChordOpen,
@@ -1348,6 +1314,7 @@ function SectionGroup({
                     blocksInSection={blocks.length}
                     otherPatterns={otherAll}
                     onPickerOpen={onPickerOpen}
+                    targeted={targetBlockId === p.id}
                     onRequestDeleteBlock={onRequestDeleteBlock}
                     onEditChordOpen={onEditChordOpen}
                     onChordClick={onChordClick}
@@ -1374,6 +1341,7 @@ function SectionGroup({
                     onClick={pasteMode ? () => onPasteIntoBlock?.(p.id) : () => onPickerOpen(p.id, 0)}
                     className={cn(
                       "w-full rounded-lg border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col gap-2 p-3 text-left text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border min-h-[80px] transition-colors",
+                      targetBlockId === p.id && "border-primary/60",
                       pasteMode && "animate-paste-glow cursor-copy",
                     )}
                   >
@@ -2043,12 +2011,28 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChordId, multiSelected, sections, progression]);
 
+  // The block last tapped to add chords. With a selected chord, it's what the
+  // sticky bar's Edit/Move Chords act on.
+  const [targetBlockId, setTargetBlockId] = useState<string | null>(null);
   const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
-  const hasChordSelection = activeChordId !== null || multiSelected.size > 0;
+  const hasChordTarget = activeChordId !== null || multiSelected.size > 0 || targetBlockId !== null;
   useEffect(() => {
-    setChordSelectionActive(hasChordSelection);
+    setChordSelectionActive(hasChordTarget);
     return () => setChordSelectionActive(false);
-  }, [hasChordSelection, setChordSelectionActive]);
+  }, [hasChordTarget, setChordSelectionActive]);
+  // Tapping anywhere but a block, the sticky bar's chord buttons, or an open
+  // sheet/menu drops the block target (and greys those buttons out again).
+  useEffect(() => {
+    if (!targetBlockId) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (useUIStore.getState().focusedEditorOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('[data-pattern-block],[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
+      setTargetBlockId(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [targetBlockId]);
   const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
   const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
   useEffect(() => {
@@ -2058,10 +2042,11 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
       openChordEditor(toolbarContext.activePatternId, activeChordId);
       return;
     }
-    const lastBlock = sections.flatMap((sec) => progression.filter((p) => (p.sectionId ?? p.id) === sec.id)).pop();
-    const owner = lastBlock ? sections.find((sec) => sec.id === (lastBlock.sectionId ?? lastBlock.id)) : undefined;
-    if (!lastBlock || !owner) return;
-    openPicker(lastBlock.id, getPatternChordsViaSSOT(owner, lastBlock).length);
+    const blocks = sections.flatMap((sec) => progression.filter((p) => (p.sectionId ?? p.id) === sec.id));
+    const block = blocks.find((p) => p.id === targetBlockId) ?? blocks[blocks.length - 1];
+    const owner = block ? sections.find((sec) => sec.id === (block.sectionId ?? block.id)) : undefined;
+    if (!block || !owner) return;
+    openPicker(block.id, getPatternChordsViaSSOT(owner, block).length);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chordPickerRequest]);
 
@@ -2105,6 +2090,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     }));
 
   const openPicker = (patternId: string, atBeat: number, replaceChordId?: string) => {
+    setTargetBlockId(patternId);
     if (isMobile && !replaceChordId) {
       const pat = progression.find((p) => p.id === patternId);
       if (pat) {
@@ -2218,6 +2204,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           index={i}
           allPatterns={progression}
           onPickerOpen={openPicker}
+          targetBlockId={targetBlockId}
           onRequestDeleteSection={requestDeleteSection}
           onRequestDeleteBlock={requestDeleteBlock}
           onEditChordOpen={openChordEditor}
