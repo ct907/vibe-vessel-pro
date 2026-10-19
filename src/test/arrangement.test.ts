@@ -16,12 +16,12 @@ import type { PatternBlock, Section } from "@/store/song";
 
 const c = (s: string) => parseChord(s)!;
 const ev = (chord: string, startBeat: number, lengthBeats: number): ChordEvent => ({ chord: c(chord), startBeat, lengthBeats });
-const pad = (arp: Partial<ArpSettings>, armed = true, bassOn = false): PadSettings => ({ arp: { ...DEFAULT_ARP, ...arp }, armed, octave: 4, bassOn });
+const pad = (arp: Partial<ArpSettings>, bassOn = false): PadSettings => ({ arp: { ...DEFAULT_ARP, ...arp }, octave: 4, bassOn });
 const fourFour = { beatsPerBar: 4, beatUnit: 4 };
 
 describe("padNotes", () => {
-  it("holds the chord when the section's arp is off", () => {
-    const notes = padNotes(ev("C", 0, 4), pad({}, false), fourFour);
+  it("holds the chord on the Hold pattern", () => {
+    const notes = padNotes(ev("C", 0, 4), pad({ pattern: "hold" }), fourFour);
     expect(notes.every((n) => n.startBeat === 0 && n.lengthBeats === 4)).toBe(true);
     expect(notes.length).toBeGreaterThanOrEqual(3);
   });
@@ -67,7 +67,7 @@ describe("padNotes", () => {
     const low = slash.filter((n) => n.velocity === 0.95);
     expect(low.map((n) => n.startBeat)).toEqual([0, 4]);
     expect(low[0].midi % 12).toBe(4);
-    const withBass = padNotes(ev("C/E", 0, 8), pad({ pattern: "asc", repeat: "1/4" }, true, true), fourFour);
+    const withBass = padNotes(ev("C/E", 0, 8), pad({ pattern: "asc", repeat: "1/4" }, true), fourFour);
     expect(withBass.some((n) => n.velocity === 0.95)).toBe(false);
   });
 });

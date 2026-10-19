@@ -6,7 +6,19 @@
 // Polyphony is capped at MAX_VOICES; the quietest voice at a new note's start is stolen.
 
 import { ChordSymbol, chordToMidi, midiToFreq } from "./chords";
-import { useSoundStore, type EQ3, type FX, type SoundSettings } from "@/store/sound";
+import {
+  presetVoice,
+  resolveBass,
+  resolveDrums,
+  resolvePad,
+  useSoundStore,
+  type BassSound,
+  type DrumSettings,
+  type EQ3,
+  type FX,
+  type SoundPreset,
+  type SoundSettings,
+} from "@/store/sound";
 import { useSongStore } from "@/store/song";
 import { useMetronomeStore } from "@/store/metronome";
 import { getAudioContext, getMasterChain } from "@/lib/audio/context";
@@ -179,13 +191,19 @@ function spawnNote(
   velocity: number,
   owner: Owner = "transport",
   part: VoicePart = "pad",
+  /** A section's own pad preset or bass sound; defaults to the song's. */
+  sound?: string,
 ): Voice {
   makeRoom(startAt, freq, owner, part);
   const s = useSoundStore.getState();
   const chain = getMasterChain();
-  const v = part === "bass"
-    ? makeBassVoice({ ctx: chain.ctx, destination: chain.bassBus, sound: s.bass.sound, tone: s.bass.tone, freq, velocity })
-    : makeVoice({ ctx: chain.ctx, destination: chain.padBus, preset: s.preset, timbre: s.timbre, adsr: s.adsr, freq, velocity });
+  let v: Voice;
+  if (part === "bass") {
+    v = makeBassVoice({ ctx: chain.ctx, destination: chain.bassBus, sound: (sound as BassSound) ?? s.bass.sound, tone: s.bass.tone, freq, velocity });
+  } else {
+    const preset = (sound as SoundPreset) ?? s.preset;
+    v = makeVoice({ ctx: chain.ctx, destination: chain.padBus, preset, ...presetVoice(s, preset), freq, velocity });
+  }
   v.start(startAt);
   if (releaseAt !== null) v.release(releaseAt);
   liveVoices.push({ v, owner, part, freq, held: releaseAt === null });
@@ -215,10 +233,9 @@ export async function playChord(chord: ChordSymbol, durationSec = 1.2, octave = 
 }
 
 /** Play an explicit set of MIDI notes (used by the Chord Explorer's edited voicings). */
-/** One bar of the current groove on the current kit, for the Sound panel. */
-export async function previewDrums(): Promise<void> {
+/** Two bars of a groove, for the Sound panel. */
+export async function previewDrums(drums: DrumSettings = useSoundStore.getState().drums): Promise<void> {
   await ensureAudio();
-  const { drums } = useSoundStore.getState();
   const { beatsPerBar, beatUnit } = useSongStore.getState().meta;
   const chain = getMasterChain();
   warmKit(chain.ctx, drums.kit, DRUM_LANES);
@@ -230,11 +247,11 @@ export async function previewDrums(): Promise<void> {
   }
 }
 
-/** A short line on the current bass sound, for the Sound panel. */
-export async function previewBass(): Promise<void> {
+/** A short line on a bass sound, for the Sound panel. */
+export async function previewBass(sound?: BassSound): Promise<void> {
   await ensureAudio();
   const t = getAudioContext().currentTime + 0.01;
-  [36, 43, 48, 43].forEach((midi, i) => spawnNote(midiToFreq(midi), t + i * 0.3, t + i * 0.3 + 0.28, 0.9, "audition", "bass"));
+  [36, 43, 48, 43].forEach((midi, i) => spawnNote(midiToFreq(midi), t + i * 0.3, t + i * 0.3 + 0.28, 0.9, "audition", "bass", sound));
 }
 
 export async function playNotes(midiNotes: number[], durationSec = 1.2): Promise<void> {
@@ -381,7 +398,7 @@ function createPlayer(owner: Owner) {
       scheduled.push({ startAbs: abs, endAbs: abs + 0.5, startT: t, node: hit.source });
       return;
     }
-    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner, n.part === "bass" ? "bass" : "pad");
+    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner, n.part === "bass" ? "bass" : "pad", n.sound);
     scheduled.push({ startAbs: abs, endAbs: abs + n.lengthBeats, startT: t, voice });
   };
 
@@ -498,20 +515,19 @@ function createPlayer(owner: Owner) {
   };
 }
 
-function sectionArpArmed(sectionId: string): boolean {
-  const sec = useSongStore.getState().sections.find((s) => s.id === sectionId);
-  return sec ? sec.arpArmed !== false : true;
-}
-
 function renderSettings(octave = 4): RenderSettings {
-  const { arp, bass, drums, mix } = useSoundStore.getState();
+  const s = useSoundStore.getState();
   const { beatsPerBar, beatUnit } = useSongStore.getState().meta;
   return {
-    pad: (sectionId) => mix.pad.on
-      ? { arp, armed: sectionId ? sectionArpArmed(sectionId) : true, octave, bassOn: mix.bass.on }
-      : null,
-    bass: () => (mix.bass.on ? bass : null),
-    drums: () => ({ settings: drums, on: mix.drums.on }),
+    pad: (sectionId) => {
+      const pad = resolvePad(s, sectionId);
+      return pad.on ? { arp: pad.arp, preset: pad.preset, octave, bassOn: resolveBass(s, sectionId).on } : null;
+    },
+    bass: (sectionId) => {
+      const bass = resolveBass(s, sectionId);
+      return bass.on ? bass.settings : null;
+    },
+    drums: (sectionId) => resolveDrums(s, sectionId),
     meter: { beatsPerBar, beatUnit },
     click: true,
   };
@@ -576,7 +592,7 @@ useSoundStore.subscribe((s, prev) => {
   }
   const heardNow = s.arp !== prev.arp || s.preset !== prev.preset
     || s.bass.sound !== prev.bass.sound || s.bass.pattern !== prev.bass.pattern || s.bass.rate !== prev.bass.rate
-    || s.drums !== prev.drums
+    || s.drums !== prev.drums || s.sectionSound !== prev.sectionSound
     || s.mix.pad.on !== prev.mix.pad.on || s.mix.bass.on !== prev.mix.bass.on || s.mix.drums.on !== prev.mix.drums.on;
   if (heardNow) rerenderSoon();
 });

@@ -61,7 +61,7 @@ export interface PlayNote {
   startBeat: number;
   lengthBeats: number;
   velocity: number;
-  /** Drums: the kit. */
+  /** The pad preset, bass sound or drum kit (sections can each have their own). */
   sound?: string;
 }
 
@@ -180,8 +180,8 @@ function eachStep(start: number, len: number, step: number, fn: (at: number, len
 
 export interface PadSettings {
   arp: ArpSettings;
-  /** False = hold block chords for the section regardless of the arp. */
-  armed: boolean;
+  /** The preset, carried on each note. */
+  preset?: string;
   octave: number;
   /** The Bass part is playing, so it takes the slash-chord bass note. */
   bassOn: boolean;
@@ -196,16 +196,17 @@ export function padNotes(ev: ChordEvent, pad: PadSettings, meter: Meter): PlayNo
   const slash = ev.chord.bass ? all[0] : null;
   const chord = slash != null && pad.bassOn ? all.slice(1) : all;
   const { startBeat: start, lengthBeats: len } = ev;
-  if (!pad.armed) {
+  const sound = pad.preset;
+  const { arp } = pad;
+  if (arp.pattern === "hold") {
     const velocity = Math.min(1, 1.4 / Math.sqrt(chord.length));
-    for (const midi of chord) out.push({ part: "pad", midi, startBeat: start, lengthBeats: len, velocity });
+    for (const midi of chord) out.push({ part: "pad", midi, startBeat: start, lengthBeats: len, velocity, sound });
     return out;
   }
-  const { arp } = pad;
   const melody = slash != null ? all.slice(1) : all;
   // Without a Bass part the slash note is struck once a bar under the arp.
   if (slash != null && !pad.bassOn) {
-    eachStep(start, len, 4, (at, l) => out.push({ part: "pad", midi: slash, startBeat: at, lengthBeats: l, velocity: 0.95 }));
+    eachStep(start, len, 4, (at, l) => out.push({ part: "pad", midi: slash, startBeat: at, lengthBeats: l, velocity: 0.95, sound }));
   }
 
   const triplet = (meter.beatsPerBar === 3 && meter.beatUnit === 4) || (meter.beatsPerBar === 6 && meter.beatUnit === 8);
@@ -219,7 +220,7 @@ export function padNotes(ev: ChordEvent, pad: PadSettings, meter: Meter): PlayNo
       const s = swung(at, i);
       if (s >= end) return;
       const l = Math.min(end, s + step) - s;
-      for (const midi of melody) out.push({ part: "pad", midi, startBeat: s, lengthBeats: l, velocity });
+      for (const midi of melody) out.push({ part: "pad", midi, startBeat: s, lengthBeats: l, velocity, sound });
     });
     return out;
   }
@@ -238,7 +239,7 @@ export function padNotes(ev: ChordEvent, pad: PadSettings, meter: Meter): PlayNo
     } else {
       midi = steps[i % steps.length];
     }
-    out.push({ part: "pad", midi, startBeat: s, lengthBeats: Math.min(end, s + step) - s, velocity });
+    out.push({ part: "pad", midi, startBeat: s, lengthBeats: Math.min(end, s + step) - s, velocity, sound });
   });
   return out;
 }
@@ -257,14 +258,15 @@ export function bassMidi(name: string): number {
 export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: BassSettings, kicks: number[] = []): PlayNote[] {
   const root = bassMidi(ev.chord.bass ?? ev.chord.root);
   const { startBeat: start, lengthBeats: len } = ev;
-  if (bass.pattern === "hold") return [{ part: "bass", midi: root, startBeat: start, lengthBeats: len, velocity: 0.95 }];
+  const sound = bass.sound;
+  if (bass.pattern === "hold") return [{ part: "bass", midi: root, startBeat: start, lengthBeats: len, velocity: 0.95, sound }];
   if (bass.pattern === "followKick") {
     const end = start + len;
     const at = kicks.filter((b) => b > start + 1e-6 && b < end - 1e-6);
     // Always land on the chord change, kick or not.
     at.unshift(start);
     return at.map((b, i) => ({
-      part: "bass", midi: root, startBeat: b, lengthBeats: (at[i + 1] ?? end) - b, velocity: i === 0 ? 0.95 : 0.85,
+      part: "bass", midi: root, startBeat: b, lengthBeats: (at[i + 1] ?? end) - b, velocity: i === 0 ? 0.95 : 0.85, sound,
     }));
   }
   const fifth = root + 7 <= 47 ? root + 7 : root - 5;
@@ -279,7 +281,7 @@ export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: Ba
     else if (bass.pattern === "approach" && i === count - 1 && count > 1 && target !== root) {
       midi = target > root ? target - 1 : target + 1;
     }
-    out.push({ part: "bass", midi, startBeat: at, lengthBeats: l, velocity: i === 0 ? 0.95 : 0.82 });
+    out.push({ part: "bass", midi, startBeat: at, lengthBeats: l, velocity: i === 0 ? 0.95 : 0.82, sound });
   });
   return out;
 }

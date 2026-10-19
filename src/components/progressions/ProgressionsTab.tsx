@@ -10,7 +10,6 @@ import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ContextMenu,
@@ -59,6 +58,7 @@ import {
   Unlock,
   Check,
   NotebookPen,
+  SlidersHorizontal,
 } from "lucide-react";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
@@ -69,6 +69,7 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { ChordActionRow } from "@/components/chord/ChordActionRow";
+import { SectionSoundSheet } from "@/components/sound/SectionSoundSheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
@@ -945,7 +946,6 @@ function SectionGroup({
   const toggleSectionCollapsed = useSongStore((s) => s.toggleSectionCollapsed);
   const duplicateSection = useSongStore((s) => s.duplicateSection);
   const setSectionColor = useSongStore((s) => s.setSectionColor);
-  const setSectionArpArmed = useSongStore((s) => s.setSectionArpArmed);
   const setSectionComment = useSongStore((s) => s.setSectionComment);
   const setSectionNotesOpen = useSongStore((s) => s.setSectionNotesOpen);
   const replacePatternChords = useSongStore((s) => s.replacePatternChords);
@@ -957,6 +957,7 @@ function SectionGroup({
   const { theme } = useTheme();
   const [customRenameOpen, setCustomRenameOpen] = useState(false);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const hasComment = !!(section?.comment && section.comment.trim().length);
   const notesOpen = section?.notesOpen ?? false;
   const effectiveOffsets = useMemo(() => computeEffectiveOffsets(allSections), [allSections]);
@@ -1195,14 +1196,9 @@ function SectionGroup({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-sm">Arpeggiator</span>
-                  <Switch
-                    checked={section?.arpArmed !== false}
-                    onCheckedChange={(b) => setSectionArpArmed(sectionId, b)}
-                    aria-label="Toggle arpeggiator for this section"
-                  />
-                </div>
+                <DropdownMenuItem onClick={() => setSoundOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4" /> Sound for this section…
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <div className="px-2 py-1.5">
                   <p className="text-xs text-muted-foreground mb-1.5">Section color</p>
@@ -1448,6 +1444,7 @@ function SectionGroup({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SectionSoundSheet sectionId={sectionId} label={section?.label ?? ""} open={soundOpen} onOpenChange={setSoundOpen} />
     </div>
   );
 }

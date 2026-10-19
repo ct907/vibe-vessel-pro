@@ -49,7 +49,6 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRecordingsStore } from "@/store/recordings";
 import {
@@ -77,6 +76,7 @@ import {
   Check,
   Guitar,
   NotebookPen,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
@@ -84,6 +84,7 @@ import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/comp
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { ChordActionRow } from "@/components/chord/ChordActionRow";
+import { SectionSoundSheet } from "@/components/sound/SectionSoundSheet";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { chordSlotWidth } from "@/lib/music/chordLayout";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -852,7 +853,6 @@ function SectionCard({
     setSectionChordsVisible,
     setSectionNotesOpen,
     setSectionColor,
-    setSectionArpArmed,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
     movePatternChord,
@@ -866,6 +866,7 @@ function SectionCard({
   const prevLabelRef = useRef<string>(section.label);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const [overdubOpen, setOverdubOpen] = useState(false);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
@@ -1252,14 +1253,9 @@ function SectionCard({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-sm">Arpeggiator</span>
-                  <Switch
-                    checked={section.arpArmed !== false}
-                    onCheckedChange={(b) => setSectionArpArmed(section.id, b)}
-                    aria-label="Toggle arpeggiator for this section"
-                  />
-                </div>
+                <DropdownMenuItem onClick={() => setSoundOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4" /> Sound for this section…
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
@@ -1475,6 +1471,7 @@ function SectionCard({
           removeSection(section.id);
         }}
       />
+      <SectionSoundSheet sectionId={section.id} label={displayName} open={soundOpen} onOpenChange={setSoundOpen} />
     </div>
   );
 }

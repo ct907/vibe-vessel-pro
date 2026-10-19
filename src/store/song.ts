@@ -102,7 +102,7 @@ export interface Section {
   notesOpen?: boolean;
   /** Optional color swatch key (matches SECTION_COLOR_KEYS). Synced lyrics ↔ progressions. */
   color?: string | null;
-  /** When false, this section plays as block chords even if the global arp is on. Default true. */
+  /** Legacy: false = held chords. Folded into the section's Pad sound on load (see useSoundStore.adoptSections). */
   arpArmed?: boolean;
   /**
    * Optional semitone offset relative to song.meta.keyRoot. Undefined means
@@ -274,7 +274,6 @@ export interface SongState {
   setSectionChordsVisible: (id: string, visible: boolean) => void;
   setSectionNotesOpen: (id: string, open: boolean) => void;
   setSectionColor: (id: string, color: string | null) => void;
-  setSectionArpArmed: (id: string, armed: boolean) => void;
   setSectionKeyChangeOffset: (id: string, offset: number | undefined) => void;
   /** Wipe all song state and replace with a single empty verse section (factory reset). */
   resetSong: () => void;
@@ -1681,6 +1680,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       progression.splice(insertAt, 0, ...newPatterns);
       return { sections, progression };
     });
+    useSoundStore.getState().copySectionSound(id, newId);
     return newId;
   },
   moveSection: (id, direction) => set((s) => {
@@ -1751,9 +1751,6 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   setSectionColor: (id, color) => set((s) => ({
     sections: s.sections.map((sec) => (sec.id === id ? { ...sec, color: color ?? null } : sec)),
   })),
-  setSectionArpArmed: (id, armed) => set((s) => ({
-    sections: s.sections.map((sec) => (sec.id === id ? { ...sec, arpArmed: armed } : sec)),
-  })),
   setSectionKeyChangeOffset: (id, offset) => set((s) => {
     if (s.sections.length > 0 && s.sections[0].id === id) return s;
     return {
@@ -1777,6 +1774,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     useAppTintStore.getState().setTint(null);
     useAppBackgroundStore.getState().setPattern("none");
     useAppBackgroundStore.getState().setMask("none");
+    useSoundStore.getState().adoptSections([fresh.section]);
   },
 
   // ---- lyric lines ----
@@ -4110,6 +4108,10 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     } as any);
     // Sound settings live in their own store but travel with the song JSON.
     useSoundStore.getState().loadFrom(parsed.sound);
+    useSoundStore.getState().adoptSections(reconciledSections);
+    if (reconciledSections.some((sec) => sec.arpArmed !== undefined)) {
+      set((st) => ({ sections: st.sections.map(({ arpArmed: _legacy, ...sec }) => sec) }));
+    }
     // App background tint also travels with the project.
     const rawTint = parsed.appTint;
     useAppTintStore.getState().setTint(

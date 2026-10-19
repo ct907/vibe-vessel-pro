@@ -9,7 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useSoundStore, SOUND_PRESETS, PRESET_BY_VALUE, BASS_SOUNDS,
-  type SoundPreset, type ArpPattern, type ArpRepeat, type BassRepeat, type BassPattern, type BassSound, type PartId,
+  type SoundPreset, type ArpPattern, type ArpRepeat, type ArpSettings, type BassRepeat, type BassPattern, type BassSound,
+  type BassSettings, type DrumSettings, type PartId,
 } from "@/store/sound";
 import { ensureAudio, playChord, previewBass, previewDrums } from "@/lib/music/audio";
 import { parseChord } from "@/lib/music/chords";
@@ -177,7 +178,7 @@ export function SoundPanel({ open, onOpenChange }: Props) {
               </Section>
 
               <Section title="Arpeggio" defaultOpen={false}>
-                <ArpControls />
+                <ArpControls arp={s.arp} onChange={s.setArp} />
               </Section>
 
               <Section title="3-band EQ" defaultOpen={false}>
@@ -256,11 +257,13 @@ export function SoundPanel({ open, onOpenChange }: Props) {
             </TabsContent>
 
             <TabsContent value="bass" className="mt-4 space-y-4">
-              <BassControls />
+              <PartOff part="bass" label="Bass" />
+              <BassControls bass={s.bass} onChange={s.setBass} />
             </TabsContent>
 
             <TabsContent value="drums" className="mt-4 space-y-4">
-              <DrumControls />
+              <PartOff part="drums" label="Drums" />
+              <DrumControls drums={s.drums} onChange={s.setDrums} />
             </TabsContent>
           </Tabs>
 
@@ -303,6 +306,7 @@ export function SoundPanel({ open, onOpenChange }: Props) {
 }
 
 const PATTERN_OPTIONS: { value: ArpPattern; label: string; Icon: typeof ListIndentIncrease }[] = [
+  { value: "hold",    label: "Hold",               Icon: Minus },
   { value: "all",     label: "All",                Icon: ListIndentIncrease },
   { value: "asc",     label: "Ascending",          Icon: MoveUpRight },
   { value: "desc",    label: "Descending",         Icon: MoveDownRight },
@@ -384,17 +388,17 @@ function TextRow<T extends string>({
   );
 }
 
-function ArpControls() {
-  const arp = useSoundStore((s) => s.arp);
-  const setArp = useSoundStore((s) => s.setArp);
+export function ArpControls({ arp, onChange: setArp }: { arp: ArpSettings; onChange: (patch: Partial<ArpSettings>) => void }) {
   return (
     <div className="space-y-3">
       <Row label={<><ListIndentIncrease className="inline h-3 w-3 mr-1" />Pattern</>}>
         <IconRow options={PATTERN_OPTIONS} value={arp.pattern} onChange={(v) => setArp({ pattern: v })} />
       </Row>
-      <Row label={<><LineStyle className="inline h-3 w-3 mr-1" />Pattern Repeat</>}>
-        <TextRow options={REPEAT_OPTIONS} value={arp.repeat} onChange={(v) => setArp({ repeat: v })} />
-      </Row>
+      {arp.pattern !== "hold" && (
+        <Row label={<><LineStyle className="inline h-3 w-3 mr-1" />Pattern Repeat</>}>
+          <TextRow options={REPEAT_OPTIONS} value={arp.repeat} onChange={(v) => setArp({ repeat: v })} />
+        </Row>
+      )}
     </div>
   );
 }
@@ -438,7 +442,7 @@ function Mixer() {
   );
 }
 
-function PartOff({ part, label }: { part: PartId; label: string }) {
+export function PartOff({ part, label }: { part: PartId; label: string }) {
   const on = useSoundStore((s) => s.mix[part].on);
   const setMix = useSoundStore((s) => s.setMix);
   if (on) return null;
@@ -455,9 +459,7 @@ function PartOff({ part, label }: { part: PartId; label: string }) {
 
 const DENSITY_LABELS = ["", "1/2", "1/4", "1/8", "1/16"];
 
-function DrumControls() {
-  const drums = useSoundStore((s) => s.drums);
-  const setDrums = useSoundStore((s) => s.setDrums);
+export function DrumControls({ drums, onChange: setDrums }: { drums: DrumSettings; onChange: (patch: Partial<DrumSettings>) => void }) {
   const beatsPerBar = useSongStore((s) => s.meta.beatsPerBar);
   const beatUnit = useSongStore((s) => s.meta.beatUnit);
   const [fineOpen, setFineOpen] = useState(drums.density != null || drums.velocity != null);
@@ -467,7 +469,6 @@ function DrumControls() {
   const velocity = drumVelocity(drums);
   return (
     <div className="space-y-3">
-      <PartOff part="drums" label="Drums" />
       <Row label="Groove">
         <div className="flex items-center gap-2">
           <Select value={genre} onValueChange={(v) => setDrums({ genre: v as DrumGenre, custom: undefined })}>
@@ -476,7 +477,7 @@ function DrumControls() {
               {genres.map((g) => <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void previewDrums()} aria-label="Preview drums">
+          <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void previewDrums(drums)} aria-label="Preview drums">
             <Play className="h-4 w-4" />
           </Button>
         </div>
@@ -529,13 +530,10 @@ function DrumControls() {
   );
 }
 
-function BassControls() {
-  const bass = useSoundStore((s) => s.bass);
-  const setBass = useSoundStore((s) => s.setBass);
+export function BassControls({ bass, onChange: setBass }: { bass: BassSettings; onChange: (patch: Partial<BassSettings>) => void }) {
   const def = BASS_SOUNDS.find((b) => b.value === bass.sound) ?? BASS_SOUNDS[0];
   return (
     <div className="space-y-3">
-      <PartOff part="bass" label="Bass" />
       <Row label="Sound">
         <div className="flex items-center gap-2">
           <Select value={bass.sound} onValueChange={(v) => setBass({ sound: v as BassSound })}>
@@ -544,7 +542,7 @@ function BassControls() {
               {BASS_SOUNDS.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void previewBass()} aria-label="Preview bass">
+          <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void previewBass(bass.sound)} aria-label="Preview bass">
             <Play className="h-4 w-4" />
           </Button>
         </div>
