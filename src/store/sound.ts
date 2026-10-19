@@ -18,8 +18,12 @@ export type SoundPreset =
   | "juno"          // Subtractive — Juno-style polysynth
   | "stringMachine" // Subtractive — Solina string machine
   | "vocalChoir"    // Formant — synthetic choir
-  | "piano"         // Subtractive — bright FM-tinted piano
-  | "organ";        // Subtractive — drawbar-ish organ
+  | "piano"         // FM — bright piano
+  | "organ"         // Subtractive — drawbar-ish organ
+  | "warmPad"       // Subtractive — saws + sub with a slow filter swell
+  | "sweepPad"      // Subtractive — resonant filter on a slow LFO
+  | "airPad"        // Subtractive — soft triangles + breath noise
+  | "glassPad";     // FM — glassy inharmonic shimmer
 
 export interface PresetDef {
   value: SoundPreset;
@@ -39,6 +43,10 @@ export const SOUND_PRESETS: PresetDef[] = [
   { value: "vocalChoir",    label: "Vocal Choir",      engine: "formant",     timbreLabel: "Vowel (Ah ↔ Oo)", timbreDefault: 0.4 },
   { value: "piano",         label: "Piano",            engine: "fm",          timbreLabel: "Brightness",      timbreDefault: 0.5 },
   { value: "organ",         label: "Organ",            engine: "subtractive", timbreLabel: "Drawbar Mix",     timbreDefault: 0.6 },
+  { value: "warmPad",       label: "Warm Pad",         engine: "subtractive", timbreLabel: "Warmth ↔ Bright", timbreDefault: 0.4 },
+  { value: "sweepPad",      label: "Sweep Pad",        engine: "subtractive", timbreLabel: "Sweep",           timbreDefault: 0.5 },
+  { value: "airPad",        label: "Air Pad",          engine: "subtractive", timbreLabel: "Air",             timbreDefault: 0.5 },
+  { value: "glassPad",      label: "Glass Pad",        engine: "fm",          timbreLabel: "Shimmer",         timbreDefault: 0.5 },
 ];
 
 export const PRESET_BY_VALUE: Record<SoundPreset, PresetDef> =
@@ -112,6 +120,10 @@ export const PRESET_DEFAULTS: Record<SoundPreset, ADSR> = {
   vocalChoir:    { attack: 0.4,   decay: 0.3,  sustain: 0.9,  release: 1.4 },
   piano:         { attack: 0.005, decay: 0.5,  sustain: 0.25, release: 1.2 },
   organ:         { attack: 0.02,  decay: 0.05, sustain: 0.95, release: 0.3 },
+  warmPad:       { attack: 0.8,   decay: 0.6,  sustain: 0.85, release: 2.2 },
+  sweepPad:      { attack: 0.5,   decay: 0.5,  sustain: 0.8,  release: 2.0 },
+  airPad:        { attack: 1.0,   decay: 0.5,  sustain: 0.9,  release: 2.5 },
+  glassPad:      { attack: 0.15,  decay: 1.8,  sustain: 0.5,  release: 2.4 },
 };
 
 export const DEFAULT_SOUND: SoundSettings = {

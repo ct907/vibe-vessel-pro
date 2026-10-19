@@ -1,8 +1,8 @@
 // Phase 1.6 — Web Audio voice engines.
 //
 // Three archetypes:
-//   - FM (2-op)         : "rhodes", "dxkeys", "piano"
-//   - Subtractive       : "juno", "stringMachine", "organ"
+//   - FM (2-op)         : "rhodes", "dxkeys", "piano", "glassPad"
+//   - Subtractive       : "juno", "stringMachine", "organ", "warmPad", "sweepPad", "airPad"
 //   - Formant (vocal)   : "vocalChoir"
 //
 // The exported makeVoice() returns a Voice that owns its own subgraph and
@@ -180,6 +180,9 @@ function makeFmVoice(p: VoiceParams): Voice {
         return { harmonicity: 14, modIndexBase: 60, modIndexPeak: 320, modDecay: 0.8 };
       case "dxkeys":
         return { harmonicity: 1, modIndexBase: 80, modIndexPeak: 220, modDecay: 1.5 };
+      case "glassPad":
+        // A non-integer ratio rings like struck glass, then settles to a soft sine.
+        return { harmonicity: 3.5, modIndexBase: 15, modIndexPeak: 110, modDecay: 2.5 };
       case "piano":
       default:
         return { harmonicity: 1, modIndexBase: 30, modIndexPeak: 120, modDecay: 0.6 };
@@ -211,13 +214,14 @@ function makeFmVoice(p: VoiceParams): Voice {
   // Slight tone shaping based on preset (a soft lowpass for piano warmth)
   const tone = ctx.createBiquadFilter();
   tone.type = "lowpass";
-  tone.frequency.value = preset === "rhodes" ? 5500 : preset === "piano" ? 4500 : 7500;
+  tone.frequency.value = preset === "rhodes" ? 5500 : preset === "piano" ? 4500 : preset === "glassPad" ? 8000 : 7500;
   tone.Q.value = 0.4;
   amp.connect(tone);
   tone.connect(destination);
 
   return assembleVoice({
-    ctx, adsr, amp, peak: velocity,
+    // The glass ratio's sidebands add ~6 dB over the other FM presets.
+    ctx, adsr, amp, peak: preset === "glassPad" ? velocity * 0.5 : velocity,
     sources: [carrier, modulator],
     nodes: [amp, tone, modGain],
     onStart(at) {
@@ -233,6 +237,23 @@ function makeFmVoice(p: VoiceParams): Voice {
 }
 
 // ---------- Subtractive ----------
+
+const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>();
+
+/** Two seconds of seeded white noise per context, shared by every voice. */
+function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
+  let buf = noiseBuffers.get(ctx);
+  if (buf) return buf;
+  buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let x = 0x9e3779b9;
+  for (let i = 0; i < d.length; i++) {
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    d[i] = ((x >>> 0) / 4294967296) * 2 - 1;
+  }
+  noiseBuffers.set(ctx, buf);
+  return buf;
+}
 function makeSubtractiveVoice(p: VoiceParams): Voice {
   const { ctx, destination, preset, timbre, adsr, freq, velocity } = p;
 
@@ -246,6 +267,24 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
           { type: "sawtooth", detuneCents: 0,   gain: 0.4 },
           { type: "sawtooth", detuneCents: +10, gain: 0.4 },
           { type: "sawtooth", detuneCents: -1200 + 7, gain: 0.2 },
+        ];
+      case "warmPad":
+        return [
+          { type: "sawtooth", detuneCents: -12, gain: 0.35 },
+          { type: "sawtooth", detuneCents: +12, gain: 0.35 },
+          { type: "sine",     detuneCents: -1200, gain: 0.45 },
+        ];
+      case "sweepPad":
+        return [
+          { type: "sawtooth", detuneCents: -6, gain: 0.4 },
+          { type: "sawtooth", detuneCents: +6, gain: 0.4 },
+          { type: "square",   detuneCents: -1200, gain: 0.2 },
+        ];
+      case "airPad":
+        return [
+          { type: "triangle", detuneCents: -5, gain: 0.5 },
+          { type: "triangle", detuneCents: +5, gain: 0.5 },
+          { type: "sine",     detuneCents: +1200, gain: 0.15 },
         ];
       case "organ":
         // Drawbar harmonics: 16', 8', 4', 2 2/3'
@@ -274,6 +313,12 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
       case "organ":
         // Timbre = drawbar mix (handled below by re-balancing harmonics).
         return 6000;
+      case "warmPad":
+        return 600 + timbre * 3400;
+      case "sweepPad":
+        return 900;
+      case "airPad":
+        return 5000;
       case "juno":
       default:
         return 250 + Math.pow(timbre, 2) * 7500;
@@ -300,7 +345,7 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.frequency.value = cutoff;
-  filter.Q.value = preset === "juno" ? 1.2 : 0.6;
+  filter.Q.value = preset === "juno" ? 1.2 : preset === "sweepPad" ? 5 : 0.6;
   sources.forEach((s) => s.g.connect(filter));
 
   const amp = ctx.createGain();
@@ -321,10 +366,50 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
     sources.forEach((s) => lfoGain!.connect(s.o.detune));
   }
 
+  // Sweep Pad: a slow LFO opens and closes the resonant filter.
+  let sweep: OscillatorNode | null = null;
+  let sweepGain: GainNode | null = null;
+  if (preset === "sweepPad") {
+    sweep = ctx.createOscillator();
+    sweep.frequency.value = 0.12 + timbre * 0.3;
+    sweepGain = ctx.createGain();
+    sweepGain.gain.value = 300 + timbre * 1800;
+    sweep.connect(sweepGain).connect(filter.frequency);
+  }
+
+  // Air Pad: breath noise, band-passed a couple of octaves above the note.
+  let noise: AudioBufferSourceNode | null = null;
+  let noiseNodes: AudioNode[] = [];
+  if (preset === "airPad") {
+    noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    noise.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = Math.min(9000, freq * 4);
+    band.Q.value = 0.9;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.15 + timbre * 0.6;
+    noise.connect(band).connect(noiseGain).connect(filter);
+    noiseNodes = [band, noiseGain];
+  }
+
+  const extraSources: AudioScheduledSourceNode[] = [];
+  for (const n of [lfo, sweep, noise]) if (n) extraSources.push(n);
+  const extraNodes: AudioNode[] = [...noiseNodes];
+  for (const n of [lfoGain, sweepGain]) if (n) extraNodes.push(n);
+
   return assembleVoice({
     ctx, adsr, amp, peak: velocity * 0.7,
-    sources: [...sources.map((s) => s.o), ...(lfo ? [lfo] : [])],
-    nodes: [...sources.map((s) => s.g), filter, amp, ...(lfoGain ? [lfoGain] : [])],
+    sources: [...sources.map((s) => s.o), ...extraSources],
+    nodes: [...sources.map((s) => s.g), filter, amp, ...extraNodes],
+    onStart(at) {
+      if (preset !== "warmPad") return;
+      // The filter opens as the note swells in.
+      const f = filter.frequency;
+      f.setValueAtTime(cutoff * 0.3, at);
+      f.exponentialRampToValueAtTime(cutoff, at + Math.max(0.05, adsr.attack + adsr.decay));
+    },
   });
 }
 
