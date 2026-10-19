@@ -54,16 +54,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "react-router-dom";
-import { ensureAudio, playProgression, stopProgression, updateScheduledProgression, updateScheduledBpm, ScheduledChord } from "@/lib/music/audio";
-import { transposeChord } from "@/lib/music/chords";
-import { computeEffectiveOffsets } from "@/lib/music/keyChange";
+import { ensureAudio, startTransport, updateTransport, setTransportBpm, stopTransport } from "@/lib/music/audio";
+import { buildArrangement, type ChordRef } from "@/lib/music/arrangement";
 import { getAudioContext } from "@/lib/audio/context";
 import { toast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/hooks/use-theme";
-import { useMetronomeStore } from "@/store/metronome";
-import { startMetronome, stopMetronome, updateMetronome } from "@/lib/audio/metronome";
 import { SoundPanel } from "@/components/sound/SoundPanel";
 import { useSoundStore, SOUND_PRESETS, type SoundPreset } from "@/store/sound";
 import { useAppTintStore } from "@/store/appTint";
@@ -132,104 +129,6 @@ const TABLET_PHOTO_SLOTS = [
   { left: "calc(30% + 220px)", top: -58, rotate: 5 },
   { left: "calc(30% + 340px)", top: -47, rotate: -3 },
 ] as const;
-
-type PlaybackMeta = {
-  patternId: string;
-  patternChordId: string;
-  mirrorId?: string;
-};
-
-type BuiltPlayback = {
-  events: ScheduledChord[];
-  meta: PlaybackMeta[];
-  loopBeats: number;
-  /** True when no rotation was applied because the anchor chord no longer exists. */
-  startAnchorStale: boolean;
-};
-
-function buildPlayback(
-  sections: ReturnType<typeof useSongStore.getState>["sections"],
-  progression: ReturnType<typeof useSongStore.getState>["progression"],
-  startFromChordId: string | null,
-): BuiltPlayback | null {
-  let cursorBeat = 0;
-  const events: ScheduledChord[] = [];
-  const meta: PlaybackMeta[] = [];
-  const effectiveOffsets = computeEffectiveOffsets(sections);
-  for (let sIdx = 0; sIdx < sections.length; sIdx++) {
-    const sec = sections[sIdx];
-    const sectionOffset = effectiveOffsets[sIdx] ?? 0;
-    const sectionPatterns = progression.filter(
-      (p) => (p.sectionId ?? p.id) === sec.id,
-    );
-    if (sectionPatterns.length === 0) continue;
-    const patternOffset = new Map<string, number>();
-    let accBeats = 0;
-    for (const p of sectionPatterns) {
-      patternOffset.set(p.id, accBeats);
-      accBeats += patternPlayBeats(p);
-    }
-    if (sec.chords.length > 0) {
-      for (const sc of sec.chords) {
-        const pp = sc.progressionPlacement;
-        if (!pp) continue;
-        const localOffset = patternOffset.get(pp.patternId);
-        if (localOffset == null) continue;
-        events.push({
-          chord: sectionOffset ? transposeChord(sc.chord, sectionOffset) : sc.chord,
-          startBeat: cursorBeat + localOffset + pp.startBeat,
-          lengthBeats: pp.lengthBeats,
-          sectionId: sec.id,
-        });
-        meta.push({
-          patternId: pp.patternId,
-          patternChordId: sc.id,
-          mirrorId: sc.lyricsPlacement ? sc.id : undefined,
-        });
-      }
-    } else {
-      // sec.chords not yet populated (e.g. duplicated section) — fall back to
-      // pattern.chords so the playhead advances across all sections.
-      for (const p of sectionPatterns) {
-        const localOffset = patternOffset.get(p.id) ?? 0;
-        for (const pc of [...p.chords].sort((a, b) => a.startBeat - b.startBeat)) {
-          events.push({ chord: sectionOffset ? transposeChord(pc.chord, sectionOffset) : pc.chord, startBeat: cursorBeat + localOffset + pc.startBeat, lengthBeats: pc.lengthBeats, sectionId: sec.id });
-          meta.push({ patternId: p.id, patternChordId: pc.id, mirrorId: pc.mirrorId });
-        }
-      }
-    }
-    cursorBeat += accBeats;
-  }
-  if (!events.length) return null;
-
-  // sec.chords is ordered by lyrics position (line → slot), which can place a chord
-  // from a later block before the last chord of an earlier block when lyric lines
-  // straddle block boundaries. Sort by startBeat so the lookahead scheduler always
-  // sees monotonically increasing beat times.
-  const sortOrder = events.map((_, i) => i).sort((a, b) => events[a].startBeat - events[b].startBeat);
-  const sortedEvents = sortOrder.map((i) => events[i]);
-  const sortedMeta = sortOrder.map((i) => meta[i]);
-
-  let outEvents = sortedEvents;
-  let outMeta = sortedMeta;
-  let startAnchorStale = false;
-  if (startFromChordId) {
-    const i = sortedMeta.findIndex((m) => m.patternChordId === startFromChordId);
-    if (i < 0) {
-      startAnchorStale = true;
-    } else if (i > 0) {
-      const offset = sortedEvents[i].startBeat;
-      outEvents = sortedEvents.map((_, k) => {
-        const src = sortedEvents[(i + k) % sortedEvents.length];
-        const rawStart = src.startBeat - offset;
-        const wrapped = rawStart < 0 ? rawStart + cursorBeat : rawStart;
-        return { chord: src.chord, startBeat: wrapped, lengthBeats: src.lengthBeats, sectionId: src.sectionId };
-      });
-      outMeta = outEvents.map((_, k) => sortedMeta[(i + k) % sortedMeta.length]);
-    }
-  }
-  return { events: outEvents, meta: outMeta, loopBeats: cursorBeat, startAnchorStale };
-}
 
 const GALLERY_URLS = [1, 2, 3, 4, 5].map(
   (n) => `https://www.gstatic.com/webp/gallery/${n}.webp`,
@@ -537,14 +436,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const [stemsProgress, setStemsProgress] = useState<StemExportProgress | null>(null);
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
-  const metronome = useMetronomeStore();
   const appTint = useAppTintStore();
   const appBg = useAppBackgroundStore();
   const onboarding = useOnboardingStore();
   const location = useLocation();
   const stopRequestedRef = useRef(false);
-  const playMetaRef = useRef<PlaybackMeta[]>([]);
-  const startFromChordIdAtPlayRef = useRef<string | null>(null);
+  const playMetaRef = useRef<ChordRef[]>([]);
   const loopBeatsRef = useRef<number | null>(null);
   const tapTimesRef = useRef<number[]>([]);
   const tapResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -607,23 +504,12 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     };
   }, [isDesktop]);
 
-  // Stop the metronome only on unmount. Don't return a cleanup keyed to
-  // [isPlaying] — React would run it on the false→true transition AFTER
-  // handlePlay scheduled the first tick, killing the metronome moments
-  // before its first downbeat. handleStop drives the stop side directly.
-  useEffect(() => () => stopMetronome(), []);
-  useEffect(() => {
-    if (!isPlaying) stopMetronome();
-  }, [isPlaying]);
-
-  useEffect(() => {
-    updateMetronome({ bpm: meta.bpm, beatsPerBar: meta.beatsPerBar, volume: metronome.volume });
-  }, [meta.bpm, meta.beatsPerBar, metronome.volume]);
+  useEffect(() => () => stopTransport(), []);
 
   // Apply tempo changes to running playback without stopping it.
   useEffect(() => {
     if (!isPlaying) return;
-    updateScheduledBpm(meta.bpm);
+    setTransportBpm(meta.bpm);
     if (loopBeatsRef.current != null) {
       updateEngineBpm(meta.bpm, loopBeatsRef.current);
     }
@@ -644,7 +530,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     // Walk the SSOT (section.chords) directly instead of the legacy
     // pattern.chords mirror. Orphaned placements / empty sections are
     // tolerated so Play always plays whatever chords actually exist.
-    const built = buildPlayback(sections, progression, startFromChordId);
+    const arr = buildArrangement(sections, progression);
+    const built = arr && arr.chords.length > 0 ? arr : null;
     const beatSec = 60 / meta.bpm;
     const audioEndBeats = useRecordingsStore.getState().tracks.reduce(
       (m, t) => t.clips.reduce((mm, c) => Math.max(mm, clipEndSec(c) + (t.offsetMs ?? 0) / 1000), m),
@@ -659,12 +546,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       });
       return;
     }
-    if (built?.startAnchorStale) {
+    const anchorIdx = built && startFromChordId ? built.refs.findIndex((r) => r.patternChordId === startFromChordId) : -1;
+    if (startFromChordId && anchorIdx < 0) {
       usePlaybackStore.getState().setStartFromChord(null, null);
     }
-    const anchorAtPlay = built && !built.startAnchorStale ? startFromChordId : null;
-    startFromChordIdAtPlayRef.current = anchorAtPlay;
-    playMetaRef.current = built?.meta ?? [];
+    playMetaRef.current = built?.refs ?? [];
 
     // The recordings loop must hold every clip: whole repeats of the chord loop
     // (so chords stay aligned) or, with no chords, whole bars. An overdub plays
@@ -676,72 +562,52 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         ? progBeats * Math.max(1, Math.ceil(audioEndBeats / progBeats - 1e-9))
         : Math.max(1, Math.ceil(audioEndBeats / meta.beatsPerBar - 1e-9)) * meta.beatsPerBar;
     loopBeatsRef.current = engineLoopBeats;
+    const transportLoop = built ? built.loopBeats : engineLoopBeats;
+    // The overdub's playhead, or the start-from chord.
+    const fromBeat = fromSec != null
+      ? (fromSec / beatSec) % transportLoop
+      : anchorIdx >= 0 ? built!.chords[anchorIdx].startBeat : 0;
 
     setIsPlaying(true);
     setPlayingStore(true);
     // Seed the playhead to the first chord immediately so the visual indicator
     // appears even if the first draw callback is delayed.
-    setCurrent(built?.meta[0] ?? null);
-    // Anchor metronome and progression to the SAME AudioContext time so the
-    // first downbeat tick lines up with the first chord onset.
+    setCurrent(built?.refs[Math.max(0, anchorIdx)] ?? null);
+    // Chords, click and recordings all start at the SAME AudioContext time.
     // requestedStartAt comes from count-in (pre-calculated beat-1 AC time);
     // fall back to 40 ms from now for a regular press-play.
     const startAt = requestedStartAt ?? getAudioContext().currentTime + 0.04;
-    const attack = Math.max(0, useSoundStore.getState().adsr.attack);
-    if (metronome.enabled) {
-      startMetronome({
-        bpm: meta.bpm,
-        beatsPerBar: meta.beatsPerBar,
-        volume: metronome.volume,
-        startAt: startAt + attack,
-      });
-    }
-    if (built) {
-      await playProgression(built.events, meta.bpm, {
-        onChordStart: (idx) => {
-          const m = playMetaRef.current;
-          setCurrent(m[idx % m.length] ?? null);
-        },
-        loopBeats: built.loopBeats,
-        startAt,
-        fromBeat: fromSec != null ? (fromSec / beatSec) % built.loopBeats : 0,
-      });
-    }
-    // Start the recordings engine in lockstep with the progression, at the same
-    // musical position: the overdub's playhead, or the start-from chord. The
-    // built events are rotated to put that chord at beat 0, so its position
-    // comes from an unrotated build.
-    let playheadOffsetSec = fromSec ?? 0;
-    if (anchorAtPlay) {
-      const plain = buildPlayback(sections, progression, null);
-      const idx = plain ? plain.meta.findIndex((m) => m.patternChordId === anchorAtPlay) : -1;
-      if (plain && idx >= 0) playheadOffsetSec = plain.events[idx].startBeat * beatSec;
-    }
+    await startTransport({
+      arrangement: built,
+      loopBeats: transportLoop,
+      bpm: meta.bpm,
+      startAt,
+      fromBeat,
+      onChordStart: (idx) => setCurrent(playMetaRef.current[idx] ?? null),
+    });
     startRecordingsEngine({
       bpm: meta.bpm,
       loopBeats: engineLoopBeats,
       startAtCtxTime: startAt,
-      playheadOffsetSec,
+      playheadOffsetSec: fromSec ?? fromBeat * beatSec,
     });
   };
 
   // Live re-feed: while the loop is running, mirror SSOT edits into the
-  // scheduler so quality / length / add / remove edits ahead of the playhead
-  // take effect this iteration, and behind-the-playhead edits land on the
-  // next loop wrap.
+  // transport. Edits ahead of the playhead are heard straight away; the
+  // transport ignores edits that don't change what plays (e.g. lyrics).
   useEffect(() => {
     if (!isPlaying) return;
-    const built = buildPlayback(sections, progression, startFromChordIdAtPlayRef.current);
-    if (!built) return;
-    playMetaRef.current = built.meta;
-    updateScheduledProgression(built.events, built.loopBeats);
+    const arr = buildArrangement(sections, progression);
+    if (!arr || arr.chords.length === 0) return;
+    playMetaRef.current = arr.refs;
+    updateTransport(arr, arr.loopBeats);
   }, [sections, progression, isPlaying]);
 
   const handleStop = () => {
     stopRequestedRef.current = true;
-    stopProgression();
+    stopTransport();
     stopRecordingsEngine();
-    stopMetronome();
     setIsPlaying(false);
     setPlayingStore(false);
     setCurrent(null);

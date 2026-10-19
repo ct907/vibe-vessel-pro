@@ -1,31 +1,16 @@
-// Lightweight Web Audio metronome with lookahead scheduling.
+// Metronome click sound. Playback clicks are scheduled by the transport in
+// src/lib/music/audio.ts, on the same grid as the chords; this module only
+// makes the click, the count-in and the settings preview.
 //
 // - Beat 1 of every bar is accented (pitched +2 semitones above the base tone).
 // - Uses the shared AudioContext from context.ts so we share the audio device.
-// - Lookahead loop schedules clicks ~100 ms ahead every 25 ms. This stays
-//   stable through tab throttling / GC pauses better than setInterval per beat.
 
 import { getAudioContext } from "./context";
 
-interface Opts {
-  bpm: number;
-  beatsPerBar: number;
-  /** 0..1 */
-  volume: number;
-  /** Optional: start the first tick at this AudioContext time (sec). */
-  startAt?: number;
-}
-
-let timerId: number | null = null;
-let nextNoteTime = 0;
-let beatInBar = 0;
-let current: Opts | null = null;
-const LOOKAHEAD_MS = 25;
-const SCHEDULE_AHEAD_S = 3.0;
 const BASE_HZ = 880;
 const ACCENT_HZ = BASE_HZ * Math.pow(2, 2 / 12); // +2 semitones
 
-function scheduleClick(at: number, accent: boolean, volume: number) {
+export function scheduleClick(at: number, accent: boolean, volume: number): OscillatorNode {
   const ctx = getAudioContext();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -39,29 +24,8 @@ function scheduleClick(at: number, accent: boolean, volume: number) {
   gain.connect(ctx.destination);
   osc.start(at);
   osc.stop(at + 0.08);
-}
-
-function tick() {
-  if (!current) return;
-  const ctx = getAudioContext();
-  const beatSec = 60 / Math.max(20, current.bpm);
-  while (nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_S) {
-    const accent = beatInBar === 0;
-    scheduleClick(nextNoteTime, accent, current.volume);
-    nextNoteTime += beatSec;
-    beatInBar = (beatInBar + 1) % Math.max(1, current.beatsPerBar);
-  }
-  timerId = window.setTimeout(tick, LOOKAHEAD_MS);
-}
-
-export function startMetronome(opts: Opts) {
-  stopMetronome();
-  const ctx = getAudioContext();
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  current = { ...opts };
-  nextNoteTime = opts.startAt != null ? opts.startAt : ctx.currentTime + 0.05;
-  beatInBar = 0;
-  tick();
+  osc.onended = () => gain.disconnect();
+  return osc;
 }
 
 /** One bar of clicks (downbeat accented) that ends exactly at `endAt` — a count-in. */
@@ -70,19 +34,6 @@ export function scheduleCountIn(opts: { bpm: number; beatsPerBar: number; volume
   for (let i = 0; i < opts.beatsPerBar; i++) {
     scheduleClick(opts.endAt - (opts.beatsPerBar - i) * beatSec, i === 0, opts.volume);
   }
-}
-
-export function updateMetronome(opts: Partial<Opts>) {
-  if (!current) return;
-  current = { ...current, ...opts };
-}
-
-export function stopMetronome() {
-  if (timerId != null) {
-    clearTimeout(timerId);
-    timerId = null;
-  }
-  current = null;
 }
 
 export function previewClick(volume: number) {
