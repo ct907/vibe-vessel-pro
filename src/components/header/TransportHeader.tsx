@@ -501,7 +501,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   } = useSongStore();
   const setPlayingStore = usePlaybackStore((s) => s.setIsPlaying);
   const setCurrent = usePlaybackStore((s) => s.setCurrent);
-  const { preset, setPreset } = useSoundStore();
+  const preset = useSoundStore((s) => s.preset);
+  const setPreset = useSoundStore((s) => s.setPreset);
   const recUndo = useRecordingsStore((s) => s.undo);
   const recRedo = useRecordingsStore((s) => s.redo);
   const recCanUndo = useRecordingsStore((s) => s.canUndo);

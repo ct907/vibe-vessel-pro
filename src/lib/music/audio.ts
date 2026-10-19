@@ -1,12 +1,10 @@
 // Phase 1.6 — Web Audio synth engine + lookahead scheduler.
 //
-// Synthesis and scheduling are 100% raw Web Audio. Tone.js is retained only
-// for ensureAudio() — it owns the autoplay-policy unlock (Tone.start()) and
-// donates its rawContext so any future Tone-using code shares our AC.
+// Synthesis and scheduling are 100% raw Web Audio on the shared context from
+// src/lib/audio/context.ts.
 //
 // Polyphony is capped at MAX_VOICES; the quietest voice at a new note's start is stolen.
 
-import * as Tone from "tone";
 import { ChordSymbol, chordToMidi, midiToFreq } from "./chords";
 import {
   useSoundStore,
@@ -26,22 +24,16 @@ import { makeVoice, type Voice } from "@/lib/audio/voices";
 let started = false;
 
 export async function ensureAudio(): Promise<void> {
+  // Resume synchronously inside the caller's gesture; awaiting anything first
+  // loses the autoplay unlock on iOS.
+  const ac = getAudioContext();
   if (!started) {
-    const Ctor: typeof AudioContext =
-      (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-    const preCtx = new Ctor({ latencyHint: "playback" });
-    Tone.setContext(new Tone.Context(preCtx));
-    await Tone.start(); // resumes the underlying AudioContext on user gesture
-    // Adopt Tone's raw AudioContext so scheduled times line up with Tone.now().
-    const raw = Tone.getContext().rawContext as unknown as AudioContext;
-    getAudioContext(raw);
     getMasterChain();
     started = true;
     applySettings(useSoundStore.getState());
   }
-  // Make sure the WebAudio context is also running (Tone shares it).
-  const ac = getAudioContext();
-  if (ac.state === "suspended") {
+  // Safari also reports "interrupted" after a call, Siri or an app switch.
+  if (ac.state !== "running") {
     try { await ac.resume(); } catch { /* noop */ }
   }
 }
@@ -83,11 +75,12 @@ function applyFX(fx: FX, bpm: number) {
   c.chorus.setRate(fx.chorusRate);
   c.chorus.setDepth(fx.chorusDepth);
   // Reverb decay (rebuild IR only when changed)
-  if ((c as any)._lastDecay !== fx.reverbDecay) {
-    (c as any)._lastDecay = fx.reverbDecay;
+  if (lastReverbDecay !== fx.reverbDecay) {
+    lastReverbDecay = fx.reverbDecay;
     c.setReverbDecay(fx.reverbDecay);
   }
 }
+let lastReverbDecay: number | null = null;
 
 function applySettings(s: SoundSettings) {
   if (!started) return;

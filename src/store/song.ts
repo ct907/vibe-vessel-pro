@@ -4271,7 +4271,7 @@ export function endInteraction() {
 }
 
 export function startAutosave() {
-  return useSongStore.subscribe((state) => {
+  const unsubSong = useSongStore.subscribe((state) => {
     if (interactionDepth > 0) {
       pendingSaveDuringInteraction = true;
       return;
@@ -4281,6 +4281,18 @@ export function startAutosave() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
     } catch { notifyStorageQuota(); }
   });
+  // Sound settings are saved inside the song but live in their own store, and
+  // their sliders fire on every tick.
+  let soundTimer: ReturnType<typeof setTimeout> | undefined;
+  const unsubSound = useSoundStore.subscribe(() => {
+    clearTimeout(soundTimer);
+    soundTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(useSongStore.getState().toJSON()));
+      } catch { notifyStorageQuota(); }
+    }, 400);
+  });
+  return () => { unsubSong(); unsubSound(); clearTimeout(soundTimer); };
 }
 
 /**
