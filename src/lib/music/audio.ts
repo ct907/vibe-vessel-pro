@@ -12,7 +12,10 @@ import { useMetronomeStore } from "@/store/metronome";
 import { getAudioContext, getMasterChain } from "@/lib/audio/context";
 import { makeBassVoice, makeVoice, type Voice } from "@/lib/audio/voices";
 import { scheduleClick } from "@/lib/audio/metronome";
+import { chokeHit, playHit, warmKit, type DrumKit, type Hit } from "@/lib/audio/drums";
+import { DRUM_LANES } from "./grooves";
 import {
+  drumHits,
   renderTrack,
   windowEvents,
   type Arrangement,
@@ -212,6 +215,21 @@ export async function playChord(chord: ChordSymbol, durationSec = 1.2, octave = 
 }
 
 /** Play an explicit set of MIDI notes (used by the Chord Explorer's edited voicings). */
+/** One bar of the current groove on the current kit, for the Sound panel. */
+export async function previewDrums(): Promise<void> {
+  await ensureAudio();
+  const { drums } = useSoundStore.getState();
+  const { beatsPerBar, beatUnit } = useSongStore.getState().meta;
+  const chain = getMasterChain();
+  warmKit(chain.ctx, drums.kit, DRUM_LANES);
+  const span = { sectionId: "", startBeat: 0, lengthBeats: beatsPerBar * 2, blocks: [{ startBeat: 0, lengthBeats: beatsPerBar * 2, beatsPerBar }] };
+  const beatSec = 60 / useSongStore.getState().meta.bpm;
+  const t0 = chain.ctx.currentTime + 0.05;
+  for (const n of drumHits(span, drums, { beatsPerBar, beatUnit })) {
+    playHit(chain.ctx, chain.drumBus, drums.kit, DRUM_LANES[n.midi], t0 + n.startBeat * beatSec, n.velocity);
+  }
+}
+
 /** A short line on the current bass sound, for the Sound panel. */
 export async function previewBass(): Promise<void> {
   await ensureAudio();
@@ -330,6 +348,7 @@ function createPlayer(owner: Owner) {
   let onChordStart: ((index: number) => void) | undefined;
   let onEnd: (() => void) | undefined;
   let ended = false;
+  let openHat: Hit | null = null;
 
   const now = () => getAudioContext().currentTime;
   const beatSec = () => 60 / bpm;
@@ -352,7 +371,17 @@ function createPlayer(owner: Owner) {
       scheduled.push({ startAbs: abs, endAbs: abs, startT: t, node: scheduleClick(t, n.midi === 1, m.volume) });
       return;
     }
-    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner, n.part);
+    if (n.part === "drums") {
+      const lane = DRUM_LANES[n.midi];
+      const chain = getMasterChain();
+      const hit = playHit(chain.ctx, chain.drumBus, n.sound as DrumKit, lane, t, n.velocity);
+      // A closed hat (or the next open one) cuts off a ringing open hat.
+      if ((lane === "hatClosed" || lane === "hatOpen") && openHat) chokeHit(openHat, t);
+      if (lane === "hatOpen") openHat = hit;
+      scheduled.push({ startAbs: abs, endAbs: abs + 0.5, startT: t, node: hit.source });
+      return;
+    }
+    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner, n.part === "bass" ? "bass" : "pad");
     scheduled.push({ startAbs: abs, endAbs: abs + n.lengthBeats, startT: t, voice });
   };
 
@@ -475,13 +504,14 @@ function sectionArpArmed(sectionId: string): boolean {
 }
 
 function renderSettings(octave = 4): RenderSettings {
-  const { arp, bass, mix } = useSoundStore.getState();
+  const { arp, bass, drums, mix } = useSoundStore.getState();
   const { beatsPerBar, beatUnit } = useSongStore.getState().meta;
   return {
     pad: (sectionId) => mix.pad.on
       ? { arp, armed: sectionId ? sectionArpArmed(sectionId) : true, octave, bassOn: mix.bass.on }
       : null,
     bass: () => (mix.bass.on ? bass : null),
+    drums: () => ({ settings: drums, on: mix.drums.on }),
     meter: { beatsPerBar, beatUnit },
     click: true,
   };
@@ -507,6 +537,8 @@ export interface TransportStart {
 export async function startTransport(o: TransportStart): Promise<void> {
   await ensureAudio();
   preview.stop();
+  const { drums, mix } = useSoundStore.getState();
+  if (mix.drums.on) warmKit(getAudioContext(), drums.kit, DRUM_LANES);
   transportArr = o.arrangement;
   transportLoop = o.loopBeats;
   transport.start({
@@ -539,11 +571,25 @@ export function stopTransport(): void {
 // after the notes already queued. Sliders apply to the next notes, so a drag
 // doesn't reschedule on every tick.
 useSoundStore.subscribe((s, prev) => {
+  if (started && s.mix.drums.on && (s.drums.kit !== prev.drums.kit || !prev.mix.drums.on)) {
+    warmKit(getAudioContext(), s.drums.kit, DRUM_LANES);
+  }
   const heardNow = s.arp !== prev.arp || s.preset !== prev.preset
     || s.bass.sound !== prev.bass.sound || s.bass.pattern !== prev.bass.pattern || s.bass.rate !== prev.bass.rate
+    || s.drums !== prev.drums
     || s.mix.pad.on !== prev.mix.pad.on || s.mix.bass.on !== prev.mix.bass.on || s.mix.drums.on !== prev.mix.drums.on;
-  if (heardNow) transport.update(renderTransport(), true);
+  if (heardNow) rerenderSoon();
 });
+
+// Sliders (Energy, Velocity) fire on every tick; reschedule at most every 80 ms.
+let rerenderTimer: number | null = null;
+function rerenderSoon() {
+  if (rerenderTimer != null) return;
+  rerenderTimer = window.setTimeout(() => {
+    rerenderTimer = null;
+    transport.update(renderTransport(), true);
+  }, 80);
+}
 useMetronomeStore.subscribe((s, prev) => {
   if (s.enabled !== prev.enabled) transport.update(renderTransport(), true);
 });

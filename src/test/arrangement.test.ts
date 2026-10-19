@@ -11,7 +11,7 @@ import {
   type PadSettings,
   type Track,
 } from "@/lib/music/arrangement";
-import { DEFAULT_ARP, DEFAULT_BASS, useSoundStore, type ArpSettings, type BassSettings } from "@/store/sound";
+import { DEFAULT_ARP, DEFAULT_BASS, DEFAULT_DRUMS, useSoundStore, type ArpSettings, type BassSettings } from "@/store/sound";
 import type { PatternBlock, Section } from "@/store/song";
 
 const c = (s: string) => parseChord(s)!;
@@ -76,7 +76,7 @@ describe("windowEvents", () => {
   const track: Track = renderTrack(
     { chords: [ev("C", 0, 4), ev("F", 4, 2), ev("G", 6, 2)], refs: [], sections: [], loopBeats: 8 },
     8,
-    { pad: () => pad({ pattern: "asc", repeat: "1/8" }), bass: () => null, meter: fourFour, click: false },
+    { pad: () => pad({ pattern: "asc", repeat: "1/8" }), bass: () => null, drums: () => ({ settings: DEFAULT_DRUMS, on: false }), meter: fourFour, click: false },
   );
   const collect = (cuts: number[], epoch = { abs: 0, local: 0 }, loop = true) => {
     const out: string[] = [];

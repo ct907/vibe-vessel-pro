@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import type { DrumKit } from "@/lib/audio/drums";
+import type { DrumGenre, DrumLane, LanePattern } from "@/lib/music/grooves";
 
 /**
  * Phase 1.6 — Web Audio synth engine presets.
@@ -115,7 +117,7 @@ export interface PartMix {
 }
 
 export type BassSound = "sub" | "analog" | "electric" | "acid";
-export type BassPattern = "hold" | "pulse" | "rootFifth" | "octave" | "approach";
+export type BassPattern = "hold" | "pulse" | "rootFifth" | "octave" | "approach" | "followKick";
 
 export interface BassSettings {
   sound: BassSound;
@@ -139,9 +141,35 @@ export const BASS_PATTERNS: { value: BassPattern; label: string }[] = [
   { value: "rootFifth", label: "Root – fifth" },
   { value: "octave",    label: "Octaves" },
   { value: "approach",  label: "Walk into next chord" },
+  { value: "followKick", label: "Follow the kick" },
 ];
 
 export const DEFAULT_BASS: BassSettings = { sound: "electric", pattern: "pulse", rate: "1/4", tone: 0.5 };
+
+export type LaneShape = "flat" | "build" | "fade";
+
+/** A drum lane's energy relative to the part: an offset, and a rise or fall across the section. */
+export interface LaneEnergy {
+  /** -1..1 */
+  offset: number;
+  shape: LaneShape;
+}
+
+export interface DrumSettings {
+  kit: DrumKit;
+  genre: DrumGenre;
+  /** 0..1 macro: sets Density and Velocity together. */
+  energy: number;
+  /** Fine-tune: 1..4 = notes as close as a half, quarter, eighth or sixteenth. Unset follows Energy. */
+  density?: number;
+  /** Fine-tune: 0..1 hit strength. Unset follows Energy. */
+  velocity?: number;
+  lanes?: Partial<Record<DrumLane, LaneEnergy>>;
+  /** A groove edited in the step editor; replaces the genre's lanes. */
+  custom?: LanePattern;
+}
+
+export const DEFAULT_DRUMS: DrumSettings = { kit: "acoustic", genre: "popRock", energy: 0.5 };
 
 export const DEFAULT_MIX: Record<PartId, PartMix> = {
   pad: { on: true, volume: 0 },
@@ -160,6 +188,7 @@ export interface SoundSettings {
   fx: FX;
   arp: ArpSettings;
   bass: BassSettings;
+  drums: DrumSettings;
   mix: Record<PartId, PartMix>;
 }
 
@@ -192,6 +221,7 @@ export const DEFAULT_SOUND: SoundSettings = {
   },
   arp: { ...DEFAULT_ARP },
   bass: { ...DEFAULT_BASS },
+  drums: { ...DEFAULT_DRUMS },
   mix: structuredClone(DEFAULT_MIX),
 };
 
@@ -207,6 +237,7 @@ interface SoundState extends SoundSettings {
   setHighLatencyMode: (b: boolean) => void;
   setArp: (patch: Partial<ArpSettings>) => void;
   setBass: (patch: Partial<BassSettings>) => void;
+  setDrums: (patch: Partial<DrumSettings>) => void;
   setMix: (part: PartId, patch: Partial<PartMix>) => void;
   reset: () => void;
   loadFrom: (s: Partial<SoundSettings> | undefined) => void;
@@ -230,6 +261,7 @@ export const useSoundStore = create<SoundState>((set, get) => ({
   setHighLatencyMode: (b) => set({ highLatencyMode: b }),
   setArp: (patch) => set((s) => ({ arp: { ...s.arp, ...patch } })),
   setBass: (patch) => set((s) => ({ bass: { ...s.bass, ...patch } })),
+  setDrums: (patch) => set((s) => ({ drums: { ...s.drums, ...patch } })),
   setMix: (part, patch) => set((s) => ({ mix: { ...s.mix, [part]: { ...s.mix[part], ...patch } } })),
   reset: () => set({ ...DEFAULT_SOUND, mix: structuredClone(DEFAULT_MIX) }),
   loadFrom: (data) => {
@@ -249,12 +281,13 @@ export const useSoundStore = create<SoundState>((set, get) => ({
       adsr: { ...PRESET_DEFAULTS[preset], ...(data.adsr ?? {}) },
       eq: { ...DEFAULT_SOUND.eq, ...(data.eq ?? {}) },
       fx: { ...DEFAULT_SOUND.fx, ...(data.fx ?? {}) },
+      drums: { ...DEFAULT_DRUMS, ...(data.drums ?? {}) },
       ...migrateBass(data),
     });
   },
   toJSON: () => {
-    const { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, mix } = get();
-    return { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, mix };
+    const { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, drums, mix } = get();
+    return { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, drums, mix };
   },
 }));
 

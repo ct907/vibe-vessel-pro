@@ -6,7 +6,8 @@
 import { chordToMidi, rootToPc, transposeChord, type ChordSymbol } from "./chords";
 import { computeEffectiveOffsets } from "./keyChange";
 import { patternPlayBeats, type PatternBlock, type Section } from "@/store/song";
-import type { ArpRepeat, ArpSettings, BassRepeat, BassSettings } from "@/store/sound";
+import type { ArpRepeat, ArpSettings, BassRepeat, BassSettings, DrumSettings } from "@/store/sound";
+import { DRUM_LANES, grooveLanes, stepsPerBar, type DrumLane } from "./grooves";
 
 export interface ChordEvent {
   chord: ChordSymbol;
@@ -51,14 +52,17 @@ export interface Meter {
   beatUnit: number;
 }
 
-export type PlayPart = "pad" | "bass" | "click";
+export type PlayPart = "pad" | "bass" | "drums" | "click";
 
 export interface PlayNote {
   part: PlayPart;
+  /** MIDI note; for drums, the lane's index in DRUM_LANES; for the click, 1 = accent. */
   midi: number;
   startBeat: number;
   lengthBeats: number;
   velocity: number;
+  /** Drums: the kit. */
+  sound?: string;
 }
 
 /** A rendered loop: every note, sorted by start, plus where each chord begins. */
@@ -246,11 +250,23 @@ export function bassMidi(name: string): number {
   return 33 + ((rootToPc(name) - 9 + 12) % 12);
 }
 
-/** One chord's bass line. `next` is the chord after it, for the walk-in. */
-export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: BassSettings): PlayNote[] {
+/**
+ * One chord's bass line. `next` is the chord after it, for the walk-in;
+ * `kicks` are the drum groove's kick beats, for Follow the kick.
+ */
+export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: BassSettings, kicks: number[] = []): PlayNote[] {
   const root = bassMidi(ev.chord.bass ?? ev.chord.root);
   const { startBeat: start, lengthBeats: len } = ev;
   if (bass.pattern === "hold") return [{ part: "bass", midi: root, startBeat: start, lengthBeats: len, velocity: 0.95 }];
+  if (bass.pattern === "followKick") {
+    const end = start + len;
+    const at = kicks.filter((b) => b > start + 1e-6 && b < end - 1e-6);
+    // Always land on the chord change, kick or not.
+    at.unshift(start);
+    return at.map((b, i) => ({
+      part: "bass", midi: root, startBeat: b, lengthBeats: (at[i + 1] ?? end) - b, velocity: i === 0 ? 0.95 : 0.85,
+    }));
+  }
   const fifth = root + 7 <= 47 ? root + 7 : root - 5;
   const target = next ? bassMidi(next.chord.bass ?? next.chord.root) : root;
   const step = BASS_STEP_BEATS[bass.rate];
@@ -267,6 +283,79 @@ export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: Ba
   });
   return out;
 }
+
+// ---- Drums ----
+
+/** Energy → how close together the notes are: 1 = half notes … 4 = sixteenths (from 75%). */
+export function drumDensity(d: DrumSettings): number {
+  return d.density ?? 1 + Math.min(3, Math.floor(Math.max(0, d.energy) * 4));
+}
+
+/** Energy → how hard the hits are, 0..1. */
+export function drumVelocity(d: DrumSettings): number {
+  return d.velocity ?? d.energy;
+}
+
+const LEVEL_VELOCITY = [0, 1, 0.85, 0.7, 0.5];
+
+/** -0.5 → +0.5 across the section for a build (one density step each way), the reverse for a fade. */
+function shapeAt(shape: string | undefined, t: number): number {
+  if (shape === "build") return t - 0.5;
+  if (shape === "fade") return 0.5 - t;
+  return 0;
+}
+
+/** Every drum hit in a section. Bars restart at each block; a cropped block stops early. */
+export function drumHits(span: SectionSpan, d: DrumSettings, meter: Meter): PlayNote[] {
+  const out: PlayNote[] = [];
+  const stepBeats = meter.beatUnit / 16;
+  const density = drumDensity(d);
+  const velocity = drumVelocity(d);
+  const groove = grooveLanes(d.genre, meter.beatsPerBar, meter.beatUnit);
+  const lanes = d.custom ?? groove.lanes;
+  const swing = groove.swing;
+  for (const block of span.blocks) {
+    const perBar = stepsPerBar(block.beatsPerBar, meter.beatUnit);
+    const blockEnd = block.startBeat + block.lengthBeats;
+    for (const lane of DRUM_LANES) {
+      const pattern = lanes[lane];
+      if (!pattern) continue;
+      const laneIdx = DRUM_LANES.indexOf(lane);
+      const energy = d.lanes?.[lane];
+      for (let step = 0; ; step++) {
+        const beat = block.startBeat + step * stepBeats;
+        if (beat >= blockEnd - 1e-6) break;
+        const level = Number(pattern[step % pattern.length]) || 0;
+        if (!level) continue;
+        const t = span.lengthBeats > 0 ? (beat - span.startBeat) / span.lengthBeats : 0;
+        const shift = (energy?.offset ?? 0) + shapeAt(energy?.shape, t);
+        const laneDensity = Math.max(0, Math.min(4, density + Math.round(shift * 2)));
+        if (level > laneDensity) continue;
+        const laneVelocity = Math.max(0, Math.min(1, velocity + shift * 0.4));
+        const inBar = step % perBar;
+        let at = beat;
+        if (swing?.unit === 16 && inBar % 2 === 1) at += swing.amount * stepBeats;
+        if (swing?.unit === 8 && inBar % 4 === 2) at += swing.amount * 2 * stepBeats;
+        const human = 1 + (rand(Math.round(beat * 960) * 17 + laneIdx) - 0.5) * 0.08;
+        out.push({
+          part: "drums",
+          midi: laneIdx,
+          startBeat: at,
+          lengthBeats: 0,
+          velocity: Math.min(1, LEVEL_VELOCITY[level] * (0.45 + 0.55 * laneVelocity) * (inBar === 0 ? 1 : 0.92) * human),
+          sound: d.kit,
+        });
+      }
+    }
+  }
+  // Mark each new section with a crash once the groove is busy enough.
+  if (density >= 3 && !lanes.crash && span.lengthBeats > 0) {
+    out.push({ part: "drums", midi: DRUM_LANES.indexOf("crash"), startBeat: span.startBeat, lengthBeats: 0, velocity: 0.45 + 0.4 * velocity, sound: d.kit });
+  }
+  return out;
+}
+
+export const laneOf = (n: PlayNote): DrumLane => DRUM_LANES[n.midi];
 
 // ---- Click ----
 
@@ -290,6 +379,8 @@ export interface RenderSettings {
   /** Null = the Pad is off (for that section). */
   pad: (sectionId?: string) => PadSettings | null;
   bass: (sectionId?: string) => BassSettings | null;
+  /** The groove is needed even when the Drums are off: the bass can follow its kick. */
+  drums: (sectionId: string) => { settings: DrumSettings; on: boolean };
   meter: Meter;
   click: boolean;
 }
@@ -298,11 +389,20 @@ export interface RenderSettings {
 export function renderTrack(arr: Arrangement | null, loopBeats: number, s: RenderSettings): Track {
   const notes: PlayNote[] = [];
   const chords = arr?.chords ?? [];
+  const kickLane = DRUM_LANES.indexOf("kick");
+  const kicks: number[] = [];
+  for (const span of arr?.sections ?? []) {
+    const { settings, on } = s.drums(span.sectionId);
+    const hits = drumHits(span, settings, s.meter);
+    if (on) notes.push(...hits);
+    for (const h of hits) if (h.midi === kickLane) kicks.push(h.startBeat);
+  }
+  kicks.sort((a, b) => a - b);
   chords.forEach((ev, i) => {
     const pad = s.pad(ev.sectionId);
     if (pad) notes.push(...padNotes(ev, pad, s.meter));
     const bass = s.bass(ev.sectionId);
-    if (bass) notes.push(...bassNotes(ev, chords[i + 1] ?? chords[0], bass));
+    if (bass) notes.push(...bassNotes(ev, chords[i + 1] ?? chords[0], bass, kicks));
   });
   if (s.click) notes.push(...clickNotes(arr, loopBeats, s.meter));
   notes.sort((a, b) => a.startBeat - b.startBeat);

@@ -11,9 +11,13 @@ import {
   useSoundStore, SOUND_PRESETS, PRESET_BY_VALUE, BASS_SOUNDS,
   type SoundPreset, type ArpPattern, type ArpRepeat, type BassRepeat, type BassPattern, type BassSound, type PartId,
 } from "@/store/sound";
-import { ensureAudio, playChord, previewBass } from "@/lib/music/audio";
+import { ensureAudio, playChord, previewBass, previewDrums } from "@/lib/music/audio";
 import { parseChord } from "@/lib/music/chords";
+import { drumDensity, drumVelocity } from "@/lib/music/arrangement";
+import { GROOVES, grooveFits, type DrumGenre } from "@/lib/music/grooves";
+import { DRUM_KITS, type DrumKit } from "@/lib/audio/drums";
 import { usePlaybackStore } from "@/store/playback";
+import { useSongStore } from "@/store/song";
 import {
   Music2, RotateCcw, Play, Square, ChevronDown,
   ListIndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
@@ -124,6 +128,7 @@ export function SoundPanel({ open, onOpenChange }: Props) {
             <TabsList className="w-full">
               <TabsTrigger value="pad" className="flex-1 gap-1.5"><Piano className="h-4 w-4" />Pad</TabsTrigger>
               <TabsTrigger value="bass" className="flex-1 gap-1.5"><Guitar className="h-4 w-4" />Bass</TabsTrigger>
+              <TabsTrigger value="drums" className="flex-1 gap-1.5"><Drum className="h-4 w-4" />Drums</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pad" className="mt-4 space-y-4">
@@ -253,6 +258,10 @@ export function SoundPanel({ open, onOpenChange }: Props) {
             <TabsContent value="bass" className="mt-4 space-y-4">
               <BassControls />
             </TabsContent>
+
+            <TabsContent value="drums" className="mt-4 space-y-4">
+              <DrumControls />
+            </TabsContent>
           </Tabs>
 
           <Section title="Playback" defaultOpen={false}>
@@ -311,6 +320,7 @@ const BASS_PATTERN_OPTIONS: { value: BassPattern; label: string; Icon: typeof Ci
   { value: "rootFifth", label: "Root – fifth",         Icon: ArrowUpDown },
   { value: "octave",    label: "Octaves",              Icon: TrendingUp },
   { value: "approach",  label: "Walk into next chord", Icon: Footprints },
+  { value: "followKick", label: "Follow the kick",     Icon: Drum },
 ];
 
 function IconRow<T extends string>({
@@ -347,10 +357,13 @@ function TextRow<T extends string>({
   options,
   value,
   onChange,
+  labels,
 }: {
   options: T[];
   value: T;
   onChange: (v: T) => void;
+  /** Shown instead of the values, indexed by value. */
+  labels?: string[];
 }) {
   return (
     <div className="grid grid-flow-col auto-cols-fr gap-1">
@@ -364,7 +377,7 @@ function TextRow<T extends string>({
             value === v ? "ring-2 ring-primary bg-accent" : "hover:bg-accent",
           )}
         >
-          {v}
+          {labels ? labels[Number(v)] : v}
         </button>
       ))}
     </div>
@@ -389,6 +402,7 @@ function ArpControls() {
 const PARTS: { id: PartId; label: string; Icon: typeof Circle }[] = [
   { id: "pad", label: "Pad", Icon: Piano },
   { id: "bass", label: "Bass", Icon: Guitar },
+  { id: "drums", label: "Drums", Icon: Drum },
 ];
 
 /** On/off and level for each part. */
@@ -424,23 +438,104 @@ function Mixer() {
   );
 }
 
+function PartOff({ part, label }: { part: PartId; label: string }) {
+  const on = useSoundStore((s) => s.mix[part].on);
+  const setMix = useSoundStore((s) => s.setMix);
+  if (on) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => setMix(part, { on: true })}
+      className="w-full rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
+    >
+      The {label} part is off. <span className="font-semibold text-foreground">Turn it on</span>
+    </button>
+  );
+}
+
+const DENSITY_LABELS = ["", "1/2", "1/4", "1/8", "1/16"];
+
+function DrumControls() {
+  const drums = useSoundStore((s) => s.drums);
+  const setDrums = useSoundStore((s) => s.setDrums);
+  const beatsPerBar = useSongStore((s) => s.meta.beatsPerBar);
+  const beatUnit = useSongStore((s) => s.meta.beatUnit);
+  const [fineOpen, setFineOpen] = useState(drums.density != null || drums.velocity != null);
+  const genres = GROOVES.filter((g) => grooveFits(g, beatsPerBar, beatUnit));
+  const genre = genres.some((g) => g.id === drums.genre) ? drums.genre : "basic";
+  const density = drumDensity(drums);
+  const velocity = drumVelocity(drums);
+  return (
+    <div className="space-y-3">
+      <PartOff part="drums" label="Drums" />
+      <Row label="Groove">
+        <div className="flex items-center gap-2">
+          <Select value={genre} onValueChange={(v) => setDrums({ genre: v as DrumGenre, custom: undefined })}>
+            <SelectTrigger className="h-9 flex-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {genres.map((g) => <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void previewDrums()} aria-label="Preview drums">
+            <Play className="h-4 w-4" />
+          </Button>
+        </div>
+      </Row>
+      <Row label="Kit">
+        <Select value={drums.kit} onValueChange={(v) => setDrums({ kit: v as DrumKit })}>
+          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {DRUM_KITS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Row>
+      <Row label="Energy" value={fmtPct(drums.energy)}>
+        <Slider
+          min={0}
+          max={1}
+          step={0.01}
+          value={[drums.energy]}
+          onValueChange={([v]) => setDrums({ energy: v, density: undefined, velocity: undefined })}
+          aria-label="Energy"
+        />
+      </Row>
+      <Collapsible open={fineOpen} onOpenChange={setFineOpen}>
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex w-full items-center justify-between text-left text-xs uppercase tracking-wide text-muted-foreground" aria-expanded={fineOpen}>
+            <span>Fine-tune{drums.density != null || drums.velocity != null ? " · custom" : ""}</span>
+            <ChevronDown className={cn("h-4 w-4 transition-transform", fineOpen && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 pt-3">
+          <Row label="Density · closest notes" value={drums.density == null ? "follows Energy" : undefined}>
+            <TextRow
+              options={["1", "2", "3", "4"]}
+              value={String(density)}
+              labels={DENSITY_LABELS}
+              onChange={(v) => setDrums({ density: Number(v) })}
+            />
+          </Row>
+          <Row label="Velocity" value={drums.velocity == null ? `${fmtPct(velocity)} · follows Energy` : fmtPct(velocity)}>
+            <Slider min={0} max={1} step={0.01} value={[velocity]} onValueChange={([v]) => setDrums({ velocity: v })} aria-label="Velocity" />
+          </Row>
+          {(drums.density != null || drums.velocity != null) && (
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setDrums({ density: undefined, velocity: undefined })}>
+              <RotateCcw className="h-3.5 w-3.5" /> Follow Energy again
+            </Button>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 function BassControls() {
   const bass = useSoundStore((s) => s.bass);
-  const on = useSoundStore((s) => s.mix.bass.on);
   const setBass = useSoundStore((s) => s.setBass);
-  const setMix = useSoundStore((s) => s.setMix);
   const def = BASS_SOUNDS.find((b) => b.value === bass.sound) ?? BASS_SOUNDS[0];
   return (
     <div className="space-y-3">
-      {!on && (
-        <button
-          type="button"
-          onClick={() => setMix("bass", { on: true })}
-          className="w-full rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
-        >
-          The Bass part is off. <span className="font-semibold text-foreground">Turn it on</span>
-        </button>
-      )}
+      <PartOff part="bass" label="Bass" />
       <Row label="Sound">
         <div className="flex items-center gap-2">
           <Select value={bass.sound} onValueChange={(v) => setBass({ sound: v as BassSound })}>
@@ -460,7 +555,7 @@ function BassControls() {
       <Row label="Pattern" value={BASS_PATTERN_OPTIONS.find((o) => o.value === bass.pattern)?.label}>
         <IconRow options={BASS_PATTERN_OPTIONS} value={bass.pattern} onChange={(v) => setBass({ pattern: v })} />
       </Row>
-      {bass.pattern !== "hold" && (
+      {bass.pattern !== "hold" && bass.pattern !== "followKick" && (
         <Row label="Rate">
           <TextRow options={BASS_RATE_OPTIONS} value={bass.rate} onChange={(v) => setBass({ rate: v })} />
         </Row>

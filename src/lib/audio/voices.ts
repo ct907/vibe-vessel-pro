@@ -538,7 +538,7 @@ export function makeBassVoice({ ctx, destination, sound, tone, freq, velocity }:
       filter.frequency.value = 900;
       filter.Q.value = 0.5;
       return assembleVoice({
-        ctx, adsr, amp, peak: velocity * 0.75,
+        ctx, adsr, amp, peak: velocity * 0.55,
         sources: parts.map((x) => x.o),
         nodes: [...parts.map((x) => x.g), filter, amp],
       });
@@ -551,7 +551,7 @@ export function makeBassVoice({ ctx, destination, sound, tone, freq, velocity }:
       const top = acid ? 400 + tone * 3600 : 300 + tone * 2700;
       const rest = acid ? 180 : 140 + tone * 300;
       return assembleVoice({
-        ctx, adsr, amp, peak: velocity * (acid ? 0.42 : 0.5),
+        ctx, adsr, amp, peak: velocity * (acid ? 0.32 : 0.38),
         sources: parts.map((x) => x.o),
         nodes: [...parts.map((x) => x.g), filter, amp],
         onStart(at) {
@@ -576,7 +576,7 @@ export function makeBassVoice({ ctx, destination, sound, tone, freq, velocity }:
       filter.Q.value = 0.7;
       const depth = freq * (0.6 + tone * 1.6);
       return assembleVoice({
-        ctx, adsr, amp, peak: velocity * 0.8,
+        ctx, adsr, amp, peak: velocity * 0.6,
         sources: [carrier, mod],
         nodes: [modGain, filter, amp],
         onStart(at) {

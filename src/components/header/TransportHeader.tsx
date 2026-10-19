@@ -531,7 +531,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     // pattern.chords mirror. Orphaned placements / empty sections are
     // tolerated so Play always plays whatever chords actually exist.
     const arr = buildArrangement(sections, progression);
-    const built = arr && arr.chords.length > 0 ? arr : null;
+    // With the Drums on, the blocks alone are enough to play.
+    const drumsOn = useSoundStore.getState().mix.drums.on;
+    const built = arr && (arr.chords.length > 0 || drumsOn) ? arr : null;
     const beatSec = 60 / meta.bpm;
     const audioEndBeats = useRecordingsStore.getState().tracks.reduce(
       (m, t) => t.clips.reduce((mm, c) => Math.max(mm, clipEndSec(c) + (t.offsetMs ?? 0) / 1000), m),
@@ -599,7 +601,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   useEffect(() => {
     if (!isPlaying) return;
     const arr = buildArrangement(sections, progression);
-    if (!arr || arr.chords.length === 0) return;
+    if (!arr || (arr.chords.length === 0 && !useSoundStore.getState().mix.drums.on)) return;
     playMetaRef.current = arr.refs;
     updateTransport(arr, arr.loopBeats);
   }, [sections, progression, isPlaying]);
