@@ -6,14 +6,14 @@
 //   - Formant (vocal)   : "vocalChoir"
 //
 // The exported makeVoice() returns a Voice that owns its own subgraph and
-// provides triggerAttack/triggerRelease + an immediate dispose() for cleanup.
-// The engine layer handles polyphony limiting (max 16 voices).
+// provides start/release + an immediate dispose() for cleanup.
+// The engine layer handles polyphony limiting.
 
 import type { ADSR, SoundPreset, SoundEngine } from "@/store/sound";
 import { PRESET_BY_VALUE } from "@/store/sound";
 
 export interface VoiceParams {
-  ctx: AudioContext;
+  ctx: BaseAudioContext;
   destination: AudioNode;
   preset: SoundPreset;
   /** 0..1 macro that the preset maps to internal parameters. */
@@ -27,36 +27,145 @@ export interface VoiceParams {
 export interface Voice {
   /** Trigger envelope at the given audio-context time. */
   start(at: number): void;
-  /** Begin release envelope at the given time. */
-  release(at: number): void;
+  /**
+   * Fade out from `at` over `fade` seconds (default: the ADSR release). Can be
+   * called again to shorten a fade, never to lengthen it. At or before the
+   * start time it cancels the note instead.
+   */
+  release(at: number, fade?: number): void;
   /** Hard-stop and disconnect. Safe to call any time. */
   dispose(): void;
+  /** Envelope level at `t` as a fraction of the voice's peak. */
+  levelAt(t: number): number;
   /** Audio-context time at which the voice will be silent and self-removable. */
   endsAt: number;
   /** Audio-context time at which the voice will start (set by start()). */
   startsAt: number;
 }
 
-// Convenience: schedule a smooth ADSR on a GainNode at the given start time.
-function applyAttack(g: GainNode, adsr: ADSR, peak: number, atRaw: number) {
-  const at = Math.max(0, atRaw);
-  const p = g.gain;
-  p.cancelScheduledValues(at);
-  p.setValueAtTime(0.0001, at);
-  p.exponentialRampToValueAtTime(Math.max(0.0001, peak), at + Math.max(0.001, adsr.attack));
-  const sustainLevel = Math.max(0.0001, peak * Math.max(0.0001, adsr.sustain));
-  p.exponentialRampToValueAtTime(sustainLevel, at + adsr.attack + Math.max(0.001, adsr.decay));
+const FLOOR = 0.0001;
+
+interface EnvEvent { t: number; v: number; curve: "set" | "linear" | "exp" }
+
+/**
+ * ADSR on a gain param that keeps its own copy of what it scheduled. The
+ * attack is linear (an exponential rise from the floor stays inaudible for
+ * most of its length); decay and release are exponential.
+ *
+ * Releases are often scheduled before the note has even started, when
+ * `AudioParam.value` is still the floor, so the level at release time has to
+ * come from the schedule. Cancelling at the release time also deletes any
+ * ramp still in progress; re-adding it as a ramp to the level it would have
+ * reached keeps the same curve up to the release.
+ */
+export function makeEnvelope(param: AudioParam, adsr: ADSR, peak: number) {
+  let events: EnvEvent[] = [];
+  let releaseEnd = Infinity;
+  const top = Math.max(FLOOR, peak);
+
+  const levelAt = (t: number): number => {
+    if (!events.length || t < events[0].t) return FLOOR;
+    let i = events.length - 1;
+    while (i > 0 && events[i].t > t) i--;
+    const prev = events[i];
+    const next = events[i + 1];
+    if (!next || next.curve === "set") return prev.v;
+    const span = next.t - prev.t;
+    if (span <= 0) return next.v;
+    const k = (t - prev.t) / span;
+    return next.curve === "linear"
+      ? prev.v + (next.v - prev.v) * k
+      : prev.v * Math.pow(next.v / prev.v, k);
+  };
+
+  return {
+    start(at: number) {
+      const a = Math.max(0.001, adsr.attack);
+      const d = Math.max(0.001, adsr.decay);
+      const sustain = Math.max(FLOOR, top * Math.max(FLOOR, adsr.sustain));
+      events = [
+        { t: at, v: FLOOR, curve: "set" },
+        { t: at + a, v: top, curve: "linear" },
+        { t: at + a + d, v: sustain, curve: "exp" },
+      ];
+      releaseEnd = Infinity;
+      param.cancelScheduledValues(at);
+      param.setValueAtTime(FLOOR, at);
+      param.linearRampToValueAtTime(top, at + a);
+      param.exponentialRampToValueAtTime(sustain, at + a + d);
+    },
+    /** Returns the time the envelope reaches the floor. */
+    release(at: number, fade: number): number {
+      if (at >= releaseEnd) return releaseEnd;
+      const end = Math.min(releaseEnd, at + Math.max(0.01, fade));
+      const v = levelAt(at);
+      const cut = events.find((e) => e.t >= at);
+      events = events.filter((e) => e.t < at);
+      param.cancelScheduledValues(at);
+      if (cut?.curve === "linear") param.linearRampToValueAtTime(v, at);
+      else if (cut?.curve === "exp") param.exponentialRampToValueAtTime(v, at);
+      else param.setValueAtTime(v, at);
+      param.exponentialRampToValueAtTime(FLOOR, end);
+      events.push({ t: at, v, curve: cut?.curve ?? "set" }, { t: end, v: FLOOR, curve: "exp" });
+      releaseEnd = end;
+      return end;
+    },
+    levelAt: (t: number) => levelAt(t) / top,
+  };
 }
 
-function applyRelease(g: GainNode, adsr: ADSR, atRaw: number): number {
-  const at = Math.max(0, atRaw);
-  const p = g.gain;
-  // Read current value to start a smooth tail
-  const v = Math.max(0.0001, p.value);
-  p.cancelScheduledValues(at);
-  p.setValueAtTime(v, at);
-  p.exponentialRampToValueAtTime(0.0001, at + Math.max(0.01, adsr.release));
-  return at + adsr.release + 0.05;
+/** Wraps a voice's graph: envelope on `amp`, sources started and stopped together. */
+function assembleVoice({
+  ctx, sources, nodes, amp, adsr, peak, onStart,
+}: {
+  ctx: BaseAudioContext;
+  sources: AudioScheduledSourceNode[];
+  /** Every node to disconnect once the voice is done. */
+  nodes: AudioNode[];
+  amp: GainNode;
+  adsr: ADSR;
+  peak: number;
+  onStart?: (at: number) => void;
+}): Voice {
+  const env = makeEnvelope(amp.gain, adsr, peak);
+  let startsAt = Infinity;
+  let endsAt = Infinity;
+  let disposed = false;
+  const disconnect = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const n of nodes) { try { n.disconnect(); } catch { /* noop */ } }
+  };
+  sources[0].onended = disconnect;
+  const stopAll = (t: number) => {
+    for (const s of sources) { try { s.stop(t); } catch { /* noop */ } }
+  };
+
+  return {
+    start(at: number) {
+      startsAt = Math.max(0, at);
+      for (const s of sources) s.start(startsAt);
+      env.start(startsAt);
+      onStart?.(startsAt);
+    },
+    release(atRaw: number, fade = adsr.release) {
+      const at = Math.max(0, atRaw);
+      if (at <= startsAt) {
+        stopAll(0);
+        endsAt = Math.min(endsAt, Math.max(at, ctx.currentTime));
+        return;
+      }
+      endsAt = env.release(at, fade) + 0.02;
+      stopAll(endsAt);
+    },
+    dispose() {
+      stopAll(0);
+      disconnect();
+    },
+    levelAt: (t: number) => (t < startsAt || t >= endsAt ? 0 : env.levelAt(t)),
+    get endsAt() { return endsAt; },
+    get startsAt() { return startsAt; },
+  };
 }
 
 // ---------- FM (2-op) ----------
@@ -107,16 +216,11 @@ function makeFmVoice(p: VoiceParams): Voice {
   amp.connect(tone);
   tone.connect(destination);
 
-  const peak = velocity;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
-
-  return {
-    start(at: number) {
-      startsAt = at;
-      carrier.start(at);
-      modulator.start(at);
-      applyAttack(amp, adsr, peak, at);
+  return assembleVoice({
+    ctx, adsr, amp, peak: velocity,
+    sources: [carrier, modulator],
+    nodes: [amp, tone, modGain],
+    onStart(at) {
       // Mod-index envelope: fast bell-like decay.
       const mg = modGain.gain;
       const startVal = freq * (modIndex * 1.6) / 100;
@@ -125,21 +229,7 @@ function makeFmVoice(p: VoiceParams): Voice {
       mg.setValueAtTime(startVal, at);
       mg.exponentialRampToValueAtTime(Math.max(0.0001, tailVal), at + cfg.modDecay);
     },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      try { carrier.stop(endsAt + 0.1); } catch { /* noop */ }
-      try { modulator.stop(endsAt + 0.1); } catch { /* noop */ }
-    },
-    dispose() {
-      try { carrier.stop(); } catch { /* noop */ }
-      try { modulator.stop(); } catch { /* noop */ }
-      try { amp.disconnect(); } catch { /* noop */ }
-      try { tone.disconnect(); } catch { /* noop */ }
-      try { modGain.disconnect(); } catch { /* noop */ }
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  });
 }
 
 // ---------- Subtractive ----------
@@ -231,32 +321,11 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
     sources.forEach((s) => lfoGain!.connect(s.o.detune));
   }
 
-  const peak = velocity * 0.7;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
-
-  return {
-    start(at: number) {
-      startsAt = at;
-      sources.forEach((s) => s.o.start(at));
-      lfo?.start(at);
-      applyAttack(amp, adsr, peak, at);
-    },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      sources.forEach((s) => { try { s.o.stop(endsAt + 0.1); } catch { /* noop */ } });
-      try { lfo?.stop(endsAt + 0.1); } catch { /* noop */ }
-    },
-    dispose() {
-      sources.forEach((s) => { try { s.o.stop(); } catch {/*noop*/} try { s.g.disconnect(); } catch {/*noop*/} });
-      try { lfo?.stop(); } catch {/*noop*/}
-      try { lfoGain?.disconnect(); } catch {/*noop*/}
-      try { filter.disconnect(); } catch {/*noop*/}
-      try { amp.disconnect(); } catch {/*noop*/}
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  return assembleVoice({
+    ctx, adsr, amp, peak: velocity * 0.7,
+    sources: [...sources.map((s) => s.o), ...(lfo ? [lfo] : [])],
+    nodes: [...sources.map((s) => s.g), filter, amp, ...(lfoGain ? [lfoGain] : [])],
+  });
 }
 
 // ---------- Formant (vocal choir) ----------
@@ -299,7 +368,8 @@ function makeFormantVoice(p: VoiceParams): Voice {
   });
 
   const sum = ctx.createGain();
-  sum.gain.value = 0.6;
+  // The narrow formant bandpasses drop ~20 dB versus the other engines.
+  sum.gain.value = 4.5;
   formants.forEach((g) => g.connect(sum));
 
   // Slight tremolo / vibrato to humanize.
@@ -316,33 +386,11 @@ function makeFormantVoice(p: VoiceParams): Voice {
   sum.connect(amp);
   amp.connect(destination);
 
-  const peak = velocity * 0.6;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
-
-  return {
-    start(at: number) {
-      startsAt = at;
-      sources.forEach((o) => o.start(at));
-      vibrato.start(at);
-      applyAttack(amp, adsr, peak, at);
-    },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      sources.forEach((o) => { try { o.stop(endsAt + 0.1); } catch {/*noop*/} });
-      try { vibrato.stop(endsAt + 0.1); } catch {/*noop*/}
-    },
-    dispose() {
-      sources.forEach((o) => { try { o.stop(); } catch {/*noop*/} });
-      try { vibrato.stop(); } catch {/*noop*/}
-      try { vibGain.disconnect(); } catch {/*noop*/}
-      formants.forEach((g) => { try { g.disconnect(); } catch {/*noop*/} });
-      try { sum.disconnect(); } catch {/*noop*/}
-      try { amp.disconnect(); } catch {/*noop*/}
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  return assembleVoice({
+    ctx, adsr, amp, peak: velocity * 0.6,
+    sources: [...sources, vibrato],
+    nodes: [sourceMix, vibGain, ...formants, sum, amp],
+  });
 }
 
 export function engineFor(preset: SoundPreset): SoundEngine {

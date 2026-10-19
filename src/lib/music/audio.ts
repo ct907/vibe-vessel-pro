@@ -4,7 +4,7 @@
 // for ensureAudio() — it owns the autoplay-policy unlock (Tone.start()) and
 // donates its rawContext so any future Tone-using code shares our AC.
 //
-// Polyphony is hard-capped at MAX_VOICES; the oldest voices are stolen first.
+// Polyphony is capped at MAX_VOICES; the quietest voice at a new note's start is stolen.
 
 import * as Tone from "tone";
 import { ChordSymbol, chordToMidi, midiToFreq } from "./chords";
@@ -104,32 +104,60 @@ useSoundStore.subscribe((state) => {
 });
 
 // ---- Voice manager (polyphony cap + auto-cleanup) ----
-const MAX_VOICES = 24;
-const liveVoices: Voice[] = [];
+//
+// Notes are scheduled ahead of time, so every decision is made at the note's
+// own start time T rather than "now": what is still audible at T, which voice
+// is quietest at T, and when a stolen voice has to be silent (by T).
+
+type Owner = "transport" | "audition";
+
+interface LiveVoice {
+  v: Voice;
+  owner: Owner;
+  freq: number;
+  /** Held chord chips: released by the caller, never stolen. */
+  held: boolean;
+}
+
+const MAX_VOICES = 20;
+/** Below this (~-60 dB of the voice's peak) a voice no longer counts as playing. */
+const AUDIBLE = 0.001;
+const STEAL_FADE = 0.025;
+const liveVoices: LiveVoice[] = [];
+
+/** Read by the browser test harness. */
+export const audioStats = { audibleSteals: 0, peakVoices: 0 };
 
 function reapVoices() {
   const now = getAudioContext().currentTime;
   for (let i = liveVoices.length - 1; i >= 0; i--) {
-    if (liveVoices[i].endsAt <= now) {
-      try { liveVoices[i].dispose(); } catch { /* noop */ }
+    if (liveVoices[i].v.endsAt <= now) {
+      liveVoices[i].v.dispose();
       liveVoices.splice(i, 1);
     }
   }
 }
 
-function steal(n: number) {
+function makeRoom(at: number, freq: number, owner: Owner) {
+  reapVoices();
   const now = getAudioContext().currentTime;
-  // Only steal voices that have already started — never cancel a future-scheduled
-  // note's attack envelope, which would silence it before it plays.
-  let stolen = 0;
-  for (let i = 0; i < liveVoices.length && stolen < n; i++) {
-    if (liveVoices[i].startsAt <= now) {
-      const v = liveVoices.splice(i, 1)[0];
-      try { v.release(now); } catch { /* noop */ }
-      setTimeout(() => { try { v.dispose(); } catch { /* noop */ } }, 200);
-      stolen++;
-      i--;
+  const { attack } = useSoundStore.getState().adsr;
+  // A re-struck pitch replaces its own ringing tail, like a re-struck string.
+  // The old note crossfades over the new note's attack so slow pads don't dip.
+  for (const l of liveVoices) {
+    if (l.owner === owner && !l.held && Math.abs(l.freq - freq) < 0.01
+        && l.v.startsAt < at && l.v.endsAt > at) {
+      l.v.release(at, Math.max(0.02, attack));
     }
+  }
+  const sounding = liveVoices.filter((l) => l.v.levelAt(at) > AUDIBLE);
+  audioStats.peakVoices = Math.max(audioStats.peakVoices, sounding.length + 1);
+  const candidates = sounding.filter((l) => !l.held).sort((a, b) => a.v.levelAt(at) - b.v.levelAt(at));
+  for (let n = sounding.length + 1 - MAX_VOICES; n > 0 && candidates.length; n--) {
+    const victim = candidates.shift()!;
+    if (victim.v.levelAt(at) > 0.01) audioStats.audibleSteals++;
+    const from = Math.max(now, at - STEAL_FADE);
+    victim.v.release(from, at - from);
   }
 }
 
@@ -138,7 +166,9 @@ function spawnNote(
   startAt: number,
   releaseAt: number | null,
   velocity: number,
+  owner: Owner = "transport",
 ): Voice {
+  makeRoom(startAt, freq, owner);
   const s = useSoundStore.getState();
   const chain = getMasterChain();
   const v = makeVoice({
@@ -152,19 +182,8 @@ function spawnNote(
   });
   v.start(startAt);
   if (releaseAt !== null) v.release(releaseAt);
-  liveVoices.push(v);
+  liveVoices.push({ v, owner, freq, held: releaseAt === null });
   return v;
-}
-
-function ensureHeadroom(need: number) {
-  reapVoices();
-  const now = getAudioContext().currentTime;
-  // Only count voices that are currently playing or starting within the next
-  // 100 ms. Future-scheduled voices don't consume audible resources yet and
-  // must not be evicted — doing so cancels their scheduled attack envelope.
-  const activeCount = liveVoices.filter(v => v.startsAt <= now + 0.1).length;
-  const overflow = (activeCount + need) - MAX_VOICES;
-  if (overflow > 0) steal(overflow);
 }
 
 function spawnChord(
@@ -172,12 +191,12 @@ function spawnChord(
   startAt: number,
   releaseAt: number | null,
   octave: number,
+  owner: Owner = "transport",
 ): Voice[] {
   const freqs = chordToMidi(chord, octave).map(midiToFreq);
-  ensureHeadroom(freqs.length);
   // Per-voice attenuation when chord is dense (3-note triad ≈ 1.0; 6-note ≈ 0.55).
   const vel = Math.min(1, 1.4 / Math.sqrt(freqs.length));
-  return freqs.map((f) => spawnNote(f, startAt, releaseAt, vel));
+  return freqs.map((f) => spawnNote(f, startAt, releaseAt, vel, owner));
 }
 
 // ---- Arpeggio expansion ----
@@ -273,7 +292,6 @@ function spawnArpForEvent(
       hasSlashBass && arp.bassMode === "off" ? "1" : arp.bassRepeat;
     const stepSec = BASS_STEP_BEATS[repeatKey] * beatSec;
     if (stepSec >= lengthSec) {
-      ensureHeadroom(1);
       spawnNote(bassFreq, startAt, startAt + lengthSec, 0.95);
     } else {
       let t = 0;
@@ -282,7 +300,6 @@ function spawnArpForEvent(
         const noteStart = startAt + t;
         const noteEnd = Math.min(startAt + lengthSec, noteStart + stepSec);
         if (noteStart < startAt + lengthSec) {
-          ensureHeadroom(1);
           spawnNote(bassFreq, noteStart, noteEnd, 0.95);
         }
         t += stepSec;
@@ -302,7 +319,6 @@ function spawnArpForEvent(
   if (!arpEnabled) {
     // "All" pattern: repeat block chord at pattern repeat interval.
     if (stepSec >= lengthSec) {
-      ensureHeadroom(melody.length);
       for (const m of melody) {
         spawnNote(midiToFreq(m), startAt, startAt + lengthSec, noteVel);
       }
@@ -314,7 +330,6 @@ function spawnArpForEvent(
         const noteStart = startAt + t + delay;
         if (noteStart >= startAt + lengthSec) break;
         const noteEnd = Math.min(startAt + lengthSec, noteStart + stepSec);
-        ensureHeadroom(melody.length);
         for (const m of melody) {
           spawnNote(midiToFreq(m), noteStart, noteEnd, noteVel);
         }
@@ -346,7 +361,6 @@ function spawnArpForEvent(
     } else {
       midi = stepNotes[i % stepNotes.length];
     }
-    ensureHeadroom(1);
     spawnNote(midiToFreq(midi), noteStart, noteEnd, noteVel);
     t += stepSec;
     i++;
@@ -359,7 +373,7 @@ export async function playChord(chord: ChordSymbol, durationSec = 1.2, octave = 
   await ensureAudio();
   const ac = getAudioContext();
   const start = ac.currentTime + 0.005;
-  spawnChord(chord, start, start + durationSec, octave);
+  spawnChord(chord, start, start + durationSec, octave, "audition");
 }
 
 /** Play an explicit set of MIDI notes (used by the Chord Explorer's edited voicings). */
@@ -368,10 +382,9 @@ export async function playNotes(midiNotes: number[], durationSec = 1.2): Promise
   if (midiNotes.length === 0) return;
   const ac = getAudioContext();
   const start = ac.currentTime + 0.005;
-  ensureHeadroom(midiNotes.length);
   const vel = Math.min(1, 1.4 / Math.sqrt(midiNotes.length));
   for (const m of midiNotes) {
-    spawnNote(midiToFreq(m), start, start + durationSec, vel);
+    spawnNote(midiToFreq(m), start, start + durationSec, vel, "audition");
   }
 }
 
@@ -383,13 +396,14 @@ export async function holdChord(chord: ChordSymbol, octave = 4): Promise<() => v
   await ensureAudio();
   const ac = getAudioContext();
   const start = ac.currentTime + 0.005;
-  const voices = spawnChord(chord, start, null, octave);
+  const voices = spawnChord(chord, start, null, octave, "audition");
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    const t = getAudioContext().currentTime;
-    for (const v of voices) { try { v.release(t); } catch { /* noop */ } }
+    const t = getAudioContext().currentTime + 0.005;
+    for (const v of voices) v.release(t);
+    for (const l of liveVoices) if (voices.includes(l.v)) l.held = false;
   };
 }
 
@@ -551,20 +565,9 @@ export async function playProgression(
 
 export function stopProgression() {
   clearScheduler();
-  const ctx = getAudioContext();
-  const t = Math.max(0, ctx.currentTime);
-  for (const v of liveVoices) {
-    try { v.release(t); } catch { /* noop */ }
-  }
-  // Dispose the released voices shortly after their tails finish so the
-  // liveVoices array doesn't grow unboundedly across stop/play cycles. Stale
-  // refs were never harmful by themselves, but they push reapVoices() past
-  // MAX_VOICES headroom on long sessions, which then steals voices we just
-  // scheduled and leaves the chord output silent.
-  const toDispose = liveVoices.splice(0, liveVoices.length);
-  setTimeout(() => {
-    for (const v of toDispose) { try { v.dispose(); } catch { /* noop */ } }
-  }, 250);
+  const t = getAudioContext().currentTime + 0.005;
+  const fade = Math.min(0.3, useSoundStore.getState().adsr.release);
+  for (const l of liveVoices) if (l.owner === "transport") l.v.release(t, fade);
 }
 
 
