@@ -17,12 +17,13 @@ import { parseChord } from "@/lib/music/chords";
 import { drumDensity, drumVelocity } from "@/lib/music/arrangement";
 import { GROOVES, grooveFits, type DrumGenre } from "@/lib/music/grooves";
 import { DRUM_KITS, type DrumKit } from "@/lib/audio/drums";
+import { DrumStepEditor } from "./DrumStepEditor";
 import { usePlaybackStore } from "@/store/playback";
 import { useSongStore } from "@/store/song";
 import {
   Music2, RotateCcw, Play, Square, ChevronDown,
   ListIndentIncrease, MoveUpRight, MoveDownRight, TrendingUp, TrendingDown, Dices,
-  LineStyle, Circle, Piano, Guitar, Drum, Minus, Activity, ArrowUpDown, Footprints,
+  LineStyle, Circle, Piano, Guitar, Drum, Minus, Activity, ArrowUpDown, Footprints, Grid3x3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -463,13 +464,14 @@ export function DrumControls({ drums, onChange: setDrums }: { drums: DrumSetting
   const beatsPerBar = useSongStore((s) => s.meta.beatsPerBar);
   const beatUnit = useSongStore((s) => s.meta.beatUnit);
   const [fineOpen, setFineOpen] = useState(drums.density != null || drums.velocity != null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const genres = GROOVES.filter((g) => grooveFits(g, beatsPerBar, beatUnit));
   const genre = genres.some((g) => g.id === drums.genre) ? drums.genre : "basic";
   const density = drumDensity(drums);
   const velocity = drumVelocity(drums);
   return (
     <div className="space-y-3">
-      <Row label="Groove">
+      <Row label="Groove" value={drums.custom ? "edited" : undefined}>
         <div className="flex items-center gap-2">
           <Select value={genre} onValueChange={(v) => setDrums({ genre: v as DrumGenre, custom: undefined })}>
             <SelectTrigger className="h-9 flex-1"><SelectValue /></SelectTrigger>
@@ -482,6 +484,10 @@ export function DrumControls({ drums, onChange: setDrums }: { drums: DrumSetting
           </Button>
         </div>
       </Row>
+      <Button variant="outline" size="sm" className="w-full justify-center" onClick={() => setEditorOpen(true)}>
+        <Grid3x3 className="h-4 w-4" /> {drums.custom ? "Edit your groove" : "Edit groove"}
+      </Button>
+      <DrumStepEditor drums={drums} onChange={setDrums} open={editorOpen} onOpenChange={setEditorOpen} />
       <Row label="Kit">
         <Select value={drums.kit} onValueChange={(v) => setDrums({ kit: v as DrumKit })}>
           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>

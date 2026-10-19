@@ -86,6 +86,12 @@ describe("drum energy", () => {
     expect(fade.filter((h) => h.startBeat >= 12).length).toBeLessThan(fade.filter((h) => h.startBeat < 4).length);
   });
 
+  it("an edited groove replaces the genre's lanes", () => {
+    const hits = drumHits(span(4), drums({ energy: 0.5, custom: { clap: "....1.......1..." } }), fourFour);
+    expect(lane(hits, "clap").map((h) => h.startBeat)).toEqual([1, 3]);
+    expect(lane(hits, "kick")).toEqual([]);
+  });
+
   it("swings the shuffle's off-beat eighths", () => {
     const ride = lane(drumHits(span(4), drums({ energy: 0.6, genre: "shuffle" }), fourFour), "ride").map((h) => h.startBeat);
     expect(ride[1]).toBeCloseTo(0.5 + 1 / 6, 6);
