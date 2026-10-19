@@ -9,7 +9,7 @@
 // provides start/release + an immediate dispose() for cleanup.
 // The engine layer handles polyphony limiting.
 
-import type { ADSR, SoundPreset, SoundEngine } from "@/store/sound";
+import type { ADSR, BassSound, SoundPreset, SoundEngine } from "@/store/sound";
 import { PRESET_BY_VALUE } from "@/store/sound";
 
 export interface VoiceParams {
@@ -488,5 +488,102 @@ export function makeVoice(p: VoiceParams): Voice {
     case "formant":     return makeFormantVoice(p);
     case "subtractive":
     default:            return makeSubtractiveVoice(p);
+  }
+}
+
+// ---------- Bass ----------
+// Fixed envelopes: a bass part should be tight whatever the pad's ADSR is.
+
+const BASS_ADSR: Record<BassSound, ADSR> = {
+  electric: { attack: 0.004, decay: 0.5,  sustain: 0.55, release: 0.12 },
+  sub:      { attack: 0.006, decay: 0.3,  sustain: 0.85, release: 0.12 },
+  analog:   { attack: 0.003, decay: 0.25, sustain: 0.7,  release: 0.1 },
+  acid:     { attack: 0.002, decay: 0.2,  sustain: 0.6,  release: 0.08 },
+};
+
+export interface BassVoiceParams {
+  ctx: BaseAudioContext;
+  destination: AudioNode;
+  sound: BassSound;
+  /** 0..1 macro. */
+  tone: number;
+  freq: number;
+  velocity: number;
+}
+
+export function makeBassVoice({ ctx, destination, sound, tone, freq, velocity }: BassVoiceParams): Voice {
+  const adsr = BASS_ADSR[sound];
+  const amp = ctx.createGain();
+  amp.gain.value = 0.0001;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.connect(amp);
+  amp.connect(destination);
+
+  const osc = (type: OscillatorType, mult = 1, gain = 1) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq * mult;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    o.connect(g).connect(filter);
+    return { o, g };
+  };
+
+  switch (sound) {
+    case "sub": {
+      // A pure sine vanishes on phone speakers; the octave and fifth
+      // harmonics keep it audible there.
+      const parts = [osc("sine", 1, 0.9), osc("sine", 2, 0.2 + tone * 0.35), osc("triangle", 3, tone * 0.12)];
+      filter.frequency.value = 900;
+      filter.Q.value = 0.5;
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * 0.75,
+        sources: parts.map((x) => x.o),
+        nodes: [...parts.map((x) => x.g), filter, amp],
+      });
+    }
+    case "analog":
+    case "acid": {
+      const acid = sound === "acid";
+      const parts = acid ? [osc("sawtooth")] : [osc("sawtooth", 1, 0.6), osc("square", 1, 0.45)];
+      filter.Q.value = acid ? 11 : 4;
+      const top = acid ? 400 + tone * 3600 : 300 + tone * 2700;
+      const rest = acid ? 180 : 140 + tone * 300;
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * (acid ? 0.42 : 0.5),
+        sources: parts.map((x) => x.o),
+        nodes: [...parts.map((x) => x.g), filter, amp],
+        onStart(at) {
+          // The filter snaps open on each note and closes down: the "pluck".
+          const f = filter.frequency;
+          f.setValueAtTime(top, at);
+          f.exponentialRampToValueAtTime(rest, at + (acid ? 0.18 : 0.3));
+        },
+      });
+    }
+    case "electric":
+    default: {
+      // Fingered bass: FM at a 1:1 ratio, the modulation fading fast.
+      const carrier = ctx.createOscillator();
+      carrier.frequency.value = freq;
+      const mod = ctx.createOscillator();
+      mod.frequency.value = freq;
+      const modGain = ctx.createGain();
+      mod.connect(modGain).connect(carrier.frequency);
+      carrier.connect(filter);
+      filter.frequency.value = 1400 + tone * 2600;
+      filter.Q.value = 0.7;
+      const depth = freq * (0.6 + tone * 1.6);
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * 0.8,
+        sources: [carrier, mod],
+        nodes: [modGain, filter, amp],
+        onStart(at) {
+          modGain.gain.setValueAtTime(depth, at);
+          modGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, depth * 0.08), at + 0.35);
+        },
+      });
+    }
   }
 }

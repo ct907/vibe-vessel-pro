@@ -86,6 +86,7 @@ export type BassRepeat = "1" | "1/2" | "1/4" | "1/8" | "1/16";
 export interface ArpSettings {
   pattern: ArpPattern;
   repeat: ArpRepeat;
+  /** Legacy: songs saved with a Bass Note mode get the Bass part instead (see loadFrom). */
   bassMode: BassMode;
   bassRepeat: BassRepeat;
   /** 0.5 = straight, 0.75 = full dotted-8th + 16th swing (DAW convention). */
@@ -100,6 +101,54 @@ export const DEFAULT_ARP: ArpSettings = {
   swing: 0.5,
 };
 
+// ---- Parts ----
+//
+// The song plays as up to three parts: Pad (the chord sound above, with its
+// arpeggiator), Bass and Drums. Each has its own level and on/off switch.
+
+export type PartId = "pad" | "bass" | "drums";
+
+export interface PartMix {
+  on: boolean;
+  /** dB, -30 to +6 */
+  volume: number;
+}
+
+export type BassSound = "sub" | "analog" | "electric" | "acid";
+export type BassPattern = "hold" | "pulse" | "rootFifth" | "octave" | "approach";
+
+export interface BassSettings {
+  sound: BassSound;
+  pattern: BassPattern;
+  /** Step length for every pattern except Hold. */
+  rate: BassRepeat;
+  /** 0..1 macro; the sound defines what it does. */
+  tone: number;
+}
+
+export const BASS_SOUNDS: { value: BassSound; label: string; toneLabel: string }[] = [
+  { value: "electric", label: "Electric Bass", toneLabel: "Brightness" },
+  { value: "sub",      label: "Sub Bass",      toneLabel: "Grit" },
+  { value: "analog",   label: "Analog Bass",   toneLabel: "Filter" },
+  { value: "acid",     label: "Acid Bass",     toneLabel: "Squelch" },
+];
+
+export const BASS_PATTERNS: { value: BassPattern; label: string }[] = [
+  { value: "hold",      label: "Hold root" },
+  { value: "pulse",     label: "Pulse" },
+  { value: "rootFifth", label: "Root – fifth" },
+  { value: "octave",    label: "Octaves" },
+  { value: "approach",  label: "Walk into next chord" },
+];
+
+export const DEFAULT_BASS: BassSettings = { sound: "electric", pattern: "pulse", rate: "1/4", tone: 0.5 };
+
+export const DEFAULT_MIX: Record<PartId, PartMix> = {
+  pad: { on: true, volume: 0 },
+  bass: { on: false, volume: 0 },
+  drums: { on: false, volume: 0 },
+};
+
 export interface SoundSettings {
   preset: SoundPreset;
   volume: number;     // dB, -40 to 6
@@ -110,6 +159,8 @@ export interface SoundSettings {
   eq: EQ3;
   fx: FX;
   arp: ArpSettings;
+  bass: BassSettings;
+  mix: Record<PartId, PartMix>;
 }
 
 export const PRESET_DEFAULTS: Record<SoundPreset, ADSR> = {
@@ -140,6 +191,8 @@ export const DEFAULT_SOUND: SoundSettings = {
     chorusWet: 0, chorusRate: 0.8, chorusDepth: 0.4,
   },
   arp: { ...DEFAULT_ARP },
+  bass: { ...DEFAULT_BASS },
+  mix: structuredClone(DEFAULT_MIX),
 };
 
 interface SoundState extends SoundSettings {
@@ -153,6 +206,8 @@ interface SoundState extends SoundSettings {
   setBpmRamp: (b: boolean) => void;
   setHighLatencyMode: (b: boolean) => void;
   setArp: (patch: Partial<ArpSettings>) => void;
+  setBass: (patch: Partial<BassSettings>) => void;
+  setMix: (part: PartId, patch: Partial<PartMix>) => void;
   reset: () => void;
   loadFrom: (s: Partial<SoundSettings> | undefined) => void;
   toJSON: () => SoundSettings;
@@ -174,7 +229,9 @@ export const useSoundStore = create<SoundState>((set, get) => ({
   setBpmRamp: (b) => set({ bpmRamp: b }),
   setHighLatencyMode: (b) => set({ highLatencyMode: b }),
   setArp: (patch) => set((s) => ({ arp: { ...s.arp, ...patch } })),
-  reset: () => set({ ...DEFAULT_SOUND }),
+  setBass: (patch) => set((s) => ({ bass: { ...s.bass, ...patch } })),
+  setMix: (part, patch) => set((s) => ({ mix: { ...s.mix, [part]: { ...s.mix[part], ...patch } } })),
+  reset: () => set({ ...DEFAULT_SOUND, mix: structuredClone(DEFAULT_MIX) }),
   loadFrom: (data) => {
     if (!data) return;
     // No migration logic (per Phase 1.6 plan): unknown preset values fall back
@@ -192,11 +249,32 @@ export const useSoundStore = create<SoundState>((set, get) => ({
       adsr: { ...PRESET_DEFAULTS[preset], ...(data.adsr ?? {}) },
       eq: { ...DEFAULT_SOUND.eq, ...(data.eq ?? {}) },
       fx: { ...DEFAULT_SOUND.fx, ...(data.fx ?? {}) },
-      arp: { ...DEFAULT_ARP, ...(data.arp ?? {}) },
+      ...migrateBass(data),
     });
   },
   toJSON: () => {
-    const { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp } = get();
-    return { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp };
+    const { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, mix } = get();
+    return { preset, volume, timbre, bpmRamp, highLatencyMode, adsr, eq, fx, arp, bass, mix };
   },
 }));
+
+/**
+ * Before the Bass part, the arpeggiator could add a bass note on the pad
+ * sound ("Bass Note" mode). Songs saved that way turn the Bass part on at the
+ * same rate instead.
+ */
+function migrateBass(data: Partial<SoundSettings>): Pick<SoundSettings, "arp" | "bass" | "mix"> {
+  const arp = { ...DEFAULT_ARP, ...(data.arp ?? {}) };
+  const mix: Record<PartId, PartMix> = {
+    pad: { ...DEFAULT_MIX.pad, ...(data.mix?.pad ?? {}) },
+    bass: { ...DEFAULT_MIX.bass, ...(data.mix?.bass ?? {}) },
+    drums: { ...DEFAULT_MIX.drums, ...(data.mix?.drums ?? {}) },
+  };
+  const bass = { ...DEFAULT_BASS, ...(data.bass ?? {}) };
+  if (!data.bass && arp.bassMode !== "off") {
+    mix.bass.on = true;
+    bass.pattern = "pulse";
+    bass.rate = arp.bassRepeat;
+  }
+  return { arp: { ...arp, bassMode: "off" }, bass, mix };
+}

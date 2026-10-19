@@ -3,10 +3,10 @@
 // Pure functions only (no Web Audio, no stores), so the scheduler in audio.ts
 // can ask for any window of notes and the same output is unit-testable.
 
-import { chordToMidi, transposeChord, type ChordSymbol } from "./chords";
+import { chordToMidi, rootToPc, transposeChord, type ChordSymbol } from "./chords";
 import { computeEffectiveOffsets } from "./keyChange";
 import { patternPlayBeats, type PatternBlock, type Section } from "@/store/song";
-import type { ArpRepeat, ArpSettings, BassRepeat } from "@/store/sound";
+import type { ArpRepeat, ArpSettings, BassRepeat, BassSettings } from "@/store/sound";
 
 export interface ChordEvent {
   chord: ChordSymbol;
@@ -179,38 +179,30 @@ export interface PadSettings {
   /** False = hold block chords for the section regardless of the arp. */
   armed: boolean;
   octave: number;
+  /** The Bass part is playing, so it takes the slash-chord bass note. */
+  bassOn: boolean;
 }
 
-/** The chord part for one chord: held, re-struck or arpeggiated, plus the arp's bass note. */
+/** The chord part for one chord: held, re-struck or arpeggiated. */
 export function padNotes(ev: ChordEvent, pad: PadSettings, meter: Meter): PlayNote[] {
   const out: PlayNote[] = [];
   const octave = ev.chord.octave ?? pad.octave;
+  // chordToMidi puts a slash bass at notes[0], an octave below.
   const all = chordToMidi(ev.chord, octave);
+  const slash = ev.chord.bass ? all[0] : null;
+  const chord = slash != null && pad.bassOn ? all.slice(1) : all;
   const { startBeat: start, lengthBeats: len } = ev;
   if (!pad.armed) {
-    const velocity = Math.min(1, 1.4 / Math.sqrt(all.length));
-    for (const midi of all) out.push({ part: "pad", midi, startBeat: start, lengthBeats: len, velocity });
+    const velocity = Math.min(1, 1.4 / Math.sqrt(chord.length));
+    for (const midi of chord) out.push({ part: "pad", midi, startBeat: start, lengthBeats: len, velocity });
     return out;
   }
   const { arp } = pad;
-  const hasSlashBass = !!ev.chord.bass;
-  // chordToMidi puts the slash bass at notes[0], an octave below.
-  let melody = hasSlashBass ? all.slice(1) : all;
-  const root = melody[0];
-  let bass: number | null = null;
-  if (hasSlashBass) bass = all[0];
-  else if (arp.bassMode === "bass" || arp.bassMode === "bassArp") {
-    bass = root - 12;
-    if (arp.bassMode === "bass") melody = melody.filter((m) => m !== root);
+  const melody = slash != null ? all.slice(1) : all;
+  // Without a Bass part the slash note is struck once a bar under the arp.
+  if (slash != null && !pad.bassOn) {
+    eachStep(start, len, 4, (at, l) => out.push({ part: "pad", midi: slash, startBeat: at, lengthBeats: l, velocity: 0.95 }));
   }
-
-  if (bass != null) {
-    const key: BassRepeat = hasSlashBass && arp.bassMode === "off" ? "1" : arp.bassRepeat;
-    eachStep(start, len, BASS_STEP_BEATS[key], (at, l) => {
-      out.push({ part: "pad", midi: bass!, startBeat: at, lengthBeats: l, velocity: 0.95 });
-    });
-  }
-  if (melody.length === 0) return out;
 
   const triplet = (meter.beatsPerBar === 3 && meter.beatUnit === 4) || (meter.beatsPerBar === 6 && meter.beatUnit === 8);
   const step = ARP_STEP_BEATS[arp.repeat] * (triplet && TRIPLET_SUBDIVS.has(arp.repeat) ? 2 / 3 : 1);
@@ -247,6 +239,35 @@ export function padNotes(ev: ChordEvent, pad: PadSettings, meter: Meter): PlayNo
   return out;
 }
 
+// ---- Bass ----
+
+/** The bass register, A1–G#2: low enough to sit under the pad, high enough for phone speakers. */
+export function bassMidi(name: string): number {
+  return 33 + ((rootToPc(name) - 9 + 12) % 12);
+}
+
+/** One chord's bass line. `next` is the chord after it, for the walk-in. */
+export function bassNotes(ev: ChordEvent, next: ChordEvent | undefined, bass: BassSettings): PlayNote[] {
+  const root = bassMidi(ev.chord.bass ?? ev.chord.root);
+  const { startBeat: start, lengthBeats: len } = ev;
+  if (bass.pattern === "hold") return [{ part: "bass", midi: root, startBeat: start, lengthBeats: len, velocity: 0.95 }];
+  const fifth = root + 7 <= 47 ? root + 7 : root - 5;
+  const target = next ? bassMidi(next.chord.bass ?? next.chord.root) : root;
+  const step = BASS_STEP_BEATS[bass.rate];
+  const count = Math.ceil(len / step - 1e-4);
+  const out: PlayNote[] = [];
+  eachStep(start, len, step, (at, l, i) => {
+    let midi = root;
+    if (bass.pattern === "rootFifth" && i % 2 === 1) midi = fifth;
+    else if (bass.pattern === "octave" && i % 2 === 1) midi = root + 12;
+    else if (bass.pattern === "approach" && i === count - 1 && count > 1 && target !== root) {
+      midi = target > root ? target - 1 : target + 1;
+    }
+    out.push({ part: "bass", midi, startBeat: at, lengthBeats: l, velocity: i === 0 ? 0.95 : 0.82 });
+  });
+  return out;
+}
+
 // ---- Click ----
 
 /** One click per beat, accented on the first beat of each bar of each block. */
@@ -266,7 +287,9 @@ function clickNotes(arr: Arrangement | null, loopBeats: number, meter: Meter): P
 // ---- Rendering ----
 
 export interface RenderSettings {
-  pad: (sectionId?: string) => PadSettings;
+  /** Null = the Pad is off (for that section). */
+  pad: (sectionId?: string) => PadSettings | null;
+  bass: (sectionId?: string) => BassSettings | null;
   meter: Meter;
   click: boolean;
 }
@@ -274,7 +297,13 @@ export interface RenderSettings {
 /** Every note the loop plays. `loopBeats` may exceed the arrangement (audio-only playback). */
 export function renderTrack(arr: Arrangement | null, loopBeats: number, s: RenderSettings): Track {
   const notes: PlayNote[] = [];
-  for (const ev of arr?.chords ?? []) notes.push(...padNotes(ev, s.pad(ev.sectionId), s.meter));
+  const chords = arr?.chords ?? [];
+  chords.forEach((ev, i) => {
+    const pad = s.pad(ev.sectionId);
+    if (pad) notes.push(...padNotes(ev, pad, s.meter));
+    const bass = s.bass(ev.sectionId);
+    if (bass) notes.push(...bassNotes(ev, chords[i + 1] ?? chords[0], bass));
+  });
   if (s.click) notes.push(...clickNotes(arr, loopBeats, s.meter));
   notes.sort((a, b) => a.startBeat - b.startBeat);
   return {

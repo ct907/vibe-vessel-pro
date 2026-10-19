@@ -1,11 +1,15 @@
 // Phase 1.6 — Shared AudioContext + master FX chain.
 //
 // Graph:
-//   voice -> voiceBus -> eq(low,mid,high) -> chorus(send/wet) ─┐
-//                                                              ├-> dryBus
-//                                                              ├-> delay -> reverb -> wet
-//                                                              ├-> reverb -> wet
+//   pad voice -> padBus -> voiceBus -> eq(low,mid,high) -> chorus(send/wet) ─┐
+//                                                                          ├-> dryBus
+//                                                                          ├-> delay -> reverb -> wet
+//                                                                          ├-> reverb -> wet
+//   bass voice -> bassBus ─────────────────────────────────────────────────┤
+//   drum hit -> drumBus ─────────────────────────── (+ small reverb send) ─┤
 //   dryBus + wet -> limiter -> destination
+//
+// The EQ and effects are the Pad's; bass and drums stay dry and up front.
 //
 // All graph nodes are constructed lazily on first call so that the
 // AudioContext only resumes after a user gesture (ensureAudio() in the
@@ -24,7 +28,13 @@ export function getAudioContext(): AudioContext {
 
 export interface MasterChain {
   ctx: AudioContext;
-  /** All synth voices connect here. */
+  /** Pad (chord) voices connect here; its gain is the Pad level. */
+  padBus: GainNode;
+  /** Bass voices; its gain is the Bass level. */
+  bassBus: GainNode;
+  /** Drum hits; its gain is the Drums level. */
+  drumBus: GainNode;
+  /** The Pad's EQ + effects input. */
   voiceBus: GainNode;
   // EQ
   eqLow: BiquadFilterNode;
@@ -177,8 +187,18 @@ export function getMasterChain(): MasterChain {
   delay.connect(reverbSend); // delay tails into reverb
   reverb.connect(reverbWet); reverbWet.connect(master);
 
+  const padBus = ac.createGain();
+  padBus.connect(voiceBus);
+  const bassBus = ac.createGain();
+  bassBus.connect(master);
+  const drumBus = ac.createGain();
+  drumBus.connect(master);
+  const drumRoom = ac.createGain();
+  drumRoom.gain.value = 0.12;
+  drumBus.connect(drumRoom).connect(reverb);
+
   chain = {
-    ctx: ac, voiceBus,
+    ctx: ac, padBus, bassBus, drumBus, voiceBus,
     eqLow, eqMid, eqHigh,
     chorusSend, chorusWet, chorus,
     delaySend, delay, delayFb, delayWet,

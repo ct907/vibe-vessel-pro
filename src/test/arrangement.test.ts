@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseChord } from "@/lib/music/chords";
 import {
+  bassMidi,
+  bassNotes,
   buildArrangement,
   padNotes,
   renderTrack,
@@ -9,12 +11,12 @@ import {
   type PadSettings,
   type Track,
 } from "@/lib/music/arrangement";
-import { DEFAULT_ARP, type ArpSettings } from "@/store/sound";
+import { DEFAULT_ARP, DEFAULT_BASS, useSoundStore, type ArpSettings, type BassSettings } from "@/store/sound";
 import type { PatternBlock, Section } from "@/store/song";
 
 const c = (s: string) => parseChord(s)!;
 const ev = (chord: string, startBeat: number, lengthBeats: number): ChordEvent => ({ chord: c(chord), startBeat, lengthBeats });
-const pad = (arp: Partial<ArpSettings>, armed = true): PadSettings => ({ arp: { ...DEFAULT_ARP, ...arp }, armed, octave: 4 });
+const pad = (arp: Partial<ArpSettings>, armed = true, bassOn = false): PadSettings => ({ arp: { ...DEFAULT_ARP, ...arp }, armed, octave: 4, bassOn });
 const fourFour = { beatsPerBar: 4, beatUnit: 4 };
 
 describe("padNotes", () => {
@@ -60,12 +62,13 @@ describe("padNotes", () => {
     expect(a.some((m, i) => i > 0 && m === a[i - 1])).toBe(false);
   });
 
-  it("plays the bass note an octave below the root and drops the root in Bass mode", () => {
-    const notes = padNotes(ev("C", 0, 4), pad({ pattern: "asc", repeat: "1/4", bassMode: "bass", bassRepeat: "1/2" }), fourFour);
-    const bass = notes.filter((n) => n.velocity === 0.95);
-    expect(bass.map((n) => n.startBeat)).toEqual([0, 2]);
-    expect(bass[0].midi).toBe(48);
-    expect(notes.filter((n) => n.velocity !== 0.95).some((n) => n.midi === 60)).toBe(false);
+  it("strikes a slash chord's bass note under the arp, unless the Bass part has it", () => {
+    const slash = padNotes(ev("C/E", 0, 8), pad({ pattern: "asc", repeat: "1/4" }), fourFour);
+    const low = slash.filter((n) => n.velocity === 0.95);
+    expect(low.map((n) => n.startBeat)).toEqual([0, 4]);
+    expect(low[0].midi % 12).toBe(4);
+    const withBass = padNotes(ev("C/E", 0, 8), pad({ pattern: "asc", repeat: "1/4" }, true, true), fourFour);
+    expect(withBass.some((n) => n.velocity === 0.95)).toBe(false);
   });
 });
 
@@ -73,7 +76,7 @@ describe("windowEvents", () => {
   const track: Track = renderTrack(
     { chords: [ev("C", 0, 4), ev("F", 4, 2), ev("G", 6, 2)], refs: [], sections: [], loopBeats: 8 },
     8,
-    { pad: () => pad({ pattern: "asc", repeat: "1/8" }), meter: fourFour, click: false },
+    { pad: () => pad({ pattern: "asc", repeat: "1/8" }), bass: () => null, meter: fourFour, click: false },
   );
   const collect = (cuts: number[], epoch = { abs: 0, local: 0 }, loop = true) => {
     const out: string[] = [];
@@ -133,5 +136,61 @@ describe("buildArrangement", () => {
     const arr = buildArrangement([section("a", [])], [block("a", 4)])!;
     expect(arr.chords).toEqual([]);
     expect(arr.loopBeats).toBe(16);
+  });
+});
+
+describe("bassNotes", () => {
+  const bass = (p: Partial<BassSettings>): BassSettings => ({ ...DEFAULT_BASS, ...p });
+
+  it("sits in the bass register and uses a slash chord's bass note", () => {
+    for (const name of ["C", "F#", "A", "Bb", "G"]) {
+      const m = bassMidi(name);
+      expect(m).toBeGreaterThanOrEqual(33);
+      expect(m).toBeLessThanOrEqual(44);
+    }
+    const [n] = bassNotes(ev("C/G", 0, 4), undefined, bass({ pattern: "hold" }));
+    expect(n.midi).toBe(bassMidi("G"));
+    expect(n.lengthBeats).toBe(4);
+  });
+
+  it("pulses at the rate, alternates fifths and octaves", () => {
+    expect(bassNotes(ev("C", 0, 4), undefined, bass({ pattern: "pulse", rate: "1/4" })).map((n) => n.startBeat)).toEqual([0, 1, 2, 3]);
+    const rf = bassNotes(ev("C", 0, 4), undefined, bass({ pattern: "rootFifth", rate: "1/4" })).map((n) => n.midi);
+    expect(rf[1] - rf[0]).toBe(7);
+    const oct = bassNotes(ev("A", 0, 2), undefined, bass({ pattern: "octave", rate: "1/4" })).map((n) => n.midi);
+    expect(oct[1] - oct[0]).toBe(12);
+  });
+
+  it("walks into the next chord a semitone away", () => {
+    const line = bassNotes(ev("C", 0, 4), ev("F", 4, 4), bass({ pattern: "approach", rate: "1/4" })).map((n) => n.midi);
+    expect(line.slice(0, 3)).toEqual([bassMidi("C"), bassMidi("C"), bassMidi("C")]);
+    expect(Math.abs(line[3] - bassMidi("F"))).toBe(1);
+  });
+});
+
+describe("sound settings load", () => {
+  it("turns an old Bass Note mode into the Bass part at the same rate", () => {
+    const store = useSoundStore.getState();
+    store.loadFrom({ preset: "piano", arp: { ...DEFAULT_ARP, bassMode: "bass", bassRepeat: "1/4" } });
+    const s = useSoundStore.getState();
+    expect(s.mix.bass.on).toBe(true);
+    expect(s.bass.pattern).toBe("pulse");
+    expect(s.bass.rate).toBe("1/4");
+    expect(s.arp.bassMode).toBe("off");
+  });
+
+  it("leaves the Bass part off for songs that never used a bass note, and keeps saved parts", () => {
+    useSoundStore.getState().loadFrom({ preset: "rhodes", arp: { ...DEFAULT_ARP } });
+    expect(useSoundStore.getState().mix.bass.on).toBe(false);
+    useSoundStore.getState().loadFrom({
+      preset: "rhodes",
+      bass: { ...DEFAULT_BASS, sound: "acid" },
+      mix: { pad: { on: true, volume: -3 }, bass: { on: false, volume: 0 }, drums: { on: false, volume: 0 } },
+      arp: { ...DEFAULT_ARP, bassMode: "bass" },
+    });
+    const s = useSoundStore.getState();
+    expect(s.bass.sound).toBe("acid");
+    expect(s.mix.bass.on).toBe(false);
+    expect(s.mix.pad.volume).toBe(-3);
   });
 });

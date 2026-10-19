@@ -10,7 +10,7 @@ import { useSoundStore, type EQ3, type FX, type SoundSettings } from "@/store/so
 import { useSongStore } from "@/store/song";
 import { useMetronomeStore } from "@/store/metronome";
 import { getAudioContext, getMasterChain } from "@/lib/audio/context";
-import { makeVoice, type Voice } from "@/lib/audio/voices";
+import { makeBassVoice, makeVoice, type Voice } from "@/lib/audio/voices";
 import { scheduleClick } from "@/lib/audio/metronome";
 import {
   renderTrack,
@@ -87,6 +87,9 @@ function applySettings(s: SoundSettings) {
   if (!started) return;
   const c = getMasterChain();
   c.master.gain.setTargetAtTime(dbToGain(s.volume), c.ctx.currentTime, 0.02);
+  c.padBus.gain.setTargetAtTime(dbToGain(s.mix.pad.volume), c.ctx.currentTime, 0.02);
+  c.bassBus.gain.setTargetAtTime(dbToGain(s.mix.bass.volume), c.ctx.currentTime, 0.02);
+  c.drumBus.gain.setTargetAtTime(dbToGain(s.mix.drums.volume), c.ctx.currentTime, 0.02);
   applyEQ(s.eq);
   applyFX(s.fx, useSongStore.getState().meta.bpm);
 }
@@ -104,16 +107,20 @@ useSoundStore.subscribe((state) => {
 // is quietest at T, and when a stolen voice has to be silent (by T).
 
 type Owner = "transport" | "preview" | "audition";
+type VoicePart = "pad" | "bass";
 
 interface LiveVoice {
   v: Voice;
   owner: Owner;
+  part: VoicePart;
   freq: number;
   /** Held chord chips: released by the caller, never stolen. */
   held: boolean;
 }
 
+/** Pad voices only: the bass is monophonic and drum hits end by themselves. */
 const MAX_VOICES = 20;
+const BASS_HANDOFF = 0.015;
 /** Below this (~-60 dB of the voice's peak) a voice no longer counts as playing. */
 const AUDIBLE = 0.001;
 const STEAL_FADE = 0.025;
@@ -132,19 +139,26 @@ function reapVoices() {
   }
 }
 
-function makeRoom(at: number, freq: number, owner: Owner) {
+function makeRoom(at: number, freq: number, owner: Owner, part: VoicePart) {
   reapVoices();
   const now = getAudioContext().currentTime;
+  if (part === "bass") {
+    // One string: each bass note hands over from the last.
+    for (const l of liveVoices) {
+      if (l.part === "bass" && l.owner === owner && l.v.startsAt < at && l.v.endsAt > at) l.v.release(at, BASS_HANDOFF);
+    }
+    return;
+  }
   const { attack } = useSoundStore.getState().adsr;
   // A re-struck pitch replaces its own ringing tail, like a re-struck string.
   // The old note crossfades over the new note's attack so slow pads don't dip.
   for (const l of liveVoices) {
-    if (l.owner === owner && !l.held && Math.abs(l.freq - freq) < 0.01
+    if (l.part === "pad" && l.owner === owner && !l.held && Math.abs(l.freq - freq) < 0.01
         && l.v.startsAt < at && l.v.endsAt > at) {
       l.v.release(at, Math.max(0.02, attack));
     }
   }
-  const sounding = liveVoices.filter((l) => l.v.levelAt(at) > AUDIBLE);
+  const sounding = liveVoices.filter((l) => l.part === "pad" && l.v.levelAt(at) > AUDIBLE);
   audioStats.peakVoices = Math.max(audioStats.peakVoices, sounding.length + 1);
   const candidates = sounding.filter((l) => !l.held).sort((a, b) => a.v.levelAt(at) - b.v.levelAt(at));
   for (let n = sounding.length + 1 - MAX_VOICES; n > 0 && candidates.length; n--) {
@@ -161,22 +175,17 @@ function spawnNote(
   releaseAt: number | null,
   velocity: number,
   owner: Owner = "transport",
+  part: VoicePart = "pad",
 ): Voice {
-  makeRoom(startAt, freq, owner);
+  makeRoom(startAt, freq, owner, part);
   const s = useSoundStore.getState();
   const chain = getMasterChain();
-  const v = makeVoice({
-    ctx: chain.ctx,
-    destination: chain.voiceBus,
-    preset: s.preset,
-    timbre: s.timbre,
-    adsr: s.adsr,
-    freq,
-    velocity,
-  });
+  const v = part === "bass"
+    ? makeBassVoice({ ctx: chain.ctx, destination: chain.bassBus, sound: s.bass.sound, tone: s.bass.tone, freq, velocity })
+    : makeVoice({ ctx: chain.ctx, destination: chain.padBus, preset: s.preset, timbre: s.timbre, adsr: s.adsr, freq, velocity });
   v.start(startAt);
   if (releaseAt !== null) v.release(releaseAt);
-  liveVoices.push({ v, owner, freq, held: releaseAt === null });
+  liveVoices.push({ v, owner, part, freq, held: releaseAt === null });
   return v;
 }
 
@@ -203,6 +212,13 @@ export async function playChord(chord: ChordSymbol, durationSec = 1.2, octave = 
 }
 
 /** Play an explicit set of MIDI notes (used by the Chord Explorer's edited voicings). */
+/** A short line on the current bass sound, for the Sound panel. */
+export async function previewBass(): Promise<void> {
+  await ensureAudio();
+  const t = getAudioContext().currentTime + 0.01;
+  [36, 43, 48, 43].forEach((midi, i) => spawnNote(midiToFreq(midi), t + i * 0.3, t + i * 0.3 + 0.28, 0.9, "audition", "bass"));
+}
+
 export async function playNotes(midiNotes: number[], durationSec = 1.2): Promise<void> {
   await ensureAudio();
   if (midiNotes.length === 0) return;
@@ -336,7 +352,7 @@ function createPlayer(owner: Owner) {
       scheduled.push({ startAbs: abs, endAbs: abs, startT: t, node: scheduleClick(t, n.midi === 1, m.volume) });
       return;
     }
-    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner);
+    const voice = spawnNote(midiToFreq(n.midi), t, timeAt(abs + n.lengthBeats), n.velocity, owner, n.part);
     scheduled.push({ startAbs: abs, endAbs: abs + n.lengthBeats, startT: t, voice });
   };
 
@@ -459,10 +475,13 @@ function sectionArpArmed(sectionId: string): boolean {
 }
 
 function renderSettings(octave = 4): RenderSettings {
-  const { arp } = useSoundStore.getState();
+  const { arp, bass, mix } = useSoundStore.getState();
   const { beatsPerBar, beatUnit } = useSongStore.getState().meta;
   return {
-    pad: (sectionId) => ({ arp, armed: sectionId ? sectionArpArmed(sectionId) : true, octave }),
+    pad: (sectionId) => mix.pad.on
+      ? { arp, armed: sectionId ? sectionArpArmed(sectionId) : true, octave, bassOn: mix.bass.on }
+      : null,
+    bass: () => (mix.bass.on ? bass : null),
     meter: { beatsPerBar, beatUnit },
     click: true,
   };
@@ -520,7 +539,10 @@ export function stopTransport(): void {
 // after the notes already queued. Sliders apply to the next notes, so a drag
 // doesn't reschedule on every tick.
 useSoundStore.subscribe((s, prev) => {
-  if (s.arp !== prev.arp || s.preset !== prev.preset) transport.update(renderTransport(), true);
+  const heardNow = s.arp !== prev.arp || s.preset !== prev.preset
+    || s.bass.sound !== prev.bass.sound || s.bass.pattern !== prev.bass.pattern || s.bass.rate !== prev.bass.rate
+    || s.mix.pad.on !== prev.mix.pad.on || s.mix.bass.on !== prev.mix.bass.on || s.mix.drums.on !== prev.mix.drums.on;
+  if (heardNow) transport.update(renderTransport(), true);
 });
 useMetronomeStore.subscribe((s, prev) => {
   if (s.enabled !== prev.enabled) transport.update(renderTransport(), true);
