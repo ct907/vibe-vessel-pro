@@ -19,12 +19,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Volume2 } from "lucide-react";
 import { useSongStore } from "@/store/song";
 import { useMetronomeStore } from "@/store/metronome";
 import { previewClick } from "@/lib/audio/metronome";
 import { usePlaybackStore } from "@/store/playback";
-import { ALL_ROOTS, MODE_LABEL, type Mode } from "@/lib/music/chords";
+import { ALL_ROOTS, MODE_LABEL, rootToPc, type Mode } from "@/lib/music/chords";
+import { playNotes } from "@/lib/music/audio";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 
@@ -174,7 +175,7 @@ export function SongAttributesMenu() {
                 </SelectContent>
               </Select>
               <Select value={meta.keyMode} onValueChange={(v) => setKey(meta.keyRoot, v as Mode)}>
-                <SelectTrigger className="h-9 w-[130px]">
+                <SelectTrigger className="h-9 w-[104px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -183,6 +184,15 @@ export function SongAttributesMenu() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => playNotes([48 + rootToPc(meta.keyRoot)], 1.5)}
+                aria-label={`Play root note ${meta.keyRoot}`}
+              >
+                <Volume2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
