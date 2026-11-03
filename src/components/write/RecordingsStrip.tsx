@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Draggable, Droppable, type DraggableProvided } from "@hello-pangea/dnd";
-import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, X, Mic, ChevronDown } from "lucide-react";
+import { Play, Pause, Star, Trash2, Save, Sparkles, MoreVertical, Pencil, RefreshCw, ListMusic, Upload, X, Mic, ChevronDown, Repeat, Plus } from "lucide-react";
 import { useTakesStore, MAX_BEST_TAKES, type Take } from "@/store/takes";
 import { useTranscriptionStore, type TranscribedChord } from "@/store/transcription";
-import { useSongStore } from "@/store/song";
+import { useSongStore, withHistoryGroup, getSectionDisplayName, CHORD_ROW_SLOTS } from "@/store/song";
+import { chordSlotWidth } from "@/lib/music/chordLayout";
 import { getAudioBlob, deleteAudioBlob, putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
 import { transcribeBlob } from "@/lib/music/transcribe";
@@ -40,6 +41,7 @@ export function RecordingsStrip() {
   const clearTake = useTranscriptionStore((s) => s.clearTake);
 
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [loopingIds, setLoopingIds] = useState<Set<string>>(() => new Set());
   const [currentTime, setCurrentTime] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [backupHintDismissed, setBackupHintDismissed] = useState(() => {
@@ -87,6 +89,7 @@ export function RecordingsStrip() {
     const url = URL.createObjectURL(blob);
     blobUrlRef.current = url;
     const audio = new Audio(url);
+    audio.loop = loopingIds.has(take.id);
     audio.currentTime = atSec;
     audioRef.current = audio;
     audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
@@ -127,6 +130,39 @@ export function RecordingsStrip() {
       return;
     }
     void startPlayback(take, sec);
+  };
+
+  // Loop a take to jam along with it.
+  const toggleLoop = (take: Take) => {
+    const next = new Set(loopingIds);
+    if (next.has(take.id)) next.delete(take.id);
+    else next.add(take.id);
+    setLoopingIds(next);
+    if (activeTakeIdRef.current === take.id && audioRef.current) audioRef.current.loop = next.has(take.id);
+  };
+
+  // Detected chords become the song's progression: on the first section without
+  // chords (or a new verse), each held for as many beats as it was played.
+  const addDetectedToSong = (chords: TranscribedChord[]) => {
+    const beatSec = 60 / useSongStore.getState().meta.bpm;
+    let sectionId = "";
+    withHistoryGroup(() => {
+      const song = useSongStore.getState();
+      sectionId = song.sections.find((sec) => sec.chords.length === 0)?.id ?? song.addSection("verse");
+      const lineId = useSongStore.getState().sections.find((sec) => sec.id === sectionId)!.lines[0].id;
+      let slot = 0;
+      for (const d of chords) {
+        const placed = useSongStore.getState().placeChordInSlot(sectionId, lineId, slot, d.chord);
+        if (!placed) break;
+        slot = Math.min(CHORD_ROW_SLOTS - 1, placed.slotIndex + chordSlotWidth(d.chord.display) + 1);
+        const pp = useSongStore.getState().sections.find((sec) => sec.id === sectionId)?.chords.find((c) => c.id === placed.id)?.progressionPlacement;
+        if (pp) useSongStore.getState().setPatternChordLength(pp.patternId, placed.id, Math.max(1, Math.round((d.endSec - d.startSec) / beatSec)));
+      }
+    });
+    const sections = useSongStore.getState().sections;
+    toast.success(`Added ${chords.length} chords to ${getSectionDisplayName(sections, sectionId)}`, {
+      action: { label: "Undo", onClick: () => { useSongStore.getState().undo(); } },
+    });
   };
 
   const handleDelete = (take: Take) => {
@@ -313,9 +349,11 @@ export function RecordingsStrip() {
                   onTranscribe={() => void handleTranscribe(take)}
                   onRename={(name) => renameTake(take.id, name)}
                   starDisabled={atMax && !take.best}
+                  looping={loopingIds.has(take.id)}
+                  onToggleLoop={() => toggleLoop(take)}
                 />
                 {st === "done" && detected.length > 0 && (
-                  <DetectedChordsStrip takeId={take.id} chords={detected} />
+                  <DetectedChordsStrip takeId={take.id} chords={detected} onAddToSong={() => addDetectedToSong(detected)} />
                 )}
               </div>
             );
@@ -354,6 +392,8 @@ function TakeCard({
   onTranscribe,
   onRename,
   starDisabled,
+  looping,
+  onToggleLoop,
 }: {
   take: Take;
   playing: boolean;
@@ -366,6 +406,8 @@ function TakeCard({
   onTranscribe: () => void;
   onRename: (name: string) => void;
   starDisabled: boolean;
+  looping: boolean;
+  onToggleLoop: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(take.name);
@@ -508,6 +550,20 @@ function TakeCard({
           />
         </div>
         <span className="shrink-0 font-mono-chord text-[9.5px] text-ink-soft">{take.duration}</span>
+        <button
+          type="button"
+          onClick={onToggleLoop}
+          aria-pressed={looping}
+          aria-label="Loop take"
+          title="Loop take"
+          className={cn(
+            "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md transition-colors",
+            looping ? "text-[var(--primary-foreground)]" : "text-ink-soft hover:text-ink",
+          )}
+          style={looping ? { background: "var(--primary-strong)" } : undefined}
+        >
+          <Repeat className="h-3 w-3" />
+        </button>
       </div>
 
       {transcribing && (
@@ -534,14 +590,21 @@ function TakeCard({
   );
 }
 
-function DetectedChordsStrip({ takeId, chords }: { takeId: string; chords: TranscribedChord[] }) {
+function DetectedChordsStrip({ takeId, chords, onAddToSong }: { takeId: string; chords: TranscribedChord[]; onAddToSong: () => void }) {
   return (
     <div className="w-full">
       <div className="mb-0.5 flex items-center gap-1 px-0.5">
-        <ListMusic className="h-3 w-3" style={{ color: "var(--primary-strong)" }} />
-        <span className="font-mono-chord text-[9px] font-semibold uppercase tracking-wide text-ink-soft">
-          Detected — drag to lyrics
+        <ListMusic className="h-3 w-3 shrink-0" style={{ color: "var(--primary-strong)" }} />
+        <span className="min-w-0 truncate font-mono-chord text-[9px] font-semibold uppercase tracking-wide text-ink-soft">
+          Detected
         </span>
+        <button
+          type="button"
+          onClick={onAddToSong}
+          className="btn-sculpt-amber ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold"
+        >
+          <Plus className="h-3 w-3" /> Add to song
+        </button>
       </div>
       <Droppable
         droppableId={`detected:${takeId}`}
@@ -559,6 +622,7 @@ function DetectedChordsStrip({ takeId, chords }: { takeId: string; chords: Trans
             {...dropProvided.droppableProps}
             className="hide-scroll flex gap-1 overflow-x-auto rounded-lg p-1.5"
             style={{ background: "var(--paper-shade)" }}
+            title="Drag a chord onto a lyric line"
           >
             {chords.map((c, i) => (
               <Draggable key={c.id} draggableId={`detected:${c.id}`} index={i}>

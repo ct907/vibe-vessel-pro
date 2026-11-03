@@ -62,7 +62,7 @@ interface UIState {
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
   /** One-shot signal: WriteStickyBar requests the active tab to open its chord picker sheet. */
-  /** True while a chord (or multi-selection) is active; the sticky bar glows to show it's ready to act on it. */
+  /** True while a chord (or multi-selection), a tapped chord row, or a tapped block is the chord target; the sticky bar enables Edit/Move Chords and glows. */
   chordSelectionActive: boolean;
   setChordSelectionActive: (v: boolean) => void;
   chordPickerRequest: boolean;

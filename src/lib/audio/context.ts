@@ -1,26 +1,24 @@
 // Phase 1.6 — Shared AudioContext + master FX chain.
 //
 // Graph:
-//   voice -> voiceBus -> eq(low,mid,high) -> chorus(send/wet) ─┐
-//                                                              ├-> dryBus
-//                                                              ├-> delay -> reverb -> wet
-//                                                              ├-> reverb -> wet
+//   pad voice -> padBus -> voiceBus -> eq(low,mid,high) -> chorus(send/wet) ─┐
+//                                                                          ├-> dryBus
+//                                                                          ├-> delay -> reverb -> wet
+//                                                                          ├-> reverb -> wet
+//   bass voice -> bassBus ─────────────────────────────────────────────────┤
+//   drum hit -> drumBus ─────────────────────────── (+ small reverb send) ─┤
 //   dryBus + wet -> limiter -> destination
 //
+// The EQ and effects are the Pad's; bass and drums stay dry and up front.
+//
 // All graph nodes are constructed lazily on first call so that the
-// AudioContext only resumes after a user gesture (Tone.start() handles
-// the actual resume in the engine layer).
+// AudioContext only resumes after a user gesture (ensureAudio() in the
+// engine layer handles the resume).
 
 let ctx: AudioContext | null = null;
 
-/**
- * Returns the shared AudioContext used by both the Web Audio synthesis layer
- * and Tone.js scheduling. Callers may inject the context explicitly (the
- * engine layer passes Tone's raw context after Tone.start()) so that
- * scheduled times line up with `Tone.now()` exactly.
- */
-export function getAudioContext(injected?: AudioContext): AudioContext {
-  if (injected && !ctx) ctx = injected;
+/** The one AudioContext shared by synthesis, scheduling, recording and decoding. */
+export function getAudioContext(): AudioContext {
   if (ctx) return ctx;
   const Ctor: typeof AudioContext =
     (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
@@ -30,7 +28,13 @@ export function getAudioContext(injected?: AudioContext): AudioContext {
 
 export interface MasterChain {
   ctx: AudioContext;
-  /** All synth voices connect here. */
+  /** Pad (chord) voices connect here; its gain is the Pad level. */
+  padBus: GainNode;
+  /** Bass voices; its gain is the Bass level. */
+  bassBus: GainNode;
+  /** Drum hits; its gain is the Drums level. */
+  drumBus: GainNode;
+  /** The Pad's EQ + effects input. */
   voiceBus: GainNode;
   // EQ
   eqLow: BiquadFilterNode;
@@ -183,8 +187,18 @@ export function getMasterChain(): MasterChain {
   delay.connect(reverbSend); // delay tails into reverb
   reverb.connect(reverbWet); reverbWet.connect(master);
 
+  const padBus = ac.createGain();
+  padBus.connect(voiceBus);
+  const bassBus = ac.createGain();
+  bassBus.connect(master);
+  const drumBus = ac.createGain();
+  drumBus.connect(master);
+  const drumRoom = ac.createGain();
+  drumRoom.gain.value = 0.12;
+  drumBus.connect(drumRoom).connect(reverb);
+
   chain = {
-    ctx: ac, voiceBus,
+    ctx: ac, padBus, bassBus, drumBus, voiceBus,
     eqLow, eqMid, eqHigh,
     chorusSend, chorusWet, chorus,
     delaySend, delay, delayFb, delayWet,

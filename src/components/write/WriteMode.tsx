@@ -10,26 +10,12 @@ import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { RecordingsStrip } from "./RecordingsStrip";
-import { WriteStickyBar, requestStickyBarRecording } from "./WriteStickyBar";
+import { WriteStickyBar, requestStickyBarRecording, focusLyricLine } from "./WriteStickyBar";
 
 interface Props {
   sortMode: boolean;
   onSwitchTab: (t: TabName) => void;
   showOnboarding: boolean;
-}
-
-/** Poll a few frames for the first lyric textarea (it mounts on reveal) and focus it. */
-function focusFirstLyricLine() {
-  let tries = 0;
-  const tick = () => {
-    const el = document.querySelector<HTMLTextAreaElement>("[data-lyric-input]");
-    if (el) {
-      el.focus();
-      return;
-    }
-    if (++tries < 10) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
 }
 
 /**
@@ -96,7 +82,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       requestStickyBarRecording();
     } else if (capture === "lyrics") {
       setLyricsRevealed(true);
-      focusFirstLyricLine();
+      focusLyricLine();
     }
     const next = new URLSearchParams(searchParams);
     next.delete("capture");
@@ -137,7 +123,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
             hint={`${tapVerb} to start typing`}
             onClick={() => {
               setLyricsRevealed(true);
-              focusFirstLyricLine();
+              focusLyricLine();
               revealLyricsForTour();
             }}
           />

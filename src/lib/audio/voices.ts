@@ -1,19 +1,19 @@
 // Phase 1.6 — Web Audio voice engines.
 //
 // Three archetypes:
-//   - FM (2-op)         : "rhodes", "dxkeys", "piano"
-//   - Subtractive       : "juno", "stringMachine", "organ"
+//   - FM (2-op)         : "rhodes", "dxkeys", "piano", "glassPad"
+//   - Subtractive       : "juno", "stringMachine", "organ", "warmPad", "sweepPad", "airPad"
 //   - Formant (vocal)   : "vocalChoir"
 //
 // The exported makeVoice() returns a Voice that owns its own subgraph and
-// provides triggerAttack/triggerRelease + an immediate dispose() for cleanup.
-// The engine layer handles polyphony limiting (max 16 voices).
+// provides start/release + an immediate dispose() for cleanup.
+// The engine layer handles polyphony limiting.
 
-import type { ADSR, SoundPreset, SoundEngine } from "@/store/sound";
+import type { ADSR, BassSound, SoundPreset, SoundEngine } from "@/store/sound";
 import { PRESET_BY_VALUE } from "@/store/sound";
 
 export interface VoiceParams {
-  ctx: AudioContext;
+  ctx: BaseAudioContext;
   destination: AudioNode;
   preset: SoundPreset;
   /** 0..1 macro that the preset maps to internal parameters. */
@@ -27,36 +27,145 @@ export interface VoiceParams {
 export interface Voice {
   /** Trigger envelope at the given audio-context time. */
   start(at: number): void;
-  /** Begin release envelope at the given time. */
-  release(at: number): void;
+  /**
+   * Fade out from `at` over `fade` seconds (default: the ADSR release). Can be
+   * called again to shorten a fade, never to lengthen it. At or before the
+   * start time it cancels the note instead.
+   */
+  release(at: number, fade?: number): void;
   /** Hard-stop and disconnect. Safe to call any time. */
   dispose(): void;
+  /** Envelope level at `t` as a fraction of the voice's peak. */
+  levelAt(t: number): number;
   /** Audio-context time at which the voice will be silent and self-removable. */
   endsAt: number;
   /** Audio-context time at which the voice will start (set by start()). */
   startsAt: number;
 }
 
-// Convenience: schedule a smooth ADSR on a GainNode at the given start time.
-function applyAttack(g: GainNode, adsr: ADSR, peak: number, atRaw: number) {
-  const at = Math.max(0, atRaw);
-  const p = g.gain;
-  p.cancelScheduledValues(at);
-  p.setValueAtTime(0.0001, at);
-  p.exponentialRampToValueAtTime(Math.max(0.0001, peak), at + Math.max(0.001, adsr.attack));
-  const sustainLevel = Math.max(0.0001, peak * Math.max(0.0001, adsr.sustain));
-  p.exponentialRampToValueAtTime(sustainLevel, at + adsr.attack + Math.max(0.001, adsr.decay));
+const FLOOR = 0.0001;
+
+interface EnvEvent { t: number; v: number; curve: "set" | "linear" | "exp" }
+
+/**
+ * ADSR on a gain param that keeps its own copy of what it scheduled. The
+ * attack is linear (an exponential rise from the floor stays inaudible for
+ * most of its length); decay and release are exponential.
+ *
+ * Releases are often scheduled before the note has even started, when
+ * `AudioParam.value` is still the floor, so the level at release time has to
+ * come from the schedule. Cancelling at the release time also deletes any
+ * ramp still in progress; re-adding it as a ramp to the level it would have
+ * reached keeps the same curve up to the release.
+ */
+export function makeEnvelope(param: AudioParam, adsr: ADSR, peak: number) {
+  let events: EnvEvent[] = [];
+  let releaseEnd = Infinity;
+  const top = Math.max(FLOOR, peak);
+
+  const levelAt = (t: number): number => {
+    if (!events.length || t < events[0].t) return FLOOR;
+    let i = events.length - 1;
+    while (i > 0 && events[i].t > t) i--;
+    const prev = events[i];
+    const next = events[i + 1];
+    if (!next || next.curve === "set") return prev.v;
+    const span = next.t - prev.t;
+    if (span <= 0) return next.v;
+    const k = (t - prev.t) / span;
+    return next.curve === "linear"
+      ? prev.v + (next.v - prev.v) * k
+      : prev.v * Math.pow(next.v / prev.v, k);
+  };
+
+  return {
+    start(at: number) {
+      const a = Math.max(0.001, adsr.attack);
+      const d = Math.max(0.001, adsr.decay);
+      const sustain = Math.max(FLOOR, top * Math.max(FLOOR, adsr.sustain));
+      events = [
+        { t: at, v: FLOOR, curve: "set" },
+        { t: at + a, v: top, curve: "linear" },
+        { t: at + a + d, v: sustain, curve: "exp" },
+      ];
+      releaseEnd = Infinity;
+      param.cancelScheduledValues(at);
+      param.setValueAtTime(FLOOR, at);
+      param.linearRampToValueAtTime(top, at + a);
+      param.exponentialRampToValueAtTime(sustain, at + a + d);
+    },
+    /** Returns the time the envelope reaches the floor. */
+    release(at: number, fade: number): number {
+      if (at >= releaseEnd) return releaseEnd;
+      const end = Math.min(releaseEnd, at + Math.max(0.01, fade));
+      const v = levelAt(at);
+      const cut = events.find((e) => e.t >= at);
+      events = events.filter((e) => e.t < at);
+      param.cancelScheduledValues(at);
+      if (cut?.curve === "linear") param.linearRampToValueAtTime(v, at);
+      else if (cut?.curve === "exp") param.exponentialRampToValueAtTime(v, at);
+      else param.setValueAtTime(v, at);
+      param.exponentialRampToValueAtTime(FLOOR, end);
+      events.push({ t: at, v, curve: cut?.curve ?? "set" }, { t: end, v: FLOOR, curve: "exp" });
+      releaseEnd = end;
+      return end;
+    },
+    levelAt: (t: number) => levelAt(t) / top,
+  };
 }
 
-function applyRelease(g: GainNode, adsr: ADSR, atRaw: number): number {
-  const at = Math.max(0, atRaw);
-  const p = g.gain;
-  // Read current value to start a smooth tail
-  const v = Math.max(0.0001, p.value);
-  p.cancelScheduledValues(at);
-  p.setValueAtTime(v, at);
-  p.exponentialRampToValueAtTime(0.0001, at + Math.max(0.01, adsr.release));
-  return at + adsr.release + 0.05;
+/** Wraps a voice's graph: envelope on `amp`, sources started and stopped together. */
+function assembleVoice({
+  ctx, sources, nodes, amp, adsr, peak, onStart,
+}: {
+  ctx: BaseAudioContext;
+  sources: AudioScheduledSourceNode[];
+  /** Every node to disconnect once the voice is done. */
+  nodes: AudioNode[];
+  amp: GainNode;
+  adsr: ADSR;
+  peak: number;
+  onStart?: (at: number) => void;
+}): Voice {
+  const env = makeEnvelope(amp.gain, adsr, peak);
+  let startsAt = Infinity;
+  let endsAt = Infinity;
+  let disposed = false;
+  const disconnect = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const n of nodes) { try { n.disconnect(); } catch { /* noop */ } }
+  };
+  sources[0].onended = disconnect;
+  const stopAll = (t: number) => {
+    for (const s of sources) { try { s.stop(t); } catch { /* noop */ } }
+  };
+
+  return {
+    start(at: number) {
+      startsAt = Math.max(0, at);
+      for (const s of sources) s.start(startsAt);
+      env.start(startsAt);
+      onStart?.(startsAt);
+    },
+    release(atRaw: number, fade = adsr.release) {
+      const at = Math.max(0, atRaw);
+      if (at <= startsAt) {
+        stopAll(0);
+        endsAt = Math.min(endsAt, Math.max(at, ctx.currentTime));
+        return;
+      }
+      endsAt = env.release(at, fade) + 0.02;
+      stopAll(endsAt);
+    },
+    dispose() {
+      stopAll(0);
+      disconnect();
+    },
+    levelAt: (t: number) => (t < startsAt || t >= endsAt ? 0 : env.levelAt(t)),
+    get endsAt() { return endsAt; },
+    get startsAt() { return startsAt; },
+  };
 }
 
 // ---------- FM (2-op) ----------
@@ -71,6 +180,9 @@ function makeFmVoice(p: VoiceParams): Voice {
         return { harmonicity: 14, modIndexBase: 60, modIndexPeak: 320, modDecay: 0.8 };
       case "dxkeys":
         return { harmonicity: 1, modIndexBase: 80, modIndexPeak: 220, modDecay: 1.5 };
+      case "glassPad":
+        // A non-integer ratio rings like struck glass, then settles to a soft sine.
+        return { harmonicity: 3.5, modIndexBase: 15, modIndexPeak: 110, modDecay: 2.5 };
       case "piano":
       default:
         return { harmonicity: 1, modIndexBase: 30, modIndexPeak: 120, modDecay: 0.6 };
@@ -102,21 +214,17 @@ function makeFmVoice(p: VoiceParams): Voice {
   // Slight tone shaping based on preset (a soft lowpass for piano warmth)
   const tone = ctx.createBiquadFilter();
   tone.type = "lowpass";
-  tone.frequency.value = preset === "rhodes" ? 5500 : preset === "piano" ? 4500 : 7500;
+  tone.frequency.value = preset === "rhodes" ? 5500 : preset === "piano" ? 4500 : preset === "glassPad" ? 8000 : 7500;
   tone.Q.value = 0.4;
   amp.connect(tone);
   tone.connect(destination);
 
-  const peak = velocity;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
-
-  return {
-    start(at: number) {
-      startsAt = at;
-      carrier.start(at);
-      modulator.start(at);
-      applyAttack(amp, adsr, peak, at);
+  return assembleVoice({
+    // The glass ratio's sidebands add ~6 dB over the other FM presets.
+    ctx, adsr, amp, peak: preset === "glassPad" ? velocity * 0.5 : velocity,
+    sources: [carrier, modulator],
+    nodes: [amp, tone, modGain],
+    onStart(at) {
       // Mod-index envelope: fast bell-like decay.
       const mg = modGain.gain;
       const startVal = freq * (modIndex * 1.6) / 100;
@@ -125,24 +233,27 @@ function makeFmVoice(p: VoiceParams): Voice {
       mg.setValueAtTime(startVal, at);
       mg.exponentialRampToValueAtTime(Math.max(0.0001, tailVal), at + cfg.modDecay);
     },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      try { carrier.stop(endsAt + 0.1); } catch { /* noop */ }
-      try { modulator.stop(endsAt + 0.1); } catch { /* noop */ }
-    },
-    dispose() {
-      try { carrier.stop(); } catch { /* noop */ }
-      try { modulator.stop(); } catch { /* noop */ }
-      try { amp.disconnect(); } catch { /* noop */ }
-      try { tone.disconnect(); } catch { /* noop */ }
-      try { modGain.disconnect(); } catch { /* noop */ }
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  });
 }
 
 // ---------- Subtractive ----------
+
+const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>();
+
+/** Two seconds of seeded white noise per context, shared by every voice. */
+function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
+  let buf = noiseBuffers.get(ctx);
+  if (buf) return buf;
+  buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let x = 0x9e3779b9;
+  for (let i = 0; i < d.length; i++) {
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    d[i] = ((x >>> 0) / 4294967296) * 2 - 1;
+  }
+  noiseBuffers.set(ctx, buf);
+  return buf;
+}
 function makeSubtractiveVoice(p: VoiceParams): Voice {
   const { ctx, destination, preset, timbre, adsr, freq, velocity } = p;
 
@@ -156,6 +267,24 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
           { type: "sawtooth", detuneCents: 0,   gain: 0.4 },
           { type: "sawtooth", detuneCents: +10, gain: 0.4 },
           { type: "sawtooth", detuneCents: -1200 + 7, gain: 0.2 },
+        ];
+      case "warmPad":
+        return [
+          { type: "sawtooth", detuneCents: -12, gain: 0.35 },
+          { type: "sawtooth", detuneCents: +12, gain: 0.35 },
+          { type: "sine",     detuneCents: -1200, gain: 0.45 },
+        ];
+      case "sweepPad":
+        return [
+          { type: "sawtooth", detuneCents: -6, gain: 0.4 },
+          { type: "sawtooth", detuneCents: +6, gain: 0.4 },
+          { type: "square",   detuneCents: -1200, gain: 0.2 },
+        ];
+      case "airPad":
+        return [
+          { type: "triangle", detuneCents: -5, gain: 0.5 },
+          { type: "triangle", detuneCents: +5, gain: 0.5 },
+          { type: "sine",     detuneCents: +1200, gain: 0.15 },
         ];
       case "organ":
         // Drawbar harmonics: 16', 8', 4', 2 2/3'
@@ -184,6 +313,12 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
       case "organ":
         // Timbre = drawbar mix (handled below by re-balancing harmonics).
         return 6000;
+      case "warmPad":
+        return 600 + timbre * 3400;
+      case "sweepPad":
+        return 900;
+      case "airPad":
+        return 5000;
       case "juno":
       default:
         return 250 + Math.pow(timbre, 2) * 7500;
@@ -210,7 +345,7 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.frequency.value = cutoff;
-  filter.Q.value = preset === "juno" ? 1.2 : 0.6;
+  filter.Q.value = preset === "juno" ? 1.2 : preset === "sweepPad" ? 5 : 0.6;
   sources.forEach((s) => s.g.connect(filter));
 
   const amp = ctx.createGain();
@@ -231,32 +366,51 @@ function makeSubtractiveVoice(p: VoiceParams): Voice {
     sources.forEach((s) => lfoGain!.connect(s.o.detune));
   }
 
-  const peak = velocity * 0.7;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
+  // Sweep Pad: a slow LFO opens and closes the resonant filter.
+  let sweep: OscillatorNode | null = null;
+  let sweepGain: GainNode | null = null;
+  if (preset === "sweepPad") {
+    sweep = ctx.createOscillator();
+    sweep.frequency.value = 0.12 + timbre * 0.3;
+    sweepGain = ctx.createGain();
+    sweepGain.gain.value = 300 + timbre * 1800;
+    sweep.connect(sweepGain).connect(filter.frequency);
+  }
 
-  return {
-    start(at: number) {
-      startsAt = at;
-      sources.forEach((s) => s.o.start(at));
-      lfo?.start(at);
-      applyAttack(amp, adsr, peak, at);
+  // Air Pad: breath noise, band-passed a couple of octaves above the note.
+  let noise: AudioBufferSourceNode | null = null;
+  let noiseNodes: AudioNode[] = [];
+  if (preset === "airPad") {
+    noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    noise.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = Math.min(9000, freq * 4);
+    band.Q.value = 0.9;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.15 + timbre * 0.6;
+    noise.connect(band).connect(noiseGain).connect(filter);
+    noiseNodes = [band, noiseGain];
+  }
+
+  const extraSources: AudioScheduledSourceNode[] = [];
+  for (const n of [lfo, sweep, noise]) if (n) extraSources.push(n);
+  const extraNodes: AudioNode[] = [...noiseNodes];
+  for (const n of [lfoGain, sweepGain]) if (n) extraNodes.push(n);
+
+  return assembleVoice({
+    ctx, adsr, amp, peak: velocity * 0.7,
+    sources: [...sources.map((s) => s.o), ...extraSources],
+    nodes: [...sources.map((s) => s.g), filter, amp, ...extraNodes],
+    onStart(at) {
+      if (preset !== "warmPad") return;
+      // The filter opens as the note swells in.
+      const f = filter.frequency;
+      f.setValueAtTime(cutoff * 0.3, at);
+      f.exponentialRampToValueAtTime(cutoff, at + Math.max(0.05, adsr.attack + adsr.decay));
     },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      sources.forEach((s) => { try { s.o.stop(endsAt + 0.1); } catch { /* noop */ } });
-      try { lfo?.stop(endsAt + 0.1); } catch { /* noop */ }
-    },
-    dispose() {
-      sources.forEach((s) => { try { s.o.stop(); } catch {/*noop*/} try { s.g.disconnect(); } catch {/*noop*/} });
-      try { lfo?.stop(); } catch {/*noop*/}
-      try { lfoGain?.disconnect(); } catch {/*noop*/}
-      try { filter.disconnect(); } catch {/*noop*/}
-      try { amp.disconnect(); } catch {/*noop*/}
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  });
 }
 
 // ---------- Formant (vocal choir) ----------
@@ -299,7 +453,8 @@ function makeFormantVoice(p: VoiceParams): Voice {
   });
 
   const sum = ctx.createGain();
-  sum.gain.value = 0.6;
+  // The narrow formant bandpasses drop ~20 dB versus the other engines.
+  sum.gain.value = 4.5;
   formants.forEach((g) => g.connect(sum));
 
   // Slight tremolo / vibrato to humanize.
@@ -316,33 +471,11 @@ function makeFormantVoice(p: VoiceParams): Voice {
   sum.connect(amp);
   amp.connect(destination);
 
-  const peak = velocity * 0.6;
-  let endsAt = Infinity;
-  let startsAt = Infinity;
-
-  return {
-    start(at: number) {
-      startsAt = at;
-      sources.forEach((o) => o.start(at));
-      vibrato.start(at);
-      applyAttack(amp, adsr, peak, at);
-    },
-    release(at: number) {
-      endsAt = applyRelease(amp, adsr, at);
-      sources.forEach((o) => { try { o.stop(endsAt + 0.1); } catch {/*noop*/} });
-      try { vibrato.stop(endsAt + 0.1); } catch {/*noop*/}
-    },
-    dispose() {
-      sources.forEach((o) => { try { o.stop(); } catch {/*noop*/} });
-      try { vibrato.stop(); } catch {/*noop*/}
-      try { vibGain.disconnect(); } catch {/*noop*/}
-      formants.forEach((g) => { try { g.disconnect(); } catch {/*noop*/} });
-      try { sum.disconnect(); } catch {/*noop*/}
-      try { amp.disconnect(); } catch {/*noop*/}
-    },
-    get endsAt() { return endsAt; },
-    get startsAt() { return startsAt; },
-  };
+  return assembleVoice({
+    ctx, adsr, amp, peak: velocity * 0.6,
+    sources: [...sources, vibrato],
+    nodes: [sourceMix, vibGain, ...formants, sum, amp],
+  });
 }
 
 export function engineFor(preset: SoundPreset): SoundEngine {
@@ -355,5 +488,102 @@ export function makeVoice(p: VoiceParams): Voice {
     case "formant":     return makeFormantVoice(p);
     case "subtractive":
     default:            return makeSubtractiveVoice(p);
+  }
+}
+
+// ---------- Bass ----------
+// Fixed envelopes: a bass part should be tight whatever the pad's ADSR is.
+
+const BASS_ADSR: Record<BassSound, ADSR> = {
+  electric: { attack: 0.004, decay: 0.5,  sustain: 0.55, release: 0.12 },
+  sub:      { attack: 0.006, decay: 0.3,  sustain: 0.85, release: 0.12 },
+  analog:   { attack: 0.003, decay: 0.25, sustain: 0.7,  release: 0.1 },
+  acid:     { attack: 0.002, decay: 0.2,  sustain: 0.6,  release: 0.08 },
+};
+
+export interface BassVoiceParams {
+  ctx: BaseAudioContext;
+  destination: AudioNode;
+  sound: BassSound;
+  /** 0..1 macro. */
+  tone: number;
+  freq: number;
+  velocity: number;
+}
+
+export function makeBassVoice({ ctx, destination, sound, tone, freq, velocity }: BassVoiceParams): Voice {
+  const adsr = BASS_ADSR[sound];
+  const amp = ctx.createGain();
+  amp.gain.value = 0.0001;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.connect(amp);
+  amp.connect(destination);
+
+  const osc = (type: OscillatorType, mult = 1, gain = 1) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq * mult;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    o.connect(g).connect(filter);
+    return { o, g };
+  };
+
+  switch (sound) {
+    case "sub": {
+      // A pure sine vanishes on phone speakers; the octave and fifth
+      // harmonics keep it audible there.
+      const parts = [osc("sine", 1, 0.9), osc("sine", 2, 0.2 + tone * 0.35), osc("triangle", 3, tone * 0.12)];
+      filter.frequency.value = 900;
+      filter.Q.value = 0.5;
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * 0.55,
+        sources: parts.map((x) => x.o),
+        nodes: [...parts.map((x) => x.g), filter, amp],
+      });
+    }
+    case "analog":
+    case "acid": {
+      const acid = sound === "acid";
+      const parts = acid ? [osc("sawtooth")] : [osc("sawtooth", 1, 0.6), osc("square", 1, 0.45)];
+      filter.Q.value = acid ? 11 : 4;
+      const top = acid ? 400 + tone * 3600 : 300 + tone * 2700;
+      const rest = acid ? 180 : 140 + tone * 300;
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * (acid ? 0.32 : 0.38),
+        sources: parts.map((x) => x.o),
+        nodes: [...parts.map((x) => x.g), filter, amp],
+        onStart(at) {
+          // The filter snaps open on each note and closes down: the "pluck".
+          const f = filter.frequency;
+          f.setValueAtTime(top, at);
+          f.exponentialRampToValueAtTime(rest, at + (acid ? 0.18 : 0.3));
+        },
+      });
+    }
+    case "electric":
+    default: {
+      // Fingered bass: FM at a 1:1 ratio, the modulation fading fast.
+      const carrier = ctx.createOscillator();
+      carrier.frequency.value = freq;
+      const mod = ctx.createOscillator();
+      mod.frequency.value = freq;
+      const modGain = ctx.createGain();
+      mod.connect(modGain).connect(carrier.frequency);
+      carrier.connect(filter);
+      filter.frequency.value = 1400 + tone * 2600;
+      filter.Q.value = 0.7;
+      const depth = freq * (0.6 + tone * 1.6);
+      return assembleVoice({
+        ctx, adsr, amp, peak: velocity * 0.6,
+        sources: [carrier, mod],
+        nodes: [modGain, filter, amp],
+        onStart(at) {
+          modGain.gain.setValueAtTime(depth, at);
+          modGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, depth * 0.08), at + 0.35);
+        },
+      });
+    }
   }
 }

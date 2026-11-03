@@ -36,26 +36,22 @@ export async function startRecording(opts: {
   });
   const mime = pickSupportedMime();
 
-  // Route through a unity-gain node so the level meter taps the same signal
-  // that's recorded. Peak normalization to -2 dBFS happens after stop().
-  const ac = getAudioContext();
-  const src = ac.createMediaStreamSource(stream);
-  const boostGain = ac.createGain();
-  boostGain.gain.value = 1.0;
-  const dest = ac.createMediaStreamDestination();
-  src.connect(boostGain);
-  boostGain.connect(dest);
-
-  const recorder = new MediaRecorder(dest.stream, { mimeType: mime });
+  // Record the mic stream itself. Recording an AudioContext destination instead
+  // captured nothing whenever the context was suspended or interrupted (iOS does
+  // this when the mic opens), leaving an empty 0:00 take. Peak normalization to
+  // -2 dBFS happens after stop().
+  const recorder = new MediaRecorder(stream, { mimeType: mime });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) chunks.push(e.data);
   };
 
-  // Level monitor — tap the boosted signal so the meter matches the recording.
+  // Level monitor only — it's fine for the meter to stay still if the context isn't running.
+  const ac = getAudioContext();
+  const src = ac.createMediaStreamSource(stream);
   const analyser = ac.createAnalyser();
   analyser.fftSize = 1024;
-  boostGain.connect(analyser);
+  src.connect(analyser);
   const data = new Uint8Array(analyser.fftSize);
   let rafId = 0;
   const tick = () => {
@@ -71,21 +67,25 @@ export async function startRecording(opts: {
   };
   rafId = requestAnimationFrame(tick);
 
-  recorder.start(250);
+  // No timeslice: one complete file at stop. Sliced recordings come out as
+  // fragmented MP4 on Safari, which decodeAudioData can't read.
+  recorder.start();
+  const startedAt = performance.now();
 
   const stop = (): Promise<{ blob: Blob; durationSec: number; mime: string }> =>
     new Promise((resolve, reject) => {
       recorder.onstop = async () => {
         cancelAnimationFrame(rafId);
         try { src.disconnect(); } catch { /* noop */ }
-        try { boostGain.disconnect(); } catch { /* noop */ }
         stream.getTracks().forEach((t) => t.stop());
         try {
           const raw = new Blob(chunks, { type: mime });
+          if (raw.size === 0) throw new Error("No audio was captured");
           const normalized = await normalizeRecording(raw);
           resolve({
             blob: normalized.blob,
-            durationSec: normalized.durationSec,
+            // A file the browser can play but not decode still has a length.
+            durationSec: normalized.durationSec || (performance.now() - startedAt) / 1000,
             mime: normalized.mime,
           });
         } catch (e) {
@@ -103,7 +103,6 @@ export async function startRecording(opts: {
     cancelAnimationFrame(rafId);
     try { recorder.stop(); } catch { /* noop */ }
     try { src.disconnect(); } catch { /* noop */ }
-    try { boostGain.disconnect(); } catch { /* noop */ }
     stream.getTracks().forEach((t) => t.stop());
   };
 

@@ -23,6 +23,23 @@ const START_RECORDING_EVENT = "write:start-recording";
 
 const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
+// Shorter than this is a double-tap, not an idea — don't save a silent 0:00 take.
+const MIN_TAKE_MS = 600;
+
+/** Focus a lyric line (the song's first if no id) once it mounts — a new section or editor renders a frame or two after the state change. */
+export function focusLyricLine(lineId?: string) {
+  let tries = 0;
+  const tick = () => {
+    const el = document.querySelector<HTMLTextAreaElement>(lineId ? `[data-lyric-input="${lineId}"]` : "[data-lyric-input]");
+    if (el) {
+      el.focus();
+      return;
+    }
+    if (++tries < 10) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 /** Ask the mounted sticky bar to start recording, as if its Record button was pressed. */
 export function requestStickyBarRecording() {
   window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
@@ -37,6 +54,9 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
+  const recordStartedAtRef = useRef(0);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
   const [recording, setRecording] = useState(false);
   const [pending, setPending] = useState(false);
   const [level, setLevel] = useState(0);
@@ -77,11 +97,16 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   }, [recording]);
 
   const start = async () => {
+    // A second tap while the mic is still opening would start a second recorder.
+    if (startingRef.current || recorderRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
     try {
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
       const handle = await startRecording({ onLevel: setLevel });
       recorderRef.current = handle;
+      recordStartedAtRef.current = Date.now();
       setRecording(true);
     } catch {
       // mic permission denied or device unavailable — tell the user so they
@@ -89,6 +114,9 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
       toast.error("Can't access the microphone", {
         description: "Allow mic access in your browser settings, then try again.",
       });
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
     }
   };
 
@@ -98,6 +126,11 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     recorderRef.current = null;
     setRecording(false);
     setLevel(0);
+    if (Date.now() - recordStartedAtRef.current < MIN_TAKE_MS) {
+      handle.cancel();
+      toast("Recording too short to keep", { description: "Tap Record, play your idea, then tap Stop." });
+      return;
+    }
     setPending(true);
     try {
       const { blob, durationSec, mime } = await handle.stop();
@@ -145,6 +178,15 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     return () => window.removeEventListener(START_RECORDING_EVENT, onRequest);
   }, [pending]);
 
+  // A new section gets the caret straight away, so the writer keeps typing.
+  const addSectionAndFocus = (type: SectionType) => {
+    onEditorAction?.();
+    const id = addSection(type);
+    setAddSectionOpen(false);
+    const lineId = useSongStore.getState().sections.find((s) => s.id === id)?.lines[0]?.id;
+    if (lineId) focusLyricLine(lineId);
+  };
+
   const handleEditChords = () => {
     onEditorAction?.();
     setChordPickerRequest(true);
@@ -177,14 +219,14 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
                 {SECTION_TYPES.map((t) => (
                   <button
                     key={t}
-                    onClick={() => { onEditorAction?.(); addSection(t); setAddSectionOpen(false); }}
+                    onClick={() => addSectionAndFocus(t)}
                     className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
                   >
                     <Plus className="h-3.5 w-3.5" />{t === "pre-chorus" ? "Pre-Chorus" : t}
                   </button>
                 ))}
                 <button
-                  onClick={() => { onEditorAction?.(); addSection("custom"); setAddSectionOpen(false); }}
+                  onClick={() => addSectionAndFocus("custom")}
                   className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
                 >
                   <Plus className="h-3.5 w-3.5" />Custom…
@@ -232,7 +274,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             <button
               type="button"
               onClick={toggle}
-              disabled={pending || (trackIsRecording && !recording)}
+              disabled={pending || starting || (trackIsRecording && !recording)}
               className={
                 "flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-xs font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
                 (recording ? " animate-rec-pulse" : "") +
@@ -245,7 +287,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
                 className="bg-white transition-all"
                 style={{ width: 10, height: 10, borderRadius: recording ? 2 : 5 }}
               />
-              {pending ? "Saving…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
+              {pending ? "Saving…" : starting ? "Starting…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
             </button>
 
             <button
@@ -260,10 +302,16 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               Add Section
             </button>
 
+            {/* Edit/Move act on the tapped chord or chord row, so they stay greyed
+                out until there is one. data-chord-keep stops the press from
+                clearing that selection before the click lands. */}
             <button
               type="button"
+              data-chord-keep
               onClick={handleEditChords}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              disabled={!chordSelectionActive}
+              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open chord picker"
             >
@@ -273,8 +321,11 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
 
             <button
               type="button"
+              data-chord-keep
               onClick={handleMoveChords}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              disabled={!chordSelectionActive}
+              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open move chords menu"
             >

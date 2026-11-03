@@ -47,9 +47,11 @@ interface Props {
   onOctaveChange?: (octave: number) => void;
   /** Ref attached to the topmost input-row container — used by parent to anchor coach marks. */
   headerRef?: RefObject<HTMLDivElement | null>;
+  /** The row/block being edited; it's scrolled clear of the sheet when it opens. */
+  targetSelector?: string;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange, headerRef }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange, headerRef, targetSelector }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
@@ -187,6 +189,38 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
+  // Same contract as FocusedChordEditor: publish how much of the page the sheet
+  // covers (the editor pads its bottom by it) and scroll the row or block being
+  // edited clear of the sheet, so the writer can see what they're changing.
+  // State, not a ref: the sheet's portal mounts a render after `open` flips.
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = contentEl;
+    if (!open || !el) return;
+    const apply = () => root.style.setProperty("--chord-sheet-h", `${el.offsetHeight}px`);
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--chord-sheet-h");
+    };
+  }, [open, contentEl]);
+  useEffect(() => {
+    if (!open || !targetSelector || !contentEl) return;
+    // Let the page take the sheet-height padding first so there's room to scroll.
+    const id = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(targetSelector);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const limit = window.innerHeight - contentEl.offsetHeight - 12;
+      if (rect.bottom > limit) window.scrollBy({ top: rect.bottom - limit, behavior: "smooth" });
+      else if (rect.top < 96) window.scrollBy({ top: rect.top - 96, behavior: "smooth" });
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [open, targetSelector, contentEl]);
+
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
   const SHEET_CHROME = isMobile ? 160 : 200;
@@ -203,6 +237,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
+        ref={setContentEl}
         side="bottom"
         className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}

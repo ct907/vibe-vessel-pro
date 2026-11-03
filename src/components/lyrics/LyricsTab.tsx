@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +49,6 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRecordingsStore } from "@/store/recordings";
 import {
@@ -75,11 +74,17 @@ import {
   Play,
   Square,
   Check,
+  Guitar,
+  NotebookPen,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
+import { SectionToggleButton } from "@/components/section/SectionToggleButton";
+import { ChordActionRow } from "@/components/chord/ChordActionRow";
+import { SectionSoundSheet } from "@/components/sound/SectionSoundSheet";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { chordSlotWidth } from "@/lib/music/chordLayout";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
@@ -154,6 +159,8 @@ interface LineRowProps {
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
   onChordFocus: (lineId: string) => void;
+  /** This line's chord row was tapped — the sticky bar's chord buttons act on it. */
+  chordFocused?: boolean;
   /** The chord id that currently shows its X chip (tab-level, one at a time). */
   activeChordId: string | null;
   onSetActiveChordId: (id: string | null) => void;
@@ -179,6 +186,7 @@ function LineRow({
   onMergeUp,
   onPickerOpen,
   onChordFocus,
+  chordFocused,
   activeChordId,
   onSetActiveChordId,
   multiSelectedIds,
@@ -353,6 +361,7 @@ function LineRow({
           className={cn(
             "group relative flex items-center flex-1 min-w-0 rounded-sm bg-[var(--paper-card)] outline-none border border-solid transition-colors",
             hasActiveChordInLine ? "border-muted-foreground/30" : "border-transparent hover:border-muted-foreground/40",
+            chordFocused && "border-primary/60",
             pasteMode && "animate-paste-glow cursor-copy",
           )}
           style={{ minHeight: 22, paddingTop: 2, paddingBottom: 2, overflowX: "visible", paddingLeft: 8 }}
@@ -468,50 +477,6 @@ function LineRow({
                             className="absolute inset-0 rounded-md ring-2 ring-[var(--chord-chip)] animate-pulse pointer-events-none"
                           />
                         )}
-                        {activeChordId === anchor!.id && (
-                          <button
-                            type="button"
-                            className="absolute -top-2.5 -left-2.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
-                            aria-label="Edit chord"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setChordToolbarOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {activeChordId === anchor!.id && (
-                          <button
-                            type="button"
-                            className="absolute -bottom-2.5 -left-2.5 z-20 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow"
-                            aria-label="Edit chord quality"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSetActiveChordId(null);
-                              onPickerOpen(line.id, slotIdx, anchor!.id);
-                            }}
-                          >
-                            <ListMusic className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {activeChordId === anchor!.id && (
-                          <button
-                            type="button"
-                            className="absolute -top-2.5 -right-2.5 z-20 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
-                            aria-label="Delete chord"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeChordAnchorsBatch(sectionId, line.id, [anchor!.id]);
-                              onSetActiveChordId(null);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
                     )}
                     {dropProvided.placeholder}
@@ -525,48 +490,56 @@ function LineRow({
       </div>
       )}
 
-      {/* Floating chord movement menu — appears below chord row when a chord is active.
-          Hidden on mobile; mobile uses the global FloatingChordToolbar. */}
+      {/* Actions for the tapped chord, in a row under the chord row. Desktop also
+          gets inline nudge arrows; Move opens the full chord toolbar everywhere. */}
       {(() => {
         if (!chordsVisible) return null;
-        if (isMobile) return null;
         if (!activeChordId) return null;
         const activeAnchor = lineChords.find((c) => c.id === activeChordId);
         if (!activeAnchor) return null;
         const currentSlot = activeAnchor.slotIndex ?? 0;
         return (
-          <div
-            data-chord-keep
-            className="mt-1 mb-1 flex items-center gap-1 w-fit rounded-lg border bg-popover shadow-md px-1.5 py-1"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
+          <ChordActionRow
+            chipSelector={`[data-chip-anchor="${activeAnchor.id}"]`}
+            onEdit={() => {
+              onSetActiveChordId(null);
+              onPickerOpen(line.id, currentSlot, activeAnchor.id);
+            }}
+            onMove={() => setChordToolbarOpen(true)}
+            onDelete={() => {
+              removeChordAnchorsBatch(sectionId, line.id, [activeAnchor.id]);
+              onSetActiveChordId(null);
+            }}
           >
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={currentSlot <= 0}
-              onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot - 1)}
-              aria-label="Move chord left"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-1 text-sm font-semibold font-mono">
-              {activeAnchor.chord.display}
-            </span>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={currentSlot >= CHORD_ROW_SLOTS - 1}
-              onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot + 1)}
-              aria-label="Move chord right"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+            {!isMobile && (
+              <>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  disabled={currentSlot <= 0}
+                  onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot - 1)}
+                  aria-label="Move chord left"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-1 text-sm font-semibold font-mono">{activeAnchor.chord.display}</span>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  disabled={currentSlot >= CHORD_ROW_SLOTS - 1}
+                  onClick={() => moveChordToSlot(sectionId, line.id, activeChordId, currentSlot + 1)}
+                  aria-label="Move chord right"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <span aria-hidden className="mx-0.5 h-6 w-px bg-border" />
+              </>
+            )}
+          </ChordActionRow>
         );
       })()}
 
@@ -779,9 +752,10 @@ function LineRow({
             <Button variant="ghost" onClick={() => { setSlashDialog(false); setTimeout(() => lyricInputRef.current?.focus(), 0); }}>Cancel</Button>
             <Button
               onClick={() => {
-                addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
+                const id = addSection(slashType, slashType === "custom" ? slashCustomLabel || undefined : undefined);
                 setSlashDialog(false);
-                lyricInputRef.current?.focus();
+                const firstLineId = useSongStore.getState().sections.find((s) => s.id === id)?.lines[0]?.id;
+                if (firstLineId) focusLineAt(firstLineId, 0);
               }}
             >
               Add section
@@ -823,6 +797,9 @@ interface SectionCardProps {
   onPickerClose: () => void;
   /** Open the chord editor for an unplaced (progression-only) chord (Door B). */
   onEditProgChord: (sectionId: string, patternId: string, chordId: string) => void;
+  /** Line whose chord row was last tapped, if it's in this section. */
+  focusedChordLineId?: string;
+  onChordRowFocus: (lineId: string) => void;
   sortMode?: boolean;
   onMoveSection?: (id: string, direction: -1 | 1) => void;
   /** Tab-level active chord for X chip (one across all sections). */
@@ -848,6 +825,8 @@ function SectionCard({
   onPickerOpen,
   onPickerClose,
   onEditProgChord,
+  focusedChordLineId,
+  onChordRowFocus,
   sortMode,
   onMoveSection,
   activeChordId,
@@ -874,7 +853,6 @@ function SectionCard({
     setSectionChordsVisible,
     setSectionNotesOpen,
     setSectionColor,
-    setSectionArpArmed,
     suppressCrossTabDeleteWarning,
     setSuppressCrossTabDeleteWarning,
     movePatternChord,
@@ -888,6 +866,7 @@ function SectionCard({
   const prevLabelRef = useRef<string>(section.label);
   const [pendingKeyChange, setPendingKeyChange] = useState(false);
   const [confirmDeleteSection, setConfirmDeleteSection] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const [overdubOpen, setOverdubOpen] = useState(false);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
@@ -999,17 +978,40 @@ function SectionCard({
   const chordsVisible = getSectionChordsVisible(section);
   const notesOpen = section.notesOpen ?? false;
 
+  const sectionToggles = (
+    <>
+      <SectionToggleButton
+        icon={<Guitar className="h-3.5 w-3.5" />}
+        label="Chords"
+        pressed={chordsVisible}
+        hasContent={hasChords}
+        onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
+        disabled={section.type === "instrumental"}
+        title={section.type === "instrumental" ? "Instrumental sections always show chords" : "Show or hide chords"}
+      />
+      <SectionToggleButton
+        icon={<NotebookPen className="h-3.5 w-3.5" />}
+        label="Notes"
+        pressed={notesOpen}
+        hasContent={hasComment}
+        onClick={() => setSectionNotesOpen(section.id, !notesOpen)}
+        title="Show or hide notes"
+      />
+    </>
+  );
+
   return (
     <div
       data-section-id={section.id}
       style={{ ...sectionTintStyle(section.color, 0.35), backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       className={cn("noise-texture-surface rounded-xl px-2 py-2 shadow-none border-0")}
     >
-      {/* Section header */}
+      {/* Section header — Chords/Notes sit in its row on desktop, a second row on mobile */}
       <div
-        className="flex items-center gap-2 px-3 h-12 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
+        className="px-3 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
         style={{ color: "oklch(0.3267 0.027 60.1)" }}
       >
+      <div className="flex items-center gap-2 h-12">
         <button
           type="button"
           onClick={() => toggleSectionCollapsed(section.id)}
@@ -1057,6 +1059,8 @@ function SectionCard({
             onCancelInitial={() => setPendingKeyChange(false)}
           />
         )}
+
+        {!sortMode && !isMobile && sectionToggles}
 
         {sortMode ? (
           <div className="ml-auto flex items-center gap-1">
@@ -1249,14 +1253,9 @@ function SectionCard({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-sm">Arpeggiator</span>
-                  <Switch
-                    checked={section.arpArmed !== false}
-                    onCheckedChange={(b) => setSectionArpArmed(section.id, b)}
-                    aria-label="Toggle arpeggiator for this section"
-                  />
-                </div>
+                <DropdownMenuItem onClick={() => setSoundOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4" /> Sound for this section…
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
@@ -1275,40 +1274,11 @@ function SectionCard({
         )}
 
       </div>
+      {!sortMode && isMobile && <div className="flex items-center gap-2 pb-2">{sectionToggles}</div>}
+      </div>
 
-      {/* Chords / Notes toggle row */}
-      <Collapsible
-        open={notesOpen}
-        onOpenChange={(o) => setSectionNotesOpen(section.id, o)}
-        className="mt-2"
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSectionChordsVisible(section.id, !chordsVisible)}
-            disabled={section.type === "instrumental"}
-            title={section.type === "instrumental" ? "Instrumental sections always show chords" : undefined}
-            className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4] disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ color: "oklch(0.3267 0.027 60.1)" }}
-          >
-            {chordsVisible ? "Hide Chords" : "Add Chords"}
-            {hasChords && (
-              <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-            )}
-          </button>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="relative inline-flex items-center rounded-lg px-3 h-8 text-xs font-semibold bg-[#b2b0a4]"
-              style={{ color: "oklch(0.3267 0.027 60.1)" }}
-            >
-              {notesOpen ? "Hide Notes" : "Show Notes"}
-              {hasComment && (
-                <span aria-hidden className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-        </div>
+      {/* Section notes */}
+      <Collapsible open={notesOpen} onOpenChange={(o) => setSectionNotesOpen(section.id, o)}>
         <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
           <div className="mt-2 w-full">
             <Textarea
@@ -1338,7 +1308,8 @@ function SectionCard({
                 onAddLineAfter={() => addLine(section.id, line.id)}
                 onMergeUp={(kind) => handleMergeUp(line.id, kind)}
                 onPickerOpen={(lineId, slot, anchorId) => onPickerOpen(section.id, lineId, slot, anchorId)}
-                onChordFocus={() => {}}
+                onChordFocus={onChordRowFocus}
+                chordFocused={focusedChordLineId === line.id}
                 activeChordId={activeChordId}
                 onSetActiveChordId={onSetActiveChordId}
                 multiSelectedIds={multiSelectedIds}
@@ -1500,6 +1471,7 @@ function SectionCard({
           removeSection(section.id);
         }}
       />
+      <SectionSoundSheet sectionId={section.id} label={displayName} open={soundOpen} onOpenChange={setSoundOpen} />
     </div>
   );
 }
@@ -1609,31 +1581,62 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
+  // The chord row last tapped (empty or not). With a selected chord, it's what
+  // the sticky bar's Edit/Move Chords act on.
+  const [chordRowFocus, setChordRowFocus] = useState<{ sectionId: string; lineId: string } | null>(null);
   const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
-  const hasChordSelection = activeChordId !== null || lyricMultiSelected.size > 0;
+  const hasChordTarget = activeChordId !== null || lyricMultiSelected.size > 0 || chordRowFocus !== null;
   useEffect(() => {
-    setChordSelectionActive(hasChordSelection);
+    setChordSelectionActive(hasChordTarget);
     return () => setChordSelectionActive(false);
-  }, [hasChordSelection, setChordSelectionActive]);
+  }, [hasChordTarget, setChordSelectionActive]);
+  // Tapping anywhere but a chord row, the sticky bar's chord buttons, or an
+  // open sheet/menu drops the row focus (and greys those buttons out again).
+  useEffect(() => {
+    if (!chordRowFocus) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (useUIStore.getState().focusedEditorOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('[data-chord-row],[data-chord-keep],[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')) return;
+      setChordRowFocus(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [chordRowFocus]);
   const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
   const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
   useEffect(() => {
     if (!chordPickerRequest) return;
     setChordPickerRequest(false);
-    for (const sec of sections) {
-      for (const l of sec.lines) {
-        const a = l.chords.find((c) => c.id === activeChordId);
-        if (a) {
-          setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: a.slotIndex ?? 0, anchorId: a.id });
+    // A selected chord opens the picker on that chord, ready to change it.
+    if (activeChordId) {
+      for (const sec of sections) {
+        for (const l of sec.lines) {
+          const a = getLineChordsViaSSOT(sec, l.id).find((c) => c.id === activeChordId);
+          if (a) {
+            setActiveChordId(null);
+            setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: a.slotIndex ?? 0, anchorId: a.id });
+            return;
+          }
+        }
+        const unplaced = sec.chords.find((c) => c.id === activeChordId && !c.lyricsPlacement && c.progressionPlacement);
+        if (unplaced?.progressionPlacement) {
+          setActiveChordId(null);
+          openProgPicker(sec.id, unplaced.progressionPlacement.patternId, unplaced.id);
           return;
         }
       }
     }
-    const sec = sections[sections.length - 1];
-    const l = sec?.lines[sec.lines.length - 1];
+    // Otherwise add to the focused chord row, after its last chord.
+    const sec = sections.find((x) => x.id === chordRowFocus?.sectionId) ?? sections[sections.length - 1];
+    const l = sec?.lines.find((x) => x.id === chordRowFocus?.lineId) ?? sec?.lines[sec.lines.length - 1];
     if (!sec || !l) return;
-    const lastSlot = l.chords.reduce((m, c) => Math.max(m, c.slotIndex ?? 0), -1);
-    setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, lastSlot + 1) });
+    const last = getLineChordsViaSSOT(sec, l.id).reduce<ChordAnchor | null>(
+      (m, c) => ((c.slotIndex ?? 0) > (m?.slotIndex ?? -1) ? c : m),
+      null,
+    );
+    const next = last ? (last.slotIndex ?? 0) + chordSlotWidth(last.chord.display) + 1 : 0;
+    setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, next) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chordPickerRequest]);
   const rangeAnchorRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
@@ -2408,6 +2411,8 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             onPickerOpen={openPicker}
             onPickerClose={() => setPicker(null)}
             onEditProgChord={openProgPicker}
+            focusedChordLineId={chordRowFocus?.sectionId === sec.id ? chordRowFocus.lineId : undefined}
+            onChordRowFocus={(lineId) => setChordRowFocus({ sectionId: sec.id, lineId })}
             activeChordId={activeChordId}
             onSetActiveChordId={setActiveChordId}
             multiSelectedIds={lyricMultiSelectedIds}
@@ -2581,6 +2586,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             if (!o) setPicker(null);
           }}
           headerRef={chordPickerHeaderRef}
+          targetSelector={picker?.lineId ? `[data-line-id="${picker.lineId}"]` : undefined}
           initialChord={initialChord}
           onPick={handlePick}
           onPickBatch={handlePickBatch}

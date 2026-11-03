@@ -416,6 +416,7 @@ export function TrackTimeline() {
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
+  const startingRef = useRef(false);
   // Set while a take records over the backing: where it started on the
   // timeline, and the AudioContext times the recorder and the backing began.
   const overdubRef = useRef<{ fromSec: number; recStartedAt: number; playAt: number } | null>(null);
@@ -737,6 +738,8 @@ export function TrackTimeline() {
   };
 
   const toggleRecord = async (tid: string) => {
+    // Ignore taps while the mic is still opening — they would start a second recorder.
+    if (startingRef.current) return;
     if (recordingTrackId === tid) {
       const handle = recorderRef.current;
       recorderRef.current = null;
@@ -781,6 +784,7 @@ export function TrackTimeline() {
       setRecLevel(0);
       setPendingTid(null);
     }
+    startingRef.current = true;
     try {
       const ac = getAudioContext();
       if (ac.state === "suspended") await ac.resume();
@@ -807,6 +811,8 @@ export function TrackTimeline() {
       toast.error("Can't access the microphone", {
         description: "Allow mic access in your browser settings, then try again.",
       });
+    } finally {
+      startingRef.current = false;
     }
   };
 
