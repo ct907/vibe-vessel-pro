@@ -41,9 +41,10 @@ const SECTIONS: Section[] = [
       "A bottom sheet opens. Type a chord directly — e.g. Fmaj7, Bbm9, Csus4 — or use the type / variant / altered-dominant / slash-bass dropdowns.",
       "Tap a suggested chord to add it and keep typing; the sheet stays open so you can add several chords in a row.",
       "Typing Nashville numbers (e.g. 2 5 1) resolves them to chords in your song's key and adds the whole sequence at once.",
+      "Prefer to play? Switch the sheet's Jam | Type tabs to Jam for a phone-style keypad: 1–7 play the chords of your key (each key shows its chord), 8 flats or sharpens, 9 adds a 7th / 9th / 11th / 13th, 0 changes major / minor / dim / aug / sus, * deletes and # adds everything you captured.",
       "Tap a placed chord chip to select it — a small toolbar lets you change its quality, move it, or delete it.",
     ],
-    tip: "The chord picker also has an Octave selector and a preview button on every chord so you can hear it before committing.",
+    tip: "The chord picker also has an Octave selector and a preview button on every chord so you can hear it before committing. It reopens on whichever tab — Jam or Type — you used last.",
   },
   {
     id: "write-lyrics",

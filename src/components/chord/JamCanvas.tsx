@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
+import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import { ChevronLeft, ChevronRight, Delete, Play, Square, X } from "lucide-react";
 import { ChordSymbol, MODE_LABEL, nashvilleLadder, transposeChord } from "@/lib/music/chords";
@@ -241,7 +242,9 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const typeLabel = current ? TYPE_LABEL[current.type ?? currentNatural!] : prefix.type ? TYPE_LABEL[prefix.type] : "—";
   const prefixArmed = prefix.accidental !== 0 || prefix.type !== null || prefix.ext !== 0;
 
-  return (
+  // Portaled: an ancestor in the tabs creates a containing block that would
+  // otherwise offset this fixed overlay.
+  return createPortal(
     <div
       ref={rootRef}
       tabIndex={-1}
@@ -256,7 +259,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <div ref={headerRef} className="flex items-center gap-2 px-3 py-2 shrink-0">
+      <div ref={headerRef} className="flex items-center gap-2 w-full max-w-md mx-auto px-3 py-2 shrink-0">
         <div className="flex-1 min-w-0">
           <p
             className="truncate"
@@ -422,7 +425,8 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -447,7 +451,7 @@ function Key({ glyph, label, caption, ariaLabel, lit, disabled, amber, onPress }
       onClick={onPress}
       className={cn(
         amber ? "btn-sculpt-amber" : "btn-sculpt-cream",
-        "flex h-[60px] items-center justify-between gap-2 rounded-xl px-3 select-none disabled:opacity-40",
+        "flex h-[clamp(56px,9dvh,76px)] items-center justify-between gap-2 rounded-xl px-3 select-none disabled:opacity-40",
       )}
       style={lit ? { outline: "2px solid var(--primary-strong)", boxShadow: "0 0 0 5px var(--primary-halo), var(--shadow-sculpt-cream-rest)" } : undefined}
     >
