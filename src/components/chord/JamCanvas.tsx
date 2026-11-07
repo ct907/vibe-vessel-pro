@@ -2,10 +2,9 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
-import { ChevronLeft, ChevronRight, Delete, Play, Plus, Square, X } from "lucide-react";
-import { ChordSymbol, MODE_LABEL, nashvilleLadder, transposeChord } from "@/lib/music/chords";
+import { ChevronLeft, ChevronRight, Delete, Play, Plus, Square, Volume2, X } from "lucide-react";
+import { ChordSymbol, MODE_LABEL, chordToMidi, midiToNoteName, nashvilleLadder, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
-import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord, playProgression, stopProgression } from "@/lib/music/audio";
 import {
   EMPTY_PREFIX,
@@ -240,6 +239,11 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const currentNatural = current ? naturalType(current.degree, current.accidental, keyRoot, keyMode) : null;
   const typeLabel = current ? TYPE_LABEL[current.type ?? currentNatural!] : prefix.type ? TYPE_LABEL[prefix.type] : "—";
   const prefixArmed = prefix.accidental !== 0 || prefix.type !== null || prefix.ext !== 0;
+  const prefixText = [prefix.accidental ? ACCIDENTAL_LABEL[prefix.accidental] : "", prefix.type ? TYPE_LABEL[prefix.type] : "", prefix.ext ? String(prefix.ext) : ""].filter(Boolean).join(" ");
+  const currentChord = current ? resolve(current) : null;
+  const noteNames = currentChord
+    ? Array.from(new Set(chordToMidi(currentChord, octave).map((m) => midiToNoteName(m, currentChord.root.includes("b")).replace(/\d+$/, ""))))
+    : [];
 
   // Portaled: an ancestor in the tabs creates a containing block that would
   // otherwise offset this fixed overlay.
@@ -278,78 +282,80 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col w-full max-w-md mx-auto px-3 pb-3 gap-3">
-        <div className="grid grid-cols-4 gap-2 shrink-0" role="group" aria-label="Jam controls">
-          <FnKey tone="btn-sculpt-cream" icon={<Play className="h-4 w-4" />} label="Play" ariaLabel="Play capture" disabled={steps.length === 0} onPress={() => void play()} />
-          <FnKey tone="btn-sculpt-blue" icon={<Square className="h-4 w-4" />} label="Stop" ariaLabel="Stop" disabled={!playing} onPress={stopPlaying} />
-          <FnKey tone="btn-sculpt-destructive" icon={<X className="h-4 w-4" />} label="Cancel" ariaLabel="Cancel" onPress={requestClose} />
-          <FnKey
-            tone="btn-sculpt-amber"
-            icon={<Plus className="h-4 w-4" />}
-            label={steps.length ? `Add ${steps.length}` : "Add"}
-            ariaLabel={`Add ${steps.length} chords to the row`}
-            disabled={steps.length === 0}
-            onPress={commit}
-          />
-        </div>
+        <div className="lcd-bezel flex flex-1 min-h-[150px]">
+          <div className="lcd-glass flex flex-1 min-h-0 flex-col">
+            <div className="lcd-band flex shrink-0 items-center justify-between px-3 py-1 text-[11px] uppercase tracking-widest">
+              <span className="inline-flex items-center gap-1.5">
+                <Volume2 className={cn("h-3.5 w-3.5", playing && "animate-lcd-blink")} aria-hidden />
+                {playing ? "Playing" : "Ready"}
+              </span>
+              <span>{steps.length} chord{steps.length === 1 ? "" : "s"} · Oct {octave}</span>
+            </div>
 
-        <div
-          ref={stripRef}
-          role="listbox"
-          aria-label="Captured chords"
-          className="flex items-stretch gap-2 overflow-x-auto rounded-xl p-2 shrink-0"
-          style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-recess)", minHeight: 68 }}
-        >
-          {steps.map((s, i) => {
-            const chord = resolve(s);
-            const active = i === cursor;
-            return (
+            <div
+              ref={stripRef}
+              role="listbox"
+              aria-label="Captured chords"
+              className="flex flex-1 min-h-0 flex-wrap content-start gap-2 overflow-y-auto p-3"
+            >
+              {steps.map((s, i) => {
+                const chord = resolve(s);
+                const active = i === cursor;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    aria-label={`${chord.display} (${recipeLabel(s)})`}
+                    data-jam-cell={i}
+                    onClick={() => { setCursor(i); audition(s); }}
+                    className={cn("shrink-0 px-2.5 py-1 text-left", active && "lcd-invert")}
+                    style={{ border: `2px solid ${active ? "var(--lcd-ink)" : "color-mix(in oklch, var(--lcd-ink) 45%, transparent)"}` }}
+                  >
+                    <span className="block text-xl leading-tight">{chord.display}</span>
+                    <span className="block text-[10px] leading-tight opacity-80">{recipeLabel(s)}</span>
+                  </button>
+                );
+              })}
               <button
-                key={s.id}
                 type="button"
                 role="option"
-                aria-selected={active}
-                aria-label={`${chord.display} (${recipeLabel(s)})`}
-                data-jam-cell={i}
-                onClick={() => { setCursor(i); audition(s); }}
-                style={{
-                  ...getChordColorClasses(chord).style,
-                  outline: active ? "2px solid var(--primary-strong)" : undefined,
-                  boxShadow: active ? "0 0 0 5px var(--primary-halo)" : undefined,
-                }}
-                className="noise-texture-chip shrink-0 rounded-md border-none px-3 py-1.5 text-left"
+                aria-selected={onInsertCell}
+                aria-label="Insertion point"
+                data-jam-cell={steps.length}
+                onClick={() => setCursor(steps.length)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1 text-xl leading-tight"
+                style={{ border: `2px dashed ${onInsertCell ? "var(--lcd-ink)" : "color-mix(in oklch, var(--lcd-ink) 45%, transparent)"}` }}
               >
-                <span className="block font-mono-chord text-base font-semibold leading-tight">{chord.display}</span>
-                <span className="block font-mono-chord text-[10px] leading-tight opacity-80">
-                  {recipeLabel(s)}
-                </span>
+                <span className={onInsertCell ? "animate-lcd-blink" : undefined}>+</span>
+                {prefixArmed && <span className="text-[11px]">{prefixText}</span>}
               </button>
-            );
-          })}
-          <button
-            type="button"
-            role="option"
-            aria-selected={onInsertCell}
-            aria-label="Insertion point"
-            data-jam-cell={steps.length}
-            onClick={() => setCursor(steps.length)}
-            className="shrink-0 rounded-md px-3 flex items-center gap-1 font-mono-chord text-sm"
-            style={{
-              border: `2px dashed ${onInsertCell ? "var(--primary-strong)" : "color-mix(in oklch, var(--ink-soft) 45%, transparent)"}`,
-              color: "var(--ink-soft)",
-            }}
-          >
-            +
-            {prefixArmed && (
-              <span className="text-[11px] font-semibold" style={{ color: "var(--primary-strong)" }}>
-                {[prefix.accidental ? ACCIDENTAL_LABEL[prefix.accidental] : "", prefix.type ? TYPE_LABEL[prefix.type] : "", prefix.ext ? String(prefix.ext) : ""].filter(Boolean).join(" ")}
-              </span>
-            )}
-          </button>
-          {steps.length === 0 && (
-            <span className="self-center text-xs" style={{ color: "var(--ink-soft)" }}>
-              Tap a number to hear its chord
-            </span>
-          )}
+            </div>
+
+            <div
+              className="min-h-[3.4rem] shrink-0 px-3 py-2 text-xs leading-snug uppercase"
+              style={{ borderTop: "2px dashed color-mix(in oklch, var(--lcd-ink) 40%, transparent)" }}
+              aria-live="polite"
+            >
+              {current && currentChord ? (
+                <>
+                  <p>{recipeLabel(current)} → <span className="normal-case">{currentChord.display}</span></p>
+                  <p>Notes: <span className="normal-case">{noteNames.join(" ")}</span></p>
+                </>
+              ) : prefixArmed ? (
+                <>
+                  <p>Next chord</p>
+                  <p>{prefixText}</p>
+                </>
+              ) : (
+                <>
+                  <p>Press 1–7 to hear a chord</p>
+                  <p>8 ♭/♯ · 9 ext · 0 type</p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -366,7 +372,21 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
           </div>
         </div>
 
-        <div className="mt-auto grid grid-cols-3 gap-2" role="group" aria-label="Nashville keypad">
+        <div className="grid grid-cols-4 gap-2 shrink-0" role="group" aria-label="Jam controls">
+          <FnKey tone="btn-sculpt-cream" icon={<Play className="h-4 w-4" />} label="Play" ariaLabel="Play capture" disabled={steps.length === 0} onPress={() => void play()} />
+          <FnKey tone="btn-sculpt-blue" icon={<Square className="h-4 w-4" />} label="Stop" ariaLabel="Stop" disabled={!playing} onPress={stopPlaying} />
+          <FnKey tone="btn-sculpt-destructive" icon={<X className="h-4 w-4" />} label="Cancel" ariaLabel="Cancel" onPress={requestClose} />
+          <FnKey
+            tone="btn-sculpt-amber"
+            icon={<Plus className="h-4 w-4" />}
+            label={steps.length ? `Add ${steps.length}` : "Add"}
+            ariaLabel={`Add ${steps.length} chords to the row`}
+            disabled={steps.length === 0}
+            onPress={commit}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 shrink-0" role="group" aria-label="Nashville keypad">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => {
             const entry = ladder[d - 1];
             const lit = !!current && current.degree === d;

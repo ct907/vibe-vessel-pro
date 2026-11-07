@@ -73,6 +73,12 @@
     --destructive: oklch(0.5326 0.1808 26.8);
     --sculpt-blue: oklch(0.5 0.13 258);
     --sculpt-blue-foreground: oklch(0.9823 0.0069 88.64);
+    /* Jam mode's LCD: olive-grey glass, near-black pixels. Hardware, so no dark-mode variant. */
+    --lcd-bezel: oklch(0.2 0.008 70);
+    --lcd-glass: oklch(0.69 0.036 105);
+    --lcd-ink: oklch(0.27 0.02 105);
+    --lcd-band: oklch(0.31 0.02 105);
+    --lcd-band-ink: oklch(0.78 0.045 105);
     --destructive-foreground: oklch(0.9823 0.0069 88.64);
 
     --border-b: oklch(0.819 0.026 78.8);
@@ -473,6 +479,52 @@
     transform: translateY(1px);
   }
 
+  /* LCD — Jam mode's chord display: dark bezel, olive glass, dot-matrix grid. */
+  .lcd-bezel {
+    background: var(--lcd-bezel);
+    border-radius: 1rem;
+    padding: 8px;
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklch, #ffffff 10%, transparent),
+      0 6px 14px -4px color-mix(in oklch, var(--cocoa-deep) 45%, transparent);
+  }
+  .lcd-glass {
+    position: relative;
+    overflow: hidden;
+    background: var(--lcd-glass);
+    color: var(--lcd-ink);
+    border-radius: 0.5rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 1px color-mix(in oklch, var(--lcd-ink) 55%, transparent);
+    box-shadow:
+      inset 0 3px 8px 0 color-mix(in oklch, #000 40%, transparent),
+      inset 0 0 0 1px color-mix(in oklch, #000 30%, transparent);
+  }
+  /* Pixel grid + a faint glare, laid over everything on the glass. */
+  .lcd-glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(to bottom, color-mix(in oklch, #fff 12%, transparent), transparent 35%),
+      repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in oklch, #000 16%, transparent) 2px 3px),
+      repeating-linear-gradient(to right, transparent 0 2px, color-mix(in oklch, #000 16%, transparent) 2px 3px);
+  }
+  .lcd-band {
+    background: var(--lcd-band);
+    color: var(--lcd-band-ink);
+    text-shadow: none;
+  }
+  /* The highlighted chord: inverted pixels. */
+  .lcd-invert {
+    background: var(--lcd-ink);
+    color: var(--lcd-glass);
+    text-shadow: none;
+  }
+
   /* Recess well — tabs container, input groups */
   .shadow-recess {
     box-shadow: var(--shadow-recess);
@@ -607,6 +659,15 @@
   animation: rec-pulse 1.2s ease infinite;
 }
 
+/* LCD cursor blink — Jam mode's insertion point. */
+@keyframes lcd-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+.animate-lcd-blink {
+  animation: lcd-blink 1s steps(1) infinite;
+}
+
 /* Playback pulse — transport stop button while playing. */
 @keyframes play-pulse {
   0%, 100% { box-shadow: 0 4px 16px color-mix(in oklch, var(--primary) 45%, transparent); }
@@ -641,6 +702,7 @@
   .animate-play-pulse { animation: none; }
   .animate-paste-glow { animation: none; }
   .onb-squiggly { animation: none; }
+  .animate-lcd-blink { animation: none; }
 }
 
 /* Radix sets `pointer-events: none` on <body> while a modal Dialog is open,
