@@ -2,14 +2,19 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
-import { ChevronLeft, ChevronRight, Delete, Play, Plus, Square, Volume2, X } from "lucide-react";
-import { ChordSymbol, MODE_LABEL, chordToMidi, midiToNoteName, nashvilleLadder, transposeChord } from "@/lib/music/chords";
+import { toast } from "sonner";
+import { Delete, Play, Plus, Square, Trash2, Volume2, X } from "lucide-react";
+import { ChordSymbol, MODE_LABEL, chordToMidi, midiToNoteName, nashvilleLadder, rootToPc, transposeChord } from "@/lib/music/chords";
+import type { Mode } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { playChord, playProgression, stopProgression } from "@/lib/music/audio";
 import {
   EMPTY_PREFIX,
   EXT_CYCLE,
+  KEY_ROOTS,
   buildJamChord,
+  isKeyChange,
+  keyRootBefore,
   naturalType,
   nextAccidental,
   nextExt,
@@ -17,6 +22,8 @@ import {
   normalizeStep,
   recipeLabel,
   stepFromPrefix,
+  type JamItem,
+  type JamKeyChange,
   type JamPrefix,
   type JamStep,
 } from "@/lib/music/jam";
@@ -31,12 +38,15 @@ import {
 import { cn } from "@/lib/utils";
 
 interface Props {
-  /** Section whose effective key resolves the numbers. */
-  sectionId: string;
+  /** Section whose effective key resolves the numbers. Omitted = standalone Jam (new song, key of C). */
+  sectionId?: string;
   /** Eyebrow naming the row or block the chords will land in. */
   targetLabel: string;
-  /** Receives the capture in storage form, octave-stamped, in order. */
-  onCommit: (chords: ChordSymbol[]) => void;
+  /**
+   * Receives the capture's chords in storage form, octave-stamped, in order.
+   * `key` is the key in effect at the first chord (a standalone Jam uses it as the new song's key).
+   */
+  onCommit: (chords: ChordSymbol[], key: { root: string; mode: Mode }) => void;
   onClose: () => void;
   headerRef?: RefObject<HTMLDivElement | null>;
 }
@@ -45,6 +55,8 @@ type Modifier = "accidental" | "ext" | "type";
 
 const ACCIDENTAL_LABEL = { [-1]: "♭", 0: "♮", 1: "♯" } as const;
 const TYPE_LABEL = { maj: "maj", min: "min", dim: "dim", aug: "aug", sus4: "sus4", sus2: "sus2" } as const;
+const LIT_STYLE = { outline: "2px solid var(--primary-strong)", boxShadow: "0 0 0 5px var(--primary-halo), var(--shadow-sculpt-cream-rest)" } as const;
+const STANDALONE_KEY = { root: "C", mode: "maj" as Mode, offset: 0 };
 
 /**
  * Jam mode: the T9 Nashville keypad. Number keys capture + audition chords,
@@ -59,21 +71,34 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
   const titleId = useId();
 
-  const effective = useMemo(() => effectiveKeyAt(sections, sectionId, meta), [sections, sectionId, meta]);
-  const { root: keyRoot, mode: keyMode, offset } = effective;
-  const ladder = useMemo(() => nashvilleLadder(keyRoot, keyMode), [keyRoot, keyMode]);
+  const effective = useMemo(
+    () => (sectionId ? effectiveKeyAt(sections, sectionId, meta) : STANDALONE_KEY),
+    [sections, sectionId, meta],
+  );
+  const { root: baseRoot, mode: keyMode, offset } = effective;
 
-  const [steps, setSteps] = useState<JamStep[]>([]);
-  // Index of the highlighted chord; steps.length is the trailing insertion cell.
+  const [items, setItems] = useState<JamItem[]>([]);
+  // Index of the highlighted cell; items.length is the trailing insertion cell.
   const [cursor, setCursor] = useState(0);
   const [prefix, setPrefix] = useState<JamPrefix>(EMPTY_PREFIX);
   const [octave, setOctave] = useState(3);
   const [playing, setPlaying] = useState(false);
+  const [pickingKey, setPickingKey] = useState(false);
   const [pending, setPending] = useState<{ then: "close" } | { then: "switch"; to: ChordInputMode } | null>(null);
 
-  const onInsertCell = cursor >= steps.length;
-  const current = onInsertCell ? null : steps[cursor];
-  const resolve = (s: Omit<JamStep, "id">) => buildJamChord(s, keyRoot, keyMode);
+  const cell = items[cursor];
+  const onInsertCell = cursor >= items.length;
+  const onKeyCell = !!cell && isKeyChange(cell);
+  const current = cell && !isKeyChange(cell) ? cell : null;
+  const picking = pickingKey && onKeyCell;
+  const insertPos = onInsertCell ? items.length : cursor + 1;
+  const keyAt = (pos: number) => keyRootBefore(items, pos, baseRoot);
+  // The key the number pad plays in: whatever is in effect where a new chord would land.
+  const activeRoot = keyAt(insertPos);
+  const ladder = useMemo(() => nashvilleLadder(activeRoot, keyMode), [activeRoot, keyMode]);
+  const chordIdx = items.flatMap((it, i) => (isKeyChange(it) ? [] : [i]));
+  const chordCount = chordIdx.length;
+  const resolveAt = (s: Omit<JamStep, "id">, pos: number) => buildJamChord(s, keyAt(pos), keyMode);
 
   useEffect(() => {
     setEditorOpen(true);
@@ -85,9 +110,8 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
 
   const auditionTimer = useRef<number | null>(null);
   useEffect(() => () => { if (auditionTimer.current) window.clearTimeout(auditionTimer.current); }, []);
-  const audition = (s: Omit<JamStep, "id">, debounce = false) => {
+  const audition = (chord: ChordSymbol, debounce = false) => {
     if (auditionTimer.current) window.clearTimeout(auditionTimer.current);
-    const chord = resolve(s);
     if (!debounce) { void playChord(chord, 1.2, octave); return; }
     // Rapid 8/9/0 taps would otherwise stack voices on every stop of the cycle.
     auditionTimer.current = window.setTimeout(() => void playChord(chord, 1.2, octave), 150);
@@ -102,14 +126,17 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const pressDegree = (degree: number) => {
     if (degree > ladder.length) return;
     stopPlaying();
-    const at = onInsertCell ? steps.length : cursor + 1;
-    const step = onInsertCell
-      ? stepFromPrefix(nanoid(), degree, prefix, keyRoot, keyMode)
-      : { id: nanoid(), degree, accidental: 0 as const, type: null, ext: 0 as const };
-    setSteps((prev) => [...prev.slice(0, at), step, ...prev.slice(at)]);
+    setPickingKey(false);
+    const at = insertPos;
+    // With no chord highlighted (insertion cell or a key-change object) an armed
+    // prefix applies to the new chord, as on the T9 hardware.
+    const step = current
+      ? { id: nanoid(), degree, accidental: 0 as const, type: null, ext: 0 as const }
+      : stepFromPrefix(nanoid(), degree, prefix, activeRoot, keyMode);
+    setItems((prev) => [...prev.slice(0, at), step, ...prev.slice(at)]);
     setCursor(at);
     setPrefix(EMPTY_PREFIX);
-    audition(step);
+    audition(buildJamChord(step, activeRoot, keyMode));
   };
 
   const pressModifier = (m: Modifier) => {
@@ -123,76 +150,117 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
       }));
       return;
     }
+    const root = keyAt(cursor);
     let next: JamStep;
     if (m === "ext") {
-      next = { ...current, ext: nextExt(current, keyRoot, keyMode) };
+      next = { ...current, ext: nextExt(current, root, keyMode) };
     } else if (m === "accidental") {
       // Borrowed roots change the natural type, so an explicit type that now
       // matches it collapses back to null.
       const accidental = nextAccidental(current.accidental);
-      const type = current.type === naturalType(current.degree, accidental, keyRoot, keyMode) ? null : current.type;
-      next = normalizeStep({ ...current, accidental, type }, keyRoot, keyMode);
+      const type = current.type === naturalType(current.degree, accidental, root, keyMode) ? null : current.type;
+      next = normalizeStep({ ...current, accidental, type }, root, keyMode);
     } else {
-      const type = nextType(current.type, naturalType(current.degree, current.accidental, keyRoot, keyMode));
-      next = normalizeStep({ ...current, type }, keyRoot, keyMode);
+      const type = nextType(current.type, naturalType(current.degree, current.accidental, root, keyMode));
+      next = normalizeStep({ ...current, type }, root, keyMode);
     }
-    setSteps((prev) => prev.map((s) => (s.id === next.id ? next : s)));
-    audition(next, true);
+    setItems((prev) => prev.map((s) => (s.id === next.id ? next : s)));
+    audition(buildJamChord(next, root, keyMode), true);
   };
 
   const deleteAtCursor = () => {
     stopPlaying();
-    if (steps.length === 0) return;
+    setPickingKey(false);
+    if (items.length === 0) return;
     if (onInsertCell) {
-      setSteps((prev) => prev.slice(0, -1));
-      setCursor(steps.length - 1);
+      setItems((prev) => prev.slice(0, -1));
+      setCursor(items.length - 1);
       return;
     }
-    setSteps((prev) => prev.filter((_, i) => i !== cursor));
+    setItems((prev) => prev.filter((_, i) => i !== cursor));
     setCursor(Math.max(0, cursor - 1));
   };
 
+  const clearAll = () => {
+    if (items.length === 0) return;
+    stopPlaying();
+    setPickingKey(false);
+    const saved = { items, cursor };
+    setItems([]);
+    setCursor(0);
+    setPrefix(EMPTY_PREFIX);
+    toast(chordCount ? `Cleared ${chordCount} chord${chordCount === 1 ? "" : "s"}` : "Cleared the capture", {
+      action: { label: "Undo", onClick: () => { setItems(saved.items); setCursor(saved.cursor); } },
+    });
+  };
+
+  // Adds a key-change object after the cursor and opens the key list; pressed
+  // again on that object it removes it.
+  const toggleKeyChange = () => {
+    if (onKeyCell) { deleteAtCursor(); return; }
+    stopPlaying();
+    const item: JamKeyChange = { id: nanoid(), kind: "key", root: activeRoot };
+    setItems((prev) => [...prev.slice(0, insertPos), item, ...prev.slice(insertPos)]);
+    setCursor(insertPos);
+    setPickingKey(true);
+  };
+
+  const pickKey = (root: string) => {
+    if (!cell || !isKeyChange(cell)) return;
+    setItems((prev) => prev.map((it) => (it.id === cell.id ? { ...it, root } : it)));
+    setPickingKey(false);
+    audition(buildJamChord({ degree: 1, accidental: 0, type: null, ext: 0 }, root, keyMode));
+  };
+
   const moveCursor = (dir: -1 | 1) => {
-    const next = Math.max(0, Math.min(steps.length, cursor + dir));
+    const next = Math.max(0, Math.min(items.length, cursor + dir));
     setCursor(next);
-    if (next < steps.length) audition(steps[next]);
+    setPickingKey(false);
+    const it = items[next];
+    if (it && !isKeyChange(it)) audition(resolveAt(it, next));
   };
 
   const play = async () => {
-    if (steps.length === 0) return;
+    if (chordCount === 0) return;
     setPlaying(true);
     await playProgression(
-      steps.map((s, i) => ({ chord: resolve(s), startBeat: i * chordLength, lengthBeats: chordLength })),
+      chordIdx.map((idx, n) => ({ chord: resolveAt(items[idx] as JamStep, idx), startBeat: n * chordLength, lengthBeats: chordLength })),
       meta.bpm,
-      { octave, onChordStart: (i) => setCursor(i), onEnd: () => setPlaying(false) },
+      { octave, onChordStart: (n) => setCursor(chordIdx[n]), onEnd: () => setPlaying(false) },
     );
   };
 
-  const captured = () =>
-    steps.map((s) => {
-      const c = resolve(s);
+  const captured = () => ({
+    chords: chordIdx.map((i) => {
+      const c = resolveAt(items[i] as JamStep, i);
       return { ...(offset ? transposeChord(c, -offset) : c), octave };
-    });
+    }),
+    key: { root: keyAt(chordIdx[0] ?? 0), mode: keyMode },
+  });
 
   const commit = () => {
-    if (steps.length === 0) return;
-    onCommit(captured());
+    if (chordCount === 0) return;
+    const { chords, key } = captured();
+    onCommit(chords, key);
     onClose();
   };
 
   const requestClose = () => {
-    if (steps.length) setPending({ then: "close" });
+    if (chordCount) setPending({ then: "close" });
     else onClose();
   };
 
   const requestSwitch = (to: ChordInputMode) => {
-    if (steps.length) setPending({ then: "switch", to });
+    if (chordCount) setPending({ then: "switch", to });
     else setMode(to);
   };
 
   const finishPending = (add: boolean) => {
     if (!pending) return;
-    if (add) onCommit(captured());
+    if (add) {
+      const { chords, key } = captured();
+      onCommit(chords, key);
+    }
     setPending(null);
     if (pending.then === "close") onClose();
     else setMode(pending.to);
@@ -215,8 +283,9 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
     else if (k === "#" || k === "Enter") commit();
     else if (k === "ArrowLeft") moveCursor(-1);
     else if (k === "ArrowRight") moveCursor(1);
-    else if (k === " " && current) audition(current);
-    else if (k === "Escape") requestClose();
+    else if (k === "k" || k === "K") toggleKeyChange();
+    else if (k === " " && current) audition(resolveAt(current, cursor));
+    else if (k === "Escape") { if (picking) setPickingKey(false); else requestClose(); }
     else return;
     e.preventDefault();
   };
@@ -233,14 +302,14 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const stripRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     stripRef.current?.querySelector<HTMLElement>(`[data-jam-cell="${cursor}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [cursor, steps.length]);
+  }, [cursor, items.length]);
 
   const state = current ?? prefix;
-  const currentNatural = current ? naturalType(current.degree, current.accidental, keyRoot, keyMode) : null;
+  const currentNatural = current ? naturalType(current.degree, current.accidental, keyAt(cursor), keyMode) : null;
   const typeLabel = current ? TYPE_LABEL[current.type ?? currentNatural!] : prefix.type ? TYPE_LABEL[prefix.type] : "—";
   const prefixArmed = prefix.accidental !== 0 || prefix.type !== null || prefix.ext !== 0;
   const prefixText = [prefix.accidental ? ACCIDENTAL_LABEL[prefix.accidental] : "", prefix.type ? TYPE_LABEL[prefix.type] : "", prefix.ext ? String(prefix.ext) : ""].filter(Boolean).join(" ");
-  const currentChord = current ? resolve(current) : null;
+  const currentChord = current ? resolveAt(current, cursor) : null;
   const noteNames = currentChord
     ? Array.from(new Set(chordToMidi(currentChord, octave).map((m) => midiToNoteName(m, currentChord.root.includes("b")).replace(/\d+$/, ""))))
     : [];
@@ -268,17 +337,25 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
             className="truncate"
             style={{ fontFamily: "var(--font-ui,'Nunito',sans-serif)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)" }}
           >
-            {targetLabel} · {keyRoot} {MODE_LABEL[keyMode]}
+            {targetLabel} · {baseRoot} {MODE_LABEL[keyMode]}
           </p>
           <h2
             id={titleId}
             className="truncate"
             style={{ fontFamily: "var(--font-display,'Zain',serif)", fontWeight: 600, fontSize: 20, color: "var(--ink)", lineHeight: 1.1 }}
           >
-            Add Chords
+            {sectionId ? "Add Chords" : "Jam"}
           </h2>
         </div>
-        <ChordInputTabs onRequestChange={requestSwitch} />
+        {sectionId && <ChordInputTabs onRequestChange={requestSwitch} />}
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={requestClose}
+          className="btn-sculpt-cream inline-flex h-8 w-8 items-center justify-center rounded-lg shrink-0"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col w-full max-w-md mx-auto px-3 pb-3 gap-3">
@@ -289,18 +366,37 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                 <Volume2 className={cn("h-3.5 w-3.5", playing && "animate-lcd-blink")} aria-hidden />
                 {playing ? "Playing" : "Ready"}
               </span>
-              <span>{steps.length} chord{steps.length === 1 ? "" : "s"} · Oct {octave}</span>
+              <span>Key {activeRoot} · {chordCount} chord{chordCount === 1 ? "" : "s"} · Oct {octave}</span>
             </div>
 
+            <div className="relative flex flex-1 min-h-0 flex-col">
             <div
               ref={stripRef}
               role="listbox"
               aria-label="Captured chords"
               className="flex flex-1 min-h-0 flex-wrap content-start gap-2 overflow-y-auto p-3"
             >
-              {steps.map((s, i) => {
-                const chord = resolve(s);
+              {items.map((s, i) => {
                 const active = i === cursor;
+                if (isKeyChange(s)) {
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      aria-label={`Key change to ${s.root}`}
+                      data-jam-cell={i}
+                      onClick={() => { setCursor(i); setPickingKey(true); }}
+                      className={cn("shrink-0 px-2.5 py-1 text-left", active && "lcd-invert")}
+                      style={{ border: "4px double var(--lcd-ink)" }}
+                    >
+                      <span className="block text-[11px] uppercase leading-tight">Key</span>
+                      <span className="block text-xl leading-tight">{s.root}</span>
+                    </button>
+                  );
+                }
+                const chord = resolveAt(s, i);
                 return (
                   <button
                     key={s.id}
@@ -309,7 +405,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                     aria-selected={active}
                     aria-label={`${chord.display} (${recipeLabel(s)})`}
                     data-jam-cell={i}
-                    onClick={() => { setCursor(i); audition(s); }}
+                    onClick={() => { setCursor(i); setPickingKey(false); audition(chord); }}
                     className={cn("shrink-0 px-2.5 py-1 text-left", active && "lcd-invert")}
                     style={{ border: "2px solid var(--lcd-ink)" }}
                   >
@@ -323,8 +419,8 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                 role="option"
                 aria-selected={onInsertCell}
                 aria-label="Insertion point"
-                data-jam-cell={steps.length}
-                onClick={() => setCursor(steps.length)}
+                data-jam-cell={items.length}
+                onClick={() => { setCursor(items.length); setPickingKey(false); }}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1 text-xl leading-tight"
                 style={{ border: "2px dashed var(--lcd-ink)" }}
               >
@@ -343,6 +439,11 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                   <p>{recipeLabel(current)} → <span className="normal-case">{currentChord.display}</span></p>
                   <p>Notes: <span className="normal-case">{noteNames.join(" ")}</span></p>
                 </>
+              ) : onKeyCell && cell && isKeyChange(cell) ? (
+                <>
+                  <p>Key change → <span className="normal-case">{cell.root}</span> {MODE_LABEL[keyMode]}</p>
+                  <p>The keypad now plays in {cell.root}</p>
+                </>
               ) : prefixArmed ? (
                 <>
                   <p>Next chord</p>
@@ -355,15 +456,50 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                 </>
               )}
             </div>
+
+            {picking && cell && isKeyChange(cell) && (
+              <div
+                role="group"
+                aria-label="Choose the new key"
+                className="absolute inset-0 z-10 flex flex-col gap-2 p-3"
+                style={{ background: "var(--lcd-glass)" }}
+              >
+                <p className="shrink-0 text-xs uppercase">Change key to…</p>
+                <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-2">
+                  {KEY_ROOTS.map((r) => {
+                    const selected = rootToPc(r) === rootToPc(cell.root);
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        aria-label={`Key of ${r}`}
+                        aria-pressed={selected}
+                        onClick={() => pickKey(r)}
+                        className={cn("flex min-h-0 items-center justify-center text-lg", selected && "lcd-invert")}
+                        style={{ border: "2px solid var(--lcd-ink)" }}
+                      >
+                        {r}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button type="button" aria-label="Previous chord" onClick={() => moveCursor(-1)} className="btn-sculpt-cream inline-flex h-9 w-9 items-center justify-center rounded-lg">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button type="button" aria-label="Next chord" onClick={() => moveCursor(1)} className="btn-sculpt-cream inline-flex h-9 w-9 items-center justify-center rounded-lg">
-            <ChevronRight className="h-4 w-4" />
+          <button
+            type="button"
+            aria-label="Key change"
+            aria-pressed={onKeyCell}
+            onClick={toggleKeyChange}
+            className="btn-sculpt-cream inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold"
+            style={onKeyCell ? LIT_STYLE : undefined}
+          >
+            <span aria-hidden className="font-mono-chord">♯♭</span>
+            Key change
           </button>
           <div className="ml-auto flex items-center gap-1" aria-label="Octave">
             <button type="button" aria-label="Decrease octave" onClick={() => setOctave((o) => Math.max(1, o - 1))} className="btn-sculpt-cream h-9 w-8 rounded-lg font-mono-chord font-bold">−</button>
@@ -373,15 +509,15 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
         </div>
 
         <div className="grid grid-cols-4 gap-2 shrink-0" role="group" aria-label="Jam controls">
-          <FnKey tone="btn-sculpt-cream" icon={<Play className="h-4 w-4" />} label="Play" ariaLabel="Play capture" disabled={steps.length === 0} onPress={() => void play()} />
-          <FnKey tone="btn-sculpt-blue" icon={<Square className="h-4 w-4" />} label="Stop" ariaLabel="Stop" disabled={!playing} onPress={stopPlaying} />
-          <FnKey tone="btn-sculpt-destructive" icon={<X className="h-4 w-4" />} label="Cancel" ariaLabel="Cancel" onPress={requestClose} />
+          <FnKey tone="btn-sculpt-cream" icon={<Play className="h-4 w-4" />} label="Play" ariaLabel="Play capture" disabled={chordCount === 0} onPress={() => void play()} />
+          <FnKey tone="btn-sculpt-tone tone-stop" icon={<Square className="h-4 w-4" />} label="Stop" ariaLabel="Stop" disabled={!playing} onPress={stopPlaying} />
+          <FnKey tone="btn-sculpt-tone tone-clear" icon={<Trash2 className="h-4 w-4" />} label="Clear" ariaLabel="Clear all chords" disabled={items.length === 0} onPress={clearAll} />
           <FnKey
-            tone="btn-sculpt-amber"
+            tone="btn-sculpt-tone tone-add"
             icon={<Plus className="h-4 w-4" />}
-            label={steps.length ? `Add ${steps.length}` : "Add"}
-            ariaLabel={`Add ${steps.length} chords to the row`}
-            disabled={steps.length === 0}
+            label={chordCount ? `Add ${chordCount}` : "Add"}
+            ariaLabel={`Add ${chordCount} chords${sectionId ? " to the row" : " to a new song"}`}
+            disabled={chordCount === 0}
             onPress={commit}
           />
         </div>
@@ -405,13 +541,13 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
           })}
           <Key glyph="8" label={ACCIDENTAL_LABEL[state.accidental]} caption="♭ / ♯" ariaLabel={`8, accidental ${ACCIDENTAL_LABEL[state.accidental]}`} lit={state.accidental !== 0} special onPress={() => pressModifier("accidental")} />
           <Key glyph="9" label={state.ext ? String(state.ext) : "—"} caption="ext" ariaLabel={`9, extension ${state.ext || "off"}`} lit={state.ext !== 0} special onPress={() => pressModifier("ext")} />
-          <Key glyph="*" label={<Delete className="h-5 w-5" aria-hidden />} caption="delete" ariaLabel="Delete chord" disabled={steps.length === 0} special onPress={deleteAtCursor} />
+          <Key glyph="*" label={<Delete className="h-5 w-5" aria-hidden />} caption="delete" ariaLabel="Delete chord" disabled={items.length === 0} special onPress={deleteAtCursor} />
           <Key glyph="0" label={typeLabel} caption="type" ariaLabel={`0, chord type ${typeLabel}`} lit={!!(current ? current.type : prefix.type)} special onPress={() => pressModifier("type")} />
           <Key
             glyph="#"
-            label={steps.length ? `Add ${steps.length}` : "Add"}
-            ariaLabel={`#, add ${steps.length} chords`}
-            disabled={steps.length === 0}
+            label={chordCount ? `Add ${chordCount}` : "Add"}
+            ariaLabel={`#, add ${chordCount} chords`}
+            disabled={chordCount === 0}
             special
             onPress={commit}
           />
@@ -421,9 +557,9 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
       <AlertDialog open={!!pending} onOpenChange={(o) => { if (!o) setPending(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Add {steps.length} captured chord{steps.length === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogTitle>Add {chordCount} captured chord{chordCount === 1 ? "" : "s"}?</AlertDialogTitle>
             <AlertDialogDescription>
-              They haven't been added to {targetLabel} yet.
+              They haven't been added to {sectionId ? targetLabel : "a song"} yet.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -435,7 +571,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
               Discard
             </AlertDialogAction>
             <AlertDialogAction onClick={() => finishPending(true)}>
-              Add {steps.length}
+              Add {chordCount}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -489,7 +625,7 @@ function Key({ glyph, label, caption, ariaLabel, lit, disabled, special, onPress
       )}
       style={{
         ...(special ? { background: "color-mix(in oklch, var(--paper-shade) 80%, var(--cocoa) 20%)" } : null),
-        ...(lit ? { outline: "2px solid var(--primary-strong)", boxShadow: "0 0 0 5px var(--primary-halo), var(--shadow-sculpt-cream-rest)" } : null),
+        ...(lit ? LIT_STYLE : null),
       }}
     >
       <span

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, Pencil, Save } from "lucide-react";
+import { Mic, Pencil, Piano, Save } from "lucide-react";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
+import { JamCanvas } from "@/components/chord/JamCanvas";
+import { chordSlotWidth } from "@/lib/music/chordLayout";
+import type { ChordSymbol, Mode } from "@/lib/music/chords";
 import { RecentProjectsList } from "@/components/common/RecentProjectsList";
 import { useIsDesktop } from "@/hooks/use-mobile";
-import { useSongStore } from "@/store/song";
+import { useSongStore, CHORD_ROW_SLOTS } from "@/store/song";
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -120,6 +123,7 @@ export default function Landing() {
   const isDesktop = useIsDesktop();
   const tapVerb = isDesktop ? "Click" : "Tap";
   const [recents, setRecents] = useState<RecentProject[]>([]);
+  const [jamOpen, setJamOpen] = useState(false);
   // The autosaved live song is always the freshest copy of what the writer was
   // last doing, so "Continue" opens it rather than its (possibly older) library entry.
   const [liveName] = useState(() =>
@@ -153,6 +157,27 @@ export default function Landing() {
     // mounts in write mode, and it's what consumes the capture param).
     useUIStore.getState().setMode("write");
     navigate(`/app?capture=${capture}`);
+  };
+  // Jam from the homepage: the capture becomes a new song, in the key it started in.
+  const jamToNewSong = (chords: ChordSymbol[], key: { root: string; mode: Mode }) => {
+    void commitCurrentSongToRecents();
+    resetSong();
+    useTakesStore.getState().clear();
+    useRecordingsStore.getState().clear();
+    useOnboardingStore.getState().resetForNewSong();
+    useUIStore.getState().setMode("write");
+    const { setKey, placeChordInSlot, autoLayoutSection } = useSongStore.getState();
+    setKey(key.root, key.mode);
+    const { sections } = useSongStore.getState();
+    const section = sections[0];
+    const lineId = section.lines[0].id;
+    let slot = 0;
+    for (const chord of chords) {
+      const placed = placeChordInSlot(section.id, lineId, slot, chord);
+      slot = Math.min(CHORD_ROW_SLOTS - 1, (placed?.slotIndex ?? slot) + chordSlotWidth(chord.display) + 1);
+    }
+    if (chords.length > 1) autoLayoutSection(section.id, window.innerWidth, 28);
+    navigate("/app");
   };
   const continueName = liveName ?? recents[0]?.name;
 
@@ -211,6 +236,12 @@ export default function Landing() {
             label={`${tapVerb} to Write Lyrics`}
             onClick={() => startCapture("lyrics")}
           />
+          <EmptyTapCard
+            icon={<Piano className="h-6 w-6" strokeWidth={1.75} />}
+            label={`${tapVerb} to Jam`}
+            hint="Play chords by number — no writing needed"
+            onClick={() => setJamOpen(true)}
+          />
           <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
@@ -228,6 +259,14 @@ export default function Landing() {
             </button>
           </div>
         </div>
+
+        {jamOpen && (
+          <JamCanvas
+            targetLabel="New song"
+            onCommit={jamToNewSong}
+            onClose={() => setJamOpen(false)}
+          />
+        )}
 
         <section className="mt-20 w-full max-w-md" aria-label="Recent projects">
           <button
