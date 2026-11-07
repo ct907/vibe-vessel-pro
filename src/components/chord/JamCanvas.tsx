@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
-import { ChevronLeft, ChevronRight, Delete, Play, Square, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Delete, Play, Plus, Square, X } from "lucide-react";
 import { ChordSymbol, MODE_LABEL, nashvilleLadder, transposeChord } from "@/lib/music/chords";
 import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { getChordColorClasses } from "@/lib/music/chordColor";
@@ -159,8 +159,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
     if (next < steps.length) audition(steps[next]);
   };
 
-  const togglePlay = async () => {
-    if (playing) { stopPlaying(); return; }
+  const play = async () => {
     if (steps.length === 0) return;
     setPlaying(true);
     await playProgression(
@@ -276,17 +275,23 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
           </h2>
         </div>
         <ChordInputTabs onRequestChange={requestSwitch} />
-        <button
-          type="button"
-          aria-label="Close jam mode"
-          onClick={requestClose}
-          className="btn-sculpt-cream inline-flex h-8 w-8 items-center justify-center rounded-lg shrink-0"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col w-full max-w-md mx-auto px-3 pb-3 gap-3">
+        <div className="grid grid-cols-4 gap-2 shrink-0" role="group" aria-label="Jam controls">
+          <FnKey tone="btn-sculpt-cream" icon={<Play className="h-4 w-4" />} label="Play" ariaLabel="Play capture" disabled={steps.length === 0} onPress={() => void play()} />
+          <FnKey tone="btn-sculpt-blue" icon={<Square className="h-4 w-4" />} label="Stop" ariaLabel="Stop" disabled={!playing} onPress={stopPlaying} />
+          <FnKey tone="btn-sculpt-destructive" icon={<X className="h-4 w-4" />} label="Cancel" ariaLabel="Cancel" onPress={requestClose} />
+          <FnKey
+            tone="btn-sculpt-amber"
+            icon={<Plus className="h-4 w-4" />}
+            label={steps.length ? `Add ${steps.length}` : "Add"}
+            ariaLabel={`Add ${steps.length} chords to the row`}
+            disabled={steps.length === 0}
+            onPress={commit}
+          />
+        </div>
+
         <div
           ref={stripRef}
           role="listbox"
@@ -354,16 +359,6 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
           <button type="button" aria-label="Next chord" onClick={() => moveCursor(1)} className="btn-sculpt-cream inline-flex h-9 w-9 items-center justify-center rounded-lg">
             <ChevronRight className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            aria-label={playing ? "Stop" : "Play capture"}
-            disabled={steps.length === 0}
-            onClick={() => void togglePlay()}
-            className="btn-sculpt-cream inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-40"
-          >
-            {playing ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? "Stop" : "Play"}
-          </button>
           <div className="ml-auto flex items-center gap-1" aria-label="Octave">
             <button type="button" aria-label="Decrease octave" onClick={() => setOctave((o) => Math.max(1, o - 1))} className="btn-sculpt-cream h-9 w-8 rounded-lg font-mono-chord font-bold">−</button>
             <span className="min-w-[44px] text-center font-mono-chord text-sm font-bold" style={{ color: "var(--ink)" }}>Oct {octave}</span>
@@ -388,16 +383,16 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
               />
             );
           })}
-          <Key glyph="8" label={ACCIDENTAL_LABEL[state.accidental]} caption="♭ / ♯" ariaLabel={`8, accidental ${ACCIDENTAL_LABEL[state.accidental]}`} lit={state.accidental !== 0} onPress={() => pressModifier("accidental")} />
-          <Key glyph="9" label={state.ext ? String(state.ext) : "—"} caption="ext" ariaLabel={`9, extension ${state.ext || "off"}`} lit={state.ext !== 0} onPress={() => pressModifier("ext")} />
-          <Key glyph="*" label={<Delete className="h-5 w-5" aria-hidden />} caption="delete" ariaLabel="Delete chord" disabled={steps.length === 0} onPress={deleteAtCursor} />
-          <Key glyph="0" label={typeLabel} caption="type" ariaLabel={`0, chord type ${typeLabel}`} lit={!!(current ? current.type : prefix.type)} onPress={() => pressModifier("type")} />
+          <Key glyph="8" label={ACCIDENTAL_LABEL[state.accidental]} caption="♭ / ♯" ariaLabel={`8, accidental ${ACCIDENTAL_LABEL[state.accidental]}`} lit={state.accidental !== 0} special onPress={() => pressModifier("accidental")} />
+          <Key glyph="9" label={state.ext ? String(state.ext) : "—"} caption="ext" ariaLabel={`9, extension ${state.ext || "off"}`} lit={state.ext !== 0} special onPress={() => pressModifier("ext")} />
+          <Key glyph="*" label={<Delete className="h-5 w-5" aria-hidden />} caption="delete" ariaLabel="Delete chord" disabled={steps.length === 0} special onPress={deleteAtCursor} />
+          <Key glyph="0" label={typeLabel} caption="type" ariaLabel={`0, chord type ${typeLabel}`} lit={!!(current ? current.type : prefix.type)} special onPress={() => pressModifier("type")} />
           <Key
             glyph="#"
             label={steps.length ? `Add ${steps.length}` : "Add"}
-            ariaLabel={`Add ${steps.length} chords to the row`}
+            ariaLabel={`#, add ${steps.length} chords`}
             disabled={steps.length === 0}
-            amber
+            special
             onPress={commit}
           />
         </div>
@@ -437,11 +432,30 @@ interface KeyProps {
   ariaLabel: string;
   lit?: boolean;
   disabled?: boolean;
-  amber?: boolean;
+  /** 8 / 9 / 0 / * / # — the function keys, shaded apart from the number keys. */
+  special?: boolean;
   onPress: () => void;
 }
 
-function Key({ glyph, label, caption, ariaLabel, lit, disabled, amber, onPress }: KeyProps) {
+function FnKey({ tone, icon, label, ariaLabel, disabled, onPress }: {
+  tone: string; icon: ReactNode; label: string; ariaLabel: string; disabled?: boolean; onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onPress}
+      className={cn(tone, "flex h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl select-none disabled:opacity-40")}
+    >
+      {icon}
+      <span className="text-[11px] font-bold uppercase leading-none tracking-wide">{label}</span>
+    </button>
+  );
+}
+
+function Key({ glyph, label, caption, ariaLabel, lit, disabled, special, onPress }: KeyProps) {
   return (
     <button
       type="button"
@@ -450,23 +464,26 @@ function Key({ glyph, label, caption, ariaLabel, lit, disabled, amber, onPress }
       onMouseDown={(e) => e.preventDefault()}
       onClick={onPress}
       className={cn(
-        amber ? "btn-sculpt-amber" : "btn-sculpt-cream",
+        "btn-sculpt-cream",
         "flex h-[clamp(56px,9dvh,76px)] items-center justify-between gap-2 rounded-xl px-3 select-none disabled:opacity-40",
       )}
-      style={lit ? { outline: "2px solid var(--primary-strong)", boxShadow: "0 0 0 5px var(--primary-halo), var(--shadow-sculpt-cream-rest)" } : undefined}
+      style={{
+        ...(special ? { background: "color-mix(in oklch, var(--paper-shade) 80%, var(--cocoa) 20%)" } : null),
+        ...(lit ? { outline: "2px solid var(--primary-strong)", boxShadow: "0 0 0 5px var(--primary-halo), var(--shadow-sculpt-cream-rest)" } : null),
+      }}
     >
       <span
         className="font-mono-chord text-2xl font-bold leading-none"
-        style={{ color: amber ? "inherit" : "var(--primary-strong)" }}
+        style={{ color: special ? "var(--ink)" : "var(--primary-strong)" }}
       >
         {glyph}
       </span>
       <span className="flex min-w-0 flex-col items-end">
-        <span className="truncate font-mono-chord text-base font-semibold leading-tight" style={{ color: amber ? "inherit" : "var(--ink)" }}>
+        <span className="truncate font-mono-chord text-base font-semibold leading-tight" style={{ color: "var(--ink)" }}>
           {label}
         </span>
         {caption && (
-          <span className="font-mono-chord text-[10px] leading-tight opacity-70" style={{ color: amber ? "inherit" : "var(--ink-soft)" }}>
+          <span className="font-mono-chord text-[10px] leading-tight opacity-70" style={{ color: special ? "var(--ink)" : "var(--ink-soft)" }}>
             {caption}
           </span>
         )}
