@@ -111,10 +111,41 @@ describe("JamCanvas", () => {
     expect(onCommit.mock.calls[0][0][0].display).toBe("G");
   });
 
+  it("Cancel closes straight away when nothing is captured", () => {
+    const { press, onClose } = setup();
+    press(/^Cancel$/);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("Play needs a capture and Stop needs something playing", async () => {
+    const audio = await import("@/lib/music/audio");
+    const { press } = setup();
+    const play = screen.getByRole("button", { name: "Play capture" });
+    const stop = screen.getByRole("button", { name: "Stop" });
+    expect(play).toBeDisabled();
+    expect(stop).toBeDisabled();
+    press(/^1, /); press(/^5, /);
+    expect(play).toBeEnabled();
+    fireEvent.click(play);
+    expect(audio.playProgression).toHaveBeenCalledTimes(1);
+    expect(stop).toBeEnabled();
+    fireEvent.click(stop);
+    expect(audio.stopProgression).toHaveBeenCalled();
+    expect(stop).toBeDisabled();
+  });
+
+  it("the # key adds the capture just like the Add key", () => {
+    const { press, onCommit, onClose } = setup();
+    press(/^2, /); press(/^5, /);
+    press(/^#, add 2 chords/);
+    expect(onCommit.mock.calls[0][0].map((c) => c.display)).toEqual(["Dm", "G"]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("asks before discarding a capture on close", () => {
     const { press, onClose } = setup();
     press(/^1, /);
-    press(/Close jam mode/);
+    press(/^Cancel$/);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(onClose).toHaveBeenCalledTimes(1);
