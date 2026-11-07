@@ -4,6 +4,7 @@ import { useSongStore, getSectionDisplayName, getPatternChordsViaSSOT, withHisto
 import { usePlaybackStore } from "@/store/playback";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
 import { FocusedChordEditor } from "@/components/lyrics/FocusedChordEditor";
+import { JamCanvas } from "@/components/chord/JamCanvas";
 import { FloatingChordToolbar } from "@/components/chord/FloatingChordToolbar";
 import { SpiceSheet } from "@/components/progressions/SpiceSheet";
 
@@ -1867,6 +1868,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   }, [activeChordId]);
 
   const [patternAddSlot, setPatternAddSlot] = useState<{ patternId: string; atBeat: number; sectionId: string } | null>(null);
+  // Adding opens the last-used input tab; Jam covers both the desktop sheet
+  // (picker) and the mobile add sheet (patternAddSlot) paths.
+  const chordInputMode = useUIStore((s) => s.chordInputMode);
+  const jamAdd = chordInputMode !== "jam"
+    ? null
+    : picker && !picker.replaceChordId
+      ? { patternId: picker.patternId, atBeat: picker.atBeat, fromSheet: true }
+      : !chordEditor && patternAddSlot
+        ? { patternId: patternAddSlot.patternId, atBeat: patternAddSlot.atBeat, fromSheet: false }
+        : null;
 
   const isMobile = useIsMobile();
   const isDesktop = useIsDesktop();
@@ -2433,8 +2444,33 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         </div>
       </div>
 
+      {jamAdd && (() => {
+        const pat = progression.find((p) => p.id === jamAdd.patternId);
+        const sid = pat?.sectionId ?? pat?.id ?? "";
+        const blockIdx = progression.filter((p) => (p.sectionId ?? p.id) === sid).findIndex((p) => p.id === jamAdd.patternId);
+        return (
+          <JamCanvas
+            sectionId={sid}
+            targetLabel={`${getSectionDisplayName(sections, sid)}${blockIdx >= 0 ? ` block ${blockIdx + 1}` : ""}`}
+            onCommit={(chords) => {
+              const { addChordToPatternSlot } = useSongStore.getState();
+              withHistoryGroup(() =>
+                chords.forEach((c, i) => addChordToPatternSlot(jamAdd.patternId, c, jamAdd.atBeat + i, !isDesktop ? 4 : undefined)),
+              );
+              // Advance the insertion point so a switch to Type keeps adding after the capture.
+              const advance = <T extends { atBeat: number }>(p: T | null) => (p ? { ...p, atBeat: p.atBeat + chords.length } : p);
+              if (jamAdd.fromSheet) setPicker(advance);
+              else setPatternAddSlot(advance);
+              if (onboardingEnabled && progressionsStep === 2) setProgressionsStep(3);
+            }}
+            onClose={() => (jamAdd.fromSheet ? setPicker(null) : setPatternAddSlot(null))}
+            headerRef={jamAdd.fromSheet ? chordPickerHeaderRef : focusedEditorHeaderRef}
+          />
+        );
+      })()}
+
       <ChordPickerSheet
-        open={!!picker}
+        open={!!picker && !jamAdd}
         onOpenChange={(o) => { if (!o) setPicker(null); }}
         onPick={handlePick}
         headerRef={chordPickerHeaderRef}
@@ -2477,7 +2513,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
           onClose={() => setChordEditor(null)}
           headerRef={focusedEditorHeaderRef}
         />
-      ) : patternAddSlot ? (
+      ) : patternAddSlot && !jamAdd ? (
         <FocusedChordEditor
           mode="progression-add"
           sectionId={patternAddSlot.sectionId}

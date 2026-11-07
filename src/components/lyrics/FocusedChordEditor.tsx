@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { ChevronRight, Plus } from "lucide-react";
 import { PresetList } from "@/components/progressions/PresetList";
 import { SlashBassPicker } from "@/components/chord/ChordPickerSheet";
+import { ChordInputTabs } from "@/components/chord/ChordInputTabs";
 
 interface LyricsModeProps {
   mode?: "lyrics";
@@ -464,6 +465,7 @@ export function FocusedChordEditor(props: Props) {
           {title}
         </h2>
       </div>
+      {isAdding && view === "type" && <ChordInputTabs />}
       <button
         type="button"
         onClick={props.onClose}

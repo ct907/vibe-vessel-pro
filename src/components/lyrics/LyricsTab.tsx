@@ -23,6 +23,7 @@ import {
 import { usePlaybackStore } from "@/store/playback";
 import { ChordChip } from "@/components/chord/ChordChip";
 import { ChordPickerSheet } from "@/components/chord/ChordPickerSheet";
+import { JamCanvas } from "@/components/chord/JamCanvas";
 import { parseChord, ChordSymbol } from "@/lib/music/chords";
 import { playChord } from "@/lib/music/audio";
 import { toast } from "sonner";
@@ -1515,6 +1516,8 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     prog?: { patternId: string; chordId: string };
   } | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
+  const chordInputMode = useUIStore((s) => s.chordInputMode);
+  const jamPicker = picker && !picker.prog && !picker.anchorId && chordInputMode === "jam" ? picker : null;
 
   // After an undo/redo that moved a lyric line, restore the caret to where the
   // edit happened so typing continues uninterrupted.
@@ -2567,10 +2570,24 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
       )}
 
 
-      {/* On mobile, the inline bottom-sheet picker fights the on-screen
-          keyboard and sticky headers — render a full-screen overlay instead.
-          Desktop continues to use the bottom sheet for fast inline editing. */}
-      {isMobile && picker && !picker.prog ? (
+      {/* Adding to a row opens the last-used input tab: the Jam keypad takes
+          over the screen; Type keeps the sheets below. On mobile, the inline
+          bottom-sheet picker fights the on-screen keyboard and sticky headers —
+          render a full-screen overlay instead. Desktop continues to use the
+          bottom sheet for fast inline editing. */}
+      {jamPicker ? (
+        <JamCanvas
+          sectionId={jamPicker.sectionId}
+          targetLabel={(() => {
+            const sec = sections.find((s) => s.id === jamPicker.sectionId);
+            const lineIdx = sec ? sec.lines.findIndex((l) => l.id === jamPicker.lineId) : -1;
+            return `${getSectionDisplayName(sections, jamPicker.sectionId)}${lineIdx >= 0 ? ` line ${lineIdx + 1}` : ""}`;
+          })()}
+          onCommit={handlePickBatch}
+          onClose={() => setPicker(null)}
+          headerRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
+        />
+      ) : isMobile && picker && !picker.prog ? (
         <FocusedChordEditor
           sectionId={picker.sectionId}
           lineId={picker.lineId}

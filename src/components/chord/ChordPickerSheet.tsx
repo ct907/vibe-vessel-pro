@@ -13,6 +13,7 @@ import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
+import { ChordInputTabs } from "@/components/chord/ChordInputTabs";
 
 const OCTAVE_OPTIONS = [3, 4, 5];
 const BASS_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
@@ -264,11 +265,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
-        <SheetTitle asChild>
-          <div className="absolute top-2 left-4 text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
-            {initialChord ? "Edit Chord" : "Add Chords"}
-          </div>
-        </SheetTitle>
+        <div className="absolute top-1.5 left-4 right-12 flex items-center gap-3">
+          <SheetTitle asChild>
+            <div className="text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
+              {initialChord ? "Edit Chord" : "Add Chords"}
+            </div>
+          </SheetTitle>
+          {!initialChord && <ChordInputTabs />}
+        </div>
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
