@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { nashvilleLadder, parseNashvilleInput, rootToPc, transposeChord } from "@/lib/music/chords";
 import type { Mode } from "@/lib/music/chords";
 import {
+  KEY_ROOTS,
   buildJamChord,
+  isKeyChange,
+  keyRootBefore,
+  type JamItem,
   jamQuality,
   nextAccidental,
   nextExt,
@@ -139,5 +143,31 @@ describe("scale length", () => {
   it("has fewer degrees in pentatonic and blues", () => {
     expect(nashvilleLadder("C", "pentatonic-maj")).toHaveLength(5);
     expect(nashvilleLadder("C", "blues")).toHaveLength(6);
+  });
+});
+
+describe("key-change objects", () => {
+  const plain = (id: string, degree = 1): JamItem => ({ id, degree, accidental: 0, type: null, ext: 0 });
+  const key = (id: string, root: string): JamItem => ({ id, kind: "key", root });
+
+  it("tells key changes from chords", () => {
+    expect(isKeyChange(key("k", "G"))).toBe(true);
+    expect(isKeyChange(plain("a"))).toBe(false);
+  });
+  it("uses the base key until a key change, then the latest one", () => {
+    const items = [plain("a"), key("k1", "G"), plain("b"), key("k2", "Eb"), plain("c")];
+    expect([0, 1, 2, 3, 4, 5].map((p) => keyRootBefore(items, p, "C"))).toEqual(["C", "C", "G", "G", "Eb", "Eb"]);
+  });
+  it("clamps positions past the end", () => {
+    expect(keyRootBefore([key("k", "D")], 99, "C")).toBe("D");
+    expect(keyRootBefore([], 3, "A")).toBe("A");
+  });
+  it("re-resolves the same recipe in the new key", () => {
+    const five = { degree: 5, accidental: 0 as const, type: null, ext: 7 as const };
+    expect(buildJamChord(five, "C", "maj").display).toBe("G7");
+    expect(buildJamChord(five, "G", "maj").display).toBe("D7");
+  });
+  it("offers twelve distinct tonics", () => {
+    expect(new Set(KEY_ROOTS.map((r) => rootToPc(r))).size).toBe(12);
   });
 });

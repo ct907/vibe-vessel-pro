@@ -25,6 +25,29 @@ export interface JamStep {
   ext: JamExt;
 }
 
+/** A key-change object in the capture: chords after it use this key's numbers. */
+export interface JamKeyChange {
+  id: string;
+  kind: "key";
+  root: string;
+}
+
+export type JamItem = JamStep | JamKeyChange;
+
+export const isKeyChange = (item: JamItem): item is JamKeyChange => (item as JamKeyChange).kind === "key";
+
+/** The twelve tonics offered by the key-change list. */
+export const KEY_ROOTS = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
+
+/** Key in effect before position `pos`: the nearest earlier key change, else the base key. */
+export function keyRootBefore(items: JamItem[], pos: number, baseRoot: string): string {
+  for (let i = Math.min(pos, items.length) - 1; i >= 0; i--) {
+    const it = items[i];
+    if (isKeyChange(it)) return it.root;
+  }
+  return baseRoot;
+}
+
 /** Modifier state armed before a number key, as on the T9 hardware. */
 export type JamPrefix = Omit<JamStep, "id" | "degree">;
 

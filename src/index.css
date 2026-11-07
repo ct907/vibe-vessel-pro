@@ -71,8 +71,6 @@
     --accent-foreground: oklch(0.2257 0.0204 261.4);
 
     --destructive: oklch(0.5326 0.1808 26.8);
-    --sculpt-blue: oklch(0.5 0.13 258);
-    --sculpt-blue-foreground: oklch(0.9823 0.0069 88.64);
     /* Jam mode's LCD: olive glass, near-black ink. Hardware, so no dark-mode variant.
        Contrast (WCAG): ink on glass 10.1:1, band-ink on band 11.6:1 — keep both ≥ 7:1. */
     --lcd-bezel: oklch(0.2 0.008 70);
@@ -138,16 +136,6 @@
       0 1px 2px 0 color-mix(in oklch, var(--destructive) 55%, transparent),
       0 1px 1px 0 color-mix(in oklch, var(--destructive) 85%, black),
       inset 0 1px 2px 0 color-mix(in oklch, var(--destructive) 55%, white);
-
-    /* BLUE (Jam mode's Stop key) */
-    --shadow-sculpt-blue-rest:
-      0 4px 8px 0 color-mix(in oklch, var(--sculpt-blue) 55%, transparent),
-      0 3px 1px 0 color-mix(in oklch, var(--sculpt-blue) 85%, black),
-      inset 0 3px 4px 0 color-mix(in oklch, var(--sculpt-blue) 55%, white);
-    --shadow-sculpt-blue-press:
-      0 1px 2px 0 color-mix(in oklch, var(--sculpt-blue) 55%, transparent),
-      0 1px 1px 0 color-mix(in oklch, var(--sculpt-blue) 85%, black),
-      inset 0 1px 2px 0 color-mix(in oklch, var(--sculpt-blue) 55%, white);
 
     /* RECESS — inner-shadow well for segmented controls (tabs container) */
     --shadow-recess:
@@ -258,8 +246,6 @@
     --accent: color-mix(in oklch, var(--accent-b) 75%, var(--app-tint-raw, var(--accent-b)) 25%);
     --accent-foreground: oklch(0.8519 0.0763 62.62);
     --destructive: oklch(0.5189 0.175 25.76);
-    --sculpt-blue: oklch(0.55 0.13 258);
-    --sculpt-blue-foreground: oklch(0.9327 0.0161 82.79);
     --destructive-foreground: oklch(0.9327 0.0161 82.79);
     --border-b: oklch(0.3432 0.0153 59.11);
     --border: color-mix(in oklch, var(--border-b) 75%, var(--app-tint-raw, var(--border-b)) 25%);
@@ -465,20 +451,31 @@
   }
 
 
-  /* Blue (Jam mode's Stop key) */
-  .btn-sculpt-blue {
-    background-color: var(--sculpt-blue);
-    color: var(--sculpt-blue-foreground);
+  /* Tone — a sculpted key coloured by a local --tone / --tone-fg, so the
+     shadows follow the shade. Jam mode's Stop / Clear / Add keys use it with
+     dark tones that keep white labels ≥ 7:1 (WCAG AAA). */
+  .btn-sculpt-tone {
+    background-color: var(--tone);
+    color: var(--tone-fg, oklch(0.99 0 0));
     border: 0;
-    box-shadow: var(--shadow-sculpt-blue-rest);
+    box-shadow:
+      0 4px 8px 0 color-mix(in oklch, var(--tone) 55%, transparent),
+      0 3px 1px 0 color-mix(in oklch, var(--tone) 85%, black),
+      inset 0 3px 4px 0 color-mix(in oklch, var(--tone) 55%, white);
     transition:
       box-shadow 120ms cubic-bezier(0.22, 0.61, 0.36, 1),
       transform 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
-  .btn-sculpt-blue:active:not(:disabled) {
-    box-shadow: var(--shadow-sculpt-blue-press);
+  .btn-sculpt-tone:active:not(:disabled) {
+    box-shadow:
+      0 1px 2px 0 color-mix(in oklch, var(--tone) 55%, transparent),
+      0 1px 1px 0 color-mix(in oklch, var(--tone) 85%, black),
+      inset 0 1px 2px 0 color-mix(in oklch, var(--tone) 55%, white);
     transform: translateY(1px);
   }
+  .tone-stop { --tone: oklch(0.45 0.14 258); }
+  .tone-clear { --tone: oklch(0.45 0.16 26); }
+  .tone-add { --tone: oklch(0.46 0.11 55); }
 
   /* LCD — Jam mode's chord display: dark bezel, flat olive glass. */
   .lcd-bezel {
