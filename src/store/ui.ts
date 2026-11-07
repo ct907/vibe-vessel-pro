@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { ChordSymbol } from "@/lib/music/chords";
 
 /**
@@ -32,6 +33,9 @@ export interface ClipboardChord {
    *  lyric placement, respecting the user's choice to add lyrics later. */
   lyricless?: boolean;
 }
+
+/** How the Add Chords wrapper takes input: the T9 keypad or the text field. */
+export type ChordInputMode = "jam" | "type";
 
 /** Slot/chord the open chord sheet is currently aimed at, so rows can highlight it. */
 export interface FocusedEditorTarget {
@@ -70,9 +74,12 @@ interface UIState {
   /** Chord clipboard shared across tabs. */
   chordClipboard: ClipboardChord[];
   setChordClipboard: (chords: ClipboardChord[]) => void;
+  /** Last-used Add Chords tab; reopens whenever a row is tapped to add chords. Persisted. */
+  chordInputMode: ChordInputMode;
+  setChordInputMode: (m: ChordInputMode) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>()(persist((set) => ({
   focusedEditorOpen: false,
   setFocusedEditorOpen: (open) => set({ focusedEditorOpen: open }),
   focusedEditorTarget: null,
@@ -97,5 +104,10 @@ export const useUIStore = create<UIState>((set) => ({
   setChordPickerRequest: (v) => set({ chordPickerRequest: v }),
   chordClipboard: [],
   setChordClipboard: (chords) => set({ chordClipboard: chords }),
+  chordInputMode: "type",
+  setChordInputMode: (chordInputMode) => set({ chordInputMode }),
+}), {
+  name: "felt:ui:v1",
+  partialize: (s) => ({ chordInputMode: s.chordInputMode }),
 }));
 
