@@ -311,10 +311,10 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                     data-jam-cell={i}
                     onClick={() => { setCursor(i); audition(s); }}
                     className={cn("shrink-0 px-2.5 py-1 text-left", active && "lcd-invert")}
-                    style={{ border: `2px solid ${active ? "var(--lcd-ink)" : "color-mix(in oklch, var(--lcd-ink) 45%, transparent)"}` }}
+                    style={{ border: "2px solid var(--lcd-ink)" }}
                   >
                     <span className="block text-xl leading-tight">{chord.display}</span>
-                    <span className="block text-[10px] leading-tight opacity-80">{recipeLabel(s)}</span>
+                    <span className="block text-[11px] leading-tight">{recipeLabel(s)}</span>
                   </button>
                 );
               })}
@@ -326,7 +326,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
                 data-jam-cell={steps.length}
                 onClick={() => setCursor(steps.length)}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1 text-xl leading-tight"
-                style={{ border: `2px dashed ${onInsertCell ? "var(--lcd-ink)" : "color-mix(in oklch, var(--lcd-ink) 45%, transparent)"}` }}
+                style={{ border: "2px dashed var(--lcd-ink)" }}
               >
                 <span className={onInsertCell ? "animate-lcd-blink" : undefined}>+</span>
                 {prefixArmed && <span className="text-[11px]">{prefixText}</span>}
@@ -335,7 +335,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
 
             <div
               className="min-h-[3.4rem] shrink-0 px-3 py-2 text-xs leading-snug uppercase"
-              style={{ borderTop: "2px dashed color-mix(in oklch, var(--lcd-ink) 40%, transparent)" }}
+              style={{ borderTop: "2px dashed var(--lcd-ink)" }}
               aria-live="polite"
             >
               {current && currentChord ? (
