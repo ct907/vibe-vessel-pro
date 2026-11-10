@@ -157,7 +157,7 @@ interface PatternProps {
   blocksInSection: number;
   otherPatterns: { id: string; label: string }[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
-  /** This block was tapped to add chords — the sticky bar's chord buttons act on it. */
+  /** This block was tapped to add chords; it stays highlighted until a tap lands elsewhere. */
   targeted?: boolean;
   onRequestDeleteBlock: (patternId: string) => void;
   /** Open the FocusedChordEditor to replace a chord's family. */
@@ -252,6 +252,7 @@ function PatternBlock({
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const setWhyChord = useUIStore((s) => s.setWhyChord);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const setMultiSelectMode = useUIStore((s) => s.setMultiSelectMode);
   const sheetOpen = useUIStore((s) => s.focusedEditorOpen);
   const sheetTarget = useUIStore((s) => s.focusedEditorTarget);
   const multiSelectModeRef = useRef(multiSelectMode);
@@ -848,6 +849,11 @@ function PatternBlock({
             chipSelector={`[data-pattern-chord="${active.id}"]`}
             onEdit={() => onEditChordOpen(pattern.id, active.id)}
             onMove={() => setChordToolbarOpen(true)}
+            onSelect={() => {
+              setMultiSelectMode(true);
+              if (!blockSelectedIds.has(active.id)) onToggleMultiSelected(active.id, pattern.id);
+              setChordToolbarOpen(true);
+            }}
             onDelete={() => {
               if (blockSelectedIds.size > 1 && blockSelectedIds.has(active.id)) {
                 removePatternChordsBatch(pattern.id, Array.from(blockSelectedIds));
@@ -884,7 +890,7 @@ interface SectionGroupProps {
   index: number;
   allPatterns: PatternBlockType[];
   onPickerOpen: (patternId: string, atBeat: number, replaceChordId?: string) => void;
-  /** Block the sticky bar's chord buttons act on (last tapped to add chords). */
+  /** Block last tapped to add chords; highlighted until a tap lands elsewhere. */
   targetBlockId?: string | null;
   onRequestDeleteSection: (sectionId: string) => void;
   onRequestDeleteBlock: (patternId: string) => void;
@@ -2027,17 +2033,10 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChordId, multiSelected, sections, progression]);
 
-  // The block last tapped to add chords. With a selected chord, it's what the
-  // sticky bar's Edit/Move Chords act on.
+  // The block last tapped to add chords, highlighted until a tap lands elsewhere.
   const [targetBlockId, setTargetBlockId] = useState<string | null>(null);
-  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
-  const hasChordTarget = activeChordId !== null || multiSelected.size > 0 || targetBlockId !== null;
-  useEffect(() => {
-    setChordSelectionActive(hasChordTarget);
-    return () => setChordSelectionActive(false);
-  }, [hasChordTarget, setChordSelectionActive]);
-  // Tapping anywhere but a block, the sticky bar's chord buttons, or an open
-  // sheet/menu drops the block target (and greys those buttons out again).
+  // Tapping anywhere but a block, the chord popup/menu, or an open sheet/menu
+  // drops the block target.
   useEffect(() => {
     if (!targetBlockId) return;
     const onPointerDown = (e: PointerEvent) => {
@@ -2049,22 +2048,6 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [targetBlockId]);
-  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
-  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
-  useEffect(() => {
-    if (!chordPickerRequest) return;
-    setChordPickerRequest(false);
-    if (activeChordId && toolbarContext.activePatternId) {
-      openChordEditor(toolbarContext.activePatternId, activeChordId);
-      return;
-    }
-    const blocks = sections.flatMap((sec) => progression.filter((p) => (p.sectionId ?? p.id) === sec.id));
-    const block = blocks.find((p) => p.id === targetBlockId) ?? blocks[blocks.length - 1];
-    const owner = block ? sections.find((sec) => sec.id === (block.sectionId ?? block.id)) : undefined;
-    if (!block || !owner) return;
-    openPicker(block.id, getPatternChordsViaSSOT(owner, block).length);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chordPickerRequest]);
 
   const handleChordClick = (_patternId: string, chordId: string) => {
     // Tapping a chord only selects it — the pencil overlay opens the editor.
