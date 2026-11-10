@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { RotateCcw, RefreshCw, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSidePanel, useCanDockPanel, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
+import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 interface FocusedRhymeEditorProps {
@@ -387,6 +389,8 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
   const search = useRhymeSearch(props.isOpen);
+  const side = useCanDockPanel();
+  useSidePanel(props.isOpen && side);
 
   useEffect(() => {
     if (props.isOpen) setTimeout(() => inputRef.current?.focus(), 50);
@@ -423,10 +427,10 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
   return (
     <Sheet open={props.isOpen} onOpenChange={(o) => { if (!o) props.onClose(); }} modal={false}>
       <SheetContent
-        side="bottom"
+        side={side ? "right" : "bottom"}
         hideClose
-        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col p-0 gap-0 data-[state=closed]:duration-0"
-        style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
+        className={cn("overflow-hidden flex flex-col p-0 gap-0 data-[state=closed]:duration-0", side ? SIDE_PANEL_CLASS : "rounded-t-2xl transition-[bottom] duration-150")}
+        style={side ? { background: "var(--ink-soft)" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           setTimeout(() => inputRef.current?.focus(), 30);
@@ -442,7 +446,7 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
           if (t && (t.closest("[data-chord-row]") || t.closest("[data-section-id]"))) e.preventDefault();
         }}
       >
-        <RhymeEditorContent {...props} {...search} inputRef={inputRef} resultsMaxHeight={resultsMaxHeight} />
+        <RhymeEditorContent {...props} {...search} inputRef={inputRef} resultsMaxHeight={side ? undefined : resultsMaxHeight} />
       </SheetContent>
     </Sheet>
   );

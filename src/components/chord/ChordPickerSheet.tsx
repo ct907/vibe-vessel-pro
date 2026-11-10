@@ -11,6 +11,7 @@ import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { ChevronRight, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSidePanel, useCanDockPanel, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
 import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
 import { ChordInputTabs } from "@/components/chord/ChordInputTabs";
@@ -66,6 +67,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   const [browse, setBrowse] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
+  // Wide screens dock the picker beside the song; narrower ones keep the bottom sheet.
+  const side = useCanDockPanel();
+  useSidePanel(open && side);
 
   useEffect(() => {
     if (open) {
@@ -205,7 +209,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   useEffect(() => {
     const root = document.documentElement;
     const el = contentEl;
-    if (!open || !el) return;
+    if (!open || !el || side) return;
     const apply = () => root.style.setProperty("--chord-sheet-h", `${el.offsetHeight}px`);
     apply();
     const ro = new ResizeObserver(apply);
@@ -214,7 +218,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
       ro.disconnect();
       root.style.removeProperty("--chord-sheet-h");
     };
-  }, [open, contentEl]);
+  }, [open, contentEl, side]);
   useEffect(() => {
     if (!open || !targetSelector || !contentEl) return;
     // Let the page take the sheet-height padding first so there's room to scroll.
@@ -222,12 +226,12 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
       const el = document.querySelector<HTMLElement>(targetSelector);
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const limit = window.innerHeight - contentEl.offsetHeight - 12;
+      const limit = window.innerHeight - (side ? 96 : contentEl.offsetHeight) - 12;
       if (rect.bottom > limit) window.scrollBy({ top: rect.bottom - limit, behavior: "smooth" });
       else if (rect.top < 96) window.scrollBy({ top: rect.top - 96, behavior: "smooth" });
     }, 60);
     return () => window.clearTimeout(id);
-  }, [open, targetSelector, contentEl]);
+  }, [open, targetSelector, contentEl, side]);
 
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
@@ -248,7 +252,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         ref={setContentEl}
-        side="bottom"
+        side={side ? "right" : "bottom"}
         hideClose
         onEscapeKeyDown={(e) => {
           if (!browse) return;
@@ -256,8 +260,8 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           setBrowse(false);
           setTimeout(() => inputRef.current?.focus(), 30);
         }}
-        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10"
-        style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
+        className={cn("overflow-hidden flex flex-col pt-10", side ? cn(SIDE_PANEL_CLASS, "p-4 pt-12") : "rounded-t-2xl transition-[bottom] duration-150")}
+        style={side ? { background: "var(--ink-soft)" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           // We focus the input ourselves; don't let Radix steal focus from
           // the chord row if user tapped to switch back.
@@ -281,7 +285,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
-        <div className="absolute top-1.5 left-4 right-3 flex items-center gap-3">
+        <div className={cn("absolute left-4 right-3 flex items-center gap-3", side ? "top-3" : "top-1.5")}>
           <SheetTitle asChild>
             <div className="text-sm font-display font-semibold shrink-0" style={{ color: "var(--paper-card)" }}>
               {browse ? "Browse Popular Progressions" : initialChord ? "Edit Chord" : "Add Chords"}
@@ -322,7 +326,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
         </div>
         ) : (
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
+          <div ref={headerRef} className={cn("flex items-stretch gap-1.5 shrink-0", side && "flex-wrap")}>
 
             <input
               ref={inputRef}
@@ -331,7 +335,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Type a chord… e.g. Bbm9, Fmaj7, Csus4"
               style={{
-                flex: 1,
+                flex: side ? "1 1 100%" : 1,
                 minWidth: 0,
                 background: "var(--paper-card)",
                 boxShadow: "var(--shadow-sculpt-cream-rest)",
@@ -448,7 +452,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
               </div>
             ) : (
               <div className="-mx-1 px-1 shrink-0">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className={cn("grid grid-cols-2 gap-2", !side && "sm:grid-cols-3")}>
                   {suggestions.map((s) => {
                     const colors = getChordColorClasses(s.symbol);
                     return (

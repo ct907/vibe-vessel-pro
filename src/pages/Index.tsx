@@ -141,7 +141,7 @@ const Index = () => {
   const inEditor = location.pathname !== "/";
 
   return (
-    <div className="min-h-screen bg-paper text-foreground flex flex-col isolate">
+    <div className="min-h-screen bg-paper text-foreground flex flex-col isolate" style={{ paddingRight: "var(--side-panel-w, 0px)" }}>
       {bg.pattern !== "none" && (
         <div
           className="fixed inset-0 pointer-events-none"

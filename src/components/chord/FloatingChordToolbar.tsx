@@ -357,14 +357,14 @@ export function FloatingChordToolbar({
   // sticky bar — the mobile version stacks icon-only controls in the corner.
   if (isDesktop) {
     return (
-      <div data-chord-keep className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[55] pointer-events-none">
+      <div data-chord-keep className="fixed bottom-24 -translate-x-1/2 z-[55] pointer-events-none" style={{ left: "calc(50% - var(--side-panel-w, 0px) / 2)" }}>
         <div
           role="toolbar"
           aria-label="Chord editing toolbar"
           style={ANIM_STYLE}
           className={cn(
             "pointer-events-auto origin-bottom rounded-2xl border bg-popover shadow-lg px-3 py-2",
-            "flex flex-row items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto",
+            "flex flex-row items-center gap-1 max-w-[calc(100vw-2rem-var(--side-panel-w,0px))] overflow-x-auto",
             expanded || pasteMode ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none",
           )}
         >

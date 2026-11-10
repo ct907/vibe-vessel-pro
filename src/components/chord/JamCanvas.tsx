@@ -36,6 +36,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { useSidePanel, useCanDockPanel } from "@/hooks/use-side-panel";
 
 interface Props {
   /** Section whose effective key resolves the numbers. Omitted = standalone Jam (new song, key of C). */
@@ -70,6 +71,9 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
   const setMode = useUIStore((s) => s.setChordInputMode);
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
   const titleId = useId();
+  // Inside the editor on wide screens the keypad docks beside the song; the homepage Jam stays full-screen.
+  const side = useCanDockPanel() && !!sectionId;
+  useSidePanel(side);
 
   const effective = useMemo(
     () => (sectionId ? effectiveKeyAt(sections, sectionId, meta) : STANDALONE_KEY),
@@ -321,10 +325,10 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
       ref={rootRef}
       tabIndex={-1}
       role="dialog"
-      aria-modal="true"
+      aria-modal={side ? undefined : "true"}
       aria-labelledby={titleId}
       data-jam-canvas
-      className="fixed inset-0 z-50 flex flex-col outline-none"
+      className={cn("fixed z-50 flex flex-col outline-none", side ? "inset-y-0 right-0 w-[420px] border-l shadow-lg" : "inset-0")}
       style={{
         background: "var(--paper-shade)",
         paddingTop: "env(safe-area-inset-top, 0px)",

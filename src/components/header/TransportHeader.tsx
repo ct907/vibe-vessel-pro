@@ -519,7 +519,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Tab") tabbed = true;
       if (e.key !== " " || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isOverlayRoute(pathnameRef.current)) return;
+      if (isOverlayRoute(pathnameRef.current) || document.querySelector("[data-jam-canvas]")) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       if (tabbed && t?.closest('button, a, [role="button"], [role="tab"], [tabindex]')) return;

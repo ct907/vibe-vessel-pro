@@ -204,6 +204,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
       className="fixed left-0 right-0 z-[45] transition-[bottom] duration-150"
       style={{
         bottom: keyboardOffset,
+        right: "var(--side-panel-w, 0px)",
         paddingBottom: keyboardOffset > 0 ? 0 : "env(safe-area-inset-bottom, 0px)",
       }}
     >
