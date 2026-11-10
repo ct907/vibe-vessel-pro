@@ -160,7 +160,7 @@ interface LineRowProps {
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
   onChordFocus: (lineId: string) => void;
-  /** This line's chord row was tapped — the sticky bar's chord buttons act on it. */
+  /** This line's chord row was tapped; it stays highlighted until a tap lands elsewhere. */
   chordFocused?: boolean;
   /** The chord id that currently shows its X chip (tab-level, one at a time). */
   activeChordId: string | null;
@@ -253,6 +253,7 @@ function LineRow({
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const setMultiSelectMode = useUIStore((s) => s.setMultiSelectMode);
   const onMultiSelectTapRef = useRef(onMultiSelectTap);
   onMultiSelectTapRef.current = onMultiSelectTap;
   const onShiftSelectTapRef = useRef(onShiftSelectTap);
@@ -507,6 +508,11 @@ function LineRow({
               onPickerOpen(line.id, currentSlot, activeAnchor.id);
             }}
             onMove={() => setChordToolbarOpen(true)}
+            onSelect={() => {
+              setMultiSelectMode(true);
+              if (!multiSelectedIds?.has(activeAnchor.id)) onMultiSelectTap?.(activeAnchor.id);
+              setChordToolbarOpen(true);
+            }}
             onDelete={() => {
               removeChordAnchorsBatch(sectionId, line.id, [activeAnchor.id]);
               onSetActiveChordId(null);
@@ -1584,17 +1590,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
-  // The chord row last tapped (empty or not). With a selected chord, it's what
-  // the sticky bar's Edit/Move Chords act on.
+  // The chord row last tapped (empty or not), highlighted until a tap lands elsewhere.
   const [chordRowFocus, setChordRowFocus] = useState<{ sectionId: string; lineId: string } | null>(null);
-  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
-  const hasChordTarget = activeChordId !== null || lyricMultiSelected.size > 0 || chordRowFocus !== null;
-  useEffect(() => {
-    setChordSelectionActive(hasChordTarget);
-    return () => setChordSelectionActive(false);
-  }, [hasChordTarget, setChordSelectionActive]);
-  // Tapping anywhere but a chord row, the sticky bar's chord buttons, or an
-  // open sheet/menu drops the row focus (and greys those buttons out again).
+  // Tapping anywhere but a chord row, the chord popup/menu, or an open
+  // sheet/menu drops the row focus.
   useEffect(() => {
     if (!chordRowFocus) return;
     const onPointerDown = (e: PointerEvent) => {
@@ -1606,42 +1605,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [chordRowFocus]);
-  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
-  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
-  useEffect(() => {
-    if (!chordPickerRequest) return;
-    setChordPickerRequest(false);
-    // A selected chord opens the picker on that chord, ready to change it.
-    if (activeChordId) {
-      for (const sec of sections) {
-        for (const l of sec.lines) {
-          const a = getLineChordsViaSSOT(sec, l.id).find((c) => c.id === activeChordId);
-          if (a) {
-            setActiveChordId(null);
-            setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: a.slotIndex ?? 0, anchorId: a.id });
-            return;
-          }
-        }
-        const unplaced = sec.chords.find((c) => c.id === activeChordId && !c.lyricsPlacement && c.progressionPlacement);
-        if (unplaced?.progressionPlacement) {
-          setActiveChordId(null);
-          openProgPicker(sec.id, unplaced.progressionPlacement.patternId, unplaced.id);
-          return;
-        }
-      }
-    }
-    // Otherwise add to the focused chord row, after its last chord.
-    const sec = sections.find((x) => x.id === chordRowFocus?.sectionId) ?? sections[sections.length - 1];
-    const l = sec?.lines.find((x) => x.id === chordRowFocus?.lineId) ?? sec?.lines[sec.lines.length - 1];
-    if (!sec || !l) return;
-    const last = getLineChordsViaSSOT(sec, l.id).reduce<ChordAnchor | null>(
-      (m, c) => ((c.slotIndex ?? 0) > (m?.slotIndex ?? -1) ? c : m),
-      null,
-    );
-    const next = last ? (last.slotIndex ?? 0) + chordSlotWidth(last.chord.display) + 1 : 0;
-    setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, next) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chordPickerRequest]);
   const rangeAnchorRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
   const toggleLyricMultiSelected = useCallback(
     (anchorId: string, ctx: { sectionId: string; lineId: string }) => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Plus, Pencil, Move } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useTakesStore } from "@/store/takes";
 import { useSongStore, type SectionType } from "@/store/song";
 import { useUIStore } from "@/store/ui";
@@ -13,7 +13,7 @@ import { getAudioContext } from "@/lib/audio/context";
 interface Props {
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
   onRecordComplete?: (blobId: string, durationSec: number, mime: string) => void;
-  /** Called when Add Section / Edit Chords is used, so the parent can reveal its card-gated editor. */
+  /** Called when Add Section is used, so the parent can reveal its card-gated editor. */
   onEditorAction?: () => void;
 }
 
@@ -48,9 +48,6 @@ export function requestStickyBarRecording() {
 export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
-  const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
-  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
-  const chordSelectionActive = useUIStore((s) => s.chordSelectionActive);
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
 
   const recorderRef = useRef<RecorderHandle | null>(null);
@@ -187,16 +184,6 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     if (lineId) focusLyricLine(lineId);
   };
 
-  const handleEditChords = () => {
-    onEditorAction?.();
-    setChordPickerRequest(true);
-  };
-
-  const handleMoveChords = () => {
-    onEditorAction?.();
-    setChordToolbarOpen(true);
-  };
-
   return (
     <div
       className="fixed left-0 right-0 z-[45] transition-[bottom] duration-150"
@@ -264,12 +251,6 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             className="relative flex w-full items-stretch overflow-hidden rounded-2xl"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
-            {chordSelectionActive && (
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-0 z-[2] rounded-2xl animate-toolbar-glow"
-              />
-            )}
             {/* Record — always visible; disabled while a track is recording */}
             <button
               type="button"
@@ -300,37 +281,6 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
             >
               <Plus className="h-3.5 w-3.5" />
               Add Section
-            </button>
-
-            {/* Edit/Move act on the tapped chord or chord row, so they stay greyed
-                out until there is one. data-chord-keep stops the press from
-                clearing that selection before the click lands. */}
-            <button
-              type="button"
-              data-chord-keep
-              onClick={handleEditChords}
-              disabled={!chordSelectionActive}
-              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
-              style={{ background: "var(--cocoa)" }}
-              aria-label="Open chord picker"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit Chords
-            </button>
-
-            <button
-              type="button"
-              data-chord-keep
-              onClick={handleMoveChords}
-              disabled={!chordSelectionActive}
-              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
-              style={{ background: "var(--cocoa)" }}
-              aria-label="Open move chords menu"
-            >
-              <Move className="h-3.5 w-3.5" />
-              Move Chords
             </button>
           </div>
         </div>

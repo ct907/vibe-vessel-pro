@@ -259,13 +259,17 @@ export function FloatingChordToolbar({
     }
   }, [chordToolbarOpen, visible, setChordToolbarOpen]);
 
+  // Multi-select resets when the menu collapses, not when it opens: the chord
+  // popup's Select enters multi-select first and opens the menu right after.
   useEffect(() => {
     setToolbarExpanded(effectiveExpanded);
-    return () => {
-      setToolbarExpanded(false);
-      setMultiSelectMode(false);
-    };
+    if (!effectiveExpanded) setMultiSelectMode(false);
   }, [effectiveExpanded, setToolbarExpanded, setMultiSelectMode]);
+
+  useEffect(() => () => {
+    setToolbarExpanded(false);
+    setMultiSelectMode(false);
+  }, [setToolbarExpanded, setMultiSelectMode]);
 
   if (!visible) return null;
 
