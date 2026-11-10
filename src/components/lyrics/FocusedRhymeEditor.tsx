@@ -298,7 +298,7 @@ function RhymeEditorContent({
 
         {!loading && !error && !query.trim() && (
           <p className="text-sm" style={{ color: "var(--ink-soft)", opacity: 0.7 }}>
-            Tap a line chip or type a word above.
+            Pick a line chip or type a word above.
           </p>
         )}
 

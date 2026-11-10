@@ -9,7 +9,7 @@ import { effectiveKeyAt } from "@/lib/music/keyChange";
 import { useSongStore } from "@/store/song";
 import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
-import { Play } from "lucide-react";
+import { ChevronRight, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
@@ -50,20 +50,26 @@ interface Props {
   headerRef?: RefObject<HTMLDivElement | null>;
   /** The row/block being edited; it's scrolled clear of the sheet when it opens. */
   targetSelector?: string;
+  /** Where the chords are going, e.g. "Verse 1 line 2". */
+  contextLabel?: string;
+  /** Alt+←/→ in the input nudges the chord being edited. */
+  onNudge?: (dir: -1 | 1) => void;
 }
 
-export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange, headerRef, targetSelector }: Props) {
+export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onPickBatch, sectionId, activeLineId, activeSlotIndex, query: queryProp, onQueryChange, onOctaveChange, headerRef, targetSelector, contextLabel, onNudge }: Props) {
   const [queryInner, setQueryInner] = useState("");
   const query = queryProp ?? queryInner;
   const setQuery = (q: string) => { setQueryInner(q); onQueryChange?.(q); };
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
   const [octave, setOctave] = useState<number>(3);
+  const [browse, setBrowse] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     if (open) {
+      setBrowse(false);
       if (queryProp === undefined) setQueryInner(initialChord ? toSounding(initialChord).display : "");
       setOctave(initialChord?.octave ?? 3);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -186,6 +192,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
     // Adding a preset progression keeps the picker open (like single-chord and
     // typed-Nashville adds) so the user can keep building. PresetList only
     // shows in add mode, so we never need to close here.
+    setBrowse(false);
     setQuery("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
@@ -230,7 +237,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   // the previous behavior (use as much height as is available above the
   // editing row) because there's much less screen real estate to work with
   // and the keyboard already eats most of it.
-  const sheetMaxHeight = isMobile
+  const sheetMaxHeight = browse
+    ? Math.max(220, vvHeight - 24)
+    : isMobile
     ? Math.max(220, vvHeight - TOP_RESERVED)
     : Math.max(220, Math.min(vvHeight * 0.4, vvHeight - TOP_RESERVED));
   const gridMaxHeight = Math.max(80, sheetMaxHeight - SHEET_CHROME);
@@ -240,7 +249,14 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
       <SheetContent
         ref={setContentEl}
         side="bottom"
-        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10 [&>button[type=button]]:top-2 [&>button[type=button]]:right-3"
+        hideClose
+        onEscapeKeyDown={(e) => {
+          if (!browse) return;
+          e.preventDefault();
+          setBrowse(false);
+          setTimeout(() => inputRef.current?.focus(), 30);
+        }}
+        className="rounded-t-2xl transition-[bottom] duration-150 overflow-hidden flex flex-col pt-10"
         style={{ bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           // We focus the input ourselves; don't let Radix steal focus from
@@ -265,14 +281,46 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           }
         }}
       >
-        <div className="absolute top-1.5 left-4 right-12 flex items-center gap-3">
+        <div className="absolute top-1.5 left-4 right-3 flex items-center gap-3">
           <SheetTitle asChild>
-            <div className="text-sm font-display font-semibold" style={{ color: "var(--paper-card)" }}>
-              {initialChord ? "Edit Chord" : "Add Chords"}
+            <div className="text-sm font-display font-semibold shrink-0" style={{ color: "var(--paper-card)" }}>
+              {browse ? "Browse Popular Progressions" : initialChord ? "Edit Chord" : "Add Chords"}
             </div>
           </SheetTitle>
-          {!initialChord && <ChordInputTabs />}
+          {contextLabel && (
+            <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--paper-card)", opacity: 0.7 }}>
+              {contextLabel}
+            </span>
+          )}
+          {!initialChord && !browse && <ChordInputTabs />}
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="btn-sculpt-amber ml-auto inline-flex h-7 shrink-0 items-center justify-center rounded-lg px-4 text-sm font-semibold"
+          >
+            Done
+          </button>
         </div>
+        {browse ? (
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
+          <div ref={headerRef} className="shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setBrowse(false);
+                setTimeout(() => inputRef.current?.focus(), 30);
+              }}
+              className="btn-sculpt-cocoa inline-flex items-center gap-1 rounded-lg h-8 px-3 text-sm font-semibold"
+            >
+              Type In Chords
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <PresetList heading="" onUse={handlePresetUse} />
+          </div>
+        </div>
+        ) : (
         <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div ref={headerRef} className="flex items-stretch gap-1.5 shrink-0">
 
@@ -302,6 +350,11 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
                 if (e.key === "Enter") {
                   if (nashvilleChords) { handlePickNashville(nashvilleChords); return; }
                   if (exact) { handlePick(exact); return; }
+                }
+                if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                  e.preventDefault();
+                  onNudge?.(e.key === "ArrowLeft" ? -1 : 1);
+                  return;
                 }
                 if ((e.key === "ArrowUp" || e.key === "ArrowDown") && activeLineId) {
                   e.preventDefault();
@@ -432,12 +485,20 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           )}
 
           {!initialChord && (
-            <div className="pt-3 mt-1 shrink-0" style={{ borderTop: "1px solid color-mix(in oklch, var(--cocoa-deep) 15%, transparent)" }}>
-              <PresetList onUse={handlePresetUse} />
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setBrowse(true)}
+                className="btn-sculpt-cocoa inline-flex items-center gap-1 rounded-lg h-8 px-3 text-sm font-semibold"
+              >
+                Browse Popular Progressions
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           )}
 
         </div>
+        )}
 
       </SheetContent>
     </Sheet>

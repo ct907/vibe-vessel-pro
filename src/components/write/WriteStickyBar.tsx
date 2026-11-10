@@ -9,6 +9,7 @@ import { useRecordingsStore } from "@/store/recordings";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
+import { useIsDesktop } from "@/hooks/use-mobile";
 
 interface Props {
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
@@ -46,6 +47,7 @@ export function requestStickyBarRecording() {
 }
 
 export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
+  const isDesktop = useIsDesktop();
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
@@ -128,7 +130,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     setLevel(0);
     if (Date.now() - recordStartedAtRef.current < MIN_TAKE_MS) {
       handle.cancel();
-      toast("Recording too short to keep", { description: "Tap Record, play your idea, then tap Stop." });
+      toast("Recording too short to keep", { description: "Press Record, play your idea, then press Stop." });
       return;
     }
     setPending(true);
@@ -310,7 +312,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               data-chord-keep
               onClick={handleEditChords}
               disabled={!chordSelectionActive}
-              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              title={chordSelectionActive ? undefined : `${isDesktop ? "Click" : "Tap"} a chord or chord row first`}
               className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open chord picker"
@@ -324,7 +326,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               data-chord-keep
               onClick={handleMoveChords}
               disabled={!chordSelectionActive}
-              title={chordSelectionActive ? undefined : "Tap a chord or chord row first"}
+              title={chordSelectionActive ? undefined : `${isDesktop ? "Click" : "Tap"} a chord or chord row first`}
               className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform,opacity] enabled:active:translate-y-px enabled:active:brightness-95 disabled:opacity-40"
               style={{ background: "var(--cocoa)" }}
               aria-label="Open move chords menu"

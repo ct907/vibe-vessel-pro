@@ -272,10 +272,10 @@ export function FloatingChordToolbar({
   const middleLabel = hasSelection
     ? `${selectedCount} selected`
     : multiSelectMode
-      ? "Tap chords to select"
+      ? `${isDesktop ? "Click" : "Tap"} chords to select`
       : activeChord
         ? activeChord.display
-        : "Tap a chord to edit";
+        : `${isDesktop ? "Click" : "Tap"} a chord to edit`;
   const beatDisabled = !hasContext;
   const octaveDisplay: string =
     selectedOctaves && selectedOctaves.length > 0
@@ -383,7 +383,7 @@ export function FloatingChordToolbar({
           {divider}
           <span
             className={cn(
-              "px-2 text-sm select-none truncate max-w-[8rem] shrink-0",
+              "px-2 text-sm select-none truncate max-w-[11rem] shrink-0",
               hasContext ? "font-mono-chord text-foreground" : "text-muted-foreground",
             )}
           >

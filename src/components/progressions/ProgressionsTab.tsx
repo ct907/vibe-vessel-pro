@@ -595,7 +595,7 @@ function PatternBlock({
                 const slotIdx = item.slotIdx;
                 const basis = item.basis;
                 const sheetTargeted =
-                  sheetOpen && sheetTarget?.patternId === pattern.id &&
+                  sheetTarget?.patternId === pattern.id &&
                   (occupied ? sheetTarget.chordId === c?.id : !sheetTarget.chordId && sheetTarget.slotIndex === slotIdx);
                 return (
                       <div
@@ -1894,6 +1894,17 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
   const firstBlockRef = useRef<HTMLDivElement | null>(null);
   const spiceButtonRef = useRef<HTMLButtonElement | null>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
+
+  // Same highlight the mobile editor publishes, for the desktop sheet.
+  const setFocusedEditorTarget = useUIStore((s) => s.setFocusedEditorTarget);
+  const sheetPatternId = picker && !jamAdd ? picker.patternId : undefined;
+  const sheetSlot = picker?.atBeat;
+  const sheetChordId = picker?.replaceChordId;
+  useEffect(() => {
+    if (!sheetPatternId) return;
+    setFocusedEditorTarget(sheetChordId ? { patternId: sheetPatternId, chordId: sheetChordId } : { patternId: sheetPatternId, slotIndex: sheetSlot });
+    return () => setFocusedEditorTarget(null);
+  }, [sheetPatternId, sheetSlot, sheetChordId, setFocusedEditorTarget]);
   const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
   const spiceHeaderRef = useRef<HTMLDivElement | null>(null);
   const [firstSpiceOpen, setFirstSpiceOpen] = useState(false);
@@ -2474,6 +2485,16 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
         onOpenChange={(o) => { if (!o) setPicker(null); }}
         onPick={handlePick}
         headerRef={chordPickerHeaderRef}
+        contextLabel={(() => {
+          if (!picker) return undefined;
+          const pat = progression.find((p) => p.id === picker.patternId);
+          const sid = pat?.sectionId ?? pat?.id ?? "";
+          const blockIdx = progression.filter((p) => (p.sectionId ?? p.id) === sid).findIndex((p) => p.id === picker.patternId);
+          return `${getSectionDisplayName(sections, sid)}${blockIdx >= 0 ? ` block ${blockIdx + 1}` : ""}`;
+        })()}
+        onNudge={(dir) => {
+          if (picker?.replaceChordId) useSongStore.getState().movePatternChord(picker.patternId, picker.replaceChordId, dir);
+        }}
         targetSelector={picker ? (picker.replaceChordId ? `[data-pattern-chord="${picker.replaceChordId}"]` : `[data-pattern-block="${picker.patternId}"]`) : undefined}
         onPickBatch={(chords) => {
           if (!picker || picker.replaceChordId) return;
