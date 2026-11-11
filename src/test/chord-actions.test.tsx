@@ -45,10 +45,10 @@ describe("contextual chord actions", () => {
     useUIStore.setState({ multiSelectMode: false, chordToolbarOpen: false, toolbarExpanded: false });
   });
 
-  it("the sticky bar only offers Record and Add Section", () => {
+  it("the sticky bar only offers Record Voice and Add Lyrics Section", () => {
     render(<WriteStickyBar />);
     const labels = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
-    expect(labels).toEqual(["Record a take", "Add a song section"]);
+    expect(labels).toEqual(["Record voice", "Add lyrics section"]);
   });
 
   it("tapping a chord shows Edit, Move, Select and Delete under it", () => {

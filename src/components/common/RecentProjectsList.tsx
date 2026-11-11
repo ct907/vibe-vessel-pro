@@ -52,7 +52,7 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
               <div key={s.id} className="flex items-center gap-3 px-4 py-2">
                 <button type="button" className="flex-1 min-w-0 text-left" onClick={() => onOpen(s)}>
                   <span className="flex items-center gap-2">
-                    <h3 className="font-display text-lg truncate">{s.name}</h3>
+                    <h3 className="font-display text-xl leading-tight truncate">{s.name}</h3>
                     {songHasAudio(s) && (
                       <>
                         <Mic className="h-3.5 w-3.5 shrink-0 text-ink-soft" aria-hidden />

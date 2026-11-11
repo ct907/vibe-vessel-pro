@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -13,8 +13,12 @@ import { getAudioContext } from "@/lib/audio/context";
 interface Props {
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
   onRecordComplete?: (blobId: string, durationSec: number, mime: string) => void;
-  /** Called when Add Section is used, so the parent can reveal its card-gated editor. */
+  /** Called when Add Lyrics Section is used, so the parent can reveal its card-gated editor. */
   onEditorAction?: () => void;
+  /** Called as a take starts, so the parent can reveal its recordings area. */
+  onRecordStart?: () => void;
+  /** Lets a coach mark point at Record Voice. */
+  recordButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 const SECTION_TYPES: SectionType[] = ["verse", "chorus", "pre-chorus", "bridge", "intro", "instrumental"];
@@ -45,7 +49,7 @@ export function requestStickyBarRecording() {
   window.dispatchEvent(new CustomEvent(START_RECORDING_EVENT));
 }
 
-export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
+export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart, recordButtonRef }: Props) {
   const addTake = useTakesStore((s) => s.addTake);
   const addSection = useSongStore((s) => s.addSection);
   const trackIsRecording = useRecordingsStore((s) => s.isRecording);
@@ -105,6 +109,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
       recorderRef.current = handle;
       recordStartedAtRef.current = Date.now();
       setRecording(true);
+      onRecordStart?.();
     } catch {
       // mic permission denied or device unavailable — tell the user so they
       // don't think the app is broken at the moment they're trying to capture.
@@ -164,8 +169,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
 
-  // The empty "Add Recording" tap card starts a take through here so the strip
-  // reveal and the recording begin in the same gesture.
+  // Capture intents from the homepage start a take through here.
   useEffect(() => {
     const onRequest = () => {
       if (recorderRef.current || pending || useRecordingsStore.getState().isRecording) return;
@@ -192,8 +196,19 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
         paddingBottom: keyboardOffset > 0 ? 0 : "env(safe-area-inset-bottom, 0px)",
       }}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 -top-6"
+        style={{
+          background: "color-mix(in oklch, var(--paper) 55%, transparent)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          maskImage: "linear-gradient(to top, black, rgb(0 0 0 / 0.2))",
+          WebkitMaskImage: "linear-gradient(to top, black, rgb(0 0 0 / 0.2))",
+        }}
+      />
       {/* Full width on mobile; capped and centered on tablet/desktop. */}
-      <div className="mx-auto w-full max-w-[420px]">
+      <div className="relative mx-auto w-full max-w-[420px]">
         {/* Section type picker — full-width bar on mobile; a centered floating
             card above the bar on desktop. */}
         {addSectionOpen && (
@@ -253,6 +268,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
           >
             {/* Record — always visible; disabled while a track is recording */}
             <button
+              ref={recordButtonRef}
               type="button"
               onClick={toggle}
               disabled={pending || starting || (trackIsRecording && !recording)}
@@ -262,13 +278,13 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
                 ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
               }
               style={{ background: "var(--destructive)" }}
-              aria-label={recording ? "Stop recording" : "Record a take"}
+              aria-label={recording ? "Stop recording" : "Record voice"}
             >
               <span
                 className="bg-white transition-all"
                 style={{ width: 10, height: 10, borderRadius: recording ? 2 : 5 }}
               />
-              {pending ? "Saving…" : starting ? "Starting…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record"}
+              {pending ? "Saving…" : starting ? "Starting…" : recording ? `Stop · ${fmtElapsed(elapsed)}` : "Record Voice"}
             </button>
 
             <button
@@ -277,10 +293,10 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction }: Props) {
               className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
               style={{ background: "var(--cocoa)" }}
               aria-expanded={addSectionOpen}
-              aria-label="Add a song section"
+              aria-label="Add lyrics section"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Section
+              Add Lyrics Section
             </button>
           </div>
         </div>
