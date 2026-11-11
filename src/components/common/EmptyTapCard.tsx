@@ -29,8 +29,8 @@ export function EmptyTapCard({ icon, label, hint, onClick, anchorRef, className,
         <Plus className="h-6 w-6" strokeWidth={1.75} />
         {icon}
       </span>
-      <span className={cn("text-base font-display font-semibold", labelClassName)}>{label}</span>
-      {hint && <span className="-mt-1.5 text-xs leading-snug">{hint}</span>}
+      <span className={cn("type-body font-display font-semibold", labelClassName)}>{label}</span>
+      {hint && <span className="-mt-1.5 type-caption leading-snug">{hint}</span>}
     </button>
   );
 }

@@ -36,15 +36,15 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search titles and lyrics"
             aria-label="Search songs"
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm"
+            className="flex-1 min-w-0 bg-transparent outline-none type-label"
           />
         </label>
       )}
       <div className="rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] divide-y divide-border/50 text-left">
         {songs.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">No recent projects yet.</p>
+          <p className="type-label text-muted-foreground italic px-4 py-6 text-center">No recent projects yet.</p>
         ) : visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic px-4 py-6 text-center">No songs match "{query}".</p>
+          <p className="type-label text-muted-foreground italic px-4 py-6 text-center">No songs match "{query}".</p>
         ) : (
           visible.map((s) => {
             const preview = songPreview(s);
@@ -52,7 +52,7 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
               <div key={s.id} className="flex items-center gap-3 px-4 py-2">
                 <button type="button" className="flex-1 min-w-0 text-left" onClick={() => onOpen(s)}>
                   <span className="flex items-center gap-2">
-                    <h3 className="font-display text-xl leading-tight truncate">{s.name}</h3>
+                    <h3 className="font-display type-body font-semibold leading-tight truncate">{s.name}</h3>
                     {songHasAudio(s) && (
                       <>
                         <Mic className="h-3.5 w-3.5 shrink-0 text-ink-soft" aria-hidden />
@@ -60,7 +60,7 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
                       </>
                     )}
                   </span>
-                  <span className="block text-xs text-ink-soft truncate">
+                  <span className="block type-label text-ink-soft truncate">
                     {formatDistanceToNow(s.savedAt, { addSuffix: true })}
                     {preview && ` · ${preview}`}
                   </span>
@@ -84,7 +84,7 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="self-center text-sm font-semibold text-ink-soft hover:text-ink"
+          className="self-center type-label font-semibold text-ink-soft hover:text-ink"
         >
           Show all {matches.length}
         </button>

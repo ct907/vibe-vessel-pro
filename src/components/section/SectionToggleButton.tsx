@@ -27,7 +27,7 @@ export function SectionToggleButton({
       title={title}
       aria-pressed={pressed}
       className={cn(
-        "relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 type-caption font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         pressed ? "bg-[var(--cocoa)] text-[var(--cocoa-foreground)]" : "bg-black/10 hover:bg-black/15",
       )}
     >

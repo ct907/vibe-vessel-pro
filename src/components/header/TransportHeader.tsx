@@ -1255,7 +1255,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                       cursor: "pointer",
                       fontFamily: "var(--font-body, 'Nunito', sans-serif)",
                       fontWeight: 700,
-                      fontSize: 14,
+                      fontSize: "var(--type-label)",
                       background: active ? "var(--cocoa)" : "transparent",
                       color: active ? "var(--cocoa-foreground)" : "var(--ink-soft)",
                       boxShadow: active ? "var(--shadow-sculpt-cocoa-rest)" : "none",

@@ -55,13 +55,13 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }:
           onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
           placeholder="Song Title"
           rows={1}
-          className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display text-[48px] leading-[1.15] text-foreground placeholder:text-muted-foreground/50 px-10 py-1 break-words text-center font-bold mt-1.5"
+          className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-display type-title leading-tight text-foreground placeholder:text-muted-foreground/50 px-10 py-1 break-words text-center font-bold mt-1.5"
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute -right-4 top-5 z-10"
+              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9 absolute -right-4 top-2 z-10"
               aria-label="Song actions"
             >
               <MoreVertical className="h-5 w-5" />
@@ -101,7 +101,7 @@ export function SongTitleHeader({ activeTab, sortMode, onToggleSort, metaSlot }:
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Add liner notes…"
         rows={1}
-        className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none text-sm leading-snug text-ink-soft placeholder:text-muted-foreground/50 px-0 pb-1 break-words text-center"
+        className="w-full min-w-0 resize-none overflow-hidden bg-transparent border-0 outline-none type-label leading-snug text-ink-soft placeholder:text-muted-foreground/50 px-0 pb-1 break-words text-center"
       />
       <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
         <SongAttributesMenu />

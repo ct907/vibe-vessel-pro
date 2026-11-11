@@ -192,6 +192,13 @@
     --section-tint-rose: oklch(0.836 0.076 5);
     --section-tint-slate: oklch(0.820 0.013 263);
     --section-tint-alpha: 35%;
+    /* Type scale calibrated against contemporary music apps on a 412dp (6.7") phone.
+       Same values at every breakpoint. */
+    --type-title: 26px;
+    --type-heading: 21px;
+    --type-body: 17px;
+    --type-label: 15px;
+    --type-caption: 13px;
     /* Section header fills: tints pushed to higher chroma; each holds >=4.5:1 against --section-header-fg. */
     --section-strong-red: oklch(0.750 0.150 22);
     --section-strong-orange: oklch(0.782 0.144 54);
@@ -408,6 +415,12 @@
   }
 
   /* Mono for chord symbols, BPM, time signatures */
+  .type-title { font-size: var(--type-title); }
+  .type-heading { font-size: var(--type-heading); }
+  .type-body { font-size: var(--type-body); }
+  .type-label { font-size: var(--type-label); }
+  .type-caption { font-size: var(--type-caption); }
+
   .font-mono-chord {
     font-family: "JetBrains Mono", ui-monospace, monospace;
   }

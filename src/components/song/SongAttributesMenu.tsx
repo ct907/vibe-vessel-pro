@@ -149,7 +149,7 @@ export function SongAttributesMenu() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 mx-auto mt-0.5 text-sm font-normal text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full px-3 py-0.5"
+          className="inline-flex items-center gap-1 mx-auto mt-0.5 type-label font-normal text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors rounded-full px-3 py-0.5"
           style={{ background: "var(--paper-shade)" }}
           aria-label="Song attributes and settings"
         >
