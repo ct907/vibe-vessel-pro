@@ -62,15 +62,9 @@ interface UIState {
   setMode: (m: AppMode) => void;
   arrangeView: ArrangeView;
   setArrangeView: (v: ArrangeView) => void;
-  /** One-shot signal: WriteStickyBar requests FloatingChordToolbar to expand. */
+  /** One-shot signal: the chord popup's Move / Select request FloatingChordToolbar to expand. */
   chordToolbarOpen: boolean;
   setChordToolbarOpen: (v: boolean) => void;
-  /** One-shot signal: WriteStickyBar requests the active tab to open its chord picker sheet. */
-  /** True while a chord (or multi-selection), a tapped chord row, or a tapped block is the chord target; the sticky bar enables Edit/Move Chords and glows. */
-  chordSelectionActive: boolean;
-  setChordSelectionActive: (v: boolean) => void;
-  chordPickerRequest: boolean;
-  setChordPickerRequest: (v: boolean) => void;
   /** Chord clipboard shared across tabs. */
   chordClipboard: ClipboardChord[];
   setChordClipboard: (chords: ClipboardChord[]) => void;
@@ -98,10 +92,6 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   setArrangeView: (arrangeView) => set({ arrangeView }),
   chordToolbarOpen: false,
   setChordToolbarOpen: (v) => set({ chordToolbarOpen: v }),
-  chordSelectionActive: false,
-  setChordSelectionActive: (v) => set({ chordSelectionActive: v }),
-  chordPickerRequest: false,
-  setChordPickerRequest: (v) => set({ chordPickerRequest: v }),
   chordClipboard: [],
   setChordClipboard: (chords) => set({ chordClipboard: chords }),
   chordInputMode: "type",

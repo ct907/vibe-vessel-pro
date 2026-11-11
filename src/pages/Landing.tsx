@@ -181,79 +181,92 @@ export default function Landing() {
   };
   const continueName = liveName ?? recents[0]?.name;
 
+  // Golden-ratio type scale on a 16px base (each step ×√φ, every second step ×φ):
+  // 110 / 68 wordmark · 20 headings & card labels · 16 body · 12 meta.
+  const tapCard = "h-full gap-2 py-4 px-3";
   return (
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
       <ChipScatterBackground />
-      <main className="relative mx-auto max-w-[1600px] px-4 pt-10 pb-24 flex flex-col items-center text-center">
+      <main className="relative mx-auto flex h-full w-full max-w-md flex-col px-4 pt-4 pb-6 text-center">
         <h1
           role="img"
           aria-label="felt."
-          className="mt-10 flex w-full max-w-[1600px] items-center justify-center mx-auto ml-5 sm:ml-2 font-normal"
+          className="mt-auto flex shrink-0 items-center justify-center ml-5 sm:ml-2 font-normal"
         >
-          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 144, lineHeight: "120px", marginTop: 12 }}>
+          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 110, lineHeight: "92px", marginTop: 9 }}>
             𝆑
           </span>
-          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 96, fontStyle: "italic", lineHeight: "120px", marginLeft: -24 }}>
+          <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 68, fontStyle: "italic", lineHeight: "92px", marginLeft: -18 }}>
             elt.
           </span>
         </h1>
 
-        <p className="mt-6 text-lg font-bold text-foreground/80">
+        <p className="mt-3 shrink-0 text-xl font-bold leading-tight text-foreground/80">
           The Songwriter's Notebook. Use Offline. Save Locally.
         </p>
 
-        <p className="mt-3 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2 whitespace-pre-wrap">
-          <span>{"\n"}</span>
+        <p className="mt-2 shrink-0 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
           <TaglineChip label="Write" style={LYRICS_STYLE} />
           <span>and Record.</span>
           <TaglineChip label="Arrange" style={CHORDS_STYLE} />
           <span>and Experiment.</span>
-          
         </p>
 
-        {continueName && (
-          <button
-            type="button"
-            onClick={() => (liveName ? navigate("/app") : openRecent(recents[0]))}
-            className="mt-8 w-full max-w-md rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-3 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
-          >
-            <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
-              <h3 className="font-display text-lg truncate">{continueName}</h3>
-            </div>
-          </button>
-        )}
+        <section className="mt-6 flex min-h-[120px] flex-col" aria-label="Recent projects">
+          <h2 className="mb-2 shrink-0 font-display text-xl font-bold">Recent Projects</h2>
+          {continueName && (
+            <button
+              type="button"
+              onClick={() => (liveName ? navigate("/app") : openRecent(recents[0]))}
+              className="mb-2 w-full shrink-0 rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-2 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
+            >
+              <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
+                <h3 className="font-display text-xl leading-tight truncate">{continueName}</h3>
+              </div>
+            </button>
+          )}
+          <div className="min-h-0 overflow-y-auto -mx-1 px-1 pb-1">
+            <RecentProjectsList songs={recents} onOpen={openRecent} onRemove={removeOne} />
+          </div>
+        </section>
 
-        <div className="mt-12 flex w-full max-w-md flex-col items-stretch gap-4">
+        <div className="mt-6 mb-auto grid shrink-0 grid-cols-2 auto-rows-fr gap-3">
           <EmptyTapCard
+            className={tapCard}
+            labelClassName="text-xl leading-tight"
             icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
-            label={`${tapVerb} to Start Recording`}
+            label={`${tapVerb} to Record`}
             onClick={() => startCapture("record")}
           />
           <EmptyTapCard
+            className={tapCard}
+            labelClassName="text-xl leading-tight"
             icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
-            label={`${tapVerb} to Write Lyrics`}
+            label={`${tapVerb} to Write`}
             onClick={() => startCapture("lyrics")}
           />
           <EmptyTapCard
+            className={tapCard}
+            labelClassName="text-xl leading-tight"
             icon={<Piano className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Jam`}
-            hint="Play chords by number — no writing needed"
+            hint="Play chords by number"
             onClick={() => setJamOpen(true)}
           />
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={() => navigate("/app?tab=chords")}
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 text-base font-semibold leading-tight"
             >
               Explore Chords
             </button>
             <button
               type="button"
               onClick={() => navigate("/app?tab=voicekey")}
-              className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-10 px-6 text-sm font-semibold"
+              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 text-base font-semibold leading-tight"
             >
               Find Your Key & Range
             </button>
@@ -267,29 +280,6 @@ export default function Landing() {
             onClose={() => setJamOpen(false)}
           />
         )}
-
-        <section className="mt-20 w-full max-w-md" aria-label="Recent projects">
-          <button
-            type="button"
-            className="w-full text-center font-semibold mb-3 cursor-pointer"
-            onClick={() => {
-              const start = window.scrollY;
-              const distance = 120;
-              const duration = 400;
-              const startTime = performance.now();
-              const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
-              const step = (now: number) => {
-                const progress = Math.min((now - startTime) / duration, 1);
-                window.scrollTo(0, start + distance * easeOut(progress));
-                if (progress < 1) requestAnimationFrame(step);
-              };
-              requestAnimationFrame(step);
-            }}
-          >
-            Recent Projects
-          </button>
-          <RecentProjectsList songs={recents} onOpen={openRecent} onRemove={removeOne} />
-        </section>
       </main>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, ListMusic } from "lucide-react";
+import { ListMusic } from "lucide-react";
 import { ProgressionsTab } from "@/components/progressions/ProgressionsTab";
 import type { TabName } from "@/store/ui";
 import { useSongStore } from "@/store/song";
@@ -8,7 +8,7 @@ import { useTakesStore } from "@/store/takes";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark } from "@/components/onboarding/OnboardingCoachMark";
 import { EmptyTapCard } from "@/components/common/EmptyTapCard";
-import { WriteStickyBar, requestStickyBarRecording } from "@/components/write/WriteStickyBar";
+import { WriteStickyBar } from "@/components/write/WriteStickyBar";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { TrackTimeline } from "./TrackTimeline";
 
@@ -19,9 +19,9 @@ interface Props {
 }
 
 /**
- * Arrange mode (Refine) — a single page mirroring Write: a card-gated recording
- * area (the multitrack timeline; recording lands on the first track) stacked
- * above a card-gated chord-progression editor.
+ * Arrange mode (Refine) — a single page mirroring Write: the multitrack
+ * timeline (shown once there is audio or Record Voice is pressed; recording
+ * lands on the first track) beside a card-gated chord-progression editor.
  */
 export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const tracksEmpty = useRecordingsStore((s) => s.tracks.length === 0);
@@ -54,7 +54,7 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
 
   const onboarding = useOnboardingStore();
   const canCoach = onboarding.enabled && showOnboarding && onboarding.globalPhase === 2;
-  const recCardRef = useRef<HTMLButtonElement | null>(null);
+  const recordButtonRef = useRef<HTMLButtonElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const chordsCardRef = useRef<HTMLButtonElement | null>(null);
 
@@ -74,27 +74,14 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   return (
     <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
       {/* Left column — multitrack timeline (2 of 5) */}
-      <div className="md:col-span-2" ref={timelineRef}>
-        {showTrack ? (
+      {showTrack && (
+        <div className="md:col-span-2" ref={timelineRef}>
           <TrackTimeline />
-        ) : (
-          <EmptyTapCard
-            anchorRef={recCardRef}
-            icon={<Mic className="h-7 w-7" strokeWidth={1.75} />}
-            label="Add Recording"
-            hint={`${tapVerb} to start recording`}
-            onClick={() => {
-              setTrackRevealed(true);
-              // Begin the take within the tap gesture so the mic prompt applies,
-              // mirroring the Write-mode card.
-              requestStickyBarRecording();
-            }}
-          />
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Right column — chord progressions (3 of 5) */}
-      <div className="md:col-span-3 min-w-0">
+      {/* Right column — chord progressions (3 of 5), centred until there is a timeline */}
+      <div className={showTrack ? "md:col-span-3 min-w-0" : "md:col-span-3 md:col-start-2 min-w-0"}>
         {showChords ? (
           <ProgressionsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
         ) : (
@@ -108,16 +95,19 @@ export function ArrangeMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
       </div>
 
       <WriteStickyBar
+        recordButtonRef={recordButtonRef}
+        onRecordStart={() => setTrackRevealed(true)}
         onRecordComplete={recordToFirstTrack}
         onEditorAction={() => { setChordsRevealed(true); revealChordsForTour(); }}
       />
 
       {canCoach && onboarding.captureStep === 1 && !showTrack && onboarding.dismissedKey !== "capture-1" && (
         <AnchoredCoachMark
-          anchorRef={recCardRef}
+          anchorRef={recordButtonRef}
+          anchorEdge="top"
           step="3/13"
-          message={`${tapVerb} Add Recording to lay your first take on the timeline.`}
-          arrowSide="top"
+          message={`${tapVerb} Record Voice to lay your first take on the timeline.`}
+          arrowSide="bottom"
           onDismiss={() => onboarding.dismissCoachMark("capture-1")}
         />
       )}

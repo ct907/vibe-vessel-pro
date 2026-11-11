@@ -192,6 +192,26 @@
     --section-tint-rose: oklch(0.836 0.076 5);
     --section-tint-slate: oklch(0.820 0.013 263);
     --section-tint-alpha: 35%;
+    /* Section header fills: tints pushed to higher chroma; each holds >=4.5:1 against --section-header-fg. */
+    --section-strong-red: oklch(0.750 0.150 22);
+    --section-strong-orange: oklch(0.782 0.144 54);
+    --section-strong-amber: oklch(0.820 0.168 83);
+    --section-strong-yellow: oklch(0.858 0.178 100);
+    --section-strong-lime: oklch(0.836 0.188 126);
+    --section-strong-green: oklch(0.790 0.150 157);
+    --section-strong-teal: oklch(0.787 0.118 185);
+    --section-strong-cyan: oklch(0.788 0.122 213);
+    --section-strong-sky: oklch(0.766 0.130 242);
+    --section-strong-blue: oklch(0.748 0.128 265);
+    --section-strong-indigo: oklch(0.718 0.144 285);
+    --section-strong-violet: oklch(0.739 0.146 304);
+    --section-strong-purple: oklch(0.760 0.146 318);
+    --section-strong-pink: oklch(0.776 0.172 340);
+    --section-strong-rose: oklch(0.766 0.146 5);
+    --section-strong-slate: oklch(0.750 0.026 263);
+    --section-strong-none: oklch(0.742 0.012 100);
+    --section-header-fg: var(--cocoa);
+    --section-header-btn: oklch(1 0 0 / 0.5);
     --tint-base: oklch(0.968 0.006 88);
 
     /* Sidebar (shadcn) */
@@ -328,6 +348,25 @@
     --section-tint-rose: oklch(0.244 0.112 8);
     --section-tint-slate: oklch(0.217 0.019 266);
     --section-tint-alpha: 18%;
+    --section-strong-red: oklch(0.450 0.181 25);
+    --section-strong-orange: oklch(0.450 0.121 48);
+    --section-strong-amber: oklch(0.450 0.094 76);
+    --section-strong-yellow: oklch(0.450 0.091 97);
+    --section-strong-lime: oklch(0.450 0.114 126);
+    --section-strong-green: oklch(0.450 0.118 152);
+    --section-strong-teal: oklch(0.450 0.080 180);
+    --section-strong-cyan: oklch(0.450 0.079 213);
+    --section-strong-sky: oklch(0.450 0.107 243);
+    --section-strong-blue: oklch(0.450 0.178 263);
+    --section-strong-indigo: oklch(0.450 0.206 277);
+    --section-strong-violet: oklch(0.450 0.182 300);
+    --section-strong-purple: oklch(0.450 0.173 317);
+    --section-strong-pink: oklch(0.450 0.192 343);
+    --section-strong-rose: oklch(0.450 0.178 8);
+    --section-strong-slate: oklch(0.450 0.032 266);
+    --section-strong-none: oklch(0.38 0.012 70);
+    --section-header-fg: oklch(0.9613 0.0142 89.2);
+    --section-header-btn: oklch(0 0 0 / 0.28);
     --tint-base: oklch(0.238 0.006 88);
   }
 }
@@ -671,17 +710,7 @@
   border-color: var(--primary) !important;
 }
 
-/* Sticky bar glow — a chord is selected and the bar is ready to act on it. */
-@keyframes toolbar-glow {
-  0%, 100% { box-shadow: inset 0 0 0 2px var(--primary), 0 0 6px color-mix(in oklch, var(--primary) 40%, transparent); }
-  50%      { box-shadow: inset 0 0 0 2px var(--primary-strong), 0 0 16px color-mix(in oklch, var(--primary) 70%, transparent); }
-}
-.animate-toolbar-glow {
-  animation: toolbar-glow 1.6s ease infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .animate-toolbar-glow { animation: none; }
   .animate-rec-pulse { animation: none; }
   .animate-play-pulse { animation: none; }
   .animate-paste-glow { animation: none; }

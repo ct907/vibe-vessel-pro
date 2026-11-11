@@ -18,6 +18,8 @@ Element.prototype.scrollIntoView = vi.fn();
 globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
 
 function openAddChords() {
+  const song = useSongStore.getState();
+  song.setSectionChordsVisible(song.sections.at(-1)!.id, true);
   render(
     <ThemeProvider>
       <DragDropContext onDragEnd={() => {}}>
@@ -25,7 +27,8 @@ function openAddChords() {
       </DragDropContext>
     </ThemeProvider>,
   );
-  act(() => useUIStore.getState().setChordPickerRequest(true));
+  const rows = document.querySelectorAll("[data-chord-row]");
+  fireEvent.click(rows[rows.length - 1]);
 }
 
 const jamOpen = () => document.querySelector("[data-jam-canvas]") !== null;

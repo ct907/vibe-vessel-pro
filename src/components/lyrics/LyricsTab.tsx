@@ -81,7 +81,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
-import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, sectionHeaderStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { ChordActionRow } from "@/components/chord/ChordActionRow";
@@ -160,7 +160,7 @@ interface LineRowProps {
   onMergeUp: (kind: "lyric" | "chord") => void;
   onPickerOpen: (lineId: string, slotIndex: number, anchorId?: string) => void;
   onChordFocus: (lineId: string) => void;
-  /** This line's chord row was tapped — the sticky bar's chord buttons act on it. */
+  /** This line's chord row was tapped; it stays highlighted until a tap lands elsewhere. */
   chordFocused?: boolean;
   /** The chord id that currently shows its X chip (tab-level, one at a time). */
   activeChordId: string | null;
@@ -253,6 +253,7 @@ function LineRow({
   const multiSelectModeRef = useRef(multiSelectMode);
   multiSelectModeRef.current = multiSelectMode;
   const setChordToolbarOpen = useUIStore((s) => s.setChordToolbarOpen);
+  const setMultiSelectMode = useUIStore((s) => s.setMultiSelectMode);
   const onMultiSelectTapRef = useRef(onMultiSelectTap);
   onMultiSelectTapRef.current = onMultiSelectTap;
   const onShiftSelectTapRef = useRef(onShiftSelectTap);
@@ -507,6 +508,11 @@ function LineRow({
               onPickerOpen(line.id, currentSlot, activeAnchor.id);
             }}
             onMove={() => setChordToolbarOpen(true)}
+            onSelect={() => {
+              setMultiSelectMode(true);
+              if (!multiSelectedIds?.has(activeAnchor.id)) onMultiSelectTap?.(activeAnchor.id);
+              setChordToolbarOpen(true);
+            }}
             onDelete={() => {
               removeChordAnchorsBatch(sectionId, line.id, [activeAnchor.id]);
               onSetActiveChordId(null);
@@ -708,7 +714,7 @@ function LineRow({
           }}
           placeholder={line._isChordOverflow ? "…continued — type to make this its own line" : "Write your lyric line…"}
           className={cn(
-            "w-full min-h-[1.875rem] bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
+            "w-full min-h-[1.875rem] bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
             isFocused && "pr-8",
           )}
         />
@@ -1009,8 +1015,8 @@ function SectionCard({
     >
       {/* Section header — Chords/Notes sit in its row on desktop, a second row on mobile */}
       <div
-        className="px-3 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
-        style={{ color: "oklch(0.3267 0.027 60.1)" }}
+        className="px-3 rounded-xl select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
+        style={sectionHeaderStyle(section.color)}
       >
       <div className="flex items-center gap-2 h-12">
         <button
@@ -1027,7 +1033,7 @@ function SectionCard({
             color: "inherit",
             fontFamily: "'Nunito', system-ui, sans-serif",
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: 14,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -1107,7 +1113,7 @@ function SectionCard({
                 "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
                 isSectionPlaying
                   ? "bg-[var(--primary)] text-white"
-                  : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
+                  : "bg-[var(--section-header-btn)] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
               aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
               title={isSectionPlaying ? "Stop" : "Play from this section"}
@@ -1124,7 +1130,7 @@ function SectionCard({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-destructive/90 hover:text-destructive transition-colors"
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[var(--section-header-btn)] text-destructive/90 hover:text-destructive transition-colors"
                     aria-label="Overdub this section"
                     title="Overdub this section"
                   >
@@ -1165,7 +1171,7 @@ function SectionCard({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[var(--section-header-btn)] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
                   aria-label="Section options"
                 >
                   <MoreVertical className="h-4 w-4" />
@@ -1596,17 +1602,10 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     () => new Set(lyricMultiSelected.keys()),
     [lyricMultiSelected],
   );
-  // The chord row last tapped (empty or not). With a selected chord, it's what
-  // the sticky bar's Edit/Move Chords act on.
+  // The chord row last tapped (empty or not), highlighted until a tap lands elsewhere.
   const [chordRowFocus, setChordRowFocus] = useState<{ sectionId: string; lineId: string } | null>(null);
-  const setChordSelectionActive = useUIStore((s) => s.setChordSelectionActive);
-  const hasChordTarget = activeChordId !== null || lyricMultiSelected.size > 0 || chordRowFocus !== null;
-  useEffect(() => {
-    setChordSelectionActive(hasChordTarget);
-    return () => setChordSelectionActive(false);
-  }, [hasChordTarget, setChordSelectionActive]);
-  // Tapping anywhere but a chord row, the sticky bar's chord buttons, or an
-  // open sheet/menu drops the row focus (and greys those buttons out again).
+  // Tapping anywhere but a chord row, the chord popup/menu, or an open
+  // sheet/menu drops the row focus.
   useEffect(() => {
     if (!chordRowFocus) return;
     const onPointerDown = (e: PointerEvent) => {
@@ -1618,42 +1617,6 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [chordRowFocus]);
-  const chordPickerRequest = useUIStore((s) => s.chordPickerRequest);
-  const setChordPickerRequest = useUIStore((s) => s.setChordPickerRequest);
-  useEffect(() => {
-    if (!chordPickerRequest) return;
-    setChordPickerRequest(false);
-    // A selected chord opens the picker on that chord, ready to change it.
-    if (activeChordId) {
-      for (const sec of sections) {
-        for (const l of sec.lines) {
-          const a = getLineChordsViaSSOT(sec, l.id).find((c) => c.id === activeChordId);
-          if (a) {
-            setActiveChordId(null);
-            setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: a.slotIndex ?? 0, anchorId: a.id });
-            return;
-          }
-        }
-        const unplaced = sec.chords.find((c) => c.id === activeChordId && !c.lyricsPlacement && c.progressionPlacement);
-        if (unplaced?.progressionPlacement) {
-          setActiveChordId(null);
-          openProgPicker(sec.id, unplaced.progressionPlacement.patternId, unplaced.id);
-          return;
-        }
-      }
-    }
-    // Otherwise add to the focused chord row, after its last chord.
-    const sec = sections.find((x) => x.id === chordRowFocus?.sectionId) ?? sections[sections.length - 1];
-    const l = sec?.lines.find((x) => x.id === chordRowFocus?.lineId) ?? sec?.lines[sec.lines.length - 1];
-    if (!sec || !l) return;
-    const last = getLineChordsViaSSOT(sec, l.id).reduce<ChordAnchor | null>(
-      (m, c) => ((c.slotIndex ?? 0) > (m?.slotIndex ?? -1) ? c : m),
-      null,
-    );
-    const next = last ? (last.slotIndex ?? 0) + chordSlotWidth(last.chord.display) + 1 : 0;
-    setPicker({ sectionId: sec.id, lineId: l.id, slotIndex: Math.min(CHORD_ROW_SLOTS - 1, next) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chordPickerRequest]);
   const rangeAnchorRef = useRef<{ sectionId: string; lineId: string; anchorId: string } | null>(null);
   const toggleLyricMultiSelected = useCallback(
     (anchorId: string, ctx: { sectionId: string; lineId: string }) => {
