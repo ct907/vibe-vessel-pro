@@ -44,9 +44,13 @@ function TaglineChip({ label, style }: { label: string; style: CSSProperties }) 
 const BASE_CHIP_FONT_PX = 14;
 const SIZE_JITTER = 0.2;
 // The design's progressive background blur is 48 in Figma, whose blur values
-// are about twice the CSS radius. Strongest at the top, sharp from BLUR_END down.
-const MAX_BLUR_PX = 24;
+// are about twice the CSS radius; capped at 75% of that. Strongest at the top,
+// sharp from BLUR_END (% of screen height) down.
+const MAX_BLUR_PX = 24 * 0.75;
 const BLUR_END = 75;
+// The shared chord palette is pastel; boosting it here keeps the tiles
+// readable through the blur without touching the chord chips elsewhere.
+const TILE_SATURATION = 3;
 
 function chipCount() {
   if (typeof window === "undefined") return 160;
@@ -91,8 +95,8 @@ function ChipScatterBackground() {
             fontSize: `${p.size}px`,
             padding: "0.2em 0.5em",
             transform: "translate(-50%, -50%)",
-            opacity: 0.7,
-            filter: `blur(${(MAX_BLUR_PX * Math.max(0, 1 - p.top / BLUR_END)).toFixed(1)}px)`,
+            opacity: 0.85,
+            filter: `saturate(${TILE_SATURATION}) blur(${(MAX_BLUR_PX * Math.max(0, 1 - p.top / BLUR_END)).toFixed(1)}px)`,
             ...p.style,
           }}
         >
