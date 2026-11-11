@@ -9,6 +9,7 @@ import { useRecordingsStore } from "@/store/recordings";
 import { startRecording, type RecorderHandle } from "@/lib/audio/recorder";
 import { putAudioBlob } from "@/lib/audio/blob-store";
 import { getAudioContext } from "@/lib/audio/context";
+import { useIsDesktop } from "@/hooks/use-mobile";
 
 interface Props {
   /** When provided, recording completion routes here instead of the takes library (Arrange mode). */
@@ -130,7 +131,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart
     setLevel(0);
     if (Date.now() - recordStartedAtRef.current < MIN_TAKE_MS) {
       handle.cancel();
-      toast("Recording too short to keep", { description: "Tap Record, play your idea, then tap Stop." });
+      toast("Recording too short to keep", { description: "Press Record, play your idea, then press Stop." });
       return;
     }
     setPending(true);
@@ -193,6 +194,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart
       className="fixed left-0 right-0 z-[45] transition-[bottom] duration-150"
       style={{
         bottom: keyboardOffset,
+        right: "var(--side-panel-w, 0px)",
         paddingBottom: keyboardOffset > 0 ? 0 : "env(safe-area-inset-bottom, 0px)",
       }}
     >

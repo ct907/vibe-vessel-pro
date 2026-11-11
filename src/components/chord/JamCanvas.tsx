@@ -36,6 +36,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { useSidePanel, useDockedPanelWidth, useBottomDock, JAM_BOTTOM_DOCK_H } from "@/hooks/use-side-panel";
 
 interface Props {
   /** Section whose effective key resolves the numbers. Omitted = standalone Jam (new song, key of C). */
@@ -49,6 +50,8 @@ interface Props {
   onCommit: (chords: ChordSymbol[], key: { root: string; mode: Mode }) => void;
   onClose: () => void;
   headerRef?: RefObject<HTMLDivElement | null>;
+  /** The row or block being edited, scrolled clear of the keypad when it docks under the song. */
+  targetSelector?: string;
 }
 
 type Modifier = "accidental" | "ext" | "type";
@@ -63,13 +66,36 @@ const STANDALONE_KEY = { root: "C", mode: "maj" as Mode, offset: 0 };
  * 8 / 9 / 0 reshape the highlighted one, and # drops the whole capture into
  * the chord row the user tapped. Lives beside the Type tab (ChordInputTabs).
  */
-export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef }: Props) {
+export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef, targetSelector }: Props) {
   const sections = useSongStore((s) => s.sections);
   const meta = useSongStore((s) => s.meta);
   const chordLength = useDefaultsStore((s) => s.defaultChordLengthBeats);
   const setMode = useUIStore((s) => s.setChordInputMode);
   const setEditorOpen = useUIStore((s) => s.setFocusedEditorOpen);
   const titleId = useId();
+  // Inside the editor on wide screens the keypad docks beside the song; the homepage Jam stays full-screen.
+  const panelW = useDockedPanelWidth();
+  const side = panelW > 0 && !!sectionId;
+  // Portrait tablets: the keypad docks under the song, which is scrolled clear of it.
+  const bottom = useBottomDock() && !!sectionId;
+  useSidePanel(side, panelW);
+  useEffect(() => {
+    if (!bottom) return;
+    const root = document.documentElement;
+    root.style.setProperty("--chord-sheet-h", `${JAM_BOTTOM_DOCK_H}px`);
+    const id = window.setTimeout(() => {
+      const el = targetSelector ? document.querySelector<HTMLElement>(targetSelector) : null;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const limit = window.innerHeight - JAM_BOTTOM_DOCK_H - 12;
+      if (rect.bottom > limit) window.scrollBy({ top: rect.bottom - limit, behavior: "smooth" });
+      else if (rect.top < 96) window.scrollBy({ top: rect.top - 96, behavior: "smooth" });
+    }, 60);
+    return () => {
+      window.clearTimeout(id);
+      root.style.removeProperty("--chord-sheet-h");
+    };
+  }, [bottom, targetSelector]);
 
   const effective = useMemo(
     () => (sectionId ? effectiveKeyAt(sections, sectionId, meta) : STANDALONE_KEY),
@@ -321,11 +347,12 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
       ref={rootRef}
       tabIndex={-1}
       role="dialog"
-      aria-modal="true"
+      aria-modal={side || bottom ? undefined : "true"}
       aria-labelledby={titleId}
       data-jam-canvas
-      className="fixed inset-0 z-50 flex flex-col outline-none"
+      className={cn("fixed z-50 flex flex-col outline-none", side ? "inset-y-0 right-0 border-l shadow-lg" : bottom ? "inset-x-0 bottom-0 rounded-t-2xl border-t shadow-lg" : "inset-0")}
       style={{
+        ...(side ? { width: panelW } : bottom ? { height: JAM_BOTTOM_DOCK_H } : {}),
         background: "var(--paper-shade)",
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",

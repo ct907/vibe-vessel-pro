@@ -82,6 +82,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Music2 } from "lucide-react";
 import { useIsMobile, useIsDesktop } from "@/hooks/use-mobile";
+import { isOverlayRoute } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { useOnboardingStore } from "@/store/onboarding";
 import { AnchoredCoachMark, OnboardingCoachMark } from "@/components/onboarding/OnboardingCoachMark";
@@ -453,11 +454,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   // would scroll above the fold. Translate it down by `visualViewport.offsetTop`
   // (same visualViewport pattern WriteStickyBar uses for the bottom bar).
   const [vvOffsetTop, setVvOffsetTop] = useState(0);
+  // A landscape tablet with its keyboard up has ~300px of screen: the pinned header would eat it.
+  const [vvShort, setVvShort] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setVvOffsetTop(vv.offsetTop > 0 ? vv.offsetTop : 0);
+    const update = () => {
+      setVvOffsetTop(vv.offsetTop > 0 ? vv.offsetTop : 0);
+      setVvShort(vv.height < 560);
+    };
     update();
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
@@ -505,6 +511,33 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   }, [isDesktop]);
 
   useEffect(() => () => stopTransport(), []);
+
+  // Space toggles playback unless the writer is typing, a dialog or the Jam
+  // keypad has the keyboard, or a control was reached with Tab (Space presses it).
+  const togglePlaybackRef = useRef<() => void>(() => {});
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
+  useEffect(() => {
+    // :focus-visible can't tell these apart — any keydown flips it on.
+    let tabbed = false;
+    const onPointerDown = () => { tabbed = false; };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Tab") tabbed = true;
+      if (e.key !== " " || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isOverlayRoute(pathnameRef.current) || document.querySelector("[data-jam-canvas]")) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      if (tabbed && t?.closest('button, a, [role="button"], [role="tab"], [tabindex]')) return;
+      e.preventDefault();
+      togglePlaybackRef.current();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
 
   // Apply tempo changes to running playback without stopping it.
   useEffect(() => {
@@ -615,6 +648,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
     setCurrent(null);
     usePlaybackStore.getState().setStartFromChord(null, null);
   };
+  togglePlaybackRef.current = () => (isPlaying ? handleStop() : void handlePlay());
 
   const handleTap = () => {
     if (tapResetRef.current) clearTimeout(tapResetRef.current);
@@ -830,8 +864,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         </div>
       </div>
       <div
-        className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && "sticky top-2")}
-        style={isDesktop && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
+        className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && !vvShort && "sticky top-2")}
+        style={isDesktop && !vvShort && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
       >
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
@@ -1274,7 +1308,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               <AnchoredCoachMark
                 anchorRef={tabsBarRef}
                 step="1/13"
-                message="Write lyrics or build progressions? Tap a tab to begin"
+                message={`Write lyrics or build progressions? ${isDesktop ? "Click" : "Tap"} a tab to begin`}
                 arrowSide="top"
                 onDismiss={() => onboarding.dismissCoachMark("phase-0")}
               />
@@ -1351,8 +1385,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
               step="13/13"
               message={
                 mode === "write"
-                  ? "That's the tour! Tap Arrange to explore the other side."
-                  : "That's the tour! Tap Write and Record to explore the other side."
+                  ? `That's the tour! ${isDesktop ? "Click" : "Tap"} Arrange to explore the other side.`
+                  : `That's the tour! ${isDesktop ? "Click" : "Tap"} Write and Record to explore the other side.`
               }
               actionLabel="Finish"
               onAction={() => {

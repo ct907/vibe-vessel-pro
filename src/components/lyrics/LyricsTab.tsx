@@ -219,7 +219,7 @@ function LineRow({
   const isMobile = useIsMobile();
   const sheetOpen = useUIStore((s) => s.focusedEditorOpen);
   const sheetTarget = useUIStore((s) => s.focusedEditorTarget);
-  const targetSlot = sheetOpen && sheetTarget?.lineId === line.id ? sheetTarget.slotIndex : undefined;
+  const targetSlot = sheetTarget?.lineId === line.id ? sheetTarget.slotIndex : undefined;
   // Focus a lyric line's textarea and place the caret. Used after split/merge/
   // paste and arrow navigation. The 10ms defer lets React render the new line
   // before we query for it (same pattern as the existing focus-after-add).
@@ -1550,6 +1550,18 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
   const canShowCoachMark = onboardingEnabled && showOnboarding;
   const lyricsRootRef = useRef<HTMLDivElement>(null);
   const chordPickerHeaderRef = useRef<HTMLDivElement | null>(null);
+
+  // The mobile editor publishes its own target; the desktop sheet's target
+  // comes from here so the row shows where the next chord will land.
+  const setFocusedEditorTarget = useUIStore((s) => s.setFocusedEditorTarget);
+  const sheetLineId = !isMobile && picker && !picker.prog && !jamPicker ? picker.lineId : undefined;
+  const sheetSlot = picker?.slotIndex;
+  const sheetAnchorId = picker?.anchorId;
+  useEffect(() => {
+    if (!sheetLineId) return;
+    setFocusedEditorTarget({ lineId: sheetLineId, slotIndex: sheetSlot, chordId: sheetAnchorId });
+    return () => setFocusedEditorTarget(null);
+  }, [sheetLineId, sheetSlot, sheetAnchorId, setFocusedEditorTarget]);
   const focusedEditorHeaderRef = useRef<HTMLDivElement | null>(null);
   const firstLyricRowRef = useRef<HTMLElement | null>(null);
   const firstChordRowRef = useRef<HTMLElement | null>(null);
@@ -2548,6 +2560,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           })()}
           onCommit={handlePickBatch}
           onClose={() => setPicker(null)}
+          targetSelector={`[data-line-id="${jamPicker.lineId}"]`}
           headerRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
         />
       ) : isMobile && picker && !picker.prog ? (
@@ -2566,6 +2579,23 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
             if (!o) setPicker(null);
           }}
           headerRef={chordPickerHeaderRef}
+          contextLabel={(() => {
+            if (!picker) return undefined;
+            const sec = sections.find((s) => s.id === picker.sectionId);
+            const lineIdx = sec ? sec.lines.findIndex((l) => l.id === picker.lineId) : -1;
+            return `${getSectionDisplayName(sections, picker.sectionId)}${lineIdx >= 0 ? ` line ${lineIdx + 1}` : ""}`;
+          })()}
+          onNudge={(dir) => {
+            if (!picker?.anchorId) return;
+            if (picker.prog) {
+              useSongStore.getState().movePatternChord(picker.prog.patternId, picker.prog.chordId, dir);
+              return;
+            }
+            const target = picker.slotIndex + dir;
+            if (target < 0 || target > CHORD_ROW_SLOTS - 1) return;
+            useSongStore.getState().moveChordToSlot(picker.sectionId, picker.lineId, picker.anchorId, target);
+            setPicker({ ...picker, slotIndex: target });
+          }}
           targetSelector={picker?.lineId ? `[data-line-id="${picker.lineId}"]` : undefined}
           initialChord={initialChord}
           onPick={handlePick}
