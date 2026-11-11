@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, Pencil, Piano, Save } from "lucide-react";
-import { EmptyTapCard } from "@/components/common/EmptyTapCard";
 import { JamCanvas } from "@/components/chord/JamCanvas";
 import { chordSlotWidth } from "@/lib/music/chordLayout";
 import type { ChordSymbol, Mode } from "@/lib/music/chords";
 import { RecentProjectsList } from "@/components/common/RecentProjectsList";
-import { useIsDesktop } from "@/hooks/use-mobile";
 import { useSongStore, CHORD_ROW_SLOTS } from "@/store/song";
 import { useTakesStore } from "@/store/takes";
 import { useRecordingsStore } from "@/store/recordings";
@@ -28,11 +26,9 @@ import { useTheme } from "@/hooks/use-theme";
 
 const TAGLINE_TEXT: CSSProperties = { color: "var(--ink)" };
 const LYRICS_STYLE: CSSProperties = { background: "var(--section-tint-purple)" };
-const CHORDS_STYLE: CSSProperties = {
-  background:
-    "linear-gradient(to right in oklch, var(--section-tint-amber), var(--section-tint-rose))",
-};
-const PROGRESSIONS_STYLE: CSSProperties = { background: "var(--section-tint-sky)" };
+const CHORDS_STYLE: CSSProperties = { background: "var(--section-tint-amber)" };
+const RECORD_STYLE: CSSProperties = { background: "var(--section-tint-rose)" };
+const ARRANGE_STYLE: CSSProperties = { background: "var(--section-tint-green)" };
 
 function TaglineChip({ label, style }: { label: string; style: CSSProperties }) {
   return (
@@ -47,6 +43,10 @@ function TaglineChip({ label, style }: { label: string; style: CSSProperties }) 
 
 const BASE_CHIP_FONT_PX = 14;
 const SIZE_JITTER = 0.2;
+// The design's progressive background blur is 48 in Figma, whose blur values
+// are about twice the CSS radius. Strongest at the top, sharp from BLUR_END down.
+const MAX_BLUR_PX = 24;
+const BLUR_END = 75;
 
 function chipCount() {
   if (typeof window === "undefined") return 160;
@@ -74,18 +74,11 @@ function ChipScatterBackground() {
     }));
   }, [count]);
 
-  const maskStyle: CSSProperties = {
-    WebkitMaskImage:
-      "radial-gradient(35% 35% at 50% calc(50% - 120px), transparent 0%, transparent 70%, black 100%)",
-    maskImage:
-      "radial-gradient(35% 35% at 50% calc(50% - 120px), transparent 0%, transparent 70%, black 100%)",
-  };
-
   return (
     <div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 w-screen h-screen overflow-hidden"
-      style={{ zIndex: 0, mixBlendMode: theme === "dark" ? "soft-light" : "multiply", ...maskStyle }}
+      style={{ zIndex: 0, mixBlendMode: theme === "dark" ? "soft-light" : "multiply" }}
     >
       {particles.map((p) => (
         <span
@@ -98,7 +91,8 @@ function ChipScatterBackground() {
             fontSize: `${p.size}px`,
             padding: "0.2em 0.5em",
             transform: "translate(-50%, -50%)",
-            opacity: 0.4,
+            opacity: 0.7,
+            filter: `blur(${(MAX_BLUR_PX * Math.max(0, 1 - p.top / BLUR_END)).toFixed(1)}px)`,
             ...p.style,
           }}
         >
@@ -120,8 +114,6 @@ const DECO_CHORDS = [
 export default function Landing() {
   const navigate = useNavigate();
   const resetSong = useSongStore((s) => s.resetSong);
-  const isDesktop = useIsDesktop();
-  const tapVerb = isDesktop ? "Click" : "Tap";
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const [jamOpen, setJamOpen] = useState(false);
   // The autosaved live song is always the freshest copy of what the writer was
@@ -181,15 +173,16 @@ export default function Landing() {
   };
   const continueName = liveName ?? recents[0]?.name;
 
-  const tapCard = "h-full gap-2 py-4 px-3";
+  const startButton = "btn-sculpt-cta flex h-[88px] flex-col items-center justify-center gap-2 rounded-xl type-body font-bold";
+  const exploreButton = "btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-2 type-label font-semibold leading-tight";
   return (
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
       <ChipScatterBackground />
-      <main className="relative mx-auto flex h-full w-full max-w-md flex-col px-4 pt-4 pb-6 text-center">
+      <main className="relative mx-auto flex h-full w-full max-w-md flex-col px-4 pt-10 pb-6 text-center">
         <h1
           role="img"
           aria-label="felt."
-          className="mt-auto flex shrink-0 items-center justify-center ml-5 sm:ml-2 font-normal"
+          className="flex shrink-0 items-center justify-center ml-5 sm:ml-2 font-normal"
         >
           <span aria-hidden className="logomark-ink" style={{ fontFamily: '"Noto Music"', fontSize: 110, lineHeight: "92px", marginTop: 9 }}>
             𝆑
@@ -199,19 +192,57 @@ export default function Landing() {
           </span>
         </h1>
 
-        <p className="mt-3 shrink-0 type-body font-bold leading-snug text-balance text-foreground/80">
-          The Songwriter's Notebook. Use Offline. Save Locally.
+        <p className="mt-4 shrink-0 type-body font-bold leading-snug text-foreground/90">
+          The Songwriter's Notebook.
         </p>
 
-        <p className="mt-2 shrink-0 type-label text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
-          <TaglineChip label="Write" style={LYRICS_STYLE} />
-          <span>and Record.</span>
-          <TaglineChip label="Arrange" style={CHORDS_STYLE} />
-          <span>and Experiment.</span>
+        <p className="mt-3 shrink-0 type-label text-foreground/80 flex flex-wrap items-center justify-center gap-x-1 gap-y-2">
+          <span>Write</span>
+          <TaglineChip label="Lyrics" style={LYRICS_STYLE} />
+          <span>and</span>
+          <TaglineChip label="Chords" style={CHORDS_STYLE} />
+          <span className="-ml-1">.</span>
+          <TaglineChip label="Record" style={RECORD_STYLE} />
+          <span>and</span>
+          <TaglineChip label="Arrange" style={ARRANGE_STYLE} />
+          <span className="-ml-1">.</span>
         </p>
 
-        <section className="mt-6 flex min-h-[120px] flex-col" aria-label="Recent projects">
-          <h2 className="mb-2 shrink-0 font-display type-heading font-bold">Recent Projects</h2>
+        <div className="mx-auto mt-9 grid w-full max-w-[308px] shrink-0 grid-cols-2 gap-x-6 gap-y-3">
+          <button type="button" className={startButton} onClick={() => startCapture("record")}>
+            <Mic className="h-6 w-6" strokeWidth={1.75} />
+            Record
+          </button>
+          <button type="button" className={startButton} onClick={() => startCapture("lyrics")}>
+            <Pencil className="h-6 w-6" strokeWidth={1.75} />
+            Write
+          </button>
+          <button type="button" className={startButton} onClick={() => setJamOpen(true)}>
+            <Piano className="h-6 w-6" strokeWidth={1.75} />
+            Jam
+          </button>
+          <div className="flex h-[88px] flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/app?tab=chords")}
+              className={exploreButton}
+              style={{ backgroundColor: "var(--paper-shade)" }}
+            >
+              Explore Chords
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/app?tab=voicekey")}
+              className={exploreButton}
+              style={{ backgroundColor: "var(--paper-shade)" }}
+            >
+              Find Your Range
+            </button>
+          </div>
+        </div>
+
+        <section className="mt-10 flex min-h-[120px] flex-1 flex-col" aria-label="Recent projects">
+          <h2 className="mb-3 shrink-0 type-body font-bold">Recent Projects</h2>
           {continueName && (
             <button
               type="button"
@@ -229,47 +260,6 @@ export default function Landing() {
             <RecentProjectsList songs={recents} onOpen={openRecent} onRemove={removeOne} />
           </div>
         </section>
-
-        <div className="mt-6 mb-auto grid shrink-0 grid-cols-2 auto-rows-fr gap-3">
-          <EmptyTapCard
-            className={tapCard}
-            labelClassName="leading-tight"
-            icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
-            label={`${tapVerb} to Record`}
-            onClick={() => startCapture("record")}
-          />
-          <EmptyTapCard
-            className={tapCard}
-            labelClassName="leading-tight"
-            icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
-            label={`${tapVerb} to Write`}
-            onClick={() => startCapture("lyrics")}
-          />
-          <EmptyTapCard
-            className={tapCard}
-            labelClassName="leading-tight"
-            icon={<Piano className="h-6 w-6" strokeWidth={1.75} />}
-            label={`${tapVerb} to Jam`}
-            hint="Play chords by number"
-            onClick={() => setJamOpen(true)}
-          />
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/app?tab=chords")}
-              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 type-label font-semibold leading-tight"
-            >
-              Explore Chords
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/app?tab=voicekey")}
-              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 type-label font-semibold leading-tight"
-            >
-              Find Your Key & Range
-            </button>
-          </div>
-        </div>
 
         {jamOpen && (
           <JamCanvas
