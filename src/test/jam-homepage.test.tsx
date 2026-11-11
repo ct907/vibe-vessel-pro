@@ -51,10 +51,10 @@ describe("Jam from the homepage", () => {
     useUIStore.setState({ mode: "arrange" });
   });
 
-  it("opens the Jam canvas from a Jam card and closes back to the homepage", () => {
+  it("opens the Jam canvas from the Jam button and closes back to the homepage", () => {
     renderHome();
     expect(document.querySelector("[data-jam-canvas]")).toBeNull();
-    fireEvent.click(screen.getByText(/to Jam$/));
+    fireEvent.click(screen.getByRole("button", { name: "Jam" }));
     expect(document.querySelector("[data-jam-canvas]")).not.toBeNull();
     press(/^Close$/);
     expect(document.querySelector("[data-jam-canvas]")).toBeNull();
@@ -67,7 +67,7 @@ describe("Jam from the homepage", () => {
     renderHome();
     // Landing saves the live song once on mount; only Add's save counts below.
     vi.mocked(commitCurrentSongToRecents).mockClear();
-    fireEvent.click(screen.getByText(/to Jam$/));
+    fireEvent.click(screen.getByRole("button", { name: "Jam" }));
     press(/^1, /); press(/^5, /); press(/^6, /); press(/^4, /);
     press(/^Add 4 chords to a new song/);
 
@@ -84,7 +84,7 @@ describe("Jam from the homepage", () => {
 
   it("a key change at the start becomes the new song's key", () => {
     renderHome();
-    fireEvent.click(screen.getByText(/to Jam$/));
+    fireEvent.click(screen.getByRole("button", { name: "Jam" }));
     press("Key change");
     press("Key of D");
     press(/^1, /); press(/^4, /); press(/^5, /);
@@ -96,7 +96,7 @@ describe("Jam from the homepage", () => {
 
   it("a mid-capture key change is kept as plain chords in the song's first key", () => {
     renderHome();
-    fireEvent.click(screen.getByText(/to Jam$/));
+    fireEvent.click(screen.getByRole("button", { name: "Jam" }));
     press(/^1, /); press(/^5, /);
     press("Key change");
     press("Key of G");
