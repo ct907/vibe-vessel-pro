@@ -50,6 +50,10 @@
     --primary-foreground: oklch(0.9823 0.0069 88.64);
     --primary-strong: oklch(0.5417 0.1612 53);
     --primary-inset: oklch(0.544 0.0744 65.5);
+    /* Homepage start buttons: deeper than --primary so cream text holds 4.5:1. */
+    --cta: oklch(0.545 0.129 59);
+    --cta-edge: oklch(0.467 0.108 61);
+    --cta-foreground: var(--primary-foreground);
     --primary-halo: oklch(0.662 0.1545 54.2 / 0.5);
     --primary-soft: oklch(0.8549 0.1077 80.53);
 
@@ -261,6 +265,9 @@
     --primary-foreground: oklch(0.2179 0.011 60.85);
     --primary-strong: oklch(0.602 0.15 53);
     --primary-inset: oklch(0.602 0.07 70);
+    --cta: var(--primary);
+    --cta-edge: var(--primary-strong);
+    --cta-foreground: var(--primary-foreground);
     --primary-halo: oklch(0.7262 0.1414 58.64 / 0.4);
 
     --secondary-b: oklch(0.3229 0.0133 57.79);
@@ -454,6 +461,25 @@
   }
   .btn-sculpt-amber:active {
     box-shadow: var(--shadow-sculpt-amber-press);
+    transform: translateY(1px);
+  }
+
+  /* CTA (homepage Record / Write / Jam) — the amber recipe on the deeper --cta fill */
+  .btn-sculpt-cta {
+    background-color: var(--cta);
+    color: var(--cta-foreground);
+    border: 0;
+    box-shadow:
+      0 4px 8px 0 color-mix(in oklch, var(--cocoa-deep) 95%, transparent), 0 3px 1px 0 var(--cta-edge),
+      inset 0 3px 4px 0 var(--primary-inset);
+    transition:
+      box-shadow 120ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .btn-sculpt-cta:active {
+    box-shadow:
+      0 1px 2px 0 color-mix(in oklch, var(--cocoa-deep) 95%, transparent), 0 1px 1px 0 var(--cta-edge),
+      inset 0 1px 2px 0 var(--primary-inset);
     transform: translateY(1px);
   }
 

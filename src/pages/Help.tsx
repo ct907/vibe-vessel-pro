@@ -27,7 +27,7 @@ const SECTIONS: Section[] = [
       "Arrange — switch between a Track view (multitrack timeline for your recordings) and a Chords view (bar-by-bar pattern blocks per section).",
       "A chord you add in either mode appears in the other automatically — they share the same song.",
     ],
-    tip: "Explore Chords and Find Your Key & Range on the home screen open standalone tools that don't require a song in progress.",
+    tip: "Explore Chords and Find Your Range on the home screen open standalone tools that don't require a song in progress.",
     image: lyricsImg,
     imageAlt: "Write and Record mode: a song titled Harbor Lights with an Fmaj7 chord pinned above the first lyric line.",
   },
