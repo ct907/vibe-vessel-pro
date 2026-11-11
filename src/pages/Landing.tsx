@@ -37,7 +37,7 @@ const PROGRESSIONS_STYLE: CSSProperties = { background: "var(--section-tint-sky)
 function TaglineChip({ label, style }: { label: string; style: CSSProperties }) {
   return (
     <span
-      className="noise-texture-chip inline-flex items-center rounded-md px-1.5 py-0.5 font-semibold"
+      className="noise-texture-chip inline-flex items-center rounded-md px-1.5 py-0.5 type-label font-semibold"
       style={{ ...style, ...TAGLINE_TEXT }}
     >
       {label}
@@ -181,8 +181,6 @@ export default function Landing() {
   };
   const continueName = liveName ?? recents[0]?.name;
 
-  // Golden-ratio type scale on a 16px base (each step ×√φ, every second step ×φ):
-  // 110 / 68 wordmark · 20 headings & card labels · 16 body · 12 meta.
   const tapCard = "h-full gap-2 py-4 px-3";
   return (
     <div className="fixed inset-0 z-50 bg-paper text-foreground overflow-y-auto">
@@ -201,11 +199,11 @@ export default function Landing() {
           </span>
         </h1>
 
-        <p className="mt-3 shrink-0 text-xl font-bold leading-tight text-foreground/80">
+        <p className="mt-3 shrink-0 type-body font-bold leading-snug text-balance text-foreground/80">
           The Songwriter's Notebook. Use Offline. Save Locally.
         </p>
 
-        <p className="mt-2 shrink-0 text-base text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
+        <p className="mt-2 shrink-0 type-label text-foreground/70 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
           <TaglineChip label="Write" style={LYRICS_STYLE} />
           <span>and Record.</span>
           <TaglineChip label="Arrange" style={CHORDS_STYLE} />
@@ -213,7 +211,7 @@ export default function Landing() {
         </p>
 
         <section className="mt-6 flex min-h-[120px] flex-col" aria-label="Recent projects">
-          <h2 className="mb-2 shrink-0 font-display text-xl font-bold">Recent Projects</h2>
+          <h2 className="mb-2 shrink-0 font-display type-heading font-bold">Recent Projects</h2>
           {continueName && (
             <button
               type="button"
@@ -222,8 +220,8 @@ export default function Landing() {
             >
               <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
               <div className="min-w-0 flex-1">
-                <p className="text-xs uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
-                <h3 className="font-display text-xl leading-tight truncate">{continueName}</h3>
+                <p className="type-caption uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
+                <h3 className="font-display type-body font-semibold leading-tight truncate">{continueName}</h3>
               </div>
             </button>
           )}
@@ -235,21 +233,21 @@ export default function Landing() {
         <div className="mt-6 mb-auto grid shrink-0 grid-cols-2 auto-rows-fr gap-3">
           <EmptyTapCard
             className={tapCard}
-            labelClassName="text-xl leading-tight"
+            labelClassName="leading-tight"
             icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Record`}
             onClick={() => startCapture("record")}
           />
           <EmptyTapCard
             className={tapCard}
-            labelClassName="text-xl leading-tight"
+            labelClassName="leading-tight"
             icon={<Pencil className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Write`}
             onClick={() => startCapture("lyrics")}
           />
           <EmptyTapCard
             className={tapCard}
-            labelClassName="text-xl leading-tight"
+            labelClassName="leading-tight"
             icon={<Piano className="h-6 w-6" strokeWidth={1.75} />}
             label={`${tapVerb} to Jam`}
             hint="Play chords by number"
@@ -259,14 +257,14 @@ export default function Landing() {
             <button
               type="button"
               onClick={() => navigate("/app?tab=chords")}
-              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 text-base font-semibold leading-tight"
+              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 type-label font-semibold leading-tight"
             >
               Explore Chords
             </button>
             <button
               type="button"
               onClick={() => navigate("/app?tab=voicekey")}
-              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 text-base font-semibold leading-tight"
+              className="btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-3 type-label font-semibold leading-tight"
             >
               Find Your Key & Range
             </button>

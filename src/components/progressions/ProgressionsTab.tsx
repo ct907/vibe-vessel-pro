@@ -1056,7 +1056,7 @@ function SectionGroup({
             color: "inherit",
             fontFamily: "'Nunito', system-ui, sans-serif",
             fontWeight: 700,
-            fontSize: 14,
+            fontSize: "var(--type-label)",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -2426,7 +2426,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               style={{
                 fontFamily: "var(--font-ui, 'Nunito', sans-serif)",
                 fontWeight: 700,
-                fontSize: 11,
+                fontSize: "var(--type-caption)",
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 color: "var(--ink)",

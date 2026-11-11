@@ -224,14 +224,14 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart
                   <button
                     key={t}
                     onClick={() => addSectionAndFocus(t)}
-                    className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold capitalize"
+                    className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-9 type-label font-semibold capitalize"
                   >
                     <Plus className="h-3.5 w-3.5" />{t === "pre-chorus" ? "Pre-Chorus" : t}
                   </button>
                 ))}
                 <button
                   onClick={() => addSectionAndFocus("custom")}
-                  className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-sm font-semibold"
+                  className="btn-sculpt-amber inline-flex items-center gap-1.5 rounded-lg px-3 h-9 type-label font-semibold"
                 >
                   <Plus className="h-3.5 w-3.5" />Custom…
                 </button>
@@ -275,7 +275,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart
               onClick={toggle}
               disabled={pending || starting || (trackIsRecording && !recording)}
               className={
-                "flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-xs font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
+                "flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 type-label font-bold text-[var(--destructive-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95" +
                 (recording ? " animate-rec-pulse" : "") +
                 ((pending || (trackIsRecording && !recording)) ? " opacity-50" : "")
               }
@@ -292,7 +292,7 @@ export function WriteStickyBar({ onRecordComplete, onEditorAction, onRecordStart
             <button
               type="button"
               onClick={() => setAddSectionOpen((o) => !o)}
-              className="flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 text-xs font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
+              className="flex h-12 flex-1 items-center justify-center gap-1 whitespace-nowrap border-l border-black/15 px-1 type-label font-bold text-[var(--cocoa-foreground)] transition-[filter,transform] active:translate-y-px active:brightness-95"
               style={{ background: "var(--cocoa)" }}
               aria-expanded={addSectionOpen}
               aria-label="Add lyrics section"

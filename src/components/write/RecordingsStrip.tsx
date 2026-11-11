@@ -251,7 +251,7 @@ export function RecordingsStrip() {
             color: "inherit",
             fontFamily: "'Nunito', system-ui, sans-serif",
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: "var(--type-label)",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
