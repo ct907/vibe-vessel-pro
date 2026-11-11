@@ -454,11 +454,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   // would scroll above the fold. Translate it down by `visualViewport.offsetTop`
   // (same visualViewport pattern WriteStickyBar uses for the bottom bar).
   const [vvOffsetTop, setVvOffsetTop] = useState(0);
+  // A landscape tablet with its keyboard up has ~300px of screen: the pinned header would eat it.
+  const [vvShort, setVvShort] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setVvOffsetTop(vv.offsetTop > 0 ? vv.offsetTop : 0);
+    const update = () => {
+      setVvOffsetTop(vv.offsetTop > 0 ? vv.offsetTop : 0);
+      setVvShort(vv.height < 560);
+    };
     update();
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
@@ -859,8 +864,8 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         </div>
       </div>
       <div
-        className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && "sticky top-2")}
-        style={isDesktop && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
+        className={cn("z-40 mx-2 sm:mx-4 mb-2", isDesktop && !vvShort && "sticky top-2")}
+        style={isDesktop && !vvShort && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
       >
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}

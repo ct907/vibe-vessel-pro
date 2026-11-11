@@ -2597,6 +2597,7 @@ export function LyricsTab({ sortMode = false, onSwitchTab, showOnboarding = true
           })()}
           onCommit={handlePickBatch}
           onClose={() => setPicker(null)}
+          targetSelector={`[data-line-id="${jamPicker.lineId}"]`}
           headerRef={isMobile ? focusedEditorHeaderRef : chordPickerHeaderRef}
         />
       ) : isMobile && picker && !picker.prog ? (

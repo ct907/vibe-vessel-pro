@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RotateCcw, RefreshCw, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useSidePanel, useCanDockPanel, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
+import { useSidePanel, useDockedPanelWidth, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -389,8 +389,9 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [vvHeight, setVvHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
   const search = useRhymeSearch(props.isOpen);
-  const side = useCanDockPanel();
-  useSidePanel(props.isOpen && side);
+  const panelW = useDockedPanelWidth();
+  const side = panelW > 0;
+  useSidePanel(props.isOpen && side, panelW);
 
   useEffect(() => {
     if (props.isOpen) setTimeout(() => inputRef.current?.focus(), 50);
@@ -430,7 +431,7 @@ function DesktopRhymeEditor(props: FocusedRhymeEditorProps) {
         side={side ? "right" : "bottom"}
         hideClose
         className={cn("overflow-hidden flex flex-col p-0 gap-0 data-[state=closed]:duration-0", side ? SIDE_PANEL_CLASS : "rounded-t-2xl transition-[bottom] duration-150")}
-        style={side ? { background: "var(--ink-soft)" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
+        style={side ? { background: "var(--ink-soft)", width: panelW, top: 0, bottom: keyboardOffset, height: "auto" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           setTimeout(() => inputRef.current?.focus(), 30);

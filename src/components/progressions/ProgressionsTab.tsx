@@ -2475,6 +2475,7 @@ export function ProgressionsTab({ sortMode = false, onSwitchTab: _onSwitchTab, s
               if (onboardingEnabled && progressionsStep === 2) setProgressionsStep(3);
             }}
             onClose={() => (jamAdd.fromSheet ? setPicker(null) : setPatternAddSlot(null))}
+            targetSelector={`[data-pattern-block="${jamAdd.patternId}"]`}
             headerRef={jamAdd.fromSheet ? chordPickerHeaderRef : focusedEditorHeaderRef}
           />
         );

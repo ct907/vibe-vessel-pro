@@ -11,7 +11,7 @@ import { getChordColorClasses } from "@/lib/music/chordColor";
 import { playChord } from "@/lib/music/audio";
 import { ChevronRight, Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useSidePanel, useCanDockPanel, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
+import { useSidePanel, useDockedPanelWidth, SIDE_PANEL_CLASS } from "@/hooks/use-side-panel";
 import { cn } from "@/lib/utils";
 import { PresetList } from "@/components/progressions/PresetList";
 import { ChordInputTabs } from "@/components/chord/ChordInputTabs";
@@ -68,8 +68,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   // Wide screens dock the picker beside the song; narrower ones keep the bottom sheet.
-  const side = useCanDockPanel();
-  useSidePanel(open && side);
+  const panelW = useDockedPanelWidth();
+  const side = panelW > 0;
+  useSidePanel(open && side, panelW);
 
   useEffect(() => {
     if (open) {
@@ -209,8 +210,9 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
   useEffect(() => {
     const root = document.documentElement;
     const el = contentEl;
-    if (!open || !el || side) return;
-    const apply = () => root.style.setProperty("--chord-sheet-h", `${el.offsetHeight}px`);
+    if (!open || !el) return;
+    // Docked, only the keyboard covers the page.
+    const apply = () => root.style.setProperty("--chord-sheet-h", `${(side ? 0 : el.offsetHeight) + keyboardOffset}px`);
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(el);
@@ -218,7 +220,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
       ro.disconnect();
       root.style.removeProperty("--chord-sheet-h");
     };
-  }, [open, contentEl, side]);
+  }, [open, contentEl, side, keyboardOffset]);
   useEffect(() => {
     if (!open || !targetSelector || !contentEl) return;
     // Let the page take the sheet-height padding first so there's room to scroll.
@@ -226,12 +228,16 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
       const el = document.querySelector<HTMLElement>(targetSelector);
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const limit = window.innerHeight - (side ? 96 : contentEl.offsetHeight) - 12;
+      // The keyboard covers the bottom of the layout viewport on iOS, and a
+      // short (landscape) viewport has no room for the 96px header allowance.
+      const limit = window.innerHeight - keyboardOffset - (side ? 0 : contentEl.offsetHeight) - 12;
+      const topMargin = vvHeight < 560 ? 12 : 96;
       if (rect.bottom > limit) window.scrollBy({ top: rect.bottom - limit, behavior: "smooth" });
-      else if (rect.top < 96) window.scrollBy({ top: rect.top - 96, behavior: "smooth" });
+      else if (rect.top < topMargin) window.scrollBy({ top: rect.top - topMargin, behavior: "smooth" });
     }, 60);
     return () => window.clearTimeout(id);
-  }, [open, targetSelector, contentEl, side]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, targetSelector, contentEl, side, keyboardOffset]);
 
   // Reserve ~140px from top so the highlighted chord row (positioned ~80px from top) stays visible.
   const TOP_RESERVED = 140;
@@ -261,7 +267,7 @@ export function ChordPickerSheet({ open, onOpenChange, initialChord, onPick, onP
           setTimeout(() => inputRef.current?.focus(), 30);
         }}
         className={cn("overflow-hidden flex flex-col pt-10", side ? cn(SIDE_PANEL_CLASS, "p-4 pt-12") : "rounded-t-2xl transition-[bottom] duration-150")}
-        style={side ? { background: "var(--ink-soft)" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
+        style={side ? { background: "var(--ink-soft)", width: panelW, top: 0, bottom: keyboardOffset, height: "auto" } : { bottom: `${keyboardOffset}px`, maxHeight: `${sheetMaxHeight}px`, background: "var(--ink-soft)" }}
         onOpenAutoFocus={(e) => {
           // We focus the input ourselves; don't let Radix steal focus from
           // the chord row if user tapped to switch back.
