@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   icon: ReactNode;
@@ -9,22 +10,27 @@ interface Props {
   onClick: () => void;
   /** Lets a coach mark anchor to the card while it stands in for the editor. */
   anchorRef?: RefObject<HTMLButtonElement | null>;
+  className?: string;
+  labelClassName?: string;
 }
 
-export function EmptyTapCard({ icon, label, hint, onClick, anchorRef }: Props) {
+export function EmptyTapCard({ icon, label, hint, onClick, anchorRef, className, labelClassName }: Props) {
   return (
     <button
       ref={anchorRef}
       type="button"
       onClick={onClick}
-      className="w-full rounded-xl border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col items-center justify-center gap-3 py-7 px-4 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border transition-colors"
+      className={cn(
+        "w-full rounded-xl border-2 border-dashed border-border/60 bg-[var(--paper-card)]/40 flex flex-col items-center justify-center gap-3 py-7 px-4 text-muted-foreground hover:text-foreground hover:bg-[var(--paper-card)] hover:border-border transition-colors",
+        className,
+      )}
     >
       <span className="flex items-center gap-3">
         <Plus className="h-6 w-6" strokeWidth={1.75} />
         {icon}
       </span>
-      <span className="text-base font-display font-semibold">{label}</span>
-      {hint && <span className="-mt-1.5 text-xs">{hint}</span>}
+      <span className={cn("text-base font-display font-semibold", labelClassName)}>{label}</span>
+      {hint && <span className="-mt-1.5 text-xs leading-snug">{hint}</span>}
     </button>
   );
 }

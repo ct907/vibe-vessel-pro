@@ -81,7 +81,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
-import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, sectionHeaderStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { ChordActionRow } from "@/components/chord/ChordActionRow";
@@ -714,7 +714,7 @@ function LineRow({
           }}
           placeholder={line._isChordOverflow ? "…continued — type to make this its own line" : "Write your lyric line…"}
           className={cn(
-            "w-full min-h-[1.875rem] bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-base leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
+            "w-full min-h-[1.875rem] bg-transparent border-0 outline-none resize-none overflow-hidden font-display text-lg leading-[1.875rem] text-foreground placeholder:italic placeholder:text-muted-foreground/60 dark:placeholder:opacity-40 px-1 ml-1 break-words",
             isFocused && "pr-8",
           )}
         />
@@ -1015,8 +1015,8 @@ function SectionCard({
     >
       {/* Section header — Chords/Notes sit in its row on desktop, a second row on mobile */}
       <div
-        className="px-3 rounded-xl bg-[#b2b0a4] select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
-        style={{ color: "oklch(0.3267 0.027 60.1)" }}
+        className="px-3 rounded-xl select-none [-webkit-touch-callout:none] [-webkit-user-select:none]"
+        style={sectionHeaderStyle(section.color)}
       >
       <div className="flex items-center gap-2 h-12">
         <button
@@ -1033,7 +1033,7 @@ function SectionCard({
             color: "inherit",
             fontFamily: "'Nunito', system-ui, sans-serif",
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: 14,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -1113,7 +1113,7 @@ function SectionCard({
                 "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
                 isSectionPlaying
                   ? "bg-[var(--primary)] text-white"
-                  : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
+                  : "bg-[var(--section-header-btn)] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
               aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
               title={isSectionPlaying ? "Stop" : "Play from this section"}
@@ -1130,7 +1130,7 @@ function SectionCard({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-destructive/90 hover:text-destructive transition-colors"
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[var(--section-header-btn)] text-destructive/90 hover:text-destructive transition-colors"
                     aria-label="Overdub this section"
                     title="Overdub this section"
                   >
@@ -1171,7 +1171,7 @@ function SectionCard({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-[var(--section-header-btn)] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors"
                   aria-label="Section options"
                 >
                   <MoreVertical className="h-4 w-4" />

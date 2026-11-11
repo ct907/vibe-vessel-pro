@@ -34,6 +34,12 @@ export function sectionTintStyle(color: string | null | undefined, _factor = 0.5
   };
 }
 
+/** Section header bar: a stronger, more saturated version of the section color with a contrast-safe foreground. */
+export function sectionHeaderStyle(color: string | null | undefined): React.CSSProperties {
+  const key = color && SECTION_COLOR_KEYS.includes(color as SectionColor) ? color : "none";
+  return { backgroundColor: `var(--section-strong-${key})`, color: "var(--section-header-fg)" };
+}
+
 interface Props {
   value?: string | null;
   onChange: (color: string | null) => void;

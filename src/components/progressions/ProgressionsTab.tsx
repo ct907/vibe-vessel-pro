@@ -66,7 +66,7 @@ import { playChord } from "@/lib/music/audio";
 import { ChordSymbol, transposeChord } from "@/lib/music/chords";
 import { computeEffectiveOffsets } from "@/lib/music/keyChange";
 import { cn } from "@/lib/utils";
-import { sectionTintStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
+import { sectionTintStyle, sectionHeaderStyle, SectionColorPicker, SECTION_COLOR_KEYS } from "@/components/section/SectionColorPicker";
 import { KeyChangeSticker } from "@/components/section/KeyChangeSticker";
 import { SectionToggleButton } from "@/components/section/SectionToggleButton";
 import { ChordActionRow } from "@/components/chord/ChordActionRow";
@@ -1038,8 +1038,8 @@ function SectionGroup({
     >
       {/* Section header — Notes sits in its row on desktop, a second row on mobile */}
       <div
-        className="px-3 rounded-xl bg-[#b2b0a4]"
-        style={{ color: "oklch(0.3267 0.027 60.1)" }}
+        className="px-3 rounded-xl"
+        style={sectionHeaderStyle(section?.color)}
       >
       <div className="flex items-center gap-2 h-12">
         <button
@@ -1056,7 +1056,7 @@ function SectionGroup({
             color: "inherit",
             fontFamily: "'Nunito', system-ui, sans-serif",
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: 14,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -1134,7 +1134,7 @@ function SectionGroup({
                 "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
                 isSectionPlaying
                   ? "bg-[var(--primary)] text-white"
-                  : "bg-[#dad8d2] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
+                  : "bg-[var(--section-header-btn)] text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] disabled:opacity-40 disabled:cursor-not-allowed",
               )}
               aria-label={isSectionPlaying ? "Stop playback" : "Play from this section"}
               title={isSectionPlaying ? "Stop" : "Play from this section"}
@@ -1145,7 +1145,7 @@ function SectionGroup({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[#dad8d2]"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--pill-rest-fg)]/80 hover:text-[var(--pill-rest-fg)] transition-colors bg-[var(--section-header-btn)]"
                   aria-label="Section options"
                 >
                   <MoreVertical className="h-4 w-4" />

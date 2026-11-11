@@ -54,7 +54,7 @@ const SECTIONS: Section[] = [
       "Click the line that says \"Write your lyric line…\" and start typing.",
       "Press Enter to start a new line below; press Backspace at the start of a line to merge it into the one above.",
       "Type / on an empty line to open the new-section dialog directly from the keyboard.",
-      "Use the \"Add Section\" button in the sticky bottom bar to add a Verse, Chorus, Bridge, Intro, or a custom section.",
+      "Use the \"Add Lyrics Section\" button in the sticky bottom bar to add a Verse, Chorus, Bridge, Intro, or a custom section.",
     ],
     tip: "Lyrics autosave to your browser as you type — there's no Save button to remember for that.",
   },
@@ -139,7 +139,7 @@ const SECTIONS: Section[] = [
     intro:
       "Write mode's recordings strip captures quick voice memos; Arrange mode's Track view multitracks up to 4 of them together.",
     steps: [
-      "Tap \"Add Recording\" (or the Record button in the sticky bottom bar) to start capturing.",
+      "Tap \"Record Voice\" in the sticky bottom bar to start capturing — your recordings appear once the first take begins.",
       "Each take is saved to a takes library — mark up to three as \"best\" to keep them handy.",
       "Use \"Convert to Chords\" to pick a take and detect its chords right on your device — the detected chords appear as chips you can drag onto your lyrics.",
       "In Arrange mode's Track view, drag a take onto a track to place it on the multitrack timeline, then trim, loop, or adjust its gain and pan.",

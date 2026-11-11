@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Mic, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { LyricsTab } from "@/components/lyrics/LyricsTab";
 import type { TabName } from "@/store/ui";
 import { useTakesStore } from "@/store/takes";
@@ -23,10 +23,9 @@ interface Props {
  * strip on top, the existing chord-over-lyric editor below, and a floating
  * Record pill for one-tap capture.
  *
- * Each area starts as a dashed tap card while it is empty; tapping reveals the
- * real editor and immediately performs the capture action (caret ready in the
- * first lyric line / recording already rolling) so inspiration isn't kept
- * waiting. An untouched area reverts to its card on remount.
+ * The recordings strip only appears once a take exists or Record Voice is
+ * pressed. The lyrics area starts as a dashed tap card while empty; tapping it
+ * reveals the editor with the caret ready in the first line.
  */
 export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   const recordingsEmpty = useTakesStore((s) => s.takes.length === 0);
@@ -46,7 +45,7 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
 
   const onboarding = useOnboardingStore();
   const canCoach = onboarding.enabled && showOnboarding && onboarding.globalPhase === 2;
-  const recCardRef = useRef<HTMLButtonElement | null>(null);
+  const recordButtonRef = useRef<HTMLButtonElement | null>(null);
   const recStripRef = useRef<HTMLDivElement | null>(null);
   const lyricsCardRef = useRef<HTMLButtonElement | null>(null);
 
@@ -93,26 +92,14 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
   return (
     <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:items-start md:gap-6">
       {/* Left column — recordings (2 of 5) */}
-      <div className="md:col-span-2" ref={recStripRef}>
-        {showRecordings ? (
+      {showRecordings && (
+        <div className="md:col-span-2" ref={recStripRef}>
           <RecordingsStrip />
-        ) : (
-          <EmptyTapCard
-            anchorRef={recCardRef}
-            icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}
-            label="Add Recording"
-            hint={`${tapVerb} to start recording`}
-            onClick={() => {
-              setRecRevealed(true);
-              // Within the tap gesture so the mic prompt/keyboard rules apply.
-              requestStickyBarRecording();
-            }}
-          />
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Right column — lyrics (3 of 5) */}
-      <div className="md:col-span-3 min-w-0">
+      {/* Right column — lyrics (3 of 5), centred until there are recordings */}
+      <div className={showRecordings ? "md:col-span-3 min-w-0" : "md:col-span-3 md:col-start-2 min-w-0"}>
         {showLyrics ? (
           <LyricsTab sortMode={sortMode} onSwitchTab={onSwitchTab} showOnboarding={showOnboarding} />
         ) : (
@@ -130,14 +117,19 @@ export function WriteMode({ sortMode, onSwitchTab, showOnboarding }: Props) {
         )}
       </div>
 
-      <WriteStickyBar onEditorAction={() => { setLyricsRevealed(true); revealLyricsForTour(); }} />
+      <WriteStickyBar
+        recordButtonRef={recordButtonRef}
+        onRecordStart={() => setRecRevealed(true)}
+        onEditorAction={() => { setLyricsRevealed(true); revealLyricsForTour(); }}
+      />
 
       {canCoach && onboarding.captureStep === 1 && !showRecordings && onboarding.dismissedKey !== "capture-1" && (
         <AnchoredCoachMark
-          anchorRef={recCardRef}
+          anchorRef={recordButtonRef}
+          anchorEdge="top"
           step="3/13"
-          message={`${tapVerb} Add Recording to capture a vocal idea — your first take.`}
-          arrowSide="top"
+          message={`${tapVerb} Record Voice to capture a vocal idea — your first take.`}
+          arrowSide="bottom"
           onDismiss={() => onboarding.dismissCoachMark("capture-1")}
         />
       )}
