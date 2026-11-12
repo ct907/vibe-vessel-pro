@@ -13,13 +13,16 @@ import { songHasAudio, songMatches, songPreview, type RecentProject } from "@/li
 interface Props {
   songs: RecentProject[];
   onOpen: (song: RecentProject) => void;
-  onRemove: (song: RecentProject) => void;
+  /** Omit to hide the row menu. */
+  onRemove?: (song: RecentProject) => void;
   /** Rows shown before "Show all". */
   limit?: number;
+  /** One line per song: title and time only. */
+  compact?: boolean;
 }
 
 /** The song library: name (or first lyric), when it was last touched, a recording badge, and search. */
-export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props) {
+export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8, compact = false }: Props) {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
   const matches = songs.filter((s) => songMatches(s, query));
@@ -47,11 +50,16 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
           <p className="type-label text-muted-foreground italic px-4 py-6 text-center">No songs match "{query}".</p>
         ) : (
           visible.map((s) => {
-            const preview = songPreview(s);
+            const preview = compact ? "" : songPreview(s);
+            const when = formatDistanceToNow(s.savedAt, { addSuffix: true });
             return (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-2">
-                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => onOpen(s)}>
-                  <span className="flex items-center gap-2">
+              <div key={s.id} className={compact ? "flex items-center gap-3 px-4 py-2.5" : "flex items-center gap-3 px-4 py-2"}>
+                <button
+                  type="button"
+                  className={compact ? "flex-1 min-w-0 flex items-baseline gap-3 text-left" : "flex-1 min-w-0 text-left"}
+                  onClick={() => onOpen(s)}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
                     <h3 className="font-display type-body font-semibold leading-tight truncate">{s.name}</h3>
                     {songHasAudio(s) && (
                       <>
@@ -60,21 +68,23 @@ export function RecentProjectsList({ songs, onOpen, onRemove, limit = 8 }: Props
                       </>
                     )}
                   </span>
-                  <span className="block type-label text-ink-soft truncate">
-                    {formatDistanceToNow(s.savedAt, { addSuffix: true })}
+                  <span className={compact ? "ml-auto shrink-0 type-caption text-ink-soft" : "block type-label text-ink-soft truncate"}>
+                    {when}
                     {preview && ` · ${preview}`}
                   </span>
                 </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`More actions for ${s.name}`}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onRemove(s)}>Remove from recents</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {onRemove && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`More actions for ${s.name}`}>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onRemove(s)}>Remove from recents</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             );
           })
