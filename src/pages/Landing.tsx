@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, Pencil, Piano, Save } from "lucide-react";
+import { Mic, Pencil, Piano } from "lucide-react";
 import { JamCanvas } from "@/components/chord/JamCanvas";
 import { chordSlotWidth } from "@/lib/music/chordLayout";
 import type { ChordSymbol, Mode } from "@/lib/music/chords";
@@ -12,15 +12,10 @@ import { useOnboardingStore } from "@/store/onboarding";
 import { useUIStore } from "@/store/ui";
 import {
   commitCurrentSongToRecents,
-  currentSongHasContent,
   listRecent,
   openRecentSong,
-  removeRecent,
-  restoreRecent,
-  songDisplayName,
   type RecentProject,
 } from "@/lib/recent-projects";
-import { toast as sonnerToast } from "sonner";
 import { ALL_CHIP_STYLES } from "@/lib/music/chordColor";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -120,11 +115,6 @@ export default function Landing() {
   const resetSong = useSongStore((s) => s.resetSong);
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const [jamOpen, setJamOpen] = useState(false);
-  // The autosaved live song is always the freshest copy of what the writer was
-  // last doing, so "Continue" opens it rather than its (possibly older) library entry.
-  const [liveName] = useState(() =>
-    currentSongHasContent() ? songDisplayName(useSongStore.getState().toJSON()) : null,
-  );
 
   useEffect(() => {
     // Save the live song first so the list shows its latest name and position.
@@ -134,12 +124,6 @@ export default function Landing() {
   const openRecent = (r: RecentProject) => {
     openRecentSong(r);
     navigate("/app");
-  };
-  const removeOne = (r: RecentProject) => {
-    void removeRecent(r.id).then(listRecent).then(setRecents);
-    sonnerToast(`Removed "${r.name}" from recents`, {
-      action: { label: "Undo", onClick: () => { void restoreRecent(r).then(listRecent).then(setRecents); } },
-    });
   };
   const startCapture = (capture: "record" | "lyrics") => {
     // The current song (with its recordings) stays in the library.
@@ -175,7 +159,6 @@ export default function Landing() {
     if (chords.length > 1) autoLayoutSection(section.id, window.innerWidth, 28);
     navigate("/app");
   };
-  const continueName = liveName ?? recents[0]?.name;
 
   const startButton = "btn-sculpt-cta flex h-[88px] flex-col items-center justify-center gap-2 rounded-xl type-body font-bold";
   const exploreButton = "btn-sculpt-cream flex-1 inline-flex items-center justify-center rounded-xl px-2 type-label font-semibold leading-tight";
@@ -247,21 +230,8 @@ export default function Landing() {
 
         <section className="mt-10 flex min-h-[120px] flex-1 flex-col" aria-label="Recent projects">
           <h2 className="mb-3 shrink-0 type-body font-bold">Recent Projects</h2>
-          {continueName && (
-            <button
-              type="button"
-              onClick={() => (liveName ? navigate("/app") : openRecent(recents[0]))}
-              className="mb-2 w-full shrink-0 rounded-xl bg-[var(--paper-card)] shadow-[var(--shadow-card)] px-4 py-2 flex items-center gap-3 text-left hover:brightness-95 transition-[filter]"
-            >
-              <Save className="h-5 w-5 shrink-0" style={{ color: "var(--ink-soft)" }} />
-              <div className="min-w-0 flex-1">
-                <p className="type-caption uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>Continue where you left off</p>
-                <h3 className="font-display type-body font-semibold leading-tight truncate">{continueName}</h3>
-              </div>
-            </button>
-          )}
           <div className="min-h-0 overflow-y-auto -mx-1 px-1 pb-1">
-            <RecentProjectsList songs={recents} onOpen={openRecent} onRemove={removeOne} />
+            <RecentProjectsList songs={recents} onOpen={openRecent} compact />
           </div>
         </section>
 
