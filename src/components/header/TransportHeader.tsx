@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore, patternPlayBeats } from "@/store/song";
+import { InspirationModal, InspirationLinkField } from "@/components/header/InspirationModal";
+import { MAX_INSPIRATION_ITEMS } from "@/lib/inspiration";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
-import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationPhoto } from "@/store/song";
+import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationLink, type InspirationPhoto } from "@/store/song";
 import {
   commitCurrentSongToRecents,
   listRecent,
@@ -20,7 +22,6 @@ import type { DriveFile } from "@/lib/drive/drive";
 import { startRecordingsEngine, stopRecordingsEngine, updateEngineBpm } from "@/lib/audio/recordings-engine";
 import { usePlaybackStore } from "@/store/playback";
 import { Button } from "@/components/ui/button";
-import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -139,10 +140,12 @@ function InspirationOnboardingModal({
   open,
   onClose,
   onUpload,
+  onAddLink,
 }: {
   open: boolean;
   onClose: () => void;
   onUpload: () => void;
+  onAddLink: (link: InspirationLink) => void;
 }) {
   const [sampleUrls, setSampleUrls] = useState<string[]>([]);
 
@@ -158,8 +161,8 @@ function InspirationOnboardingModal({
         <DialogHeader>
           <DialogTitle>Inspiration photos</DialogTitle>
           <DialogDescription>
-            Upload up to 3 photos to keep your creative vision in focus.
-            They float above your workspace while you write.
+            Add up to {MAX_INSPIRATION_ITEMS} photos or song links to keep your creative
+            vision in focus. Photos float above your workspace while you write.
           </DialogDescription>
         </DialogHeader>
 
@@ -227,133 +230,13 @@ function InspirationOnboardingModal({
             <ImageIcon className="h-4 w-4" />
             Choose photos
           </button>
+          <InspirationLinkField onAdd={onAddLink} />
           <p className="text-xs text-center" style={{ color: "var(--ink-soft)" }}>
-            Save your project after uploading to preserve your photos.
+            Save your project after adding to preserve your photos and links.
           </p>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function InspirationLightbox({
-  photos,
-  initialIndex,
-  onClose,
-  onRemove,
-  onRemoveAll,
-  onAddPhotos,
-}: {
-  photos: InspirationPhoto[];
-  initialIndex: number;
-  onClose: () => void;
-  onRemove: (id: string) => void;
-  onRemoveAll: () => void;
-  onAddPhotos: () => void;
-}) {
-  const [idx, setIdx] = useState(initialIndex);
-  const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
-  const current = photos[idx] ?? photos[0];
-  if (!current) return null;
-  const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
-  const next = () => setIdx((i) => (i + 1) % photos.length);
-  const removeCurrent = () => {
-    const removed = current;
-    onRemove(removed.id);
-    if (idx >= photos.length - 1) setIdx(Math.max(0, photos.length - 2));
-    sonnerToast("Photo removed", {
-      action: { label: "Undo", onClick: () => useSongStore.getState().addInspirationPhoto(removed) },
-    });
-  };
-  return (
-    <>
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent
-        onKeyDown={(e) => {
-          if (photos.length <= 1) return;
-          if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
-          else if (e.key === "ArrowRight") { e.preventDefault(); next(); }
-        }}
-        onPointerDownOutside={(e) => {
-          // Don't dismiss the lightbox when the user clicks the "Undo" action
-          // on the "Photo removed" toast — that toast renders outside this
-          // dialog's DOM subtree, so Radix treats a click on it as an
-          // outside-interaction close request otherwise.
-          if ((e.target as HTMLElement | null)?.closest(".toaster")) e.preventDefault();
-        }}
-        className="left-0 top-0 z-[9999] flex h-full max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none border-0 bg-black/88 p-6 shadow-none [&>button]:text-white/70 [&>button]:hover:text-white [&>button]:hover:bg-white/10"
-      >
-        <DialogTitle className="sr-only">
-          Inspiration photo {idx + 1} of {photos.length}
-        </DialogTitle>
-        {/* Photo */}
-        <div className="relative max-w-[min(90vw,480px)] max-h-[60vh]">
-          <img
-            src={current.dataUrl}
-            alt={`Inspiration photo ${idx + 1}`}
-            draggable={false}
-            className="block w-full max-h-[60vh] object-contain rounded-xl"
-            style={{ boxShadow: "0 8px 40px color-mix(in oklch, black 60%, transparent)" }}
-          />
-        </div>
-        {/* Inline nav: [‹] 1/3 [›] */}
-        <div className="flex items-center gap-2.5">
-          {photos.length > 1 && (
-            <button
-              type="button"
-              onClick={prev}
-              className="h-8 w-8 rounded-full flex items-center justify-center text-lg text-white"
-              style={{ background: "color-mix(in oklch, white 15%, transparent)", border: "1px solid color-mix(in oklch, white 30%, transparent)" }}
-              aria-label="Previous photo"
-            >‹</button>
-          )}
-          <span className="font-mono-chord text-[13px] min-w-9 text-center" style={{ color: "color-mix(in oklch, white 60%, transparent)" }}>
-            {idx + 1}/{photos.length}
-          </span>
-          {photos.length > 1 && (
-            <button
-              type="button"
-              onClick={next}
-              className="h-8 w-8 rounded-full flex items-center justify-center text-lg text-white"
-              style={{ background: "color-mix(in oklch, white 15%, transparent)", border: "1px solid color-mix(in oklch, white 30%, transparent)" }}
-              aria-label="Next photo"
-            >›</button>
-          )}
-        </div>
-        {/* Actions */}
-        <div className="flex gap-2.5 mt-4">
-          {photos.length < 3 && (
-            <button
-              type="button"
-              onClick={onAddPhotos}
-              className="px-4 py-2 rounded-lg text-[13px] text-white"
-              style={{ background: "color-mix(in oklch, white 18%, transparent)", border: "1px solid color-mix(in oklch, white 35%, transparent)" }}
-            >Add photos</button>
-          )}
-          <button
-            type="button"
-            onClick={removeCurrent}
-            className="px-4 py-2 rounded-lg text-[13px] text-white"
-            style={{ background: "color-mix(in oklch, white 12%, transparent)", border: "1px solid color-mix(in oklch, white 25%, transparent)" }}
-          >Remove this photo</button>
-          <button
-            type="button"
-            onClick={() => setConfirmRemoveAll(true)}
-            className="px-4 py-2 rounded-lg text-[13px] text-white"
-            style={{ background: "color-mix(in oklch, var(--destructive) 75%, transparent)", border: "1px solid color-mix(in oklch, white 20%, transparent)" }}
-          >Remove all photos</button>
-        </div>
-      </DialogContent>
-    </Dialog>
-    <ConfirmDeleteDialog
-      open={confirmRemoveAll}
-      onOpenChange={setConfirmRemoveAll}
-      title="Remove all inspiration photos?"
-      description={`This removes all ${photos.length} photo${photos.length === 1 ? "" : "s"} from this song. This can't be undone.`}
-      confirmLabel="Remove all"
-      onConfirm={() => { onRemoveAll(); onClose(); }}
-    />
-    </>
   );
 }
 
@@ -426,8 +309,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const photoInputRef = useRef<HTMLInputElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [soundOpen, setSoundOpen] = useState(false);
@@ -798,8 +680,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    const remaining = 3 - inspirationPhotos.length;
+    const remaining = MAX_INSPIRATION_ITEMS - inspirationPhotos.length;
     const toProcess = files.slice(0, Math.max(0, remaining));
+    if (files.length > toProcess.length) {
+      sonnerToast(`Only ${MAX_INSPIRATION_ITEMS} photos and links fit — added ${toProcess.length}.`);
+    }
     const vw = typeof window !== "undefined" ? window.innerWidth : 400;
     const containerW = Math.min(vw - 32, 600);
     for (let i = 0; i < toProcess.length; i++) {
@@ -849,15 +734,14 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
             type="button"
             onClick={() => {
               if (inspirationPhotos.length > 0) {
-                setLightboxIndex(0);
-                setLightboxOpen(true);
+                setGalleryOpen(true);
               } else {
                 setInspirationModalOpen(true);
               }
             }}
             className="btn-sculpt-cream inline-flex items-center justify-center rounded-lg h-9 w-9"
             aria-label={inspirationPhotos.length > 0 ? "View inspiration photos" : "Add inspiration photo"}
-            title={inspirationPhotos.length > 0 ? "View / manage inspiration photos" : "Add up to 3 inspiration photos"}
+            title={inspirationPhotos.length > 0 ? "View / manage inspiration" : `Add up to ${MAX_INSPIRATION_ITEMS} photos or song links`}
           >
             <ImageIcon className="h-4 w-4" />
           </button>
@@ -869,7 +753,7 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
       >
       <div className="relative">
         {/* Static inspiration photos — positioned behind header card */}
-        {inspirationPhotos.map((photo, i) => {
+        {inspirationPhotos.filter((p): p is InspirationPhoto => p.kind !== "link").slice(0, PHOTO_SLOTS.length).map((photo, i) => {
           const slots = isMobile ? PHOTO_SLOTS : isDesktop ? DESKTOP_PHOTO_SLOTS : TABLET_PHOTO_SLOTS;
           const slot = slots[slots.length - 1 - i] ?? slots[0];
           return (
@@ -895,14 +779,9 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           );
         })}
 
-        {/* Lightbox portal */}
-        {lightboxOpen && inspirationPhotos.length > 0 && (
-          <InspirationLightbox
-            photos={inspirationPhotos}
-            initialIndex={lightboxIndex}
-            onClose={() => setLightboxOpen(false)}
-            onRemove={(id) => { removeInspirationPhoto(id); if (inspirationPhotos.length <= 1) setLightboxOpen(false); }}
-            onRemoveAll={() => { inspirationPhotos.forEach((p) => removeInspirationPhoto(p.id)); setLightboxOpen(false); }}
+        {galleryOpen && (
+          <InspirationModal
+            onClose={() => setGalleryOpen(false)}
             onAddPhotos={() => photoInputRef.current?.click()}
           />
         )}
@@ -1321,6 +1200,11 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
           open={inspirationModalOpen}
           onClose={() => setInspirationModalOpen(false)}
           onUpload={() => photoInputRef.current?.click()}
+          onAddLink={(link) => {
+            addInspirationPhoto(link);
+            setInspirationModalOpen(false);
+            setGalleryOpen(true);
+          }}
         />
         <input
           ref={photoInputRef}

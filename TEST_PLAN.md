@@ -423,10 +423,13 @@ User wants to revert a mistake.
 Header **Undo/Redo** buttons (or **Ctrl/Cmd+Z** / **+Shift+Z** / **+Y**); falls through
 from the song store to the recordings store. Disabled when nothing to undo.
 
-**Add inspiration photos.** ☐
-User wants visual mood references.
-Header image button → upload up to 3 photos (converted to WebP); they float above the
-workspace; lightbox to navigate/remove. Save to persist.
+**Add inspiration photos and song links.** ☐
+User wants visual and musical mood references.
+Header image button → upload photos (converted to WebP) and/or paste a Spotify, Apple
+Music, YouTube or SoundCloud link; 5 items max across both. Photos (first 3) float above
+the workspace. Opens a blurred single-column modal: each link is the service's own visible
+player plus an "Open in …" button (new tab); remove one (with Undo) or all. Short links
+(spotify.link, on.soundcloud.com) are rejected. Save to persist.
 
 ---
 
