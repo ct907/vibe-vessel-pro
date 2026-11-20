@@ -9,6 +9,7 @@ import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/Sect
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 import { notifyStorageQuota } from "@/lib/storage-quota";
+import { MAX_INSPIRATION_ITEMS, parseStreamingUrl, type InspirationService } from "@/lib/inspiration";
 import { toast } from "sonner";
 
 // ---------- Types ----------
@@ -222,9 +223,36 @@ export interface BasketItem {
 
 export interface InspirationPhoto {
   id: string;
+  kind?: "image";
   dataUrl: string;
   x: number;
   y: number;
+}
+
+export interface InspirationLink {
+  id: string;
+  kind: "link";
+  service: InspirationService;
+  url: string;
+}
+
+// The store field and persisted JSON key keep the original "inspirationPhotos"
+// name so projects saved before links existed still load.
+export type InspirationItem = InspirationPhoto | InspirationLink;
+
+function sanitizeInspirationItems(raw: unknown): InspirationItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: InspirationItem[] = [];
+  for (const it of raw) {
+    if (!it || typeof it.id !== "string") continue;
+    if (it.kind === "link") {
+      const embed = typeof it.url === "string" ? parseStreamingUrl(it.url) : null;
+      if (embed) items.push({ id: it.id, kind: "link", service: embed.service, url: embed.url });
+    } else if (typeof it.dataUrl === "string") {
+      items.push(it);
+    }
+  }
+  return items.slice(0, MAX_INSPIRATION_ITEMS);
 }
 
 export interface SongState {
@@ -248,8 +276,8 @@ export interface SongState {
   /** When true, cross-tab delete confirmation dialogs are suppressed. */
   suppressCrossTabDeleteWarning: boolean;
   setSuppressCrossTabDeleteWarning: (v: boolean) => void;
-  inspirationPhotos: InspirationPhoto[];
-  addInspirationPhoto: (photo: InspirationPhoto) => void;
+  inspirationPhotos: InspirationItem[];
+  addInspirationPhoto: (photo: InspirationItem) => void;
   removeInspirationPhoto: (id: string) => void;
   moveInspirationPhoto: (id: string, x: number, y: number) => void;
 
@@ -414,7 +442,7 @@ export interface SerializedSong {
   progression: PatternBlock[];
   suppressCrossTabDeleteWarning?: boolean;
   sound?: SoundSettings;
-  inspirationPhotos?: InspirationPhoto[];
+  inspirationPhotos?: InspirationItem[];
   /** Background tint key (matches SECTION_COLOR_KEYS), or null/undefined for no tint. */
   appTint?: SectionColor | null;
   /** Background pattern and mask settings. */
@@ -1513,9 +1541,11 @@ export const useSongStore = create<SongState>((rawSet, get) => {
   suppressCrossTabDeleteWarning: false,
   setSuppressCrossTabDeleteWarning: (v) => set({ suppressCrossTabDeleteWarning: v }),
   inspirationPhotos: [],
-  addInspirationPhoto: (photo) => set((s) => ({ inspirationPhotos: [...s.inspirationPhotos, photo] })),
+  addInspirationPhoto: (photo) => set((s) => (
+    s.inspirationPhotos.length >= MAX_INSPIRATION_ITEMS ? s : { inspirationPhotos: [...s.inspirationPhotos, photo] }
+  )),
   removeInspirationPhoto: (id) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.filter((p) => p.id !== id) })),
-  moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id ? { ...p, x, y } : p) })),
+  moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id && p.kind !== "link" ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),
   setDescription: (description) => set((s) => ({ meta: { ...s.meta, description } })),
@@ -4099,7 +4129,7 @@ export const useSongStore = create<SongState>((rawSet, get) => {
       progression: migratedProgression,
       basket: [],
       suppressCrossTabDeleteWarning: !!parsed.suppressCrossTabDeleteWarning,
-      inspirationPhotos: Array.isArray(parsed.inspirationPhotos) ? parsed.inspirationPhotos : [],
+      inspirationPhotos: sanitizeInspirationItems(parsed.inspirationPhotos),
       // SSOT-first load: section.chords (reconstructed + repaired above) is
       // authoritative; rebuild line.chords + pattern.chords from it so stale or
       // duplicated mirror entries in the file can never resurface.
