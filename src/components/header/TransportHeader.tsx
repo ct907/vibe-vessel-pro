@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useSongStore, patternPlayBeats } from "@/store/song";
 import { InspirationModal, InspirationLinkField } from "@/components/header/InspirationModal";
-import { MAX_INSPIRATION_ITEMS } from "@/lib/inspiration";
+import { MAX_INSPIRATION_ITEMS, SERVICE_LABEL } from "@/lib/inspiration";
 import { useUIStore, type TabName, type AppMode } from "@/store/ui";
-import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationLink, type InspirationPhoto } from "@/store/song";
+import { downloadProjectJSON, downloadProjectZip, loadProjectFromFile, type InspirationLink } from "@/store/song";
 import {
   commitCurrentSongToRecents,
   listRecent,
@@ -132,6 +132,24 @@ const TABLET_PHOTO_SLOTS = [
   { left: "calc(30% + 340px)", top: -47, rotate: -3 },
 ] as const;
 
+// Used once there are more than 3 items. Percent-based so up to 5 tiles stay clear
+// of the wordmark and the menu button at every width.
+const COMPACT_PHOTO_SLOTS = [
+  { left: "26%", top: -48, rotate: -7 },
+  { left: "37%", top: -58, rotate: 5 },
+  { left: "48%", top: -47, rotate: -3 },
+  { left: "59%", top: -55, rotate: 6 },
+  { left: "70%", top: -45, rotate: -5 },
+] as const;
+
+const COMPACT_MOBILE_PHOTO_SLOTS = [
+  { left: "22%", top: -42, rotate: -7 },
+  { left: "32.5%", top: -50, rotate: 5 },
+  { left: "43%", top: -41, rotate: -3 },
+  { left: "53.5%", top: -48, rotate: 6 },
+  { left: "64%", top: -40, rotate: -5 },
+] as const;
+
 const GALLERY_URLS = [1, 2, 3, 4, 5].map(
   (n) => `https://www.gstatic.com/webp/gallery/${n}.webp`,
 );
@@ -162,7 +180,7 @@ function InspirationOnboardingModal({
           <DialogTitle>Inspiration photos</DialogTitle>
           <DialogDescription>
             Add up to {MAX_INSPIRATION_ITEMS} photos or song links to keep your creative
-            vision in focus. Photos float above your workspace while you write.
+            vision in focus. They appear as a collage above your workspace while you write.
           </DialogDescription>
         </DialogHeader>
 
@@ -752,29 +770,50 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
         style={isDesktop && !vvShort && vvOffsetTop > 0 ? { transform: `translateY(${vvOffsetTop}px)` } : undefined}
       >
       <div className="relative">
-        {/* Static inspiration photos — positioned behind header card */}
-        {inspirationPhotos.filter((p): p is InspirationPhoto => p.kind !== "link").slice(0, PHOTO_SLOTS.length).map((photo, i) => {
-          const slots = isMobile ? PHOTO_SLOTS : isDesktop ? DESKTOP_PHOTO_SLOTS : TABLET_PHOTO_SLOTS;
+        {/* Static inspiration collage (photos and song links) — positioned behind header card */}
+        {inspirationPhotos.map((item, i) => {
+          const compact = inspirationPhotos.length > 3;
+          const slots = compact
+            ? (isMobile ? COMPACT_MOBILE_PHOTO_SLOTS : COMPACT_PHOTO_SLOTS)
+            : isMobile ? PHOTO_SLOTS : isDesktop ? DESKTOP_PHOTO_SLOTS : TABLET_PHOTO_SLOTS;
           const slot = slots[slots.length - 1 - i] ?? slots[0];
-          return (
+          const size = compact && isMobile ? "min(64px, 16vw)" : "90px";
+          const tile = {
+            position: "absolute",
+            left: slot.left,
+            top: slot.top,
+            borderRadius: 8,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+            transform: `rotate(${slot.rotate}deg)`,
+            zIndex: 0,
+            pointerEvents: "none",
+            userSelect: "none",
+          } as const;
+          return item.kind === "link" ? (
+            <div
+              key={item.id}
+              aria-hidden="true"
+              className="flex flex-col gap-1 p-1.5"
+              style={{
+                ...tile,
+                width: size,
+                height: `calc(${size} * 0.78)`,
+                background: "var(--paper-card)",
+                border: "1px solid color-mix(in oklch, var(--ink) 12%, transparent)",
+              }}
+            >
+              <Music2 className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
+              <span className="text-[10px] font-semibold leading-[1.1]" style={{ color: "var(--ink)" }}>
+                {SERVICE_LABEL[item.service]}
+              </span>
+            </div>
+          ) : (
             <img
-              key={photo.id}
-              src={photo.dataUrl}
+              key={item.id}
+              src={item.dataUrl}
               alt=""
               draggable={false}
-              style={{
-                position: "absolute",
-                left: slot.left,
-                top: slot.top,
-                maxWidth: 90,
-                maxHeight: 90,
-                borderRadius: 8,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
-                transform: `rotate(${slot.rotate}deg)`,
-                zIndex: 0,
-                pointerEvents: "none",
-                userSelect: "none",
-              }}
+              style={{ ...tile, maxWidth: size, maxHeight: size }}
             />
           );
         })}

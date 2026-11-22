@@ -426,8 +426,10 @@ from the song store to the recordings store. Disabled when nothing to undo.
 **Add inspiration photos and song links.** ☐
 User wants visual and musical mood references.
 Header image button → upload photos (converted to WebP) and/or paste a Spotify, Apple
-Music, YouTube or SoundCloud link; 5 items max across both. Photos (first 3) float above
-the workspace. Opens a blurred single-column modal: each link is the service's own visible
+Music, YouTube or SoundCloud link; 5 items max across both. All items show as a tilted
+collage above the nav bar (links as a note-icon tile with the service name; check 4–5
+items at phone width — nothing should touch the wordmark or menu button). Opens a blurred
+single-column modal: each link is the service's own visible
 player plus an "Open in …" button (new tab); remove one (with Undo) or all. Short links
 (spotify.link, on.soundcloud.com) are rejected. Save to persist.
 
