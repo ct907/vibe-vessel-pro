@@ -9,7 +9,7 @@ import { SECTION_COLOR_KEYS, type SectionColor } from "@/components/section/Sect
 import { getDefaults } from "@/store/defaults";
 import { formatChordsAndLyrics } from "@/lib/music/chordLayout";
 import { notifyStorageQuota } from "@/lib/storage-quota";
-import { MAX_INSPIRATION_ITEMS, parseStreamingUrl, type InspirationService } from "@/lib/inspiration";
+import { MAX_INSPIRATION_ITEMS, MAX_INSPIRATION_LABEL, parseStreamingUrl, type InspirationService } from "@/lib/inspiration";
 import { toast } from "sonner";
 
 // ---------- Types ----------
@@ -234,6 +234,8 @@ export interface InspirationLink {
   kind: "link";
   service: InspirationService;
   url: string;
+  /** Title / artist typed by the user; never fetched from the service. */
+  label?: string;
 }
 
 // The store field and persisted JSON key keep the original "inspirationPhotos"
@@ -247,7 +249,8 @@ function sanitizeInspirationItems(raw: unknown): InspirationItem[] {
     if (!it || typeof it.id !== "string") continue;
     if (it.kind === "link") {
       const embed = typeof it.url === "string" ? parseStreamingUrl(it.url) : null;
-      if (embed) items.push({ id: it.id, kind: "link", service: embed.service, url: embed.url });
+      const label = typeof it.label === "string" ? it.label.trim().slice(0, MAX_INSPIRATION_LABEL) : "";
+      if (embed) items.push({ id: it.id, kind: "link", service: embed.service, url: embed.url, ...(label && { label }) });
     } else if (typeof it.dataUrl === "string") {
       items.push(it);
     }
@@ -279,6 +282,7 @@ export interface SongState {
   inspirationPhotos: InspirationItem[];
   addInspirationPhoto: (photo: InspirationItem) => void;
   removeInspirationPhoto: (id: string) => void;
+  setInspirationLabel: (id: string, label: string) => void;
   moveInspirationPhoto: (id: string, x: number, y: number) => void;
 
   // ---- meta ----
@@ -1545,6 +1549,14 @@ export const useSongStore = create<SongState>((rawSet, get) => {
     s.inspirationPhotos.length >= MAX_INSPIRATION_ITEMS ? s : { inspirationPhotos: [...s.inspirationPhotos, photo] }
   )),
   removeInspirationPhoto: (id) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.filter((p) => p.id !== id) })),
+  setInspirationLabel: (id, label) => set((s) => ({
+    inspirationPhotos: s.inspirationPhotos.map((p) => {
+      if (p.id !== id || p.kind !== "link") return p;
+      const { label: _old, ...rest } = p;
+      const next = label.trim().slice(0, MAX_INSPIRATION_LABEL);
+      return next ? { ...rest, label: next } : rest;
+    }),
+  })),
   moveInspirationPhoto: (id, x, y) => set((s) => ({ inspirationPhotos: s.inspirationPhotos.map((p) => p.id === id && p.kind !== "link" ? { ...p, x, y } : p) })),
 
   setTitle: (title) => set((s) => ({ meta: { ...s.meta, title } })),

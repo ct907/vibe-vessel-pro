@@ -1,4 +1,5 @@
 export const MAX_INSPIRATION_ITEMS = 5;
+export const MAX_INSPIRATION_LABEL = 60;
 
 export type InspirationService = "spotify" | "apple" | "youtube" | "soundcloud";
 

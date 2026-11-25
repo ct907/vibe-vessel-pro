@@ -164,6 +164,10 @@ describe("JamCanvas", () => {
     expect(play).toBeEnabled();
     fireEvent.click(play);
     expect(audio.playProgression).toHaveBeenCalledTimes(1);
+    // Two chords loop (play-and-repeat until Stop), not play-once.
+    const opts = vi.mocked(audio.playProgression).mock.calls[0][2];
+    expect(opts?.loopBeats).toBeGreaterThan(0);
+    expect(opts?.loopBeats).toBe(2 * vi.mocked(audio.playProgression).mock.calls[0][0][0].lengthBeats);
     expect(stop).toBeEnabled();
     fireEvent.click(stop);
     expect(audio.stopProgression).toHaveBeenCalled();

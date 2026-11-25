@@ -252,7 +252,7 @@ export function JamCanvas({ sectionId, targetLabel, onCommit, onClose, headerRef
     await playProgression(
       chordIdx.map((idx, n) => ({ chord: resolveAt(items[idx] as JamStep, idx), startBeat: n * chordLength, lengthBeats: chordLength })),
       meta.bpm,
-      { octave, onChordStart: (n) => setCursor(chordIdx[n]), onEnd: () => setPlaying(false) },
+      { octave, loopBeats: chordCount * chordLength, onChordStart: (n) => setCursor(chordIdx[n]), onEnd: () => setPlaying(false) },
     );
   };
 

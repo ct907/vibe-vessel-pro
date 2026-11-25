@@ -4,7 +4,7 @@ import { toast as sonnerToast } from "sonner";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ExternalLink, Image as ImageIcon, Trash2, X } from "lucide-react";
 import { useSongStore, type InspirationItem, type InspirationLink } from "@/store/song";
-import { MAX_INSPIRATION_ITEMS, SERVICE_LABEL, parseStreamingUrl } from "@/lib/inspiration";
+import { MAX_INSPIRATION_ITEMS, MAX_INSPIRATION_LABEL, SERVICE_LABEL, parseStreamingUrl } from "@/lib/inspiration";
 import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -68,6 +68,25 @@ export function InspirationLinkField({
   );
 }
 
+function LabelField({ link }: { link: InspirationLink }) {
+  const setLabel = useSongStore((s) => s.setInspirationLabel);
+  const [value, setValue] = useState(link.label ?? "");
+  return (
+    <div className="px-3 pt-3">
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => setLabel(link.id, value)}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        maxLength={MAX_INSPIRATION_LABEL}
+        placeholder="Title and artist (shown in the collage)"
+        aria-label={`Title and artist for this ${SERVICE_LABEL[link.service]} link`}
+        className="h-9"
+      />
+    </div>
+  );
+}
+
 function ItemCard({ item, onRemove }: { item: InspirationItem; onRemove: (item: InspirationItem) => void }) {
   const link = item.kind === "link" ? item : null;
   const embed = link ? parseStreamingUrl(link.url) : null;
@@ -76,6 +95,7 @@ function ItemCard({ item, onRemove }: { item: InspirationItem; onRemove: (item: 
       className="overflow-hidden rounded-xl"
       style={{ background: "var(--paper-card)", boxShadow: "var(--shadow-card)" }}
     >
+      {link && <LabelField link={link} />}
       {link && embed ? (
         <iframe
           title={`${SERVICE_LABEL[embed.service]} player`}
@@ -86,7 +106,7 @@ function ItemCard({ item, onRemove }: { item: InspirationItem; onRemove: (item: 
           allowFullScreen
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
-          className={embed.height ? "block w-full border-0" : "block aspect-video w-full border-0"}
+          className={embed.height ? "mt-3 block w-full border-0" : "mt-3 block aspect-video w-full border-0"}
         />
       ) : (
         item.kind !== "link" && (
