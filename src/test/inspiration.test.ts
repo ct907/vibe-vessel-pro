@@ -141,4 +141,33 @@ describe("inspiration items in the song store", () => {
     });
     expect(useSongStore.getState().inspirationPhotos).toHaveLength(MAX_INSPIRATION_ITEMS);
   });
+
+  it("stores a trimmed, length-capped label on links only, and clears it when emptied", () => {
+    const { addInspirationPhoto, setInspirationLabel } = useSongStore.getState();
+    addInspirationPhoto(link("l1"));
+    addInspirationPhoto(photo("p1"));
+    setInspirationLabel("l1", "  Dreams — Fleetwood Mac  ");
+    expect(useSongStore.getState().inspirationPhotos[0]).toMatchObject({ label: "Dreams — Fleetwood Mac" });
+    setInspirationLabel("l1", "x".repeat(200));
+    expect((useSongStore.getState().inspirationPhotos[0] as { label: string }).label).toHaveLength(60);
+    setInspirationLabel("p1", "nope");
+    expect(useSongStore.getState().inspirationPhotos[1]).not.toHaveProperty("label");
+    setInspirationLabel("l1", "   ");
+    expect(useSongStore.getState().inspirationPhotos[0]).not.toHaveProperty("label");
+  });
+
+  it("sanitises labels from imported files (non-strings dropped, long ones capped)", () => {
+    useSongStore.getState().loadFromJSON({
+      ...song,
+      inspirationPhotos: [
+        { ...link("a"), label: "Good Song, Great Artist" },
+        { ...link("b"), label: { evil: true } },
+        { ...link("c"), label: "y".repeat(500) },
+      ],
+    });
+    const items = useSongStore.getState().inspirationPhotos as Array<{ label?: string }>;
+    expect(items[0].label).toBe("Good Song, Great Artist");
+    expect(items[1]).not.toHaveProperty("label");
+    expect(items[2].label).toHaveLength(60);
+  });
 });

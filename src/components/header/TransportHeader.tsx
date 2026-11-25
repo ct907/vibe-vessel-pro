@@ -802,9 +802,16 @@ export function TransportHeader({ isPlaying, setIsPlaying, tab, setTab, onTabSel
                 border: "1px solid color-mix(in oklch, var(--ink) 12%, transparent)",
               }}
             >
-              <Music2 className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
-              <span className="text-[10px] font-semibold leading-[1.1]" style={{ color: "var(--ink)" }}>
-                {SERVICE_LABEL[item.service]}
+              <div className="flex items-center gap-1">
+                <Music2 className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--primary)" }} />
+                {item.label && (
+                  <span className="truncate text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--ink-soft)" }}>
+                    {SERVICE_LABEL[item.service]}
+                  </span>
+                )}
+              </div>
+              <span className="line-clamp-2 break-words text-[10px] font-semibold leading-[1.15]" style={{ color: "var(--ink)" }}>
+                {item.label || SERVICE_LABEL[item.service]}
               </span>
             </div>
           ) : (
